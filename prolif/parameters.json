@@ -1,0 +1,42 @@
+{
+  "HBond": {
+    "donor":    "[O,N,S][H]",
+    "acceptor": "[O,N,*-;!+]",
+    "distance": 3.6,
+    "angle":    [0,30]
+  },
+  "XBond": {
+    "donor":    "[C,N,Si,F,Cl,Br,I]-[F,Cl,Br,I]",
+    "acceptor": "[N,O,P,S,Se,*-;!+]",
+    "distance": 3.6,
+    "angle":    [0,30]
+  },
+  "ionic": {
+    "cation":   "[*+]",
+    "anion":    "[*-]",
+    "distance": 4.2
+  },
+  "aromatic": {
+    "smarts":     [
+                    "[a]1:[a]:[a]:[a]:[a]:1",
+                    "[a]1:[a]:[a]:[a]:[a]:[a]:1",
+                    "[a]1:[a]:[a]:[a]:[a]:[a]:[a]:1"
+                  ],
+    "distance":   4.2,
+    "FaceToFace": [0,45],
+    "EdgeToFace": [45,135]
+  },
+  "pi-cation": {
+    "distance": 4.2,
+    "angle":    [0,45]
+  },
+  "hydrophobic": {
+    "smarts":   "[C,S,F,Cl,Br,I]",
+    "distance": 3.6
+  },
+  "metallic": {
+    "metal":   "[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
+    "ligand":  "[O,N;!+]",
+    "distance": 3.0
+  }
+}
