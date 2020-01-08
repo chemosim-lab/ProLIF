@@ -2,6 +2,8 @@ import re, textwrap
 from rdkit import Chem
 from .logger import logger
 
+periodic_table = Chem.GetPeriodicTable()
+
 
 def get_resnumber(resname):
     pattern = re.search(r'(\d+)', resname)
