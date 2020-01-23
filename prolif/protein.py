@@ -1,66 +1,48 @@
 from rdkit import Chem
 from rdkit import Geometry as rdGeometry
-import os.path
-from .residue import Residue
-from .utils import mol2_reader
+from .trajectory import Trajectory
 from .logger import logger
 
-class Protein:
-    """Class for a protein"""
 
-    def __init__(self, inputFile, reference=None, cutoff=10.0, residueList=None):
-        """Initialization of the protein, defined by a list of residues"""
-        self.residueList = residueList
-        self.residues = {}
-        self.inputFile = inputFile
-        fileExtension = os.path.splitext(inputFile)[1]
-        if fileExtension.lower() == '.mol2':
-            logger.debug('Reading {}'.format(self.inputFile))
-            self.residuesFromMOL2File()
-        else:
-            raise ValueError('{} files are not supported for the protein.'.format(fileExtension[1:].upper()))
-        if not self.residueList:
-            logger.info('Detecting residues within {} Å of the reference molecule'.format(cutoff))
-            self.residueList = self.detectCloseResidues(reference, cutoff)
-        self.cleanResidues()
+class Protein(Trajectory):
+    """
+    The Protein class, which inherits from the `prolif.Trajectory` class.
+
+    """
+
+    def __init__(self, topology, coordinates, reference=None, cutoff=6.0, residues_list=[]):
+        super().__init__(topology, coordinates)
+        if not residues_list:
+            if reference:
+                logger.info('Detecting residues within {} Å of the reference molecule'.format(cutoff))
+                residues_list = self.detect_pocket_residues(reference, cutoff)
+            else:
+                logger.info('Considering all protein residues for calculations. This might take a while.')
+                residues_list = list(self.top.residues)
+        self.residues_list = residues_list
 
     def __repr__(self):
-        return self.inputFile
+        name = ".".join([self.__class__.__module__, self.__class__.__name__])
+        params = f"{self.n_frames} frame(s), {self.top.residues} residues, {self.GetNumAtoms()} atoms, {self.GetNumBonds()} bonds, {Chem.GetSSSR(self)} rings"
+        return f"<{name}: {params} at 0x{id(self):02x}>"
 
-    def residuesFromMOL2File(self):
-        """Read a MOL2 file and assign each line to an object of class Atom"""
-        # Create a list of molecule with RDKIT
-        residues_list = mol2_reader(self.inputFile, ignoreH=False)
-        # Loop through each RDKIT molecule and create a Residue
-        for mol in residues_list:
-            resname = mol.GetProp('resname')
-            self.residues[resname] = Residue(mol)
-        logger.debug('Read {} residues'.format(len(self.residues)))
-
-    def detectCloseResidues(self, reference, cutoff=5.0):
+    def detect_pocket_residues(self, reference, cutoff=6.0):
         """Detect residues close to a reference ligand"""
-        residueList = []
+        residues_list = []
+        frame = next(iter(self))
         for ref_point in reference.get_USRlike_atoms():
-            for residue in self.residues:
-                if self.residues[residue].centroid.Distance(ref_point) > 14:
+            for residue in frame:
+                if residue.centroid.Distance(ref_point) > 10:
                     # skip residues with centroid far from ligand reference point
                     continue
-                if self.residues[residue].resname in residueList:
+                if residue.resname in residues_list:
                     # skip residues already inside the list
                     continue
-                for atom in self.residues[residue].mol.GetConformer().GetPositions():
-                    res_point = rdGeometry.Point3D(*atom)
-                    dist = ref_point.Distance(res_point)
+                for atom_crd in residue.xyz:
+                    resid_point = rdGeometry.Point3D(*atom_crd)
+                    dist = ref_point.Distance(resid_point)
                     if dist <= cutoff:
-                        residueList.append(self.residues[residue].resname)
+                        residues_list.append(residue.resname)
                         break
-        logger.info('Detected {} residues'.format(len(residueList)))
-        return residueList
-
-    def cleanResidues(self):
-        """Cleans the residues of the protein to only keep those in self.residueList"""
-        residues = {}
-        for residue in self.residues:
-            if residue in self.residueList:
-                residues[residue] = self.residues[residue]
-        self.residues = residues
+        logger.info('Detected {} residues inside the binding pocket'.format(len(residues_list)))
+        return residues_list

@@ -6,7 +6,7 @@
     "angle":    [0,30]
   },
   "XBond": {
-    "donor":    "[C,N,Si,F,Cl,Br,I]-[F,Cl,Br,I]",
+    "donor":    "[#6,#7,Si,F,Cl,Br,I]-[F,Cl,Br,I]",
     "acceptor": "[N,O,P,S,Se,*-;!+]",
     "distance": 3.6,
     "angle":    [0,30]
@@ -20,7 +20,6 @@
     "smarts":     [
                     "[a]1:[a]:[a]:[a]:[a]:1",
                     "[a]1:[a]:[a]:[a]:[a]:[a]:1",
-                    "[a]1:[a]:[a]:[a]:[a]:[a]:[a]:1"
                   ],
     "distance":   4.2,
     "FaceToFace": [0,45],
@@ -31,7 +30,7 @@
     "angle":    [0,45]
   },
   "hydrophobic": {
-    "smarts":   "[C,S,F,Cl,Br,I]",
+    "smarts":   "[#6,S,F,Cl,Br,I]",
     "distance": 3.6
   },
   "metallic": {

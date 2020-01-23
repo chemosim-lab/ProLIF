@@ -1,8 +1,60 @@
 import re, textwrap
+import numpy as np
 from rdkit import Chem
 from .logger import logger
 
-periodic_table = Chem.GetPeriodicTable()
+PERIODIC_TABLE = Chem.GetPeriodicTable()
+BONDTYPE_TO_RDKIT = {
+    "AROMATIC": Chem.BondType.AROMATIC,
+    'SINGLE': Chem.BondType.SINGLE,
+    'DOUBLE': Chem.BondType.DOUBLE,
+    'TRIPLE': Chem.BondType.TRIPLE,
+}
+
+def update_bonds_and_charges(mol):
+    """mdtraj and pytraj don't keep information on bond order, and formal charges.
+    Since the given molecule should have all hydrogens added, we can infer
+    bond order and charges from the valence."""
+
+    for atom in mol.GetAtoms():
+        vtot = atom.GetTotalValence()
+        valences = PERIODIC_TABLE.GetValenceList(atom.GetAtomicNum())
+        electrons = [ v - vtot for v in valences ]
+        # if numbers in the electrons array are >0, the atom is missing bonds or
+        # formal charges. If it's <0, it has too many bonds and we must add the
+        # corresponding formal charge (we cannot break bonds present in the topology).
+
+        # if the only option is to add a positive charge
+        if (len(electrons)==1) and (electrons[0]<0):
+            charge = -electrons[0] # positive
+            atom.SetFormalCharge(charge)
+            mol.UpdatePropertyCache(strict=False)
+        else:
+            set_electrons = set(electrons)
+            neighbors = atom.GetNeighbors()
+            # check if neighbor can accept a double / triple bond
+            for i,na in enumerate(neighbors, start=1):
+                na_vtot = na.GetTotalValence()
+                na_valences = PERIODIC_TABLE.GetValenceList(na.GetAtomicNum())
+                na_electrons = [ v - na_vtot for v in na_valences ]
+                common_electrons = min(set_electrons.intersection(na_electrons), default=np.nan)
+                if common_electrons != 0:
+                    # if they have no valence need in common but it's the last option
+                    if common_electrons is np.nan:
+                        if i == len(neighbors): # if it's the last option available
+                            charge = -electrons[0] # negative
+                            atom.SetFormalCharge(charge)
+                            mol.UpdatePropertyCache(strict=False)
+                    # if they both need a supplementary bond
+                    else:
+                        bond = mol.GetBondBetweenAtoms(atom.GetIdx(), na.GetIdx())
+                        if common_electrons == 1:
+                            bond.SetBondType(Chem.BondType.DOUBLE)
+                        elif common_electrons == 2:
+                            bond.SetBondType(Chem.BondType.TRIPLE)
+                        mol.UpdatePropertyCache(strict=False)
+                        break # out of neighbors loop
+    Chem.SanitizeMol(mol)
 
 
 def get_resnumber(resname):
