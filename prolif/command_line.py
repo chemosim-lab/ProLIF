@@ -1,6 +1,13 @@
 import argparse, textwrap, os, sys
-from . import prolif
+import logging
+from rdkit import RDLogger
+from .ligand import Ligand
+from .protein import Protein
+from .fingerprint import Fingerprint
+from .utils import get_resnumber
 from .version import __version__
+
+logger = logging.getLogger("prolif")
 
 class Range:
     """Class to raise an exception if the value is not between start and end.
@@ -13,7 +20,7 @@ class Range:
     def __repr__(self):
         return '{} to {}'.format(self.start, self.end)
 
-def cli():
+def parse_args():
     jsonpath = os.path.join(os.path.dirname(__file__),'parameters.json')
     description = 'ProLIF: Protein Ligand Interaction Fingerprints\nGenerates Interaction FingerPrints (IFP) and a similarity score for protein-ligand interactions'
     epilog = 'Mandatory arguments: --reference --ligand --protein\nMOL2 files only.'
@@ -51,17 +58,18 @@ def cli():
         ['HBacceptor', 'Hydrogen bond', 'acceptor', 'donor'],
         ['XBdonor', 'Halogen bond', 'donor', 'acceptor'],
         ['XBacceptor', 'Halogen bond', 'acceptor', 'donor'],
-        ['cation', 'Ionic', 'cation', 'anion'],
-        ['anion', 'Ionic', 'anion', 'cation'],
-        ['hydrophobic', 'Hydrophobic', 'hydrophobic', 'hydrophobic'],
-        ['FaceToFace', 'Pi-stacking', 'aromatic', 'aromatic'],
-        ['EdgeToFace', 'Pi-stacking', 'aromatic', 'aromatic'],
-        ['pi-cation', 'Pi-cation', 'aromatic', 'cation'],
-        ['cation-pi', 'Pi-cation', 'cation', 'aromatic'],
-        ['MBdonor', 'Metal', 'metal', 'ligand'],
-        ['MBacceptor', 'Metal', 'ligand', 'metal'],
+        ['Cation', 'Ionic', 'cation', 'anion'],
+        ['Anion', 'Ionic', 'anion', 'cation'],
+        ['Hydrophobic', 'Hydrophobic', 'hydrophobic', 'hydrophobic'],
+        ['PiStacking', 'π-stacking', 'aromatic', 'aromatic'],
+        ['FaceToFace', 'π-stacking', 'aromatic', 'aromatic'],
+        ['EdgeToFace', 'π-stacking', 'aromatic', 'aromatic'],
+        ['Pi-Cation', 'Cation-π', 'aromatic', 'cation'],
+        ['Cation-Pi', 'Cation-π', 'cation', 'aromatic'],
+        ['MBdonor', 'Metallic', 'metal', 'ligand'],
+        ['MBacceptor', 'Metallic', 'ligand', 'metal'],
     ]
-    defaults = ['HBdonor','HBacceptor','cation','anion','FaceToFace','EdgeToFace','hydrophobic']
+    defaults = ['HBdonor','HBacceptor','Cation','Anion','PiStacking','Hydrophobic']
     table_as_str = '\n'.join(['{:>13} │{:>15}{:>15}{:>15}'.format(*line) for line in table])
     group_args.add_argument("--interactions", metavar="bit", nargs='+',
         choices=[line[0] for line in table[2:]],
@@ -83,4 +91,71 @@ def cli():
     # Parse arguments from command line
     args = parser.parse_args()
 
-    prolif.main(args)
+    return args
+
+def main():
+    # parse command line arguments
+    args = parse_args()
+
+    # set logger level
+    lg = RDLogger.logger()
+    if args.log == 'CRITICAL':
+        lg.setLevel(RDLogger.CRITICAL)
+        logger.setLevel(logging.CRITICAL)
+    elif args.log == 'ERROR':
+        lg.setLevel(RDLogger.ERROR)
+        logger.setLevel(logging.ERROR)
+    elif args.log == 'WARNING':
+        lg.setLevel(RDLogger.WARNING)
+        logger.setLevel(logging.WARNING)
+    elif args.log == 'INFO':
+        lg.setLevel(RDLogger.INFO)
+        logger.setLevel(logging.INFO)
+    elif args.log == 'DEBUG':
+        lg.setLevel(RDLogger.DEBUG)
+        logger.setLevel(logging.DEBUG)
+    logger.info('Using {} to compute similarity between fingerprints'.format(args.score))
+    # Read files
+    fingerprint = Fingerprint(args.json, args.interactions)
+    reference   = Ligand(args.reference)
+    protein     = Protein(args.protein, reference, cutoff=args.cutoff, residueList=args.residues)
+    residues    = [protein.residues[residue] for residue in sorted(protein.residues, key=get_resnumber)]
+    # Print residues on terminal:
+    bitstr_length  = len(args.interactions)
+    print(''.join('{resname: <{bitstr_length}s}'.format(
+        resname=residue.resname, bitstr_length=bitstr_length
+        ) for residue in residues))
+    # Generate the IFP between the reference ligand and the protein
+    fingerprint.generate_ifp(reference, protein)
+    ifp_list = [reference.IFP[i:i+bitstr_length] for i in range(0, len(reference.IFP), bitstr_length)]
+    print(''.join('{ifp: <{size}s}'.format(
+        ifp=ifp_list[i], size=len(residues[i].resname)
+        ) for i in range(len(ifp_list))), reference.inputFile)
+
+    # Loop over ligands:
+    ligandList = []
+    for lig in args.ligand:
+        ligand = Ligand(lig)
+        # Generate the IFP between a ligand and the protein
+        fingerprint.generate_ifp(ligand, protein)
+        # Calculate similarity
+        score = ligand.getSimilarity(reference, args.score, args.alpha, args.beta)
+        ligand.setSimilarity(score)
+        ifp_list = [ligand.IFP[i:i+bitstr_length] for i in range(0, len(ligand.IFP), bitstr_length)]
+        print(''.join('{ifp: <{size}s}'.format(ifp=ifp_list[i], size=len(residues[i].resname)) for i in range(len(ifp_list)) ),
+              '{:.3f}'.format(ligand.score), ligand.inputFile)
+        ligandList.append(ligand)
+
+    # Output
+    if args.output:
+        logger.info('Writing CSV formatted output to ' + args.output)
+        with open(args.output, 'w') as f:
+            f.write('File,SimilarityScore')
+            for residue in residues:
+                f.write(',{}'.format(protein.residues[residue].resname))
+            f.write('\n')
+            CSIFP = ','.join(reference.IFP[i:i+bitstr_length] for i in range(0, len(reference.IFP), bitstr_length))
+            f.write('{},,{}\n'.format(args.reference, CSIFP))
+            for ligand in ligandList:
+                CSIFP = ','.join(ligand.IFP[i:i+bitstr_length] for i in range(0, len(ligand.IFP), bitstr_length))
+                f.write('{},{:.3f},{}\n'.format(ligand.inputFile, ligand.score, CSIFP))

@@ -1,7 +1,9 @@
 import copy
+import numpy as np
 from rdkit import Chem
 from .topology import Topology
 from .frame import Frame
+
 
 class Trajectory(Chem.Mol):
     """
@@ -29,6 +31,11 @@ class Trajectory(Chem.Mol):
         self.n_frame += 1
         return frame
 
+    def get_frame(self, frame=0):
+        """Returns a particular frame from the trajectory"""
+        xyz = self.coordinates[frame]
+        return Frame(self.top, xyz, n_frame=frame)
+
     @classmethod
     def from_pytraj(cls, traj):
         """Create a trajectory from a pytraj `Trajectory`"""
@@ -41,6 +48,14 @@ class Trajectory(Chem.Mol):
         """Create a trajectory from a mdtraj `Trajectory`"""
         topology = Topology.from_mdtraj(traj.topology)
         coordinates = 10*traj.xyz.astype(float)
+        return cls(topology, coordinates)
+
+    @classmethod
+    def from_rdkit(cls, mol):
+        """Create a trajectory from a RDKit `Chem.Mol`"""
+        topology = Topology.from_rdkit(mol)
+        topology.RemoveAllConformers()
+        coordinates = np.array([conf.GetPositions() for conf in mol.GetConformers()])
         return cls(topology, coordinates)
 
     def __repr__(self):

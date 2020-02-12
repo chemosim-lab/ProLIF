@@ -1,8 +1,9 @@
-import re
+import re, copy
 from rdkit import Chem
 from .chemistry import Atom, Bond
 from .residue import Residues
 from .utils import update_bonds_and_charges
+
 
 class Topology(Chem.Mol):
     """
@@ -13,7 +14,8 @@ class Topology(Chem.Mol):
     packages such as mdtraj and pytraj.
     """
 
-    def __init__(self, atoms, bonds, residues_list=[]):
+    def __init__(self, atoms, bonds):
+        residues_list = []
         # RDKit editable molecule
         mol = Chem.RWMol()
         # add atoms to the molecule
@@ -23,13 +25,14 @@ class Topology(Chem.Mol):
             # add atom to molecule
             mol.AddAtom(a)
             # update residues list
-            if atom.resname not in residues_list:
-                residues_list.append(atom.resname)
+            if atom.residue not in residues_list:
+                residues_list.append(atom.residue)
         residues_list.sort(key=lambda x: int(re.findall(r'\d+', x)[0]))
         # add bonds
         for bond in bonds:
             mol.AddBond(*bond.indices, bond.bond_type)
         mol.UpdatePropertyCache(strict=False)
+        # update bondtype and charges
         update_bonds_and_charges(mol)
         super().__init__(mol)
         self.residues_list = residues_list
@@ -52,9 +55,26 @@ class Topology(Chem.Mol):
     @classmethod
     def from_rdkit(cls, mol):
         """Create a topology from a RDKit `Chem.Mol`"""
-        return mol
+        topology = copy.deepcopy(mol)
+        residues_list = []
+        for atom in topology.GetAtoms():
+            mi = atom.GetMonomerInfo()
+            if mi:
+                resname = "%s%d" % (t.GetResidueName(), t.GetResidueNumber())
+            else:
+                mi = Chem.AtomPDBResidueInfo()
+                mi.SetResidueName("UNL")
+                mi.SetResidueNumber(0)
+                atom.SetMonomerInfo(mi)
+                resname = "UNL0"
+                atom.SetProp("residue_name", resname)
+            if resname not in residues_list:
+                residues_list.append(resname)
+        topology.residues_list = residues_list
+        topology.residues = Residues(topology)
+        return topology
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{self.residues} residues, {self.GetNumAtoms()} atoms, {self.GetNumBonds()} bonds, {Chem.GetSSSR(self)} rings"
+        params = f"{len(self.residues_list)} residues, {self.GetNumAtoms()} atoms, {self.GetNumBonds()} bonds, {Chem.GetSSSR(self)} rings"
         return f"<{name}: {params} at 0x{id(self):02x}>"

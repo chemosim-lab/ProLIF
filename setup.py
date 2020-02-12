@@ -36,7 +36,7 @@ setup(
     keywords='science chemistry biology drug-design chemoinformatics virtual-screening',
     packages=['prolif'],
     entry_points = {
-        'console_scripts': ['prolif=prolif.command_line:cli'],
+        'console_scripts': ['prolif=prolif.command_line:main'],
     },
     python_requires='>=3',
     install_requires=['numpy>=1.13.3'],
@@ -44,14 +44,13 @@ setup(
     #    'test': ['coveralls','coverage'],
     #},
     dependency_links=['git+https://github.com/rdkit/rdkit'],
-    #test_suite="tests",
+    test_suite="tests",
     package_data={
-        'prolif':   ['parameters.json'],
-        'examples': ['protein.mol2', 'ligand.mol2'],
+        'tests': ['*.mol2'],
     },
     include_package_data=True,
     project_urls={
-        'Bug Reports':  'https://github.com/cbouy/ProLIF/issues',
+        'Bug Reports':  'https://github.com/chemosim-lab/ProLIF/issues',
         'Say Thanks!':  'https://saythanks.io/to/cbouy',
     },
     zip_safe=False,

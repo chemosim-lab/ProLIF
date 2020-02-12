@@ -1,402 +1,317 @@
-import json
+import logging
 from os import path
+from math import radians
 from rdkit import Chem, DataStructs
 from rdkit import Geometry as rdGeometry
-from math import degrees
-from .logger import logger
-from .utils import (get_resnumber,
-                    getCentroid,
-                    isinAngleLimits,
-                    getNormalVector)
+from .parameters import RULES
+from .utils import (
+    angle_between_limits,
+    get_resnumber,
+    get_centroid,
+    get_ring_normal_vector)
 
-class Fingerprint:
+logger = logging.getLogger("prolif")
+
+class FingerprintFactory:
     """Class that generates an interaction fingerprint between a protein and a ligand"""
 
-    def __init__(self,
-        json_file=path.join(path.dirname(__file__),'parameters.json'),
-        interactions=['HBdonor','HBacceptor','cation','anion','FaceToFace','EdgeToFace','hydrophobic']):
-        # read parameters from json file
-        with open(json_file) as data_file:
-            logger.debug('Reading JSON parameters file from {}'.format(json_file))
-            self.prm = json.load(data_file)
-        # create aromatic patterns from json file
-        self.AROMATIC_PATTERNS = [ Chem.MolFromSmarts(smart) for smart in self.prm["aromatic"]["smarts"]]
+    def __init__(self, rules=None,
+        interactions=['HBdonor','HBacceptor','Cation','Anion','PiStacking','Hydrophobic']):
+        # read parameters
+        if rules:
+            logger.debug("Using supplied geometric rules")
+            self.rules = rules
+        else:
+            _path = path.join(path.dirname(__file__), 'parameters.py')
+            logger.debug(f"Using default geometric rules from {_path}")
+            self.rules = RULES
+        # convert angles from degrees to radian
+        for i in range(2):
+            for key in ["HBond", "XBond", "Cation-Pi"]:
+                self.rules[key]["angle"][i] = radians(self.rules[key]["angle"][i])
+            for key in ["FaceToFace", "EdgeToFace"]:
+                self.rules["Aromatic"][key]["angle"][i] = radians(self.rules["Aromatic"][key]["angle"][i])
+        # create SMARTS
+        self.SMARTS = {
+            "Aromatic": [Chem.MolFromSmarts(s) for s in self.rules["Aromatic"]["smarts"]],
+            "Hydrophobic": Chem.MolFromSmarts(self.rules["Hydrophobic"]["smarts"]),
+            "HBdonor": Chem.MolFromSmarts(self.rules["HBond"]["donor"]),
+            "HBacceptor": Chem.MolFromSmarts(self.rules["HBond"]["acceptor"]),
+            "XBdonor": Chem.MolFromSmarts(self.rules["XBond"]["donor"]),
+            "XBacceptor": Chem.MolFromSmarts(self.rules["XBond"]["acceptor"]),
+            "Cation": Chem.MolFromSmarts(self.rules["Ionic"]["cation"]),
+            "Anion": Chem.MolFromSmarts(self.rules["Ionic"]["anion"]),
+            "Metal": Chem.MolFromSmarts(self.rules["Metallic"]["metal"]),
+            "Ligand": Chem.MolFromSmarts(self.rules["Metallic"]["ligand"]),
+        }
         # read interactions to compute
         self.interactions = interactions
-        logger.info('Built fingerprint generator using the following bitstring: {}'.format(' '.join(self.interactions)))
-
+        logger.info('The fingerprint factory will generate the following bitstring: {}'.format(' '.join(self.interactions)))
 
     def __repr__(self):
-        return ' '.join(self.interactions)
+        name = ".".join([self.__class__.__module__, self.__class__.__name__])
+        params = f"{len(self.interactions)} interactions"
+        return f"<{name}: {params} at 0x{id(self):02x}>"
 
-
-    def hasHydrophobic(self, ligand, residue):
+    def get_hydrophobic(self, ligand, residue):
         """Get the presence or absence of an hydrophobic interaction between
-        a residue and a ligand"""
+        a ResidueFrame and a ligand Frame"""
         # define SMARTS query as hydrophobic
-        hydrophobic = Chem.MolFromSmarts(self.prm["hydrophobic"]["smarts"])
+        hydrophobic = self.SMARTS["Hydrophobic"]
         # get atom tuples matching query
-        lig_matches = ligand.mol.GetSubstructMatches(hydrophobic)
-        res_matches = residue.mol.GetSubstructMatches(hydrophobic)
+        lig_matches = ligand.GetSubstructMatches(hydrophobic)
+        res_matches = residue.GetSubstructMatches(hydrophobic)
         if lig_matches and res_matches:
             for lig_match in lig_matches:
                 # define ligand atom matching query as 3d point
-                lig_atom = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
+                lig_atom = rdGeometry.Point3D(*ligand.xyz[lig_match[0]])
                 for res_match in res_matches:
                     # define residue atom matching query as 3d point
-                    res_atom = rdGeometry.Point3D(*residue.coordinates[res_match[0]])
+                    res_atom = rdGeometry.Point3D(*residue.xyz[res_match[0]])
                     # compute distance between points
                     dist = lig_atom.Distance(res_atom)
-                    if dist <= self.prm["hydrophobic"]["distance"]:
+                    if dist <= self.rules["Hydrophobic"]["distance"]:
                         return 1
         return 0
 
-
-    def hasHBdonor(self, ligand, residue):
+    def get_hbond_donor(self, ligand, residue):
         """Get the presence or absence of a H-bond interaction between
         a residue as an acceptor and a ligand as a donor"""
-        # define hbond donor and acceptor smarts queries
-        donor    = Chem.MolFromSmarts(self.prm["HBond"]["donor"])
-        acceptor = Chem.MolFromSmarts(self.prm["HBond"]["acceptor"])
-        # get atom tuples matching queries
-        lig_matches = ligand.mol.GetSubstructMatches(donor)
-        res_matches = residue.mol.GetSubstructMatches(acceptor)
-        if lig_matches and res_matches:
-            for lig_match in lig_matches:
-                # D-H ... A
-                d = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
-                h = rdGeometry.Point3D(*ligand.coordinates[lig_match[1]])
-                for res_match in res_matches:
-                    a = rdGeometry.Point3D(*residue.coordinates[res_match[0]])
-                    dist = d.Distance(a)
-                    if dist <= self.prm["HBond"]["distance"]:
-                        # define vector between H and D, and H and A
-                        hd = h.DirectionVector(d)
-                        ha = h.DirectionVector(a)
-                        # get angle between hd and ha in degrees
-                        angle = degrees(hd.AngleTo(ha))
-                        if isinAngleLimits(angle, *self.prm["HBond"]["angle"]):
-                            return 1
-        return 0
+        return self._get_hbond(residue, ligand)
 
-
-    def hasHBacceptor(self, ligand, residue):
+    def get_hbond_acceptor(self, ligand, residue):
         """Get the presence or absence of a H-bond interaction between
         a residue as a donor and a ligand as an acceptor"""
-        donor    = Chem.MolFromSmarts(self.prm["HBond"]["donor"])
-        acceptor = Chem.MolFromSmarts(self.prm["HBond"]["acceptor"])
-        lig_matches = ligand.mol.GetSubstructMatches(acceptor)
-        res_matches = residue.mol.GetSubstructMatches(donor)
-        if lig_matches and res_matches:
-            for res_match in res_matches:
+        return self._get_hbond(ligand, residue)
+
+    def _get_hbond(self, acceptor_frame, donor_frame):
+        """Get the presence or absence of a Hydrogen Bond between two frames"""
+        donor = self.SMARTS["HBdonor"]
+        acceptor = self.SMARTS["HBacceptor"]
+        acceptor_matches = acceptor_frame.GetSubstructMatches(acceptor)
+        donor_matches = donor_frame.GetSubstructMatches(donor)
+        if acceptor_matches and donor_matches:
+            for donor_match in donor_matches:
                 # D-H ... A
-                d = rdGeometry.Point3D(*residue.coordinates[res_match[0]])
-                h = rdGeometry.Point3D(*residue.coordinates[res_match[1]])
-                for lig_match in lig_matches:
-                    a = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
-                    dist = d.Distance(a)
-                    if dist <= self.prm["HBond"]["distance"]:
-                        hd = h.DirectionVector(d)
+                d = rdGeometry.Point3D(*donor_frame.xyz[donor_match[0]])
+                h = rdGeometry.Point3D(*donor_frame.xyz[donor_match[1]])
+                for acceptor_match in acceptor_matches:
+                    a = rdGeometry.Point3D(*acceptor_frame.xyz[acceptor_match[0]])
+                    dist = h.Distance(a)
+                    if dist <= self.rules["HBond"]["distance"]:
+                        dh = d.DirectionVector(h)
                         ha = h.DirectionVector(a)
-                        # get angle between hd and ha in degrees
-                        angle = degrees(hd.AngleTo(ha))
-                        if isinAngleLimits(angle, *self.prm["HBond"]["angle"]):
+                        # get angle between hd and ha
+                        angle = dh.AngleTo(ha)
+                        if angle_between_limits(angle, *self.rules["HBond"]["angle"]):
                             return 1
         return 0
 
-
-    def hasXBdonor(self, ligand, residue):
+    def get_xbond_donor(self, ligand, residue):
         """Get the presence or absence of a Halogen Bond where the ligand acts as
         a donor"""
-        donor    = Chem.MolFromSmarts(self.prm["XBond"]["donor"])
-        acceptor = Chem.MolFromSmarts(self.prm["XBond"]["acceptor"])
-        lig_matches = ligand.mol.GetSubstructMatches(donor)
-        res_matches = residue.mol.GetSubstructMatches(acceptor)
-        if lig_matches and res_matches:
-            for lig_match in lig_matches:
-                # D-X ... A
-                d = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
-                x = rdGeometry.Point3D(*ligand.coordinates[lig_match[1]])
-                for res_match in res_matches:
-                    a = rdGeometry.Point3D(*residue.coordinates[res_match[0]])
-                    dist = d.Distance(a)
-                    if dist <= self.prm["XBond"]["distance"]:
-                        xd = x.DirectionVector(d)
-                        xa = x.DirectionVector(a)
-                        # get angle between hd and ha in degrees
-                        angle = degrees(xd.AngleTo(xa))
-                        if isinAngleLimits(angle, *self.prm["XBond"]["angle"]):
-                            return 1
-        return 0
+        return self._get_xbond(residue, ligand)
 
-
-    def hasXBacceptor(self, ligand, residue):
+    def get_xbond_acceptor(self, ligand, residue):
         """Get the presence or absence of a Halogen Bond where the residue acts as
         a donor"""
-        donor    = Chem.MolFromSmarts(self.prm["XBond"]["donor"])
-        acceptor = Chem.MolFromSmarts(self.prm["XBond"]["acceptor"])
-        lig_matches = ligand.mol.GetSubstructMatches(acceptor)
-        res_matches = residue.mol.GetSubstructMatches(donor)
-        if lig_matches and res_matches:
-            for res_match in res_matches:
+        return self._get_xbond(ligand, residue)
+
+    def _get_xbond(self, acceptor_frame, donor_frame):
+        """Get the presence or absence of a Halogen Bond between two frames"""
+        donor = self.SMARTS["XBdonor"]
+        acceptor = self.SMARTS["XBacceptor"]
+        acceptor_matches = acceptor_frame.GetSubstructMatches(acceptor)
+        donor_matches = donor_frame.GetSubstructMatches(donor)
+        if acceptor_matches and donor_matches:
+            for donor_match in donor_matches:
                 # D-X ... A
-                d = rdGeometry.Point3D(*residue.coordinates[res_match[0]])
-                x = rdGeometry.Point3D(*residue.coordinates[res_match[1]])
-                for lig_match in lig_matches:
-                    a = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
-                    dist = d.Distance(a)
-                    if dist <= self.prm["XBond"]["distance"]:
-                        xd = x.DirectionVector(d)
+                d = rdGeometry.Point3D(*donor_frame.xyz[donor_match[0]])
+                x = rdGeometry.Point3D(*donor_frame.xyz[donor_match[1]])
+                for acceptor_match in acceptor_matches:
+                    a = rdGeometry.Point3D(*acceptor_frame.xyz[acceptor_match[0]])
+                    dist = x.Distance(a)
+                    if dist <= self.rules["XBond"]["distance"]:
+                        dx = d.DirectionVector(x)
                         xa = x.DirectionVector(a)
-                        # get angle between hd and ha in degrees
-                        angle = degrees(xd.AngleTo(xa))
-                        if isinAngleLimits(angle, *self.prm["XBond"]["angle"]):
+                        # get angle between hd and ha
+                        angle = dx.AngleTo(xa)
+                        if angle_between_limits(angle, *self.rules["XBond"]["angle"]):
                             return 1
         return 0
 
-
-    def hasCationic(self, ligand, residue):
+    def get_cationic(self, ligand, residue):
         """Get the presence or absence of an ionic interaction between a residue
         as an anion and a ligand as a cation"""
-        cation = Chem.MolFromSmarts(self.prm["ionic"]["cation"])
-        anion  = Chem.MolFromSmarts(self.prm["ionic"]["anion"])
-        lig_matches = ligand.mol.GetSubstructMatches(cation)
-        res_matches = residue.mol.GetSubstructMatches(anion)
-        if lig_matches and res_matches:
-            for lig_match in lig_matches:
-                c = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
-                for res_match in res_matches:
-                    a = rdGeometry.Point3D(*residue.coordinates[res_match[0]])
-                    dist = c.Distance(a)
-                    if dist <= self.prm["ionic"]["distance"]:
-                        return 1
-        return 0
+        return self._get_ionic(ligand, residue)
 
-
-    def hasAnionic(self, ligand, residue):
+    def get_anionic(self, ligand, residue):
         """Get the presence or absence of an ionic interaction between a residue
         as a cation and a ligand as an anion"""
-        cation = Chem.MolFromSmarts(self.prm["ionic"]["cation"])
-        anion  = Chem.MolFromSmarts(self.prm["ionic"]["anion"])
-        lig_matches = ligand.mol.GetSubstructMatches(anion)
-        res_matches = residue.mol.GetSubstructMatches(cation)
-        if lig_matches and res_matches:
-            for lig_match in lig_matches:
-                a = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
-                for res_match in res_matches:
-                    c = rdGeometry.Point3D(*residue.coordinates[lig_match[0]])
+        return self._get_ionic(residue, ligand)
+
+    def _get_ionic(self, cation_frame, anion_frame):
+        """Get the presence or absence of an ionic interaction between two frames"""
+        cation = self.SMARTS["Cation"]
+        anion  = self.SMARTS["Anion"]
+        anion_matches = anion_frame.GetSubstructMatches(anion)
+        cation_matches = cation_frame.GetSubstructMatches(cation)
+        if anion_matches and cation_matches:
+            for anion_match in anion_matches:
+                a = rdGeometry.Point3D(*anion_frame.xyz[anion_match[0]])
+                for cation_match in cation_matches:
+                    c = rdGeometry.Point3D(*cation_frame.xyz[cation_match[0]])
                     dist = a.Distance(c)
-                    if dist <= self.prm["ionic"]["distance"]:
+                    if dist <= self.rules["Ionic"]["distance"]:
                         return 1
         return 0
 
-
-    def hasPiCation(self, ligand, residue):
+    def get_pi_cation(self, ligand, residue):
         """Get the presence or absence of an interaction between a residue as
         a cation and a ligand as a pi system"""
-        # check for residues matching cation smarts query
-        cation = Chem.MolFromSmarts(self.prm["ionic"]["cation"])
-        res_matches = residue.mol.GetSubstructMatches(cation)
-        if res_matches:
-            # check for ligand matching pi query
-            for pi in self.AROMATIC_PATTERNS:
-                lig_matches = ligand.mol.GetSubstructMatches(pi)
-                for res_match in res_matches:
-                    # cation as 3d point
-                    cat = rdGeometry.Point3D(*residue.coordinates[res_match[0]])
-                    for lig_match in lig_matches:
-                        # get coordinates of atoms matching pi-system
-                        pi_coords = ligand.coordinates[list(lig_match)]
-                        # centroid of pi-system as 3d point
-                        centroid  = rdGeometry.Point3D(*getCentroid(pi_coords))
-                        # distance between cation and centroid
-                        dist = cat.Distance(centroid)
-                        if dist <= self.prm["pi-cation"]["distance"]:
-                            # compute angle between centroid-normal and centroid-cation vectors
-                            # get vector in the ring plane
-                            atom_plane = rdGeometry.Point3D(*pi_coords[0])
-                            centroid_plane = centroid.DirectionVector(atom_plane)
-                            # vector normal to the ring plane
-                            centroid_normal = rdGeometry.Point3D(*getNormalVector(centroid_plane))
-                            # vector between the centroid and the charge
-                            centroid_charge = centroid.DirectionVector(cat)
-                            angle = degrees(centroid_normal.AngleTo(centroid_charge))
-                            if isinAngleLimits(angle, *self.prm["pi-cation"]["angle"]):
-                                return 1
-        return 0
+        return self._get_cation_pi(residue, ligand)
 
-
-    def hasCationPi(self, ligand, residue):
+    def get_cation_pi(self, ligand, residue):
         """Get the presence or absence of an interaction between a residue as a
         pi system and a ligand as a cation"""
-        # check for ligand matching cation smarts query
-        cation = Chem.MolFromSmarts(self.prm["ionic"]["cation"])
-        lig_matches = ligand.mol.GetSubstructMatches(cation)
-        if lig_matches:
-            # check for residue matching pi query
-            for pi in self.AROMATIC_PATTERNS:
-                res_matches = residue.mol.GetSubstructMatches(pi)
-                for lig_match in lig_matches:
-                    cat = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
-                    for res_match in res_matches:
+        return self._get_cation_pi(ligand, residue)
+
+    def _get_cation_pi(self, cation_frame, pi_frame):
+        """Get the presence or absence of a cation-pi interaction between two frames"""
+        # check for matches with cation smarts query
+        cation = self.SMARTS["Cation"]
+        cation_matches = cation_frame.GetSubstructMatches(cation)
+        for pi in self.SMARTS["Aromatic"]:
+            pi_matches = pi_frame.GetSubstructMatches(pi)
+            if cation_matches and pi_matches:
+                for cation_match in cation_matches:
+                    cat = rdGeometry.Point3D(*cation_frame.xyz[cation_match[0]])
+                    for pi_match in pi_matches:
                         # get coordinates of atoms matching pi-system
-                        pi_coords = residue.coordinates[list(res_match)]
+                        pi_coords = pi_frame.xyz[list(pi_match)]
                         # centroid of pi-system as 3d point
-                        centroid  = rdGeometry.Point3D(*getCentroid(pi_coords))
+                        centroid  = rdGeometry.Point3D(*get_centroid(pi_coords))
                         # distance between cation and centroid
                         dist = cat.Distance(centroid)
-                        if dist <= self.prm["pi-cation"]["distance"]:
-                            # compute angle between centroid-normal and centroid-cation vectors
-                            # get vector in the ring plane
-                            atom_plane = rdGeometry.Point3D(*pi_coords[0])
-                            centroid_plane = centroid.DirectionVector(atom_plane)
-                            # vector normal to the ring plane
-                            centroid_normal = rdGeometry.Point3D(*getNormalVector(centroid_plane))
+                        if dist <= self.rules["Cation-Pi"]["distance"]:
+                            # vector normal to ring plane
+                            normal = get_ring_normal_vector(centroid, pi_coords)
                             # vector between the centroid and the charge
-                            centroid_charge = centroid.DirectionVector(cat)
-                            angle = degrees(centroid_normal.AngleTo(centroid_charge))
-                            if isinAngleLimits(angle, *self.prm["pi-cation"]["angle"]):
+                            centroid_cation = centroid.DirectionVector(cat)
+                            # compute angle between normal to ring plane and centroid-cation
+                            angle = normal.AngleTo(centroid_cation)
+                            if angle_between_limits(angle, *self.rules["Cation-Pi"]["angle"], ring=True):
                                 return 1
         return 0
 
+    def get_pi_stacking(self, ligand, residue):
+        """Get the presence of any kind of pi-stacking interaction"""
+        return self.get_face_to_face(ligand, residue) or self.get_edge_to_face(ligand, residue)
 
-    def hasFaceToFace(self, ligand, residue):
+    def get_face_to_face(self, ligand, residue):
         """Get the presence or absence of an aromatic face to face interaction
         between a residue and a ligand"""
-        for pi_res in self.AROMATIC_PATTERNS:
-            for pi_lig in self.AROMATIC_PATTERNS:
-                res_matches = residue.mol.GetSubstructMatches(pi_res)
-                lig_matches = ligand.mol.GetSubstructMatches(pi_lig)
-                for lig_match in lig_matches:
-                    lig_pi_coords = ligand.coordinates[list(lig_match)]
-                    lig_centroid  = rdGeometry.Point3D(*getCentroid(lig_pi_coords))
-                    for res_match in res_matches:
-                        res_pi_coords = residue.coordinates[list(res_match)]
-                        res_centroid  = rdGeometry.Point3D(*getCentroid(res_pi_coords))
-                        dist = lig_centroid.Distance(res_centroid)
-                        if dist <= self.prm["aromatic"]["distance"]:
-                            # ligand
-                            lig_plane = rdGeometry.Point3D(*lig_pi_coords[0])
-                            lig_centroid_plane = lig_centroid.DirectionVector(lig_plane)
-                            lig_normal = rdGeometry.Point3D(*getNormalVector(lig_centroid_plane))
-                            # residue
-                            res_plane = rdGeometry.Point3D(*res_pi_coords[0])
-                            res_centroid_plane = res_centroid.DirectionVector(res_plane)
-                            res_normal = rdGeometry.Point3D(*getNormalVector(res_centroid_plane))
-                            # angle
-                            angle = degrees(res_normal.AngleTo(lig_normal))
-                            if isinAngleLimits(angle, *self.prm["aromatic"]["FaceToFace"]):
-                                return 1
-        return 0
+        return self._get_pi_stacking(ligand, residue, kind="FaceToFace")
 
-
-    def hasEdgeToFace(self, ligand, residue):
+    def get_edge_to_face(self, ligand, residue):
         """Get the presence or absence of an aromatic face to edge interaction
         between a residue and a ligand"""
-        for pi_res in self.AROMATIC_PATTERNS:
-            for pi_lig in self.AROMATIC_PATTERNS:
-                res_matches = residue.mol.GetSubstructMatches(pi_res)
-                lig_matches = ligand.mol.GetSubstructMatches(pi_lig)
+        return self._get_pi_stacking(ligand, residue, kind="EdgeToFace")
+
+    def _get_pi_stacking(self, ligand, residue, kind="FaceToFace"):
+        """Get the presence or absence of pi-stacking interaction
+        between a residue and a ligand"""
+        for pi in self.SMARTS["Aromatic"]:
+            res_matches = residue.GetSubstructMatches(pi)
+            lig_matches = ligand.GetSubstructMatches(pi)
+            if lig_matches and res_matches:
                 for lig_match in lig_matches:
-                    lig_pi_coords = ligand.coordinates[list(lig_match)]
-                    lig_centroid  = rdGeometry.Point3D(*getCentroid(lig_pi_coords))
+                    lig_pi_coords = ligand.xyz[list(lig_match)]
+                    lig_centroid  = rdGeometry.Point3D(*get_centroid(lig_pi_coords))
                     for res_match in res_matches:
-                        res_pi_coords = residue.coordinates[list(res_match)]
-                        res_centroid  = rdGeometry.Point3D(*getCentroid(res_pi_coords))
+                        res_pi_coords = residue.xyz[list(res_match)]
+                        res_centroid  = rdGeometry.Point3D(*get_centroid(res_pi_coords))
                         dist = lig_centroid.Distance(res_centroid)
-                        if dist <= self.prm["aromatic"]["distance"]:
+                        if dist <= self.rules["Aromatic"][kind]["distance"]:
                             # ligand
-                            lig_plane = rdGeometry.Point3D(*lig_pi_coords[0])
-                            lig_centroid_plane = lig_centroid.DirectionVector(lig_plane)
-                            lig_normal = rdGeometry.Point3D(*getNormalVector(lig_centroid_plane))
+                            lig_normal = get_ring_normal_vector(lig_centroid, lig_pi_coords)
                             # residue
-                            res_plane = rdGeometry.Point3D(*res_pi_coords[0])
-                            res_centroid_plane = res_centroid.DirectionVector(res_plane)
-                            res_normal = rdGeometry.Point3D(*getNormalVector(res_centroid_plane))
+                            res_normal = get_ring_normal_vector(res_centroid, res_pi_coords)
                             # angle
-                            angle = degrees(res_normal.AngleTo(lig_normal))
-                            if isinAngleLimits(angle, *self.prm["aromatic"]["EdgeToFace"]):
+                            angle = res_normal.AngleTo(lig_normal)
+                            if angle_between_limits(angle, *self.rules["Aromatic"][kind]["angle"], ring=True):
                                 return 1
         return 0
 
-
-    def hasMetalDonor(self, ligand, residue):
+    def get_metal_donor(self, ligand, residue):
         """Get the presence or absence of a metal complexation where the ligand is a metal"""
-        metal = Chem.MolFromSmarts(self.prm["metallic"]["metal"])
-        lig   = Chem.MolFromSmarts(self.prm["metallic"]["ligand"])
-        lig_matches = ligand.mol.GetSubstructMatches(metal)
-        res_matches = residue.mol.GetSubstructMatches(lig)
-        if lig_matches and res_matches:
-            for lig_match in lig_matches:
-                lig_atom = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
-                for res_match in res_matches:
-                    res_atom = rdGeometry.Point3D(*residue.coordinates[res_match[0]])
-                    dist = lig_atom.Distance(res_atom)
-                    if dist <= self.prm["metallic"]["distance"]:
-                        return 1
-        return 0
+        return self._get_metallic(ligand, residue)
 
-
-    def hasMetalAcceptor(self, ligand, residue):
+    def get_metal_acceptor(self, ligand, residue):
         """Get the presence or absence of a metal complexation where the residue is a metal"""
-        metal = Chem.MolFromSmarts(self.prm["metallic"]["metal"])
-        lig   = Chem.MolFromSmarts(self.prm["metallic"]["ligand"])
-        lig_matches = ligand.mol.GetSubstructMatches(lig)
-        res_matches = residue.mol.GetSubstructMatches(metal)
-        if lig_matches and res_matches:
-            for lig_match in lig_matches:
-                lig_atom = rdGeometry.Point3D(*ligand.coordinates[lig_match[0]])
-                for res_match in res_matches:
-                    res_atom = rdGeometry.Point3D(*residue.coordinates[res_match[0]])
-                    dist = lig_atom.Distance(res_atom)
-                    if dist <= self.prm["metallic"]["distance"]:
+        return self._get_metallic(residue, ligand)
+
+    def _get_metallic(self, metal_frame, ligand_frame):
+        """Get the presence or absence of a metal complexation"""
+        metal = self.SMARTS["Metal"]
+        ligand = self.SMARTS["Ligand"]
+        ligand_matches = ligand_frame.GetSubstructMatches(ligand)
+        metal_matches = metal_frame.GetSubstructMatches(metal)
+        if ligand_matches and metal_matches:
+            for ligand_match in ligand_matches:
+                ligand_atom = rdGeometry.Point3D(*ligand_frame.xyz[ligand_match[0]])
+                for metal_match in metal_matches:
+                    metal_atom = rdGeometry.Point3D(*residue.xyz[metal_match[0]])
+                    dist = ligand_atom.Distance(metal_atom)
+                    if dist <= self.rules["Metallic"]["distance"]:
                         return 1
         return 0
 
-
-    def generateBitstring(self, ligand, residue):
+    def generate_bitstring(self, ligand, residue):
         """Generate the complete bitstring for the interactions of a residue with a ligand"""
         bitstring = []
         for interaction in self.interactions:
             if   interaction == 'HBdonor':
-                bitstring.append(self.hasHBdonor(ligand, residue))
+                bitstring.append(self.get_hbond_donor(ligand, residue))
             elif interaction == 'HBacceptor':
-                bitstring.append(self.hasHBacceptor(ligand, residue))
+                bitstring.append(self.get_hbond_acceptor(ligand, residue))
             elif interaction == 'XBdonor':
-                bitstring.append(self.hasXBdonor(ligand, residue))
+                bitstring.append(self.get_xbond_donor(ligand, residue))
             elif interaction == 'XBacceptor':
-                bitstring.append(self.hasXBdonor(ligand, residue))
-            elif interaction == 'cation':
-                bitstring.append(self.hasCationic(ligand, residue))
-            elif interaction == 'anion':
-                bitstring.append(self.hasAnionic(ligand, residue))
+                bitstring.append(self.get_xbond_acceptor(ligand, residue))
+            elif interaction == 'Cation':
+                bitstring.append(self.get_cationic(ligand, residue))
+            elif interaction == 'Anion':
+                bitstring.append(self.get_anionic(ligand, residue))
+            elif interaction == 'PiStacking':
+                bitstring.append(self.get_pi_stacking(ligand, residue))
             elif interaction == 'FaceToFace':
-                bitstring.append(self.hasFaceToFace(ligand, residue))
+                bitstring.append(self.get_face_to_face(ligand, residue))
             elif interaction == 'EdgeToFace':
-                bitstring.append(self.hasEdgeToFace(ligand, residue))
-            elif interaction == 'pi-cation':
-                bitstring.append(self.hasPiCation(ligand, residue))
-            elif interaction == 'cation-pi':
-                bitstring.append(self.hasCationPi(ligand, residue))
-            elif interaction == 'hydrophobic':
-                bitstring.append(self.hasHydrophobic(ligand, residue))
+                bitstring.append(self.get_edge_to_face(ligand, residue))
+            elif interaction == 'Pi-Cation':
+                bitstring.append(self.get_pi_cation(ligand, residue))
+            elif interaction == 'Cation-Pi':
+                bitstring.append(self.get_cation_pi(ligand, residue))
+            elif interaction == 'Hydrophobic':
+                bitstring.append(self.get_hydrophobic(ligand, residue))
             elif interaction == 'MBdonor':
-                bitstring.append(self.hasMetalDonor(ligand, residue))
+                bitstring.append(self.get_metal_donor(ligand, residue))
             elif interaction == 'MBacceptor':
-                bitstring.append(self.hasMetalAcceptor(ligand, residue))
+                bitstring.append(self.get_metal_acceptor(ligand, residue))
         return ''.join(str(bit) for bit in bitstring)
 
 
-    def generateIFP(self, ligand, protein):
-        """Generates the complete IFP from each residue's bitstring"""
-        IFPvector = DataStructs.ExplicitBitVect(len(self.interactions)*len(protein.residues))
+    def generate_ifp(self, ligand_frame, protein_frame):
+        """Generates the complete IFP between two Frames"""
+        IFPvector = DataStructs.ExplicitBitVect(len(self.interactions)*len(protein_frame.residues.keys()))
         i=0
         IFP = ''
-        for residue in sorted(protein.residues, key=get_resnumber):
-            bitstring = self.generateBitstring(ligand, protein.residues[residue])
+        for resname, residue in protein_frame.residues.items():
+            bitstring = self.generate_bitstring(ligand_frame, residue)
             for bit in bitstring:
                 if bit == '1':
                     IFPvector.SetBit(i)
                 i+=1
             IFP += bitstring
-        ligand.setIFP(IFP, IFPvector)
+        return IFP, IFPvector

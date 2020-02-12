@@ -1,21 +1,23 @@
 import os.path
+import logging
 from rdkit import Chem, DataStructs
 from rdkit.Chem import rdMolTransforms, rdmolops
 from rdkit import Geometry as rdGeometry
 from numpy import argmax
-from .logger import logger
 from .trajectory import Trajectory
+
+logger = logging.getLogger("prolif")
 
 class Ligand(Trajectory):
     """The Ligand class"""
 
-    def get_USRlike_atoms(self):
+    def get_USRlike_atoms(self, frame=0):
         """Returns 4 rdkit Point3D objects similar to those used in the USR method:
         - centroid (ctd)
         - closest to ctd (cst)
         - farthest from cst (fct)
         - farthest from fct (ftf)"""
-        frame = next(iter(self))
+        frame = self.get_frame(frame)
         matrix = rdmolops.Get3DDistanceMatrix(frame)
         conf = frame.GetConformer()
         coords = conf.GetPositions()
@@ -46,24 +48,3 @@ class Ligand(Trajectory):
         logger.debug('farthest from cst (fct) = {}'.format(list(fct)))
         logger.debug('farthest from fct (ftf) = {}'.format(list(ftf)))
         return ctd, cst, fct, ftf
-
-
-
-    def setIFP(self, IFP, vector):
-        """Set the IFP for the ligand, as a bitstring and vector"""
-        self.IFP = IFP
-        self.IFPvector = vector
-
-
-    def getSimilarity(self, reference, method='tanimoto', alpha=None, beta=None):
-        if   method == 'tanimoto':
-            return DataStructs.TanimotoSimilarity(reference.IFPvector, self.IFPvector)
-        elif method == 'dice':
-            return DataStructs.DiceSimilarity(reference.IFPvector, self.IFPvector)
-        elif method == 'tversky':
-            return DataStructs.TverskySimilarity(reference.IFPvector, self.IFPvector, alpha, beta)
-
-
-    def setSimilarity(self, score):
-        """Set the value for the similarity score between the ligand and a reference"""
-        self.score = score

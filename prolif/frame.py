@@ -31,7 +31,8 @@ class Frame(Chem.Mol):
             raise StopIteration
         resname = list(self.residues.keys())[self.n_residue]
         atom_map = self.residues.atom_map[resname]
-        residue = ResidueFrame(self.residues.get(resname), self.xyz, atom_map)
+        atom_xyz_indices = [atom_map[atom.GetIdx()] for atom in self.residues[resname].GetAtoms()]
+        residue = ResidueFrame(self.residues[resname], self.xyz[atom_xyz_indices])
         self.n_residue += 1
         return residue
 

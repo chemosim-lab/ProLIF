@@ -2,7 +2,7 @@ import copy
 from collections import OrderedDict
 from rdkit import Chem
 from rdkit.Chem import rdMolTransforms
-from .logger import logger
+
 
 class Residues(OrderedDict):
     """The Residues class, which inherits `collections.OrderedDict`, an ordered
@@ -10,26 +10,33 @@ class Residues(OrderedDict):
 
     def __init__(self, topology):
         super().__init__()
-        atoms = {}
+        # map topology atoms to residue atoms
+        atom_map_top_to_res = {}
+        # map residue atoms to the the full topology
         atom_map = {}
+        # init each residue
         for resname in topology.residues_list:
             atom_map[resname] = {}
             self[resname] = Chem.RWMol()
+        # atoms
         for atom in topology.GetAtoms():
-            resname = atom.GetMonomerInfo().GetName()
-            index = self.get(resname).AddAtom(atom)
-            atoms[atom.GetIdx()] = index
-            atom_map[resname][index] = atom.GetIdx()
+            resname = atom.GetProp("residue_name")
+            top_index = atom.GetIdx()
+            res_index = self[resname].AddAtom(atom)
+            atom_map_top_to_res[top_index] = res_index
+            atom_map[resname][res_index] = top_index
+        # store the atom mapping for creating a ResidueFrame from a Frame
         self.atom_map = atom_map
+        # bonds
         for bond in topology.GetBonds():
             a1, a2 = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-            res1 = topology.GetAtomWithIdx(a1).GetMonomerInfo().GetName()
-            res2 = topology.GetAtomWithIdx(a2).GetMonomerInfo().GetName()
+            res1 = topology.GetAtomWithIdx(a1).GetProp("residue_name")
+            res2 = topology.GetAtomWithIdx(a2).GetProp("residue_name")
             if res1 == res2:
-                self.get(res1).AddBond(*[atoms[i] for i in (a1,a2)], bond.GetBondType())
+                self[res1].AddBond(*[atom_map_top_to_res[i] for i in (a1,a2)], bond.GetBondType())
         for resname in topology.residues_list:
-            self.get(resname).SetProp("resname", resname)
-            self.get(resname).UpdatePropertyCache(strict=False)
+            self[resname].SetProp("resname", resname)
+            self[resname].UpdatePropertyCache(strict=False)
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
@@ -42,14 +49,14 @@ class ResidueFrame(Chem.Mol):
 
     Contains the 3D information from a particular residue and frame"""
 
-    def __init__(self, residue, xyz, atom_map):
+    def __init__(self, residue, xyz, n_frame=0):
         super().__init__(residue)
         conformer = Chem.Conformer()
-        for atom in self.GetAtoms():
-            atom_index = atom_map.get(atom.GetIdx())
-            position = Chem.rdGeometry.Point3D(*xyz[atom_index])
-            conformer.SetAtomPosition(atom_index, position)
+        for i in range(self.GetNumAtoms()):
+            position = Chem.rdGeometry.Point3D(*xyz[i])
+            conformer.SetAtomPosition(i, position)
         self.AddConformer(conformer)
+        self.n_frame = n_frame
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])

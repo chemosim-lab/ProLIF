@@ -10,10 +10,13 @@ class Atom:
     Optionnal information include the symbol, name, residue name, and charge.
     """
 
-    def __init__(self, atomic_number, symbol=None, name=None, resname="UNL",
-        charge=0.0):
+    def __init__(self, atomic_number, symbol=None, name=None, charge=0.0,
+        resname="UNL", resid=0,
+        ):
         self.atomic_number = atomic_number
         self.resname = resname
+        self.resid = resid
+        self.residue = "%s%d" % (self.resname, self.resid)
         self.charge = charge
         if symbol:
             self.symbol = symbol
@@ -27,22 +30,27 @@ class Atom:
     @classmethod
     def from_pytraj(cls, atom):
         """Create an atom from a pytraj `Atom`"""
-        resname = atom.resname + str(atom.resid)
-        return cls(atom.atomic_number, name=atom.name, resname=resname, charge=atom.charge)
+        return cls(atom.atomic_number, name=atom.name, charge=atom.charge,
+        resname=atom.resname, resid=atom.resid)
 
     @classmethod
     def from_mdtraj(cls, atom):
         """Create an atom from a mdtraj `Atom`"""
         number, name, symbol, mass, radius = atom.element
-        resname = str(atom.residue)
-        return cls(number, symbol=symbol, name=atom.name, resname=resname)
+        res = atom.residue
+        return cls(number, symbol=symbol, name=atom.name,
+        resname=res.name, resid=res.resSeq)
 
     def to_rdkit(self):
         a = Chem.Atom(self.atomic_number)
         # add atom name
         a.SetProp("_Name", self.name)
         # add residue name
-        a.SetMonomerInfo(Chem.AtomPDBResidueInfo(self.resname))
+        mi = Chem.AtomPDBResidueInfo()
+        mi.SetResidueName(self.resname)
+        mi.SetResidueNumber(self.resid)
+        a.SetMonomerInfo(mi)
+        a.SetProp("residue_name", self.residue)
         # set partial charge
         a.SetDoubleProp("_GasteigerCharge", self.charge)
         # disable adding H to the molecule
@@ -51,7 +59,7 @@ class Atom:
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{self.symbol}[{self.atomic_number}], name={self.name}, resname={self.resname}, charge={self.charge}"
+        params = f"{self.symbol}[{self.atomic_number}], name={self.name}, residue={self.residue}, charge={self.charge}"
         return f"<{name}({params}) at 0x{id(self):02x}>"
 
 
