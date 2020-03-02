@@ -1,6 +1,5 @@
-# created with PyMOL 2.3.2
 @<TRIPOS>MOLECULE
-obj01
+benzene
 12 12 1                 
 SMALL
 USER_CHARGES

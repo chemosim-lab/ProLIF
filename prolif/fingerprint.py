@@ -1,4 +1,4 @@
-import logging
+import logging, copy
 from os import path
 from math import radians
 from rdkit import Chem, DataStructs
@@ -24,11 +24,13 @@ class FingerprintFactory:
         else:
             _path = path.join(path.dirname(__file__), 'parameters.py')
             logger.debug(f"Using default geometric rules from {_path}")
-            self.rules = RULES
+            self.rules = copy.deepcopy(RULES)
         # convert angles from degrees to radian
         for i in range(2):
-            for key in ["HBond", "XBond", "Cation-Pi"]:
+            for key in ["HBond", "Cation-Pi"]:
                 self.rules[key]["angle"][i] = radians(self.rules[key]["angle"][i])
+            for key in ["AXD","XAR"]:
+                self.rules["XBond"]["angle"][key][i] = radians(self.rules["XBond"]["angle"][key][i])
             for key in ["FaceToFace", "EdgeToFace"]:
                 self.rules["Aromatic"][key]["angle"][i] = radians(self.rules["Aromatic"][key]["angle"][i])
         # create SMARTS
@@ -101,7 +103,7 @@ class FingerprintFactory:
                     if dist <= self.rules["HBond"]["distance"]:
                         dh = d.DirectionVector(h)
                         ha = h.DirectionVector(a)
-                        # get angle between hd and ha
+                        # get angle between dh and ha
                         angle = dh.AngleTo(ha)
                         if angle_between_limits(angle, *self.rules["HBond"]["angle"]):
                             return 1
@@ -132,12 +134,16 @@ class FingerprintFactory:
                     a = rdGeometry.Point3D(*acceptor_frame.xyz[acceptor_match[0]])
                     dist = x.Distance(a)
                     if dist <= self.rules["XBond"]["distance"]:
-                        dx = d.DirectionVector(x)
+                        xd = x.DirectionVector(d)
                         xa = x.DirectionVector(a)
-                        # get angle between hd and ha
-                        angle = dx.AngleTo(xa)
-                        if angle_between_limits(angle, *self.rules["XBond"]["angle"]):
-                            return 1
+                        angle = xd.AngleTo(xa)
+                        if angle_between_limits(angle, *self.rules["XBond"]["angle"]["AXD"]):
+                            r = rdGeometry.Point3D(*acceptor_frame.xyz[acceptor_match[1]])
+                            ax = a.DirectionVector(x)
+                            ar = a.DirectionVector(r)
+                            angle = ax.AngleTo(ar)
+                            if angle_between_limits(angle, *self.rules["XBond"]["angle"]["XAR"]):
+                                return 1
         return 0
 
     def get_cationic(self, ligand, residue):
@@ -261,7 +267,7 @@ class FingerprintFactory:
             for ligand_match in ligand_matches:
                 ligand_atom = rdGeometry.Point3D(*ligand_frame.xyz[ligand_match[0]])
                 for metal_match in metal_matches:
-                    metal_atom = rdGeometry.Point3D(*residue.xyz[metal_match[0]])
+                    metal_atom = rdGeometry.Point3D(*metal_frame.xyz[metal_match[0]])
                     dist = ligand_atom.Distance(metal_atom)
                     if dist <= self.rules["Metallic"]["distance"]:
                         return 1
