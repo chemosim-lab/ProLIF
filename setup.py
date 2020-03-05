@@ -38,8 +38,8 @@ setup(
     entry_points = {
         'console_scripts': ['prolif=prolif.command_line:main'],
     },
-    python_requires='>=3',
-    install_requires=['numpy>=1.13.3'],
+    python_requires='>=3.6',
+    install_requires=['numpy>=1.13.3','pandas>=1.0.0'],
     #extra_requires={
     #    'test': ['coveralls','coverage'],
     #},
@@ -51,7 +51,6 @@ setup(
     include_package_data=True,
     project_urls={
         'Bug Reports':  'https://github.com/chemosim-lab/ProLIF/issues',
-        'Say Thanks!':  'https://saythanks.io/to/cbouy',
     },
     zip_safe=False,
 )

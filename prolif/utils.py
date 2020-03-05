@@ -12,6 +12,28 @@ BONDTYPE_TO_RDKIT = {
     'DOUBLE': Chem.BondType.DOUBLE,
     'TRIPLE': Chem.BondType.TRIPLE,
 }
+BONDORDER_TO_RDKIT = {
+    1: Chem.BondType.SINGLE,
+    2: Chem.BondType.DOUBLE,
+    3: Chem.BondType.TRIPLE,
+}
+
+def pdbqt_to_mol2(path):
+    from openbabel import pybel
+    mols = []
+    for m in pybel.readfile("pdbqt", path):
+        # necessary to properly add H
+        mH = pybel.readstring("pdb", m.write("pdb"))
+        mH.addh()
+        # need to reassign old charges to mol
+        mH.OBMol.SetPartialChargesPerceived(True)
+        for i, (atom, old) in enumerate(zip(mH.atoms, m.atoms)):
+            if i == len(m.atoms): # stop at new hydrogens
+                break
+            # assign old charges
+            atom.OBAtom.SetPartialCharge(old.partialcharge)
+        mols.append(mH)
+    return [x.write("mol2") for x in mols]
 
 def update_bonds_and_charges(mol):
     """mdtraj and pytraj don't keep information on bond order, and formal charges.
@@ -60,7 +82,7 @@ def update_bonds_and_charges(mol):
 
 def get_resnumber(resname):
     pattern = re.search(r'(\d+)', resname)
-    return int(pattern.group(0))
+    return int(pattern.group(1))
 
 def get_centroid(coordinates):
     """Centroid for an array of XYZ coordinates"""

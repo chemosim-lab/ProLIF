@@ -36,6 +36,7 @@ class Topology(Chem.Mol):
         update_bonds_and_charges(mol)
         super().__init__(mol)
         self.residues_list = residues_list
+        self.n_residues = len(self.residues_list)
         self.residues = Residues(self)
 
     @classmethod
@@ -53,6 +54,13 @@ class Topology(Chem.Mol):
         return cls(atoms, bonds)
 
     @classmethod
+    def from_openbabel(cls, mol):
+        """Create a topology from an openbabel `OBMol`"""
+        atoms = [Atom.from_openbabel(mol.GetAtomById(i)) for i in range(mol.NumAtoms())]
+        bonds = [Bond.from_openbabel(mol.GetBondById(i)) for i in range(mol.NumBonds())]
+        return cls(atoms, bonds)
+
+    @classmethod
     def from_rdkit(cls, mol):
         """Create a topology from a RDKit `Chem.Mol`"""
         topology = copy.deepcopy(mol)
@@ -60,21 +68,22 @@ class Topology(Chem.Mol):
         for atom in topology.GetAtoms():
             mi = atom.GetMonomerInfo()
             if mi:
-                resname = "%s%d" % (t.GetResidueName(), t.GetResidueNumber())
+                resname = "%s%d" % (mi.GetResidueName(), mi.GetResidueNumber())
             else:
                 mi = Chem.AtomPDBResidueInfo()
                 mi.SetResidueName("UNL")
                 mi.SetResidueNumber(0)
                 atom.SetMonomerInfo(mi)
                 resname = "UNL0"
-                atom.SetProp("residue_name", resname)
+            atom.SetProp("residue_name", resname)
             if resname not in residues_list:
                 residues_list.append(resname)
         topology.residues_list = residues_list
+        topology.n_residues = len(residues_list)
         topology.residues = Residues(topology)
         return topology
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{len(self.residues_list)} residues, {self.GetNumAtoms()} atoms, {self.GetNumBonds()} bonds, {Chem.GetSSSR(self)} rings"
+        params = f"{self.n_residues} residues, {self.GetNumAtoms()} atoms, {self.GetNumBonds()} bonds, {Chem.GetSSSR(self)} rings"
         return f"<{name}: {params} at 0x{id(self):02x}>"

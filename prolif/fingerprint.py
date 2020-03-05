@@ -1,5 +1,6 @@
 import logging, copy
 from os import path
+from collections import OrderedDict
 from math import radians
 from rdkit import Chem, DataStructs
 from rdkit import Geometry as rdGeometry
@@ -16,7 +17,7 @@ class FingerprintFactory:
     """Class that generates an interaction fingerprint between a protein and a ligand"""
 
     def __init__(self, rules=None,
-        interactions=['HBdonor','HBacceptor','Cation','Anion','PiStacking','Hydrophobic']):
+        interactions=['HBdonor','HBacceptor','Cation','Anion','PiCation','PiStacking','Hydrophobic']):
         # read parameters
         if rules:
             logger.debug("Using supplied geometric rules")
@@ -47,8 +48,38 @@ class FingerprintFactory:
             "Ligand": Chem.MolFromSmarts(self.rules["Metallic"]["ligand"]),
         }
         # read interactions to compute
-        self.interactions = interactions
-        logger.info('The fingerprint factory will generate the following bitstring: {}'.format(' '.join(self.interactions)))
+        logger.info('The fingerprint factory will generate the following bitstring: {}'.format(' '.join(interactions)))
+        self.n_interactions = len(interactions)
+        self.interactions = OrderedDict()
+        for interaction in interactions:
+            if   interaction == 'HBdonor':
+                self.interactions[interaction] = self.get_hbond_donor
+            elif interaction == 'HBacceptor':
+                self.interactions[interaction] = self.get_hbond_acceptor
+            elif interaction == 'XBdonor':
+                self.interactions[interaction] = self.get_xbond_donor
+            elif interaction == 'XBacceptor':
+                self.interactions[interaction] = self.get_xbond_acceptor
+            elif interaction == 'Cation':
+                self.interactions[interaction] = self.get_cationic
+            elif interaction == 'Anion':
+                self.interactions[interaction] = self.get_anionic
+            elif interaction == 'PiStacking':
+                self.interactions[interaction] = self.get_pi_stacking
+            elif interaction == 'FaceToFace':
+                self.interactions[interaction] = self.get_face_to_face
+            elif interaction == 'EdgeToFace':
+                self.interactions[interaction] = self.get_edge_to_face
+            elif interaction == 'Pi-Cation':
+                self.interactions[interaction] = self.get_pi_cation
+            elif interaction == 'Cation-Pi':
+                self.interactions[interaction] = self.get_cation_pi
+            elif interaction == 'Hydrophobic':
+                self.interactions[interaction] = self.get_hydrophobic
+            elif interaction == 'MBdonor':
+                self.interactions[interaction] = self.get_metal_donor
+            elif interaction == 'MBacceptor':
+                self.interactions[interaction] = self.get_metal_acceptor
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
@@ -276,48 +307,26 @@ class FingerprintFactory:
     def generate_bitstring(self, ligand, residue):
         """Generate the complete bitstring for the interactions of a residue with a ligand"""
         bitstring = []
-        for interaction in self.interactions:
-            if   interaction == 'HBdonor':
-                bitstring.append(self.get_hbond_donor(ligand, residue))
-            elif interaction == 'HBacceptor':
-                bitstring.append(self.get_hbond_acceptor(ligand, residue))
-            elif interaction == 'XBdonor':
-                bitstring.append(self.get_xbond_donor(ligand, residue))
-            elif interaction == 'XBacceptor':
-                bitstring.append(self.get_xbond_acceptor(ligand, residue))
-            elif interaction == 'Cation':
-                bitstring.append(self.get_cationic(ligand, residue))
-            elif interaction == 'Anion':
-                bitstring.append(self.get_anionic(ligand, residue))
-            elif interaction == 'PiStacking':
-                bitstring.append(self.get_pi_stacking(ligand, residue))
-            elif interaction == 'FaceToFace':
-                bitstring.append(self.get_face_to_face(ligand, residue))
-            elif interaction == 'EdgeToFace':
-                bitstring.append(self.get_edge_to_face(ligand, residue))
-            elif interaction == 'Pi-Cation':
-                bitstring.append(self.get_pi_cation(ligand, residue))
-            elif interaction == 'Cation-Pi':
-                bitstring.append(self.get_cation_pi(ligand, residue))
-            elif interaction == 'Hydrophobic':
-                bitstring.append(self.get_hydrophobic(ligand, residue))
-            elif interaction == 'MBdonor':
-                bitstring.append(self.get_metal_donor(ligand, residue))
-            elif interaction == 'MBacceptor':
-                bitstring.append(self.get_metal_acceptor(ligand, residue))
-        return ''.join(str(bit) for bit in bitstring)
-
+        for interaction_function in self.interactions.values():
+            bitstring.append(interaction_function(ligand, residue))
+        return bitstring
 
     def generate_ifp(self, ligand_frame, protein_frame):
         """Generates the complete IFP between two Frames"""
-        IFPvector = DataStructs.ExplicitBitVect(len(self.interactions)*len(protein_frame.residues.keys()))
-        i=0
-        IFP = ''
-        for resname, residue in protein_frame.residues.items():
-            bitstring = self.generate_bitstring(ligand_frame, residue)
-            for bit in bitstring:
-                if bit == '1':
-                    IFPvector.SetBit(i)
-                i+=1
-            IFP += bitstring
-        return IFP, IFPvector
+        ifp = dict()
+        for ligand_resframe in ligand_frame:
+            data = {
+                "Ligand name": ligand_frame.name,
+                "Ligand frame": ligand_frame.n_frame,
+                "Ligand residue": ligand_resframe.resname,
+                "Protein name": protein_frame.name,
+                "Protein frame": protein_frame.n_frame,
+            }
+            for residue_frame in protein_frame:
+                data[residue_frame.resname] = self.generate_bitstring(ligand_resframe, residue_frame)
+            for key in data.keys():
+                if key not in ifp:
+                    ifp[key] = [data[key]]
+                else:
+                    ifp[key].append(data[key])
+        return ifp

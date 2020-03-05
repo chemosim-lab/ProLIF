@@ -11,6 +11,9 @@ logger = logging.getLogger("prolif")
 class Ligand(Trajectory):
     """The Ligand class"""
 
+    def __init__(self, topology, coordinates, name="ligand"):
+        super().__init__(topology, coordinates, name=name)
+
     def get_USRlike_atoms(self, frame=0):
         """Returns 4 rdkit Point3D objects similar to those used in the USR method:
         - centroid (ctd)
@@ -24,7 +27,6 @@ class Ligand(Trajectory):
 
         # centroid
         ctd = frame.centroid
-
         # closest to centroid
         min_dist = 100
         for atom in self.GetAtoms():
@@ -34,15 +36,12 @@ class Ligand(Trajectory):
                 min_dist = dist
                 cst = point
                 cst_idx = atom.GetIdx()
-
         # farthest from cst
         fct_idx = argmax(matrix[cst_idx])
         fct = rdGeometry.Point3D(*coords[fct_idx])
-
         # farthest from fct
         ftf_idx = argmax(matrix[fct_idx])
         ftf = rdGeometry.Point3D(*coords[ftf_idx])
-
         logger.debug('centroid (ctd) = {}'.format(list(ctd)))
         logger.debug('closest to ctd (cst) = {}'.format(list(cst)))
         logger.debug('farthest from cst (fct) = {}'.format(list(fct)))

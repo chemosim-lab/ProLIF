@@ -60,7 +60,7 @@ class ResidueFrame(Chem.Mol):
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{self.resname} with centroid {list(self.centroid)}"
+        params = f"{self.resname} and frame #{self.n_frame}"
         return f"<{name}: {params} at 0x{id(self):02x}>"
 
     @property

@@ -11,25 +11,22 @@ lg.setLevel(RDLogger.ERROR)
 class TestInteractions(unittest.TestCase):
 
     def get_file(self, f):
-        return os.path.join(os.path.dirname(__file__), f)
+        return os.path.join(os.path.dirname(__file__), "data", f)
 
     def setUp(self):
         # Fingerprint Factory
         self.ff = prolif.FingerprintFactory()
         # Molecules used regularly
         benzene = Chem.MolFromMol2File(self.get_file("benzene.mol2"), removeHs=False)
-        benzene = prolif.Trajectory.from_rdkit(benzene)
-        benzene = next(iter(next(iter(benzene))))
+        benzene = prolif.Trajectory.from_rdkit(benzene).get_frame().get_residue()
         self.benzene = benzene
 
     def test_ionic(self):
         # prepare inputs
         cation = Chem.MolFromMol2File(self.get_file("cation.mol2"), removeHs=False)
         anion = Chem.MolFromMol2File(self.get_file("anion.mol2"), removeHs=False)
-        cation = prolif.Trajectory.from_rdkit(cation)
-        cation = next(iter(next(iter(cation))))
-        anion = prolif.Trajectory.from_rdkit(anion)
-        anion = next(iter(next(iter(anion))))
+        cation = prolif.Trajectory.from_rdkit(cation).get_frame().get_residue()
+        anion = prolif.Trajectory.from_rdkit(anion).get_frame().get_residue()
         # positive tests
         self.assertEqual(self.ff.get_anionic(anion, cation), 1)
         self.assertEqual(self.ff.get_cationic(cation, anion), 1)
@@ -41,10 +38,8 @@ class TestInteractions(unittest.TestCase):
         # prepare inputs
         cation = Chem.MolFromMol2File(self.get_file("cation.mol2"), removeHs=False)
         false = Chem.MolFromMol2File(self.get_file("cation_false.mol2"), removeHs=False)
-        cation = prolif.Trajectory.from_rdkit(cation)
-        cation = next(iter(next(iter(cation))))
-        false = prolif.Trajectory.from_rdkit(false)
-        false = next(iter(next(iter(false))))
+        cation = prolif.Trajectory.from_rdkit(cation).get_frame().get_residue()
+        false = prolif.Trajectory.from_rdkit(false).get_frame().get_residue()
         # positive tests
         self.assertEqual(self.ff.get_cation_pi(cation, self.benzene), 1)
         self.assertEqual(self.ff.get_pi_cation(self.benzene, cation), 1)
@@ -58,10 +53,8 @@ class TestInteractions(unittest.TestCase):
         # prepare inputs
         f2f = Chem.MolFromMol2File(self.get_file("facetoface.mol2"), removeHs=False)
         e2f = Chem.MolFromMol2File(self.get_file("edgetoface.mol2"), removeHs=False)
-        f2f = prolif.Trajectory.from_rdkit(f2f)
-        f2f = next(iter(next(iter(f2f))))
-        e2f = prolif.Trajectory.from_rdkit(e2f)
-        e2f = next(iter(next(iter(e2f))))
+        f2f = prolif.Trajectory.from_rdkit(f2f).get_frame().get_residue()
+        e2f = prolif.Trajectory.from_rdkit(e2f).get_frame().get_residue()
         # positive tests
         self.assertEqual(self.ff.get_face_to_face(self.benzene, f2f), 1)
         self.assertEqual(self.ff.get_face_to_face(f2f, self.benzene), 1)
@@ -73,10 +66,8 @@ class TestInteractions(unittest.TestCase):
         # prepare inputs
         f2f = Chem.MolFromMol2File(self.get_file("facetoface.mol2"), removeHs=False)
         e2f = Chem.MolFromMol2File(self.get_file("edgetoface.mol2"), removeHs=False)
-        f2f = prolif.Trajectory.from_rdkit(f2f)
-        f2f = next(iter(next(iter(f2f))))
-        e2f = prolif.Trajectory.from_rdkit(e2f)
-        e2f = next(iter(next(iter(e2f))))
+        f2f = prolif.Trajectory.from_rdkit(f2f).get_frame().get_residue()
+        e2f = prolif.Trajectory.from_rdkit(e2f).get_frame().get_residue()
         # positive tests
         self.assertEqual(self.ff.get_edge_to_face(self.benzene, e2f), 1)
         self.assertEqual(self.ff.get_edge_to_face(e2f, self.benzene), 1)
@@ -91,16 +82,11 @@ class TestInteractions(unittest.TestCase):
         chlorine = Chem.MolFromMol2File(self.get_file("chlorine.mol2"), removeHs=False)
         anion = Chem.MolFromMol2File(self.get_file("anion.mol2"), removeHs=False)
         cation = Chem.MolFromMol2File(self.get_file("cation.mol2"), removeHs=False)
-        f2f = prolif.Trajectory.from_rdkit(f2f)
-        f2f = next(iter(next(iter(f2f))))
-        e2f = prolif.Trajectory.from_rdkit(e2f)
-        e2f = next(iter(next(iter(e2f))))
-        chlorine = prolif.Trajectory.from_rdkit(chlorine)
-        chlorine = next(iter(next(iter(chlorine))))
-        anion = prolif.Trajectory.from_rdkit(anion)
-        anion = next(iter(next(iter(anion))))
-        cation = prolif.Trajectory.from_rdkit(cation)
-        cation = next(iter(next(iter(cation))))
+        f2f = prolif.Trajectory.from_rdkit(f2f).get_frame().get_residue()
+        e2f = prolif.Trajectory.from_rdkit(e2f).get_frame().get_residue()
+        chlorine = prolif.Trajectory.from_rdkit(chlorine).get_frame().get_residue()
+        anion = prolif.Trajectory.from_rdkit(anion).get_frame().get_residue()
+        cation = prolif.Trajectory.from_rdkit(cation).get_frame().get_residue()
         # positive tests
         self.assertEqual(self.ff.get_hydrophobic(self.benzene, e2f), 1)
         self.assertEqual(self.ff.get_hydrophobic(self.benzene, f2f), 1)
@@ -114,12 +100,9 @@ class TestInteractions(unittest.TestCase):
         donor = Chem.MolFromMol2File(self.get_file("donor.mol2"), removeHs=False)
         acceptor = Chem.MolFromMol2File(self.get_file("acceptor.mol2"), removeHs=False)
         acceptor_false = Chem.MolFromMol2File(self.get_file("acceptor_false.mol2"), removeHs=False)
-        donor = prolif.Trajectory.from_rdkit(donor)
-        donor = next(iter(next(iter(donor))))
-        acceptor = prolif.Trajectory.from_rdkit(acceptor)
-        acceptor = next(iter(next(iter(acceptor))))
-        acceptor_false = prolif.Trajectory.from_rdkit(acceptor_false)
-        acceptor_false = next(iter(next(iter(acceptor_false))))
+        donor = prolif.Trajectory.from_rdkit(donor).get_frame().get_residue()
+        acceptor = prolif.Trajectory.from_rdkit(acceptor).get_frame().get_residue()
+        acceptor_false = prolif.Trajectory.from_rdkit(acceptor_false).get_frame().get_residue()
         # positive tests
         self.assertEqual(self.ff.get_hbond_donor(donor, acceptor), 1)
         self.assertEqual(self.ff.get_hbond_acceptor(acceptor, donor), 1)
@@ -135,14 +118,10 @@ class TestInteractions(unittest.TestCase):
         acceptor = Chem.MolFromMol2File(self.get_file("xbond_acceptor.mol2"), removeHs=False)
         acceptor_false_xar = Chem.MolFromMol2File(self.get_file("xbond_acceptor_false_xar.mol2"), removeHs=False)
         acceptor_false_axd = Chem.MolFromMol2File(self.get_file("xbond_acceptor_false_axd.mol2"), removeHs=False)
-        donor = prolif.Trajectory.from_rdkit(donor)
-        donor = next(iter(next(iter(donor))))
-        acceptor = prolif.Trajectory.from_rdkit(acceptor)
-        acceptor = next(iter(next(iter(acceptor))))
-        acceptor_false_xar = prolif.Trajectory.from_rdkit(acceptor_false_xar)
-        acceptor_false_xar = next(iter(next(iter(acceptor_false_xar))))
-        acceptor_false_axd = prolif.Trajectory.from_rdkit(acceptor_false_axd)
-        acceptor_false_axd = next(iter(next(iter(acceptor_false_axd))))
+        donor = prolif.Trajectory.from_rdkit(donor).get_frame().get_residue()
+        acceptor = prolif.Trajectory.from_rdkit(acceptor).get_frame().get_residue()
+        acceptor_false_xar = prolif.Trajectory.from_rdkit(acceptor_false_xar).get_frame().get_residue()
+        acceptor_false_axd = prolif.Trajectory.from_rdkit(acceptor_false_axd).get_frame().get_residue()
         # positive tests
         self.assertEqual(self.ff.get_xbond_donor(donor, acceptor), 1)
         self.assertEqual(self.ff.get_xbond_acceptor(acceptor, donor), 1)
@@ -159,12 +138,9 @@ class TestInteractions(unittest.TestCase):
         ligand = Chem.MolFromMol2File(self.get_file("ligand.mol2"), removeHs=False)
         metal = Chem.MolFromMol2File(self.get_file("metal.mol2"), removeHs=False)
         metal_false = Chem.MolFromMol2File(self.get_file("metal_false.mol2"), removeHs=False)
-        ligand = prolif.Trajectory.from_rdkit(ligand)
-        ligand = next(iter(next(iter(ligand))))
-        metal = prolif.Trajectory.from_rdkit(metal)
-        metal = next(iter(next(iter(metal))))
-        metal_false = prolif.Trajectory.from_rdkit(metal_false)
-        metal_false = next(iter(next(iter(metal_false))))
+        ligand = prolif.Trajectory.from_rdkit(ligand).get_frame().get_residue()
+        metal = prolif.Trajectory.from_rdkit(metal).get_frame().get_residue()
+        metal_false = prolif.Trajectory.from_rdkit(metal_false).get_frame().get_residue()
         # positive tests
         self.assertEqual(self.ff.get_metal_donor(metal, ligand), 1)
         self.assertEqual(self.ff.get_metal_acceptor(ligand, metal), 1)

@@ -1,5 +1,5 @@
 from rdkit import Chem
-from .utils import PERIODIC_TABLE, BONDTYPE_TO_RDKIT
+from .utils import PERIODIC_TABLE, BONDTYPE_TO_RDKIT, BONDORDER_TO_RDKIT
 
 
 class Atom:
@@ -30,7 +30,7 @@ class Atom:
     @classmethod
     def from_pytraj(cls, atom):
         """Create an atom from a pytraj `Atom`"""
-        return cls(atom.atomic_number, name=atom.name, charge=atom.charge,
+        return cls(atom.atomic_number, name=atom.name,
         resname=atom.resname, resid=atom.resid)
 
     @classmethod
@@ -40,6 +40,13 @@ class Atom:
         res = atom.residue
         return cls(number, symbol=symbol, name=atom.name,
         resname=res.name, resid=res.resSeq)
+
+    @classmethod
+    def from_openbabel(cls, atom):
+        """Create an atom from an openbabel `OBAtom`"""
+        residue = atom.GetResidue()
+        return cls(atom.GetAtomicNum(), name=atom.GetType(), charge=atom.GetFormalCharge(),
+            resname=residue.GetName(), resid=residue.GetNum())
 
     def to_rdkit(self):
         a = Chem.Atom(self.atomic_number)
@@ -52,7 +59,7 @@ class Atom:
         a.SetMonomerInfo(mi)
         a.SetProp("residue_name", self.residue)
         # set partial charge
-        a.SetDoubleProp("_GasteigerCharge", self.charge)
+        a.SetFormalCharge(self.charge)
         # disable adding H to the molecule
         a.SetNoImplicit(True)
         return a
@@ -89,6 +96,12 @@ class Bond:
         """Create a bond from a mdtraj `Bond`"""
         a1, a2, bond_type = bond.atom1, bond.atom2, bond.type
         return cls([a1.index, a2.index], bond_type)
+
+    @classmethod
+    def from_openbabel(cls, bond):
+        """Create a bond from an openbabel `OBBond`"""
+        return cls([bond.GetBeginAtomIdx()-1, bond.GetEndAtomIdx()-1],
+            BONDORDER_TO_RDKIT.get(bond.GetBondOrder(), Chem.BondType.SINGLE))
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])

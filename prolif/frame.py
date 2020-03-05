@@ -1,4 +1,5 @@
 import copy
+from collections import OrderedDict
 from rdkit import Chem
 from rdkit.Chem import rdMolTransforms
 from .residue import ResidueFrame
@@ -9,7 +10,11 @@ class Frame(Chem.Mol):
     Contains a conformer of the whole molecule. Looping over a frame returns a
     ResidueFrame."""
 
-    def __init__(self, topology, xyz, n_frame=0):
+    def __init__(self, trajectory, n_frame=None):
+        topology = trajectory.top
+        if not n_frame:
+            n_frame = trajectory.n_frame
+        xyz = trajectory.coordinates[n_frame]
         super().__init__(topology)
         conformer = Chem.Conformer(self.GetNumAtoms())
         for atom in self.GetAtoms():
@@ -20,7 +25,9 @@ class Frame(Chem.Mol):
         self.n_frame = n_frame
         self.xyz = xyz
         self.n_residues = len(topology.residues_list)
-        self.residues = topology.residues
+        self.residues = OrderedDict((resname, r) for resname,r in topology.residues.items() if resname in topology.residues_list)
+        self.residues.atom_map = topology.residues.atom_map
+        self.name = trajectory.name
 
     def __iter__(self):
         self.n_residue = 0
@@ -38,9 +45,18 @@ class Frame(Chem.Mol):
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"frame #{self.n_frame} with centroid {list(self.centroid)}"
+        params = f"frame #{self.n_frame} with {self.n_residues} residues"
         return f"<{name}: {params} at 0x{id(self):02x}>"
 
     @property
     def centroid(self):
         return rdMolTransforms.ComputeCentroid(self.GetConformer())
+
+    def get_residue(self, resname=None):
+        if resname:
+            atom_map = self.residues.atom_map[resname]
+            atom_xyz_indices = [atom_map[atom.GetIdx()] for atom in self.residues[resname].GetAtoms()]
+            residue = ResidueFrame(self.residues[resname], self.xyz[atom_xyz_indices])
+            return residue
+        else:
+            return next(iter(self))
