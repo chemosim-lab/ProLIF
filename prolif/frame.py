@@ -12,7 +12,7 @@ class Frame(Chem.Mol):
 
     def __init__(self, trajectory, n_frame=None):
         topology = trajectory.top
-        if not n_frame:
+        if n_frame is None:
             n_frame = trajectory.n_frame
         xyz = trajectory.coordinates[n_frame]
         super().__init__(topology)
@@ -24,8 +24,9 @@ class Frame(Chem.Mol):
         self.AddConformer(conformer)
         self.n_frame = n_frame
         self.xyz = xyz
-        self.n_residues = len(topology.residues_list)
-        self.residues = OrderedDict((resname, r) for resname,r in topology.residues.items() if resname in topology.residues_list)
+        self.pocket_residues = trajectory.pocket_residues
+        self.n_residues = len(topology.residues)
+        self.residues = topology.residues
         self.residues.atom_map = topology.residues.atom_map
         self.name = trajectory.name
 

@@ -64,8 +64,8 @@ def parse_args():
         ['PiStacking', 'π-stacking', 'aromatic', 'aromatic'],
         ['FaceToFace', 'π-stacking', 'aromatic', 'aromatic'],
         ['EdgeToFace', 'π-stacking', 'aromatic', 'aromatic'],
-        ['Pi-Cation', 'Cation-π', 'aromatic', 'cation'],
-        ['Cation-Pi', 'Cation-π', 'cation', 'aromatic'],
+        ['PiCation', 'Cation-π', 'aromatic', 'cation'],
+        ['CationPi', 'Cation-π', 'cation', 'aromatic'],
         ['MBdonor', 'Metallic', 'metal', 'ligand'],
         ['MBacceptor', 'Metallic', 'ligand', 'metal'],
     ]

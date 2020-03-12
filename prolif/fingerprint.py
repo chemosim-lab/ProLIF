@@ -2,7 +2,7 @@ import logging, copy
 from os import path
 from collections import OrderedDict
 from math import radians
-from rdkit import Chem, DataStructs
+from rdkit import Chem
 from rdkit import Geometry as rdGeometry
 from .parameters import RULES
 from .utils import (
@@ -28,7 +28,7 @@ class FingerprintFactory:
             self.rules = copy.deepcopy(RULES)
         # convert angles from degrees to radian
         for i in range(2):
-            for key in ["HBond", "Cation-Pi"]:
+            for key in ["HBond", "CationPi"]:
                 self.rules[key]["angle"][i] = radians(self.rules[key]["angle"][i])
             for key in ["AXD","XAR"]:
                 self.rules["XBond"]["angle"][key][i] = radians(self.rules["XBond"]["angle"][key][i])
@@ -47,6 +47,14 @@ class FingerprintFactory:
             "Metal": Chem.MolFromSmarts(self.rules["Metallic"]["metal"]),
             "Ligand": Chem.MolFromSmarts(self.rules["Metallic"]["ligand"]),
         }
+        for smarts in self.SMARTS.values():
+            if isinstance(smarts, list):
+                for s in smarts:
+                    s.UpdatePropertyCache()
+                    Chem.GetSymmSSSR(s)
+            else:
+                smarts.UpdatePropertyCache()
+                Chem.GetSymmSSSR(smarts)
         # read interactions to compute
         logger.info('The fingerprint factory will generate the following bitstring: {}'.format(' '.join(interactions)))
         self.n_interactions = len(interactions)
@@ -70,9 +78,9 @@ class FingerprintFactory:
                 self.interactions[interaction] = self.get_face_to_face
             elif interaction == 'EdgeToFace':
                 self.interactions[interaction] = self.get_edge_to_face
-            elif interaction == 'Pi-Cation':
+            elif interaction == 'PiCation':
                 self.interactions[interaction] = self.get_pi_cation
-            elif interaction == 'Cation-Pi':
+            elif interaction == 'CationPi':
                 self.interactions[interaction] = self.get_cation_pi
             elif interaction == 'Hydrophobic':
                 self.interactions[interaction] = self.get_hydrophobic
@@ -83,7 +91,7 @@ class FingerprintFactory:
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{len(self.interactions)} interactions"
+        params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
         return f"<{name}: {params} at 0x{id(self):02x}>"
 
     def get_hydrophobic(self, ligand, residue):
@@ -132,10 +140,10 @@ class FingerprintFactory:
                     a = rdGeometry.Point3D(*acceptor_frame.xyz[acceptor_match[0]])
                     dist = h.Distance(a)
                     if dist <= self.rules["HBond"]["distance"]:
-                        dh = d.DirectionVector(h)
+                        hd = h.DirectionVector(d)
                         ha = h.DirectionVector(a)
-                        # get angle between dh and ha
-                        angle = dh.AngleTo(ha)
+                        # get DHA angle
+                        angle = hd.AngleTo(ha)
                         if angle_between_limits(angle, *self.rules["HBond"]["angle"]):
                             return 1
         return 0
@@ -230,14 +238,14 @@ class FingerprintFactory:
                         centroid  = rdGeometry.Point3D(*get_centroid(pi_coords))
                         # distance between cation and centroid
                         dist = cat.Distance(centroid)
-                        if dist <= self.rules["Cation-Pi"]["distance"]:
+                        if dist <= self.rules["CationPi"]["distance"]:
                             # vector normal to ring plane
                             normal = get_ring_normal_vector(centroid, pi_coords)
                             # vector between the centroid and the charge
                             centroid_cation = centroid.DirectionVector(cat)
                             # compute angle between normal to ring plane and centroid-cation
                             angle = normal.AngleTo(centroid_cation)
-                            if angle_between_limits(angle, *self.rules["Cation-Pi"]["angle"], ring=True):
+                            if angle_between_limits(angle, *self.rules["CationPi"]["angle"], ring=True):
                                 return 1
         return 0
 
@@ -322,8 +330,9 @@ class FingerprintFactory:
                 "Protein name": protein_frame.name,
                 "Protein frame": protein_frame.n_frame,
             }
-            for residue_frame in protein_frame:
-                data[residue_frame.resname] = self.generate_bitstring(ligand_resframe, residue_frame)
+            for resname in protein_frame.pocket_residues:
+                residue_frame = protein_frame.get_residue(resname)
+                data[resname] = self.generate_bitstring(ligand_resframe, residue_frame)
             for key in data.keys():
                 if key not in ifp:
                     ifp[key] = [data[key]]

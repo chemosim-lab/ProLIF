@@ -19,6 +19,7 @@ class Trajectory(Chem.Mol):
         self.n_frames = len(coordinates)
         self.coordinates = coordinates
         self.name = name
+        self.pocket_residues = []
 
     def __iter__(self):
         self.n_frame = 0
@@ -62,7 +63,7 @@ class Trajectory(Chem.Mol):
     def from_pdbqt(cls, pdbqt_file, **kwargs):
         """Create a trajectory from an AutoDock Vina PDBQT file"""
         mol2_blocks = pdbqt_to_mol2(pdbqt_file)
-        mols = [Chem.MolFromMol2Block(mol2) for mol2 in mol2_blocks]
+        mols = [Chem.MolFromMol2Block(mol2, removeHs=False) for mol2 in mol2_blocks]
         topology = Topology.from_rdkit(mols[0])
         topology.RemoveAllConformers()
         coordinates = np.array([conf.GetPositions() for mol in mols for conf in mol.GetConformers()])

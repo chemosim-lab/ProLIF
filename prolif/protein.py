@@ -13,9 +13,9 @@ class Protein(Trajectory):
 
     """
 
-    def __init__(self, topology, coordinates, reference=None, cutoff=6.0, reference_frame=0, residues_list=[], name="protein"):
+    def __init__(self, topology, coordinates, reference=None, cutoff=6.0, reference_frame=0, pocket_residues=[], name="protein"):
         super().__init__(topology, coordinates, name=name)
-        if not residues_list:
+        if not pocket_residues:
             if reference:
                 self.reference = reference
                 self.reference_frame = reference_frame
@@ -27,25 +27,25 @@ class Protein(Trajectory):
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{self.n_frames} frame(s), {len(self.residues_list)} residues, {self.GetNumAtoms()} atoms, {self.GetNumBonds()} bonds, {Chem.GetSSSR(self)} rings"
+        params = f"{self.n_frames} frame(s), {len(self.residues)} residues, {self.GetNumAtoms()} atoms, {self.GetNumBonds()} bonds, {Chem.GetSSSR(self)} rings"
         return f"<{name}: {params} at 0x{id(self):02x}>"
 
     def detect_pocket_residues(self, reference, cutoff=6.0, frame=0, prot_frame=None, ref_frame=None):
         """Detect residues close to a reference ligand, based on the given frame"""
-        residues_list = []
+        pocket_residues = []
         # set which frame to use
-        lig_frame = ref_frame if ref_frame else frame
-        prot_frame = prot_frame if prot_frame else frame
+        lig_frame = ref_frame if ref_frame is not None else frame
+        prot_frame = prot_frame if prot_frame is not None else frame
         logger.info("Detecting pocket residues using frame #{} for the protein and frame #{} for the reference ligand".format(prot_frame, lig_frame))
         prot_frame = self.get_frame(prot_frame)
         ref_frame = reference.get_frame(lig_frame)
         ref_points = reference.get_USRlike_atoms(lig_frame)
         for residue in prot_frame:
             # skip residues already inside the list
-            if residue.resname in residues_list:
+            if residue.resname in pocket_residues:
                 continue
             # skip residues with centroid far from ligand centroid
-            if residue.centroid.Distance(ref_frame.centroid) > 2*cutoff:
+            if residue.centroid.Distance(ref_frame.centroid) > 3*cutoff:
                 continue
             # iterate over each reference point
             for ref_point in ref_points:
@@ -53,13 +53,9 @@ class Protein(Trajectory):
                     resid_point = rdGeometry.Point3D(*atom_crd)
                     dist = ref_point.Distance(resid_point)
                     if dist <= cutoff:
-                        residues_list.append(residue.resname)
+                        pocket_residues.append(residue.resname)
                         break
-                if residue.resname in residues_list:
+                if residue.resname in pocket_residues:
                     break
-        logger.info('Detected {} residues inside the binding pocket'.format(len(residues_list)))
-        self.top.residues_list = residues_list
-
-    @property
-    def residues_list(self):
-        return self.top.residues_list
+        logger.info('Detected {} residues inside the binding pocket'.format(len(pocket_residues)))
+        self.pocket_residues = pocket_residues

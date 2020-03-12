@@ -10,9 +10,8 @@ class Atom:
     Optionnal information include the symbol, name, residue name, and charge.
     """
 
-    def __init__(self, atomic_number, symbol=None, name=None, charge=0.0,
-        resname="UNL", resid=0,
-        ):
+    def __init__(self, atomic_number, symbol=None, name=None, charge=0,
+        resname="UNL", resid=0):
         self.atomic_number = atomic_number
         self.resname = resname
         self.resid = resid
@@ -31,7 +30,7 @@ class Atom:
     def from_pytraj(cls, atom):
         """Create an atom from a pytraj `Atom`"""
         return cls(atom.atomic_number, name=atom.name,
-        resname=atom.resname, resid=atom.resid)
+            resname=atom.resname, resid=atom.resid)
 
     @classmethod
     def from_mdtraj(cls, atom):
@@ -39,7 +38,7 @@ class Atom:
         number, name, symbol, mass, radius = atom.element
         res = atom.residue
         return cls(number, symbol=symbol, name=atom.name,
-        resname=res.name, resid=res.resSeq)
+            resname=res.name, resid=res.resSeq)
 
     @classmethod
     def from_openbabel(cls, atom):

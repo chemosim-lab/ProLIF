@@ -1,8 +1,22 @@
-import re, textwrap
+import re
 from math import pi
+from functools import wraps
 import numpy as np
 from rdkit import Chem
 from rdkit import Geometry as rdGeometry
+# optionnal imports
+try:
+    import sklearn
+except ImportError:
+    _has_sklearn = False
+else:
+    _has_sklearn = True
+try:
+    import seaborn
+except ImportError:
+    _has_seaborn = False
+else:
+    _has_seaborn = True
 
 
 PERIODIC_TABLE = Chem.GetPeriodicTable()
@@ -17,6 +31,24 @@ BONDORDER_TO_RDKIT = {
     2: Chem.BondType.DOUBLE,
     3: Chem.BondType.TRIPLE,
 }
+
+def requires_sklearn(func):
+    """Decorator for when sklearn is required in a function"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not _has_sklearn:
+            raise ImportError("sklearn is required for this function, but isn't installed")
+        return func(*args, **kwargs)
+    return wrapper
+
+def requires_seaborn(func):
+    """Decorator for when seaborn is required in a function"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not _has_seaborn:
+            raise ImportError("seaborn is required for this function, but isn't installed")
+        return func(*args, **kwargs)
+    return wrapper
 
 def pdbqt_to_mol2(path):
     from openbabel import pybel
