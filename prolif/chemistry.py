@@ -1,3 +1,4 @@
+import re
 from rdkit import Chem
 from .utils import PERIODIC_TABLE, BONDTYPE_TO_RDKIT, BONDORDER_TO_RDKIT
 
@@ -50,9 +51,17 @@ class Atom:
     def to_rdkit(self):
         a = Chem.Atom(self.atomic_number)
         # add atom name
-        a.SetProp("_Name", self.name)
+        a.SetProp("_AtomName", self.name)
+        a.SetProp('_AtomType', self.symbol)
         # add residue name
         mi = Chem.AtomPDBResidueInfo()
+        s = re.findall('(\d+|\D+)', self.name)
+        if len(s) == 2:
+            symbol, number = s
+        else:
+            symbol, number = s[0], ""
+        name = "{:>2}".format(symbol) + "{:<2}".format(number)
+        mi.SetName(name)
         mi.SetResidueName(self.resname)
         mi.SetResidueNumber(self.resid)
         a.SetMonomerInfo(mi)

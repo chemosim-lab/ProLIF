@@ -177,6 +177,8 @@ class Dataframe(pd.DataFrame):
             Threshold value to discard residues. Needs `drop_residues=True`
         font_scale: float, 1.5
             Font scale on the plot
+        ylim: tuple, (0, nframes)
+            Limits of frames displayed on the Y-axis
 
         All remaining parameters are passed to `sns.catplot`
         """
@@ -197,6 +199,7 @@ class Dataframe(pd.DataFrame):
             print("Removed", ", ".join(todrop), f"""- interacting with the ligand in less than {100*drop_threshold}% of frames ({threshold}/{nframes} frames)""")
         # plot
         font_scale = kwargs.pop("font_scale", 1.5)
+        ylim = kwargs.pop("ylim", (0, data.Frame.max()+1))
         user_kwargs = copy.deepcopy(kwargs)
         kwargs = dict(
             height=10, aspect=0.08, jitter=0, sharex=False,
@@ -207,9 +210,10 @@ class Dataframe(pd.DataFrame):
             data=data, x="interaction", y="Frame",
             hue="interaction", col="residue", **kwargs)
         g.set_titles("{col_name}", rotation=90)
-        g.set(xticks=[], ylim=(0,data.Frame.max()+1))
+        g.set(xticks=[], ylim=ylim)
         g.set_xticklabels([])
         g.set_xlabels("")
         g.add_legend()
         for ax in g.axes.flat:
             ax.invert_yaxis()
+        return g
