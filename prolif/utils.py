@@ -17,6 +17,12 @@ except ImportError:
     _has_seaborn = False
 else:
     _has_seaborn = True
+try:
+    from openbabel import pybel
+except ImportError:
+    _has_pybel = False
+else:
+    _has_pybel = True
 
 
 PERIODIC_TABLE = Chem.GetPeriodicTable()
@@ -50,8 +56,25 @@ def requires_seaborn(func):
         return func(*args, **kwargs)
     return wrapper
 
+def requires_pybel(func):
+    """Decorator for when openbabel's pybel is required in a function"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not _has_pybel:
+            raise ImportError("pybel (openbabel) is required for this function, but isn't installed")
+        return func(*args, **kwargs)
+    return wrapper
+
+def requires_config(func):
+    """Check if the dataframe has been configured with a FingerprintFactory"""
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        assert self._configured, "The Dataframe needs to be configured with df.configure()"
+        return func(self, *args, **kwargs)
+    return wrapper
+
+@requires_pybel
 def pdbqt_to_mol2(path):
-    from openbabel import pybel
     mols = []
     for m in pybel.readfile("pdbqt", path):
         # necessary to properly add H

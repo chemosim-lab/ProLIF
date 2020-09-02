@@ -41,7 +41,7 @@ setup(
     python_requires='>=3.6',
     install_requires=['numpy>=1.13.3','pandas>=1.0.0'],
     extra_requires={
-        'sklearn': ['scikit-learn'],
+        'sklearn': ['scikit-learn'], 'openbabel': ['pybel']
     },
     dependency_links=['git+https://github.com/rdkit/rdkit'],
     test_suite="tests",

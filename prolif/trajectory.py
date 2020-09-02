@@ -3,7 +3,7 @@ import numpy as np
 from rdkit import Chem
 from .topology import Topology
 from .frame import Frame
-from .utils import pdbqt_to_mol2
+from .utils import pdbqt_to_mol2, requires_pybel
 
 class Trajectory(Chem.Mol):
     """
@@ -58,8 +58,13 @@ class Trajectory(Chem.Mol):
         topology.RemoveAllConformers()
         coordinates = np.array([conf.GetPositions() for conf in mol.GetConformers()])
         return cls(topology, coordinates, **kwargs)
+    
+    @classmethod
+    def from_pybel(cls, mol, **kwargs):
+        pass
 
     @classmethod
+    @requires_pybel
     def from_pdbqt(cls, pdbqt_file, **kwargs):
         """Create a trajectory from an AutoDock Vina PDBQT file"""
         mol2_blocks = pdbqt_to_mol2(pdbqt_file)

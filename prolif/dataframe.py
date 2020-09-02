@@ -1,10 +1,9 @@
 import logging
 import copy
-from functools import wraps
 import pandas as pd
 import numpy as np
 from rdkit import DataStructs
-from .utils import get_resnumber, requires_sklearn, requires_seaborn
+from .utils import get_resnumber, requires_sklearn, requires_seaborn, requires_config
 from .fingerprint import FingerprintFactory
 try:
     from sklearn.cluster import KMeans
@@ -41,14 +40,6 @@ class Dataframe(pd.DataFrame):
         self.interactions = list(ff.interactions.keys())
         self.n_interactions = ff.n_interactions
         self.id_columns = ["Ligand name", "Ligand frame", "Ligand residue", "Protein name", "Protein frame"]
-
-    def requires_config(func):
-        """Check if the dataframe has been configured with a FingerprintFactory"""
-        @wraps(func)
-        def wrapper(self, *args, **kwargs):
-            assert self._configured, "The Dataframe needs to be configured with df.configure()"
-            return func(self, *args, **kwargs)
-        return wrapper
 
     @requires_config
     def generate_ifp(self, ligand_frame, protein_frame):
