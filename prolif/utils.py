@@ -1,10 +1,11 @@
 import re
 from math import pi
 from functools import wraps
+from collections import namedtuple
 import numpy as np
 from rdkit import Chem
-from rdkit import Geometry as rdGeometry
-# optionnal imports
+from rdkit.Chem import rdmolops
+from rdkit.Geometry import Point3D
 try:
     import sklearn
 except ImportError:
@@ -17,26 +18,10 @@ except ImportError:
     _has_seaborn = False
 else:
     _has_seaborn = True
-try:
-    from openbabel import pybel
-except ImportError:
-    _has_pybel = False
-else:
-    _has_pybel = True
 
 
-PERIODIC_TABLE = Chem.GetPeriodicTable()
-BONDTYPE_TO_RDKIT = {
-    "AROMATIC": Chem.BondType.AROMATIC,
-    'SINGLE': Chem.BondType.SINGLE,
-    'DOUBLE': Chem.BondType.DOUBLE,
-    'TRIPLE': Chem.BondType.TRIPLE,
-}
-BONDORDER_TO_RDKIT = {
-    1: Chem.BondType.SINGLE,
-    2: Chem.BondType.DOUBLE,
-    3: Chem.BondType.TRIPLE,
-}
+ResidueId = namedtuple("Residue", ["name", "number", "chain"])
+
 
 def requires_sklearn(func):
     """Decorator for when sklearn is required in a function"""
@@ -47,6 +32,7 @@ def requires_sklearn(func):
         return func(*args, **kwargs)
     return wrapper
 
+
 def requires_seaborn(func):
     """Decorator for when seaborn is required in a function"""
     @wraps(func)
@@ -56,14 +42,6 @@ def requires_seaborn(func):
         return func(*args, **kwargs)
     return wrapper
 
-def requires_pybel(func):
-    """Decorator for when openbabel's pybel is required in a function"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not _has_pybel:
-            raise ImportError("pybel (openbabel) is required for this function, but isn't installed")
-        return func(*args, **kwargs)
-    return wrapper
 
 def requires_config(func):
     """Check if the dataframe has been configured with a FingerprintFactory"""
@@ -73,81 +51,17 @@ def requires_config(func):
         return func(self, *args, **kwargs)
     return wrapper
 
-@requires_pybel
-def pdbqt_to_mol2(path):
-    mols = []
-    for m in pybel.readfile("pdbqt", path):
-        # necessary to properly add H
-        mH = pybel.readstring("pdb", m.write("pdb"))
-        mH.addh()
-        # need to reassign old charges to mol
-        mH.OBMol.SetPartialChargesPerceived(True)
-        for i, (atom, old) in enumerate(zip(mH.atoms, m.atoms)):
-            if i == len(m.atoms): # stop at new hydrogens
-                break
-            # assign old charges
-            atom.OBAtom.SetPartialCharge(old.partialcharge)
-        mols.append(mH)
-    return [x.write("mol2") for x in mols]
-
-def update_bonds_and_charges(mol):
-    """mdtraj and pytraj don't keep information on bond order, and formal charges.
-    Since the given molecule should have all hydrogens added, we can infer
-    bond order and charges from the valence."""
-
-    for atom in mol.GetAtoms():
-        vtot = atom.GetTotalValence()
-        valences = PERIODIC_TABLE.GetValenceList(atom.GetAtomicNum())
-        electrons = [ v - vtot for v in valences ]
-        # if numbers in the electrons array are >0, the atom is missing bonds or
-        # formal charges. If it's <0, it has too many bonds and we must add the
-        # corresponding formal charge (we cannot break bonds present in the topology).
-
-        # if the only option is to add a positive charge
-        if (len(electrons)==1) and (electrons[0]<0):
-            charge = -electrons[0] # positive
-            atom.SetFormalCharge(charge)
-            mol.UpdatePropertyCache(strict=False)
-        else:
-            set_electrons = set(electrons)
-            neighbors = atom.GetNeighbors()
-            # check if neighbor can accept a double / triple bond
-            for i,na in enumerate(neighbors, start=1):
-                na_vtot = na.GetTotalValence()
-                na_valences = PERIODIC_TABLE.GetValenceList(na.GetAtomicNum())
-                na_electrons = [ v - na_vtot for v in na_valences ]
-                common_electrons = min(set_electrons.intersection(na_electrons), default=np.nan)
-                if common_electrons != 0:
-                    # if they have no valence need in common but it's the last option
-                    if common_electrons is np.nan:
-                        if i == len(neighbors): # if it's the last option available
-                            charge = -electrons[0] # negative
-                            atom.SetFormalCharge(charge)
-                            mol.UpdatePropertyCache(strict=False)
-                    # if they both need a supplementary bond
-                    else:
-                        bond = mol.GetBondBetweenAtoms(atom.GetIdx(), na.GetIdx())
-                        if common_electrons == 1:
-                            bond.SetBondType(Chem.BondType.DOUBLE)
-                        elif common_electrons == 2:
-                            bond.SetBondType(Chem.BondType.TRIPLE)
-                        mol.UpdatePropertyCache(strict=False)
-                        break # out of neighbors loop
-    Chem.SanitizeMol(mol)
-
-def get_resnumber(resname):
-    pattern = re.search(r'(\d+)', resname)
-    return int(pattern.group(1))
 
 def get_centroid(coordinates):
     """Centroid for an array of XYZ coordinates"""
     return np.mean(coordinates, axis=0)
 
+
 def get_ring_normal_vector(centroid, coordinates):
     """Returns a vector that is normal to the ring plane"""
     # A & B are two edges of the ring
-    a = rdGeometry.Point3D(*coordinates[0])
-    b = rdGeometry.Point3D(*coordinates[1])
+    a = Point3D(*coordinates[0])
+    b = Point3D(*coordinates[1])
     # vectors between centroid and these edges
     ca = centroid.DirectionVector(a)
     cb = centroid.DirectionVector(b)
@@ -155,6 +69,7 @@ def get_ring_normal_vector(centroid, coordinates):
     normal = ca.CrossProduct(cb)
     # note that cb.CrossProduct(ca) will the normal vector in the opposite direction
     return normal
+
 
 def angle_between_limits(angle, min_angle, max_angle, ring=False):
     """
@@ -164,7 +79,79 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
     """
     if ring and (angle > pi/2):
         mirror_angle = (pi/2) - (angle % (pi/2))
-        condition = (min_angle <= angle <= max_angle) or (min_angle <= mirror_angle <= max_angle)
-    else:
-        condition = (min_angle <= angle <= max_angle)
-    return condition
+        return (min_angle <= angle <= max_angle) or (min_angle <= mirror_angle <= max_angle)
+    return (min_angle <= angle <= max_angle)
+
+
+def get_residue_components(resid_str):
+    matches = re.search(r'(\w{3})(\d+)\.?(\w)?', resid_str)
+    resname, resnumber, chain = matches.groups()
+    return (resname, int(resnumber), chain if chain else "")
+
+
+def get_resid(atom):
+    mi = atom.GetMonomerInfo()
+    if mi:
+        resname = mi.GetResidueName() if mi.GetResidueName() else "UNK"
+        return ResidueId(resname, mi.GetResidueNumber(), 
+                         mi.GetChainId())
+    return ResidueId("UNK", 1, "")
+
+
+def get_reference_points(mol):
+    """Returns 4 rdkit Point3D objects similar to those used in the USR method:
+    - centroid (ctd)
+    - closest to ctd (cst)
+    - farthest from cst (fct)
+    - farthest from fct (ftf)"""
+    matrix = rdmolops.Get3DDistanceMatrix(mol)
+    conf = mol.GetConformer()
+    coords = conf.GetPositions()
+
+    # centroid
+    ctd = mol.centroid
+    # closest to centroid
+    min_dist = 100
+    for atom in mol.GetAtoms():
+        point = Point3D(*coords[atom.GetIdx()])
+        dist = ctd.Distance(point)
+        if dist < min_dist:
+            min_dist = dist
+            cst = point
+            cst_idx = atom.GetIdx()
+    # farthest from cst
+    fct_idx = argmax(matrix[cst_idx])
+    fct = Point3D(*coords[fct_idx])
+    # farthest from fct
+    ftf_idx = argmax(matrix[fct_idx])
+    ftf = Point3D(*coords[ftf_idx])
+    logger.debug('centroid (ctd) = {}'.format(list(ctd)))
+    logger.debug('closest to ctd (cst) = {}'.format(list(cst)))
+    logger.debug('farthest from cst (fct) = {}'.format(list(fct)))
+    logger.debug('farthest from fct (ftf) = {}'.format(list(ftf)))
+    return ctd, cst, fct, ftf
+
+
+def detect_pocket_residues(prot, lig, cutoff=6.0):
+    """Detect residues close to a reference ligand"""
+    pocket_residues = []
+    ref_points = get_reference_points(lig)
+    for residue in prot:
+        # skip residues already inside the list
+        if residue.resname in pocket_residues:
+            continue
+        # skip residues with centroid far from ligand centroid
+        if residue.centroid.Distance(lig.centroid) > 3*cutoff:
+            continue
+        # iterate over each reference point
+        for ref_point in ref_points:
+            for atom_crd in residue.xyz:
+                resid_point = Point3D(*atom_crd)
+                dist = ref_point.Distance(resid_point)
+                if dist <= cutoff:
+                    pocket_residues.append(residue.resname)
+                    break
+            if residue.resname in pocket_residues:
+                break
+    logger.info('Detected {} residues inside the binding pocket'.format(len(pocket_residues)))
+    return pocket_residues

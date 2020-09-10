@@ -1,4 +1,4 @@
-import unittest
+import pytest
 import os
 from rdkit import Chem, RDLogger
 import prolif
@@ -8,147 +8,106 @@ lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
 
-class TestInteractions(unittest.TestCase):
+def from_mol2(f):
+    path = os.path.join(os.path.dirname(__file__), "data", f)
+    mol = Chem.MolFromMol2File(path, removeHs=False)
+    return prolif.Molecule(mol)
 
-    def get_file(self, f):
-        return os.path.join(os.path.dirname(__file__), "data", f)
 
-    def setUp(self):
-        # Fingerprint Factory
-        self.ff = prolif.FingerprintFactory()
-        # Molecules used regularly
-        benzene = Chem.MolFromMol2File(self.get_file("benzene.mol2"), removeHs=False)
-        benzene = prolif.Trajectory.from_rdkit(benzene).get_frame().get_residue()
-        self.benzene = benzene
+class TestInteractions:
+    @pytest.fixture
+    def benzene(self):
+        return from_mol2("benzene.mol2")
+    
+    @pytest.fixture
+    def cation(self):
+        return from_mol2("cation.mol2")
 
-    def test_ionic(self):
-        # prepare inputs
-        cation = Chem.MolFromMol2File(self.get_file("cation.mol2"), removeHs=False)
-        anion = Chem.MolFromMol2File(self.get_file("anion.mol2"), removeHs=False)
-        cation = prolif.Trajectory.from_rdkit(cation).get_frame().get_residue()
-        anion = prolif.Trajectory.from_rdkit(anion).get_frame().get_residue()
-        # positive tests
-        self.assertEqual(self.ff.get_anionic(anion, cation), 1)
-        self.assertEqual(self.ff.get_cationic(cation, anion), 1)
-        # negative tests
-        self.assertEqual(self.ff.get_anionic(cation, anion), 0)
-        self.assertEqual(self.ff.get_cationic(anion, cation), 0)
+    @pytest.fixture
+    def anion(self):
+        return from_mol2("anion.mol2")
 
-    def test_cation_pi(self):
-        # prepare inputs
-        cation = Chem.MolFromMol2File(self.get_file("cation.mol2"), removeHs=False)
-        false = Chem.MolFromMol2File(self.get_file("cation_false.mol2"), removeHs=False)
-        cation = prolif.Trajectory.from_rdkit(cation).get_frame().get_residue()
-        false = prolif.Trajectory.from_rdkit(false).get_frame().get_residue()
-        # positive tests
-        self.assertEqual(self.ff.get_cation_pi(cation, self.benzene), 1)
-        self.assertEqual(self.ff.get_pi_cation(self.benzene, cation), 1)
-        # negative tests
-        self.assertEqual(self.ff.get_cation_pi(false, self.benzene), 0)
-        self.assertEqual(self.ff.get_cation_pi(self.benzene, cation), 0)
-        self.assertEqual(self.ff.get_pi_cation(self.benzene, false), 0)
-        self.assertEqual(self.ff.get_pi_cation(cation, self.benzene), 0)
+    @pytest.fixture
+    def ftf(self):
+        return from_mol2("facetoface.mol2")
 
-    def test_face_to_face(self):
-        # prepare inputs
-        f2f = Chem.MolFromMol2File(self.get_file("facetoface.mol2"), removeHs=False)
-        e2f = Chem.MolFromMol2File(self.get_file("edgetoface.mol2"), removeHs=False)
-        f2f = prolif.Trajectory.from_rdkit(f2f).get_frame().get_residue()
-        e2f = prolif.Trajectory.from_rdkit(e2f).get_frame().get_residue()
-        # positive tests
-        self.assertEqual(self.ff.get_face_to_face(self.benzene, f2f), 1)
-        self.assertEqual(self.ff.get_face_to_face(f2f, self.benzene), 1)
-        # negative tests
-        self.assertEqual(self.ff.get_face_to_face(self.benzene, e2f), 0)
-        self.assertEqual(self.ff.get_face_to_face(e2f, self.benzene), 0)
+    @pytest.fixture
+    def etf(self):
+        return from_mol2("edgetoface.mol2")
+    
+    @pytest.fixture(scope="class")
+    def encoder(self):
+        return prolif.Encoder("all")
 
-    def test_edge_to_face(self):
-        # prepare inputs
-        f2f = Chem.MolFromMol2File(self.get_file("facetoface.mol2"), removeHs=False)
-        e2f = Chem.MolFromMol2File(self.get_file("edgetoface.mol2"), removeHs=False)
-        f2f = prolif.Trajectory.from_rdkit(f2f).get_frame().get_residue()
-        e2f = prolif.Trajectory.from_rdkit(e2f).get_frame().get_residue()
-        # positive tests
-        self.assertEqual(self.ff.get_edge_to_face(self.benzene, e2f), 1)
-        self.assertEqual(self.ff.get_edge_to_face(e2f, self.benzene), 1)
-        # negative tests
-        self.assertEqual(self.ff.get_edge_to_face(self.benzene, f2f), 0)
-        self.assertEqual(self.ff.get_edge_to_face(f2f, self.benzene), 0)
+    def test_ionic(self, encoder, cation, anion):
+        assert encoder.anionic(anion, cation) is True
+        assert encoder.cationic(cation, anion) is True
+        assert encoder.anionic(cation, anion) is False
+        assert encoder.cationic(anion, cation) is False
 
-    def test_hydrophobic(self):
-        # prepare inputs
-        f2f = Chem.MolFromMol2File(self.get_file("facetoface.mol2"), removeHs=False)
-        e2f = Chem.MolFromMol2File(self.get_file("edgetoface.mol2"), removeHs=False)
-        chlorine = Chem.MolFromMol2File(self.get_file("chlorine.mol2"), removeHs=False)
-        anion = Chem.MolFromMol2File(self.get_file("anion.mol2"), removeHs=False)
-        cation = Chem.MolFromMol2File(self.get_file("cation.mol2"), removeHs=False)
-        f2f = prolif.Trajectory.from_rdkit(f2f).get_frame().get_residue()
-        e2f = prolif.Trajectory.from_rdkit(e2f).get_frame().get_residue()
-        chlorine = prolif.Trajectory.from_rdkit(chlorine).get_frame().get_residue()
-        anion = prolif.Trajectory.from_rdkit(anion).get_frame().get_residue()
-        cation = prolif.Trajectory.from_rdkit(cation).get_frame().get_residue()
-        # positive tests
-        self.assertEqual(self.ff.get_hydrophobic(self.benzene, e2f), 1)
-        self.assertEqual(self.ff.get_hydrophobic(self.benzene, f2f), 1)
-        self.assertEqual(self.ff.get_hydrophobic(self.benzene, chlorine), 1)
-        # negative tests
-        self.assertEqual(self.ff.get_hydrophobic(self.benzene, anion), 0)
-        self.assertEqual(self.ff.get_hydrophobic(self.benzene, cation), 0)
+    def test_cation_pi(self, encoder, benzene, cation):
+        false = from_mol2("cation_false.mol2")
+        assert encoder.cationpi(cation, benzene) is True
+        assert encoder.pication(benzene, cation) is True
+        assert encoder.cationpi(false, benzene) is False
+        assert encoder.cationpi(benzene, cation) is False
+        assert encoder.pication(benzene, false) is False
+        assert encoder.pication(cation, benzene) is False
 
-    def test_hbond(self):
-        # prepare inputs
-        donor = Chem.MolFromMol2File(self.get_file("donor.mol2"), removeHs=False)
-        acceptor = Chem.MolFromMol2File(self.get_file("acceptor.mol2"), removeHs=False)
-        acceptor_false = Chem.MolFromMol2File(self.get_file("acceptor_false.mol2"), removeHs=False)
-        donor = prolif.Trajectory.from_rdkit(donor).get_frame().get_residue()
-        acceptor = prolif.Trajectory.from_rdkit(acceptor).get_frame().get_residue()
-        acceptor_false = prolif.Trajectory.from_rdkit(acceptor_false).get_frame().get_residue()
-        # positive tests
-        self.assertEqual(self.ff.get_hbond_donor(donor, acceptor), 1)
-        self.assertEqual(self.ff.get_hbond_acceptor(acceptor, donor), 1)
-        # negative tests
-        self.assertEqual(self.ff.get_hbond_acceptor(acceptor_false, donor), 0)
-        self.assertEqual(self.ff.get_hbond_donor(donor, acceptor_false), 0)
-        self.assertEqual(self.ff.get_hbond_donor(acceptor, donor), 0)
-        self.assertEqual(self.ff.get_hbond_acceptor(donor, acceptor), 0)
+    def test_pistacking(self, encoder, benzene, ftf, etf):
+        assert encoder.facetoface(benzene, ftf) is True
+        assert encoder.facetoface(ftf, benzene) is True
+        assert encoder.facetoface(benzene, etf) is False
+        assert encoder.facetoface(etf, benzene) is False
+        assert encoder.edgetoface(benzene, etf) is True
+        assert encoder.edgetoface(etf, benzene) is True
+        assert encoder.edgetoface(benzene, ftf) is False
+        assert encoder.edgetoface(ftf, benzene) is False
+        assert encoder.pistacking(benzene, etf) is True
+        assert encoder.pistacking(etf, benzene) is True
+        assert encoder.pistacking(ftf, benzene) is True
+        assert encoder.pistacking(benzene, ftf) is True
 
-    def test_xbond(self):
-        # prepare inputs
-        donor = Chem.MolFromMol2File(self.get_file("xbond_donor.mol2"), removeHs=False)
-        acceptor = Chem.MolFromMol2File(self.get_file("xbond_acceptor.mol2"), removeHs=False)
-        acceptor_false_xar = Chem.MolFromMol2File(self.get_file("xbond_acceptor_false_xar.mol2"), removeHs=False)
-        acceptor_false_axd = Chem.MolFromMol2File(self.get_file("xbond_acceptor_false_axd.mol2"), removeHs=False)
-        donor = prolif.Trajectory.from_rdkit(donor).get_frame().get_residue()
-        acceptor = prolif.Trajectory.from_rdkit(acceptor).get_frame().get_residue()
-        acceptor_false_xar = prolif.Trajectory.from_rdkit(acceptor_false_xar).get_frame().get_residue()
-        acceptor_false_axd = prolif.Trajectory.from_rdkit(acceptor_false_axd).get_frame().get_residue()
-        # positive tests
-        self.assertEqual(self.ff.get_xbond_donor(donor, acceptor), 1)
-        self.assertEqual(self.ff.get_xbond_acceptor(acceptor, donor), 1)
-        # negative tests
-        self.assertEqual(self.ff.get_xbond_acceptor(acceptor_false_xar, donor), 0)
-        self.assertEqual(self.ff.get_xbond_donor(donor, acceptor_false_xar), 0)
-        self.assertEqual(self.ff.get_xbond_acceptor(acceptor_false_axd, donor), 0)
-        self.assertEqual(self.ff.get_xbond_donor(donor, acceptor_false_axd), 0)
-        self.assertEqual(self.ff.get_xbond_donor(acceptor, donor), 0)
-        self.assertEqual(self.ff.get_xbond_acceptor(donor, acceptor), 0)
+    def test_hydrophobic(self, encoder, ftf, etf, anion, cation, benzene):
+        chlorine = from_mol2("chlorine.mol2")
+        assert encoder.hydrophobic(benzene, etf) is True
+        assert encoder.hydrophobic(benzene, ftf) is True
+        assert encoder.hydrophobic(benzene, chlorine) is True
+        assert encoder.hydrophobic(benzene, anion) is False
+        assert encoder.hydrophobic(benzene, cation) is False
 
-    def test_metallic(self):
-        # prepare inputs
-        ligand = Chem.MolFromMol2File(self.get_file("ligand.mol2"), removeHs=False)
-        metal = Chem.MolFromMol2File(self.get_file("metal.mol2"), removeHs=False)
-        metal_false = Chem.MolFromMol2File(self.get_file("metal_false.mol2"), removeHs=False)
-        ligand = prolif.Trajectory.from_rdkit(ligand).get_frame().get_residue()
-        metal = prolif.Trajectory.from_rdkit(metal).get_frame().get_residue()
-        metal_false = prolif.Trajectory.from_rdkit(metal_false).get_frame().get_residue()
-        # positive tests
-        self.assertEqual(self.ff.get_metal_donor(metal, ligand), 1)
-        self.assertEqual(self.ff.get_metal_acceptor(ligand, metal), 1)
-        # negative tests
-        self.assertEqual(self.ff.get_metal_acceptor(ligand, metal_false), 0)
-        self.assertEqual(self.ff.get_metal_donor(metal_false, ligand), 0)
-        self.assertEqual(self.ff.get_metal_acceptor(metal, ligand), 0)
-        self.assertEqual(self.ff.get_metal_donor(ligand, metal), 0)
+    def test_hbond(self, encoder):
+        donor = from_mol2("donor.mol2")
+        acceptor = from_mol2("acceptor.mol2")
+        acceptor_false = from_mol2("acceptor_false.mol2")
+        assert encoder.hbdonor(donor, acceptor) is True
+        assert encoder.hbacceptor(acceptor, donor) is True
+        assert encoder.hbacceptor(acceptor_false, donor) is False
+        assert encoder.hbdonor(donor, acceptor_false) is False
+        assert encoder.hbdonor(acceptor, donor) is False
+        assert encoder.hbacceptor(donor, acceptor) is False
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_xbond(self, encoder):
+        donor = from_mol2("xbond_donor.mol2")
+        acceptor = from_mol2("xbond_acceptor.mol2")
+        acceptor_false_xar = from_mol2("xbond_acceptor_false_xar.mol2")
+        acceptor_false_axd = from_mol2("xbond_acceptor_false_axd.mol2")
+        assert encoder.xbdonor(donor, acceptor) is True
+        assert encoder.xbacceptor(acceptor, donor) is True
+        assert encoder.xbacceptor(acceptor_false_xar, donor) is False
+        assert encoder.xbdonor(donor, acceptor_false_xar) is False
+        assert encoder.xbacceptor(acceptor_false_axd, donor) is False
+        assert encoder.xbdonor(donor, acceptor_false_axd) is False
+        assert encoder.xbdonor(acceptor, donor) is False
+        assert encoder.xbacceptor(donor, acceptor) is False
+
+    def test_metallic(self, encoder):
+        ligand = from_mol2("ligand.mol2")
+        metal = from_mol2("metal.mol2")
+        metal_false = from_mol2("metal_false.mol2")
+        assert encoder.metaldonor(metal, ligand) is True
+        assert encoder.metalacceptor(ligand, metal) is True
+        assert encoder.metalacceptor(ligand, metal_false) is False
+        assert encoder.metaldonor(metal_false, ligand) is False
+        assert encoder.metalacceptor(metal, ligand) is False
+        assert encoder.metaldonor(ligand, metal) is False

@@ -18,7 +18,7 @@ setup(
     description='Protein-Ligand Interaction Fingerprints',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/cbouy/ProLIF',
+    url='https://github.com/chemosim-lab/ProLIF',
     author='Cédric Bouysset',
     author_email='bouysset.cedric@gmail.com',
     license='Apache License, Version 2.0',
@@ -39,12 +39,12 @@ setup(
         'console_scripts': ['prolif=prolif.command_line:main'],
     },
     python_requires='>=3.6',
-    install_requires=['numpy>=1.13.3','pandas>=1.0.0'],
-    extra_requires={
-        'sklearn': ['scikit-learn'], 'openbabel': ['pybel']
+    install_requires=['numpy>=1.13.3','mdanalysis>=2.0.0'],
+    extras_require={
+        'sklearn': ['scikit-learn'],
     },
-    dependency_links=['git+https://github.com/rdkit/rdkit'],
     test_suite="tests",
+    tests_require="pytest",
     package_data={
         'tests': ['*.mol2'],
     },
