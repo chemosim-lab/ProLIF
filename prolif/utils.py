@@ -1,11 +1,12 @@
 import re
 from math import pi
 from functools import wraps
-from collections import namedtuple
+from operator import attrgetter
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import rdmolops
 from rdkit.Geometry import Point3D
+from .residue import ResidueId
 try:
     import sklearn
 except ImportError:
@@ -18,9 +19,6 @@ except ImportError:
     _has_seaborn = False
 else:
     _has_seaborn = True
-
-
-ResidueId = namedtuple("Residue", ["name", "number", "chain"])
 
 
 def requires_sklearn(func):
@@ -83,21 +81,6 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
     return (min_angle <= angle <= max_angle)
 
 
-def get_residue_components(resid_str):
-    matches = re.search(r'(\w{3})(\d+)\.?(\w)?', resid_str)
-    resname, resnumber, chain = matches.groups()
-    return (resname, int(resnumber), chain if chain else "")
-
-
-def get_resid(atom):
-    mi = atom.GetMonomerInfo()
-    if mi:
-        resname = mi.GetResidueName() if mi.GetResidueName() else "UNK"
-        return ResidueId(resname, mi.GetResidueNumber(), 
-                         mi.GetChainId())
-    return ResidueId("UNK", 1, "")
-
-
 def get_reference_points(mol):
     """Returns 4 rdkit Point3D objects similar to those used in the USR method:
     - centroid (ctd)
@@ -120,38 +103,21 @@ def get_reference_points(mol):
             cst = point
             cst_idx = atom.GetIdx()
     # farthest from cst
-    fct_idx = argmax(matrix[cst_idx])
+    fct_idx = np.argmax(matrix[cst_idx])
     fct = Point3D(*coords[fct_idx])
     # farthest from fct
-    ftf_idx = argmax(matrix[fct_idx])
+    ftf_idx = np.argmax(matrix[fct_idx])
     ftf = Point3D(*coords[ftf_idx])
-    logger.debug('centroid (ctd) = {}'.format(list(ctd)))
-    logger.debug('closest to ctd (cst) = {}'.format(list(cst)))
-    logger.debug('farthest from cst (fct) = {}'.format(list(fct)))
-    logger.debug('farthest from fct (ftf) = {}'.format(list(ftf)))
-    return ctd, cst, fct, ftf
+    return np.array((ctd, cst, fct, ftf))
 
 
 def detect_pocket_residues(prot, lig, cutoff=6.0):
     """Detect residues close to a reference ligand"""
-    pocket_residues = []
     ref_points = get_reference_points(lig)
-    for residue in prot:
-        # skip residues already inside the list
-        if residue.resname in pocket_residues:
-            continue
-        # skip residues with centroid far from ligand centroid
-        if residue.centroid.Distance(lig.centroid) > 3*cutoff:
-            continue
-        # iterate over each reference point
-        for ref_point in ref_points:
-            for atom_crd in residue.xyz:
-                resid_point = Point3D(*atom_crd)
-                dist = ref_point.Distance(resid_point)
-                if dist <= cutoff:
-                    pocket_residues.append(residue.resname)
-                    break
-            if residue.resname in pocket_residues:
-                break
-    logger.info('Detected {} residues inside the binding pocket'.format(len(pocket_residues)))
-    return pocket_residues
+    pocket_residues = []
+    for point in ref_points:
+        distances = np.linalg.norm(point - prot.xyz, axis=1)
+        indices = np.where(distances <= cutoff)[0]
+        pocket_residues.extend([ResidueId.from_atom(
+            prot.GetAtomWithIdx(int(i))) for i in indices])
+    return sorted(set(pocket_residues), key=attrgetter("chain", "number"))

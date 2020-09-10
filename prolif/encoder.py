@@ -24,7 +24,7 @@ class Encoder:
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
         return f"<{name}: {params} at {id(self):#x}>"
-    
+
     def add_interaction(self, interaction):
         """Add an interaction to the encoder"""
         if callable(interaction):
@@ -43,11 +43,11 @@ class Encoder:
             bitstring.append(interaction_function(res1, res2))
         return bitstring
 
-    def get_ifp(self, ligand, protein, resnames):
-        """Generates the complete IFP between two Molecules for a list of residue names"""
+    def get_ifp(self, ligand, protein, residues):
+        """Generates the complete IFP between two Molecules for a list of residues"""
         ifp = {}
         for lig in ligand:
-            for resname in resnames:
+            for resid in residues:
                 res = protein[resid]
                 key = (lig.resid, res.resid)
                 ifp[key] = self.get_bitstring(lig, res)
