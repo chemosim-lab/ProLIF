@@ -1,5 +1,6 @@
 import copy
 from collections import defaultdict
+from collections.abc import Iterable
 from rdkit import Chem
 from rdkit.Chem import rdMolTransforms
 from .residue import Residue, ResidueId
@@ -47,8 +48,7 @@ class Molecule(Chem.Mol):
         self.residues = {resid: Residue(mol) for resid, mol in sorted(
                          residues.items(), key=lambda x: (x[0].chain, x[0].number))}
         self.n_residues = len(self.residues)
-        self._residues_indices_map = {i: resid for i, resid in enumerate(
-                                      self.residues.keys())}
+        self._residues_indices = list(self.residues.keys())
 
     def _make_residues(self):
         """Generate a dict of residues"""
@@ -72,29 +72,30 @@ class Molecule(Chem.Mol):
         return residues, atom_map
 
     def __iter__(self):
-        self._residue_index = 0
-        return self
-
-    def __next__(self):
-        if self._residue_index >= self.n_residues:
-            raise StopIteration
-        resid = self._residues_indices_map[self._residue_index]
-        self._residue_index += 1
-        return self.residues[resid]
+        for i in range(self.n_residues):
+            resid = self._residues_indices[i]
+            yield self.residues[resid]
 
     def __getitem__(self, selection):
         if isinstance(selection, ResidueId):
-            resid = selection
+            return self.residues[selection]
         elif isinstance(selection, int):
-            if selection < 0:
-                selection = self.n_residues + selection
-            resid = self._residues_indices_map[selection]
+            resid = self._residues_indices[selection]
+            return self.residues[resid]
         elif isinstance(selection, str):
             resid = ResidueId.from_string(selection)
-        else:
-            raise ValueError("Expected a ResidueId, int or str, got "
-                             f"{type(selection)} instead")
-        return self.residues[resid]
+            return self.residues[resid]
+        elif isinstance(selection, slice):
+            resids = self._residues_indices[selection]
+            return {resid: self.residues[resid] for resid in resids}
+        elif isinstance(selection, Iterable):
+            if isinstance(selection[0], int):
+                resids = [self._residues_indices[i] for i in selection]
+            elif isinstance(selection[0], str):
+                resids = [ResidueId.from_string(s) for s in selection]
+            return {resid: self.residues[resid] for resid in resids}
+        raise ValueError("Expected a ResidueId, int or str, got "
+                         f"{type(selection)} instead")
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])

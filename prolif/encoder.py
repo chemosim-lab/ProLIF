@@ -14,7 +14,8 @@ class Encoder:
         # read interactions to compute
         self.interactions = {}
         if interactions == "all":
-            interactions = _INTERACTIONS.keys()
+            interactions = [i for i in _INTERACTIONS.keys() 
+                            if not (i.startswith("_") or i == "Interaction")]
         for interaction in interactions:
             self.add_interaction(interaction)
         self.n_interactions = len(self.interactions)

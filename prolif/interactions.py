@@ -14,8 +14,7 @@ _INTERACTIONS = {}
 class _InteractionMeta(type):
     def __init__(cls, name, bases, classdict):
         type.__init__(cls, name, bases, classdict)
-        if not (name.startswith("_") or name == "Interaction"):
-            _INTERACTIONS[name] = cls
+        _INTERACTIONS[name] = cls
 
 
 class Interaction(metaclass=_InteractionMeta):
