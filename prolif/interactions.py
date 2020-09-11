@@ -23,6 +23,24 @@ class Interaction(metaclass=_InteractionMeta):
         raise NotImplementedError("This method must be defined by the subclass")
 
 
+def get_mapindex(res, index):
+    """Get the index of the atom in the original molecule
+
+    Parameters
+    ----------
+    res : prolif.residue.Residue
+        The ligand or residue
+    index : int
+        The index of the atom in the :class:`~prolif.residue.Residue`
+
+    Returns
+    -------
+    mapindex : int
+        The index of the atom in the :class:`~prolif.molecule.Molecule`
+    """
+    return res.GetAtomWithIdx(index).GetUnsignedProp("__mapindex")
+
+
 class Hydrophobic(Interaction):
     """Get the presence or absence of an hydrophobic interaction between
     a ResidueFrame and a ligand Frame"""
@@ -46,8 +64,9 @@ class Hydrophobic(Interaction):
                     # compute distance between points
                     dist = lig_atom.Distance(res_atom)
                     if dist <= self.distance:
-                        return True
-        return False
+                        return (True, get_mapindex(ligand, lig_match[0]), 
+                                get_mapindex(residue, res_match[0]))
+        return False, None, None
 
 
 class _BaseHBond(Interaction):
@@ -76,15 +95,18 @@ class _BaseHBond(Interaction):
                         # get DHA angle
                         angle = hd.AngleTo(ha)
                         if angle_between_limits(angle, *self.angles):
-                            return True
-        return False
+                            return (True, get_mapindex(acceptor,
+                                    acceptor_match[0]), get_mapindex(donor,
+                                    donor_match[1]))
+        return False, None, None
 
 
 class HBDonor(_BaseHBond):
     """Get the presence or absence of a H-bond interaction between
     a residue as an acceptor and a ligand as a donor"""
     def detect(self, ligand, residue):
-        return super().detect(residue, ligand)
+        bit, ires, ilig = super().detect(residue, ligand)
+        return bit, ilig, ires
 
 
 class HBAcceptor(_BaseHBond):
@@ -126,8 +148,10 @@ class _BaseXBond(Interaction):
                             ar = a.DirectionVector(r)
                             angle = ax.AngleTo(ar)
                             if angle_between_limits(angle, *self.xar_angles):
-                                return True
-        return False
+                                return (True, get_mapindex(acceptor,
+                                        acceptor_match[0]), get_mapindex(donor,
+                                        donor_match[1]))
+        return False, None, None
 
 
 class XBAcceptor(_BaseXBond):
@@ -141,7 +165,8 @@ class XBDonor(_BaseXBond):
     """Get the presence or absence of a Halogen Bond where the ligand acts as
     a donor"""
     def detect(self, ligand, residue):
-        return super().detect(residue, ligand)
+        bit, ires, ilig = super().detect(residue, ligand)
+        return bit, ilig, ires
 
 
 class _BaseIonic(Interaction):
@@ -161,8 +186,9 @@ class _BaseIonic(Interaction):
                     c = rdGeometry.Point3D(*cation.xyz[cation_match[0]])
                     dist = a.Distance(c)
                     if dist <= self.distance:
-                        return True
-        return False
+                        return (True, get_mapindex(cation, cation_match[0]),
+                                get_mapindex(anion, anion_match[0]))
+        return False, None, None
 
 
 class Cationic(_BaseIonic):
@@ -176,7 +202,8 @@ class Anionic(_BaseIonic):
     """Get the presence or absence of an ionic interaction between a residue
     as a cation and a ligand as an anion"""
     def detect(self, ligand, residue):
-        return super().detect(residue, ligand)
+        bit, ires, ilig = super().detect(residue, ligand)
+        return bit, ilig, ires
 
 
 class _BaseCationPi(Interaction):
@@ -210,15 +237,18 @@ class _BaseCationPi(Interaction):
                             # compute angle between normal to ring plane and centroid-cation
                             angle = normal.AngleTo(centroid_cation)
                             if angle_between_limits(angle, *self.angles, ring=True):
-                                return True
-        return False
+                                return (True, get_mapindex(cation,
+                                        cation_match[0]), get_mapindex(pi,
+                                        pi_match[0]))
+        return False, None, None
 
 
 class PiCation(_BaseCationPi):
     """Get the presence or absence of an interaction between a residue as
     a cation and a ligand as a pi system"""
     def detect(self, ligand, residue):
-        return super().detect(residue, ligand)
+        bit, ires, ilig = super().detect(residue, ligand)
+        return bit, ilig, ires
 
 
 class CationPi(_BaseCationPi):
@@ -256,8 +286,10 @@ class _BasePiStacking(Interaction):
                             # angle
                             angle = res_normal.AngleTo(lig_normal)
                             if angle_between_limits(angle, *self.angles, ring=True):
-                                return True
-        return False
+                                return (True, get_mapindex(ligand,
+                                        lig_match[0]), get_mapindex(residue,
+                                        res_match[0]))
+        return False, None, None
 
 
 class FaceToFace(_BasePiStacking):
@@ -281,7 +313,11 @@ class PiStacking(Interaction):
         self.etf = EdgeToFace()
 
     def detect(self, ligand, residue):
-        return self.ftf.detect(ligand, residue) or self.etf.detect(ligand, residue)
+        ftf = self.ftf.detect(ligand, residue)
+        etf = self.etf.detect(ligand, residue)
+        if ftf[0]:
+            return ftf
+        return etf
 
 
 class _BaseMetallic(Interaction):
@@ -302,8 +338,9 @@ class _BaseMetallic(Interaction):
                     metal_atom = rdGeometry.Point3D(*metal.xyz[metal_match[0]])
                     dist = ligand_atom.Distance(metal_atom)
                     if dist <= self.distance:
-                        return True
-        return False
+                        return (True, get_mapindex(metal, metal_match[0]),
+                                get_mapindex(ligand, ligand_match[0]))
+        return False, None, None
 
 
 class MetalDonor(_BaseMetallic):
@@ -315,4 +352,5 @@ class MetalDonor(_BaseMetallic):
 class MetalAcceptor(_BaseMetallic):
     """Get the presence or absence of a metal complexation where the residue is a metal"""
     def detect(self, ligand, residue):
-        return super().detect(residue, ligand)
+        bit, ires, ilig = super().detect(residue, ligand)
+        return bit, ilig, ires

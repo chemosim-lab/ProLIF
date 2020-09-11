@@ -38,8 +38,7 @@ class Molecule(Chem.Mol):
         xyz = self.GetConformer().GetPositions()
         for resid, mol in residues.items():
             for atom in mol.GetAtoms():
-                idx = atom.GetIntProp("__mapindex")
-                atom.ClearProp("__mapindex")
+                idx = atom.GetUnsignedProp("__mapindex")
                 conformers[resid].SetAtomPosition(
                     atom_map[resid][idx], xyz[idx])
             residues[resid].AddConformer(conformers[resid])
@@ -47,6 +46,7 @@ class Molecule(Chem.Mol):
         # assign the list of residues to the molecule
         self.residues = {resid: Residue(mol) for resid, mol in sorted(
                          residues.items(), key=lambda x: (x[0].chain, x[0].number))}
+        self.atom_map = atom_map
         self.n_residues = len(self.residues)
         self._residues_indices = list(self.residues.keys())
 
@@ -57,7 +57,7 @@ class Molecule(Chem.Mol):
 
         for atom in self.GetAtoms():
             resid = ResidueId.from_atom(atom)
-            atom.SetIntProp("__mapindex", atom.GetIdx())
+            atom.SetUnsignedProp("__mapindex", atom.GetIdx())
             idx = residues[resid].AddAtom(atom)
             atom_map[resid][atom.GetIdx()] = idx
 

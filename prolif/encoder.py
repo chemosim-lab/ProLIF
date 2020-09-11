@@ -1,16 +1,25 @@
 import logging
 from array import array
+from functools import wraps
 from .interactions import _INTERACTIONS
 
 
 logger = logging.getLogger("prolif")
+
+def _only_return_bits(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        return f(*args, **kwargs)[0]
+    return wrapper
 
 
 class Encoder:
     """Class that generates an interaction fingerprint between a protein and a ligand"""
 
     def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",
-                 "PiStacking", "Anionic", "Cationic", "CationPi", "PiCation"]):
+                 "PiStacking", "Anionic", "Cationic", "CationPi", "PiCation"],
+                 return_atoms=False):
+        self.return_atoms = return_atoms
         # read interactions to compute
         self.interactions = {}
         if interactions == "all":
@@ -28,28 +37,40 @@ class Encoder:
 
     def add_interaction(self, interaction):
         """Add an interaction to the encoder"""
-        if callable(interaction):
-            func = interaction
-            name = interaction.__name__
-        else:
-            func = _INTERACTIONS[interaction]().detect
-            name = interaction
+        func = _INTERACTIONS[interaction]().detect
+        if not self.return_atoms:
+            func = _only_return_bits(func)
         self.interactions[interaction] = func
-        setattr(self, name.lower(), func)
+        setattr(self, interaction.lower(), func)
 
-    def get_bitstring(self, res1, res2):
-        """Generate the complete bitstring for the interactions between two residues"""
+    def run(self, res1, res2):
+        """Generate the complete bitstring for the interactions between two
+        residues
+
+        Parameters
+        ----------
+        res1 : prolif.residue.Residue
+            A residue (usually from a ligand in examples)
+        res2 : prolif.residue.Residue
+            A residue (usually from a protein in examples)
+
+        Returns
+        -------
+        bitstring : array.array
+            An array encoding the interactions between res1 and res2
+        atoms : list, optionnal
+            A list containing tuples of (res1_atom_index, res2_atom_index) for
+            each interaction. Available if the encoder was created with
+            ``return_atoms=True``
+        """
         bitstring = array("B")
+        if self.return_atoms:
+            atoms = []
+            for interaction_function in self.interactions.values():
+                bit, lig_atom, prot_atom = interaction_function(res1, res2)
+                bitstring.append(bit)
+                atoms.append((lig_atom, prot_atom))
+            return bitstring, atoms
         for interaction_function in self.interactions.values():
             bitstring.append(interaction_function(res1, res2))
         return bitstring
-
-    def get_ifp(self, ligand, protein, residues):
-        """Generates the complete IFP between two Molecules for a list of residues"""
-        ifp = {}
-        for lig in ligand:
-            for resid in residues:
-                res = protein[resid]
-                key = (lig.resid, res.resid)
-                ifp[key] = self.get_bitstring(lig, res)
-        return ifp
