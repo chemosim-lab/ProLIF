@@ -70,7 +70,7 @@ def get_reference_points(mol):
     return ctd, cst, fct, ftf
 
 
-def get_pocket_residues(prot, lig, cutoff=6.0):
+def get_pocket_residues(lig, prot, cutoff=6.0):
     """Detect residues close to a reference ligand"""
     ref_points = get_reference_points(lig)
     pocket_residues = []
@@ -80,6 +80,36 @@ def get_pocket_residues(prot, lig, cutoff=6.0):
         pocket_residues.extend([ResidueId.from_atom(
             prot.GetAtomWithIdx(int(i))) for i in indices])
     return sorted(set(pocket_residues), key=attrgetter("chain", "number"))
+
+
+def split_mol_in_residues(protein):
+    """Code adapted from Maciek Wójcikowski on the discussion list"""
+    residues = []
+    peptide_bond = Chem.MolFromSmarts('N-C-C(=O)-N')
+    disulfide_bridge = Chem.MolFromSmarts('S-S')
+    for res in Chem.SplitMolByPDBResidues(protein).values():
+        for frag in Chem.GetMolFrags(res, asMols=True, sanitizeFrags=False):
+            # split on peptide bond
+            frags = _split_on_pattern(frag, peptide_bond, (2, 4))
+            for f in frags:
+                # split on disulfide bridge
+                mols = _split_on_pattern(f, disulfide_bridge, (0, 1))
+                residues.extend(mols)
+    return residues
+
+
+def _split_on_pattern(mol, smarts, smarts_atom_indices):
+    """Split a molecule in fragments on a bond, given a SMARTS pattern and the
+    indices of atoms in the SMARTS pattern between which the split will be done
+    """
+    bonds = [mol.GetBondBetweenAtoms(match[smarts_atom_indices[0]],
+             match[smarts_atom_indices[1]]).GetIdx() for match in
+             mol.GetSubstructMatches(smarts)]
+    if bonds:
+        disconnected_aa = Chem.FragmentOnBonds(mol, bonds, addDummies=False)
+        return Chem.GetMolFrags(disconnected_aa, asMols=True,
+                                sanitizeFrags=False)
+    return (mol,)
 
 
 def to_dataframe(ifp, encoder):
@@ -118,14 +148,15 @@ def to_dataframe(ifp, encoder):
     resids = list(set(key for d in ifp for key, value in d.items() if isinstance(value, np.ndarray)))
     resids = sorted(resids, key=attrgetter("chain", "number"))
     ids = df.drop(columns=resids).columns.tolist()
-    df = df.applymap(lambda x: [0]*encoder.n_interactions if x is np.nan else x)
+    df = df.applymap(lambda x: [False]*encoder.n_interactions if x is np.nan else x)
     ifps = pd.DataFrame()
     for res in resids:
         cols = [f"{res}{i}" for i in range(encoder.n_interactions)]
         ifps[cols] = df[res].apply(pd.Series)
-    ifps.columns = pd.MultiIndex.from_product([[r.resid for r in resids],
+    ifps.columns = pd.MultiIndex.from_product([[str(r) for r in resids],
                                               encoder.interactions],
                                               names=["residue", "interaction"])
+    ifps = ifps.astype(np.uint8)
     ifps = ifps.loc[:, (ifps != 0).any(axis=0)]
     temp = df[ids].copy()
     temp.columns = pd.MultiIndex.from_product([ids, [""]])
@@ -169,7 +200,7 @@ def to_bitvectors(ifp, encoder):
 
     """
     df = to_dataframe(ifp, encoder)
-    resids = list(set(key.resid for d in ifp for key, value in d.items() if isinstance(value, np.ndarray)))
+    resids = list(set(str(key) for d in ifp for key, value in d.items() if isinstance(value, np.ndarray)))
     ids = df.drop(columns=resids).columns.tolist()
     n_bits = len(df[resids].columns)
     return df[resids].apply(_series_to_bv, n_bits=n_bits, axis=1).tolist()

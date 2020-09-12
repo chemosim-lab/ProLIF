@@ -10,11 +10,21 @@ _RE_RESID = r'(\w{3})(\d+)\.?(\w)?'
 
 class ResidueId:
     """Residue Id"""
-    def __init__(self, name: str, number: int, chain: str):
+    def __init__(self, name:str, number=None, chain=None):
+        """
+        Parameters
+        ----------
+        name : str
+            3-letter residue name
+        number : int or None
+            residue number
+        chain : str or None
+            1-letter protein chain
+        """
         self.name = name
         self.number = number
         self.chain = chain
-        self.resid = f"{self.name}{self.number}"
+        self.resid = f"{self.name or ''}{self.number or ''}"
         if self.chain:
             self.resid += f".{self.chain}"
 
@@ -44,7 +54,6 @@ class ResidueId:
 
 class Residue(Chem.Mol):
     """Residue"""
-
     def __init__(self, mol):
         super().__init__(mol)
         self.resid = ResidueId.from_atom(mol.GetAtomWithIdx(0))
@@ -52,6 +61,9 @@ class Residue(Chem.Mol):
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         return f"<{name} {self.resid} at {id(self):#x}>"
+
+    def __str__(self):
+        return str(self.resid)
 
     @property
     def xyz(self):
@@ -74,6 +86,10 @@ class ResidueGroup(UserDict):
 
     def __getitem__(self, key):
         if isinstance(key, ResidueId):
+            if key.number is None:
+                return ResidueGroup((resid, self.data[resid])
+                                    for resid in self.data.keys()
+                                    if resid.name == key.name)
             return self.data[key]
         elif isinstance(key, int):
             resid = self._residues_indices[key]
@@ -93,8 +109,8 @@ class ResidueGroup(UserDict):
                 resids = [ResidueId.from_string(s) for s in key]
             return ResidueGroup((resid, self.data[resid]) for resid in resids)
         raise KeyError("Expected a ResidueId, int, str, an iterable of those "
-                       "or a slice, got %s instead" % type(key))
-    
+                       f"or a slice, got {type(key).__name__!r} instead")
+
     def __setitem__(self, key, value):
         if isinstance(key, ResidueId):
             resid = key
@@ -114,3 +130,7 @@ class ResidueGroup(UserDict):
     @property
     def n_residues(self):
         return len(self)
+
+    @property
+    def resid(self):
+        return self._residues_indices

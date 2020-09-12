@@ -69,12 +69,14 @@ class Encoder:
         """
         bitstring = []
         if self.return_atoms:
-            atoms = []
+            atoms_lst = []
             for interaction_function in self.interactions.values():
-                bit, lig_atom, prot_atom = interaction_function(res1, res2)
+                bit, *atoms = interaction_function(res1, res2)
                 bitstring.append(bit)
-                atoms.append((lig_atom, prot_atom))
-            return np.array(bitstring, dtype=np.uint8), atoms
+                atoms_lst.append(atoms)
+            bitstring = np.array(bitstring, dtype=bool)
+            return bitstring, atoms_lst
         for interaction_function in self.interactions.values():
-            bitstring.append(interaction_function(res1, res2))
-        return np.array(bitstring, dtype=np.uint8)
+            bit = interaction_function(res1, res2)
+            bitstring.append(bit)
+        return np.array(bitstring, dtype=bool)

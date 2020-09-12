@@ -38,7 +38,7 @@ def get_mapindex(res, index):
     mapindex : int
         The index of the atom in the :class:`~prolif.molecule.Molecule`
     """
-    return res.GetAtomWithIdx(index).GetUnsignedProp("__mapindex")
+    return res.GetAtomWithIdx(index).GetUnsignedProp("mapindex")
 
 
 class Hydrophobic(Interaction):

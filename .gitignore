@@ -105,4 +105,3 @@ venv.bak/
 
 .coveragerc
 .vscode
-*.ipynb
