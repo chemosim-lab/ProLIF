@@ -1,53 +1,12 @@
-import re
 from math import pi
-from functools import wraps
 from operator import attrgetter
 import numpy as np
+import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import rdmolops
 from rdkit.Geometry import Point3D
+from rdkit.DataStructs import ExplicitBitVect
 from .residue import ResidueId
-try:
-    import sklearn
-except ImportError:
-    _has_sklearn = False
-else:
-    _has_sklearn = True
-try:
-    import seaborn
-except ImportError:
-    _has_seaborn = False
-else:
-    _has_seaborn = True
-
-
-def requires_sklearn(func):
-    """Decorator for when sklearn is required in a function"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not _has_sklearn:
-            raise ImportError("sklearn is required for this function, but isn't installed")
-        return func(*args, **kwargs)
-    return wrapper
-
-
-def requires_seaborn(func):
-    """Decorator for when seaborn is required in a function"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not _has_seaborn:
-            raise ImportError("seaborn is required for this function, but isn't installed")
-        return func(*args, **kwargs)
-    return wrapper
-
-
-def requires_config(func):
-    """Check if the dataframe has been configured with a FingerprintFactory"""
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        assert self._configured, "The Dataframe needs to be configured with df.configure()"
-        return func(self, *args, **kwargs)
-    return wrapper
 
 
 def get_centroid(coordinates):
@@ -108,10 +67,10 @@ def get_reference_points(mol):
     # farthest from fct
     ftf_idx = np.argmax(matrix[fct_idx])
     ftf = Point3D(*coords[ftf_idx])
-    return np.array((ctd, cst, fct, ftf))
+    return ctd, cst, fct, ftf
 
 
-def detect_pocket_residues(prot, lig, cutoff=6.0):
+def get_pocket_residues(prot, lig, cutoff=6.0):
     """Detect residues close to a reference ligand"""
     ref_points = get_reference_points(lig)
     pocket_residues = []
@@ -121,3 +80,96 @@ def detect_pocket_residues(prot, lig, cutoff=6.0):
         pocket_residues.extend([ResidueId.from_atom(
             prot.GetAtomWithIdx(int(i))) for i in indices])
     return sorted(set(pocket_residues), key=attrgetter("chain", "number"))
+
+
+def to_dataframe(ifp, encoder):
+    """Convert IFPs to a pandas DataFrame
+
+    Parameters
+    ----------
+    ifp : list
+        A list of dict in the format {ResidueId: fingerprint} where
+        fingerprint is a numpy.ndarray obtained by running the :method:`run`
+        method of an :class:`~prolif.encoder.Encoder`. Each dictionnary can
+        contain other (key, value) pairs, such as frame numbers...etc. as long
+        as the values are not numpy arrays or np.NaN
+    encoder : prolif.encoder.Encoder
+        The encoder that was used to generate the fingerprint
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        A DataFrame where each residue and interaction type are in separate
+        columns
+
+    Example
+    -------
+    Example of output ::
+
+        >>> df = to_dataframe(ifp, encoder)
+        >>> print(df)
+        Frame     ILE59                  ILE55       TYR93
+                Hydrophobic HBAcceptor Hydrophobic Hydrophobic PiStacking
+        0      0           1          0           0           0          0
+        ...
+
+    """
+    df = pd.DataFrame(ifp)
+    resids = list(set(key for d in ifp for key, value in d.items() if isinstance(value, np.ndarray)))
+    resids = sorted(resids, key=attrgetter("chain", "number"))
+    ids = df.drop(columns=resids).columns.tolist()
+    df = df.applymap(lambda x: [0]*encoder.n_interactions if x is np.nan else x)
+    ifps = pd.DataFrame()
+    for res in resids:
+        cols = [f"{res}{i}" for i in range(encoder.n_interactions)]
+        ifps[cols] = df[res].apply(pd.Series)
+    ifps.columns = pd.MultiIndex.from_product([[r.resid for r in resids],
+                                              encoder.interactions],
+                                              names=["residue", "interaction"])
+    ifps = ifps.loc[:, (ifps != 0).any(axis=0)]
+    temp = df[ids].copy()
+    temp.columns = pd.MultiIndex.from_product([ids, [""]])
+    return pd.concat([temp, ifps], axis=1)
+
+
+def _series_to_bv(s, n_bits):
+    bv = ExplicitBitVect(n_bits)
+    on_bits = np.where(s == 1)[0].tolist()
+    bv.SetBitsFromList(on_bits)
+    return bv
+
+
+def to_bitvectors(ifp, encoder):
+    """Convert IFPs to a list of RDKit BitVector
+
+    Parameters
+    ----------
+    ifp : list
+        A list of dict in the format {ResidueId: fingerprint} where
+        fingerprint is a numpy.ndarray obtained by running the :method:`run`
+        method of an :class:`~prolif.encoder.Encoder`. Each dictionnary can
+        contain other (key, value) pairs, such as frame numbers...etc. as long
+        as the values are not numpy arrays or np.NaN
+    encoder : prolif.encoder.Encoder
+        The encoder that was used to generate the fingerprint
+
+    Returns
+    -------
+    bv : list
+        A list of :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect`
+
+    Example
+    -------
+    ::
+
+        >>> from rdkit.DataStructs import TanimotoSimilarity
+        >>> bv = to_bitvectors(ifp, encoder)
+        >>> TanimotoSimilarity(bv[0], bv[1])
+        0.42
+
+    """
+    df = to_dataframe(ifp, encoder)
+    resids = list(set(key.resid for d in ifp for key, value in d.items() if isinstance(value, np.ndarray)))
+    ids = df.drop(columns=resids).columns.tolist()
+    n_bits = len(df[resids].columns)
+    return df[resids].apply(_series_to_bv, n_bits=n_bits, axis=1).tolist()

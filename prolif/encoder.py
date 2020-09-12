@@ -1,6 +1,6 @@
 import logging
-from array import array
 from functools import wraps
+import numpy as np
 from .interactions import _INTERACTIONS
 
 
@@ -9,7 +9,8 @@ logger = logging.getLogger("prolif")
 def _only_return_bits(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        return f(*args, **kwargs)[0]
+        results = f(*args, **kwargs)
+        return results if isinstance(results, (bool, type(None))) else results[0]
     return wrapper
 
 
@@ -27,7 +28,6 @@ class Encoder:
                             if not (i.startswith("_") or i == "Interaction")]
         for interaction in interactions:
             self.add_interaction(interaction)
-        self.n_interactions = len(self.interactions)
         logger.info('The fingerprint factory will generate the following bitstring: {}'.format(' '.join(interactions)))
 
     def __repr__(self):
@@ -42,6 +42,10 @@ class Encoder:
             func = _only_return_bits(func)
         self.interactions[interaction] = func
         setattr(self, interaction.lower(), func)
+    
+    @property
+    def n_interactions(self):
+        return len(self.interactions)
 
     def run(self, res1, res2):
         """Generate the complete bitstring for the interactions between two
@@ -56,21 +60,21 @@ class Encoder:
 
         Returns
         -------
-        bitstring : array.array
-            An array encoding the interactions between res1 and res2
+        bitstring : np.ndarray
+            An array storing the encoded interactions between res1 and res2
         atoms : list, optionnal
             A list containing tuples of (res1_atom_index, res2_atom_index) for
             each interaction. Available if the encoder was created with
             ``return_atoms=True``
         """
-        bitstring = array("B")
+        bitstring = []
         if self.return_atoms:
             atoms = []
             for interaction_function in self.interactions.values():
                 bit, lig_atom, prot_atom = interaction_function(res1, res2)
                 bitstring.append(bit)
                 atoms.append((lig_atom, prot_atom))
-            return bitstring, atoms
+            return np.array(bitstring, dtype=np.uint8), atoms
         for interaction_function in self.interactions.values():
             bitstring.append(interaction_function(res1, res2))
-        return bitstring
+        return np.array(bitstring, dtype=np.uint8)

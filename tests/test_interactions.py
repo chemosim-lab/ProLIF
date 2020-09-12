@@ -11,7 +11,7 @@ lg.setLevel(RDLogger.ERROR)
 def from_mol2(f):
     path = os.path.join(os.path.dirname(__file__), "data", f)
     mol = Chem.MolFromMol2File(path, removeHs=False)
-    return prolif.Molecule(mol)
+    return prolif.Molecule(mol, cache=False)
 
 
 class TestInteractions:

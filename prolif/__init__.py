@@ -1,6 +1,6 @@
 from .molecule import Molecule
+from .residue import ResidueId
 from .encoder import Encoder
 from .interactions import Interaction
-from .fingerprint import Fingerprint
-from .utils import detect_pocket_residues
+from .utils import get_pocket_residues, to_dataframe, to_bitvectors
 from .version import __version__

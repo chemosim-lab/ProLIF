@@ -1,9 +1,8 @@
 import copy
 from collections import defaultdict
-from collections.abc import Iterable
 from rdkit import Chem
 from rdkit.Chem import rdMolTransforms
-from .residue import Residue, ResidueId
+from .residue import Residue, ResidueId, ResidueGroup
 
 class Molecule(Chem.Mol):
     """Molecule class"""
@@ -44,11 +43,10 @@ class Molecule(Chem.Mol):
             residues[resid].AddConformer(conformers[resid])
 
         # assign the list of residues to the molecule
-        self.residues = {resid: Residue(mol) for resid, mol in sorted(
-                         residues.items(), key=lambda x: (x[0].chain, x[0].number))}
+        self.residues = ResidueGroup(sorted([(resid, Residue(mol))
+                                     for resid, mol in residues.items()],
+                                     key=lambda x: (x[0].chain, x[0].number)))
         self.atom_map = atom_map
-        self.n_residues = len(self.residues)
-        self._residues_indices = list(self.residues.keys())
 
     def _make_residues(self):
         """Generate a dict of residues"""
@@ -72,35 +70,20 @@ class Molecule(Chem.Mol):
         return residues, atom_map
 
     def __iter__(self):
-        for i in range(self.n_residues):
-            resid = self._residues_indices[i]
-            yield self.residues[resid]
+        for residue in self.residues.values():
+            yield residue
 
-    def __getitem__(self, selection):
-        if isinstance(selection, ResidueId):
-            return self.residues[selection]
-        elif isinstance(selection, int):
-            resid = self._residues_indices[selection]
-            return self.residues[resid]
-        elif isinstance(selection, str):
-            resid = ResidueId.from_string(selection)
-            return self.residues[resid]
-        elif isinstance(selection, slice):
-            resids = self._residues_indices[selection]
-            return {resid: self.residues[resid] for resid in resids}
-        elif isinstance(selection, Iterable):
-            if isinstance(selection[0], int):
-                resids = [self._residues_indices[i] for i in selection]
-            elif isinstance(selection[0], str):
-                resids = [ResidueId.from_string(s) for s in selection]
-            return {resid: self.residues[resid] for resid in resids}
-        raise ValueError("Expected a ResidueId, int or str, got "
-                         f"{type(selection)} instead")
+    def __getitem__(self, key):
+        return self.residues[key]
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"with {self.n_residues} residues"
-        return f"<{name} {params} at {id(self):#x}>"
+        params = f"{self.n_residues} residues and {self.GetNumAtoms()} atoms"
+        return f"<{name} with {params} at {id(self):#x}>"
+
+    @property
+    def n_residues(self):
+        return len(self.residues)
 
     @property
     def centroid(self):
