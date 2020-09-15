@@ -13,18 +13,18 @@ _RE_RESID = r'(\w{3})(\d+)\.?(\w)?'
 
 
 class ResidueId:
-    """Residue Id"""
+    """A unique residue identifier
+    
+    Parameters
+    ----------
+    name : str
+        3-letter residue name
+    number : int or None
+        residue number
+    chain : str or None, optionnal
+        1-letter protein chain
+    """
     def __init__(self, name:str, number=None, chain=None):
-        """
-        Parameters
-        ----------
-        name : str
-            3-letter residue name
-        number : int or None
-            residue number
-        chain : str or None
-            1-letter protein chain
-        """
         self.name = name
         self.number = number
         self.chain = chain
@@ -43,6 +43,14 @@ class ResidueId:
 
     @classmethod
     def from_atom(cls, atom):
+        """Creates a ResidueId from an RDKit atom
+        
+        Parameters
+        ----------
+        atom : rdkit.Chem.rdchem.Atom
+            An atom that contains an RDKit :class:`~rdkit.Chem.rdchem.AtomMonomerInfo`
+            (also know as ``PDBResidueInfo``)
+        """
         mi = atom.GetMonomerInfo()
         if mi:
             resname = mi.GetResidueName() if mi.GetResidueName() else "UNK"
@@ -51,13 +59,42 @@ class ResidueId:
 
     @classmethod
     def from_string(cls, resid_str):
+        """Creates a ResidueId from a string
+        
+        Parameters
+        ----------
+        resid_str : str
+            A string in the format ``<3-letter code><residue number>.<chain>``,
+            i.e. for alanine number 10 and chain B: ``ALA10.B``
+            The ".chain" is optionnal
+        """
         matches = re.search(_RE_RESID, resid_str)
         resname, resnumber, chain = matches.groups()
         return cls(resname, int(resnumber), chain if chain else "")
 
 
 class Residue(Chem.Mol):
-    """Residue"""
+    """An RDKit molecule with custom attributes
+
+    Parameters
+    ----------
+    mol : rdkit.Chem.rdchem.Mol
+        The residue as an RDKit molecule
+
+    Attributes
+    ----------
+    resid : prolif.residue.ResidueId
+        The residue identifier
+    centroid : numpy.ndarray
+        XYZ coordinates of the centroid of the molecule
+    xyz : numpy.ndarray
+        XYZ coordinates of all atoms in the molecule
+    
+    Notes
+    -----
+    The name of the residue can be converted to a string by using
+    ``str(Residue)``
+    """
     def __init__(self, mol):
         super().__init__(mol)
         self.resid = ResidueId.from_atom(mol.GetAtomWithIdx(0))
@@ -79,7 +116,7 @@ class Residue(Chem.Mol):
 
 
 class ResidueGroup(UserDict):
-    """Residue container"""
+    """A container to store and retrieve Residue instances easily"""
 
     def __init__(self, residues):
         """Create a ResidueGroup from a dict {ResidueId: Residue} or an

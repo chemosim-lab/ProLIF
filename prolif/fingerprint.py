@@ -2,24 +2,23 @@
 prolif.fingerprint
 ==================
 
-Calculate a Protein-Ligand Interaction Fingerprint::
+Calculate a Protein-Ligand Interaction Fingerprint:
 
-    >>> import MDAnalysis as mda
-    >>> from rdkit.DataStructs import TanimotoSimilarity
-    >>> import prolif
-    >>> u = mda.Universe("traj.pdb", "traj.nc")
-    >>> prot = u.select_atoms("protein")
-    >>> lig = u.select_atoms("resname LIG")
-    >>> fp = prolif.Fingerprint().run(u.trajectory[::5], prot, lig)
-    >>> df = fp.to_dataframe()
-    >>> print(df)
-    Frame     ILE59                  ILE55       TYR93
-            Hydrophobic HBAcceptor Hydrophobic Hydrophobic PiStacking
-    0      0           1          0           0           0          0
-    ...
-    >>> bv = fp.to_bitvectors()
-    >>> TanimotoSimilarity(bv[0], bv[1])
-    0.42
+.. ipython:: python
+    :okwarning:
+
+    import MDAnalysis as mda
+    from rdkit.DataStructs import TanimotoSimilarity
+    import prolif
+    u = mda.Universe(prolif.datafiles.TOP, prolif.datafiles.TRAJ)
+    prot = u.select_atoms("protein")
+    lig = u.select_atoms("resname ERM")
+    fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "CationPi", "Cationic"])
+    fp.run(u.trajectory[::2], lig, prot)
+    df = fp.to_dataframe()
+    df
+    bv = fp.to_bitvectors()
+    TanimotoSimilarity(bv[0], bv[1])
     
 """
 import logging

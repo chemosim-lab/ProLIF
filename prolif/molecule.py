@@ -13,6 +13,11 @@ class Molecule(Chem.Mol):
     """Main molecule class that behaves like an RDKit :class:`~rdkit.Chem.rdchem.Mol`
     with extra attributes (see below)
 
+    Parameters
+    ----------
+    mol : rdkit.Chem.rdchem.Mol
+        A ligand or protein with a single conformer
+
     Attributes
     ----------
     residues : prolif.residue.ResidueGroup
@@ -25,24 +30,37 @@ class Molecule(Chem.Mol):
     xyz : numpy.ndarray
         XYZ coordinates of all atoms in the molecule
     
+    Example
+    -------
+
+    .. ipython:: python
+        :okwarning:
+
+        import MDAnalysis as mda
+        import prolif
+        u = mda.Universe(prolif.datafiles.TOP, prolif.datafiles.TRAJ)
+        mol = u.select_atoms("protein").convert_to("RDKIT")
+        mol = prolif.Molecule(mol)
+    
     Notes
     -----
-    Residues can be accessed easily in different manners::
-        TODO
-        >>> mol["TYR51"]
-        >>> mol[prolif.ResidueId("ALA")]
-        >>> mol[42]
+    Residues can be accessed easily in different ways:
+        
+    .. ipython:: python
+
+        mol["TYR38.0"] # by resid string (residue name + number + chain)
+        mol[42] # by index
+        mol[::10] # by slice (start:stop:step)
+        mol[[0, 10, 100]] # by list of indices
+        mol[["TRP125.0", "ASP129.0"]] # by list of resid
+        mol[prolif.ResidueId("ALA")] # by ResidueId
+    
+    See :mod:`prolif.residue` for more information on residues
 
     """
     def __init__(self, mol):
-        """
-        RDKit-like molecule that is splitted in residues for a more convenient
-        usage.
-
-        Parameters
-        ----------
-        mol : rdkit.Chem.rdchem.Mol
-            A ligand or protein with a single conformer
+        """RDKit-like molecule that is splitted in residues for a more
+        convenient usage
         """
         super().__init__(mol)
         # set mapping of atoms

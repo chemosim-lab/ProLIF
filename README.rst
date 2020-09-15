@@ -24,9 +24,6 @@ ProLIF (*Protein-Ligand Interaction Fingerprints*) is a tool designed to generat
 Installing dependencies
 -----------------------
 
-Requirements
-""""""""""""
-
 * Python 3.6+
 * `RDKit <https://www.rdkit.org/docs/>`_ (2020.03+)
 * `MDAnalysis <https://www.mdanalysis.org/>`_ (2.0+)
@@ -49,8 +46,8 @@ Alternatively, you can install the latest development version::
 
 .. _conda: https://docs.conda.io/projects/conda/en/latest/user-guide/index.html
 
-Quickstart guide
-----------------
+Quickstart
+----------
 
 TODO
 

@@ -1,9 +1,6 @@
 Installation
 ------------
 
-Requirements
-""""""""""""
-
 * Python 3.6+
 * `RDKit <https://www.rdkit.org/docs/>`_ (2020.03+)
 * `MDAnalysis <https://www.mdanalysis.org/>`_ (2.0+)
@@ -13,10 +10,10 @@ Requirements
 
 .. note::
     | RDKit needs to be installed through `conda`_
-    | Once conda in installed, run the following command:
+    | Once conda is installed, run the following command:
     | ``conda install -c conda-forge rdkit``  
 
-Then, install prolif with its dependencies::
+The rest of the dependencies are automatically installed through pip when installing prolif::
 
     pip install prolif
 

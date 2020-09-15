@@ -13,7 +13,10 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('./source/'))
 import sphinx_rtd_theme
+import recommonmark
+from recommonmark.transform import AutoStructify
 
 # -- Project information -----------------------------------------------------
 
@@ -24,6 +27,7 @@ author = 'Cédric Bouysset'
 
 # -- General configuration ---------------------------------------------------
 
+github_doc_root = 'https://github.com/chemosim-lab/ProLIF/tree/master/docs/'
 needs_sphinx = '3.0'
 
 # Add any Sphinx extension module names here, as strings. They can be
@@ -32,11 +36,13 @@ needs_sphinx = '3.0'
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx',
               'sphinx.ext.mathjax', 'sphinx.ext.viewcode',
               'sphinx.ext.napoleon', 'sphinx.ext.autosectionlabel',
-              'sphinx_rtd_theme',
+              'sphinx_rtd_theme', 'recommonmark',
+              'IPython.sphinxext.ipython_console_highlighting',
+              'IPython.sphinxext.ipython_directive',
 ]
 
 mathjax_path = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
-
+autosectionlabel_prefix_document = True
 napoleon_google_docstring = False
 
 # Add any paths that contain templates here, relative to this directory.
@@ -47,6 +53,7 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+source_suffix = ['.rst', '.md']
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -66,3 +73,14 @@ intersphinx_mapping = {'https://docs.python.org/': None,
                        'https://docs.mdanalysis.org/2.0.0-dev0/': None,
                        'https://www.rdkit.org/docs/': None,
                        }
+
+# app setup hook
+def setup(app):
+    app.add_config_value('recommonmark_config', {
+        #'url_resolver': lambda url: github_doc_root + url,
+        'auto_toc_tree_section': 'Contents',
+        'enable_math': False,
+        'enable_inline_math': False,
+        'enable_eval_rst': True,
+    }, True)
+    app.add_transform(AutoStructify)
