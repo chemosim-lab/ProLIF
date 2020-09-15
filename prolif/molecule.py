@@ -1,3 +1,7 @@
+"""
+prolif.molecule
+===============
+"""
 import copy
 from collections import defaultdict
 from rdkit import Chem
@@ -6,8 +10,40 @@ from .residue import Residue, ResidueId, ResidueGroup
 from .utils import split_mol_in_residues
 
 class Molecule(Chem.Mol):
-    """Molecule class"""
+    """Main molecule class that behaves like an RDKit :class:`~rdkit.Chem.rdchem.Mol`
+    with extra attributes (see below)
+
+    Attributes
+    ----------
+    residues : prolif.residue.ResidueGroup
+        A dictionnary storing one/many :class:`~prolif.residue.Residue` indexed
+        by :class:`~prolif.residue.ResidueId`. The residue list is sorted.
+    n_residues : int
+        Number of residues
+    centroid : numpy.ndarray
+        XYZ coordinates of the centroid of the molecule
+    xyz : numpy.ndarray
+        XYZ coordinates of all atoms in the molecule
+    
+    Notes
+    -----
+    Residues can be accessed easily in different manners::
+        TODO
+        >>> mol["TYR51"]
+        >>> mol[prolif.ResidueId("ALA")]
+        >>> mol[42]
+
+    """
     def __init__(self, mol):
+        """
+        RDKit-like molecule that is splitted in residues for a more convenient
+        usage.
+
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
+            A ligand or protein with a single conformer
+        """
         super().__init__(mol)
         # set mapping of atoms
         for atom in self.GetAtoms():

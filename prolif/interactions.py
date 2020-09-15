@@ -1,3 +1,7 @@
+"""
+prolif.interactions
+===================
+"""
 import copy
 from math import radians
 from .utils import (

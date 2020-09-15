@@ -9,7 +9,7 @@ __version__ = None
 exec(open('prolif/version.py').read())
 
 # Get the long description from the README file
-with open(path.join(here, 'README.md'), encoding='utf-8') as f:
+with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
@@ -17,7 +17,7 @@ setup(
     version=__version__,
     description='Protein-Ligand Interaction Fingerprints',
     long_description=long_description,
-    long_description_content_type='text/markdown',
+    long_description_content_type='text/x-rst',
     url='https://github.com/chemosim-lab/ProLIF',
     author='Cédric Bouysset',
     author_email='bouysset.cedric@gmail.com',
@@ -35,13 +35,10 @@ setup(
     ],
     keywords='science chemistry biology drug-design chemoinformatics virtual-screening',
     packages=['prolif'],
-    entry_points = {
-        'console_scripts': ['prolif=prolif.command_line:main'],
-    },
     python_requires='>=3.6',
-    install_requires=['numpy>=1.13.3','mdanalysis>=2.0.0'],
+    install_requires=['numpy>=1.13.3', 'mdanalysis>=2.0.0', 'pandas>=1.0.0', 'tqdm'],
     extras_require={
-        'sklearn': ['scikit-learn'],
+        'docs': ['recommonmark', 'sphinx-rtd-theme'],
     },
     test_suite="tests",
     tests_require="pytest",
