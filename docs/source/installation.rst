@@ -1,6 +1,8 @@
 Installation
 ------------
 
+Requirements:
+
 * Python 3.6+
 * `RDKit <https://www.rdkit.org/docs/>`_ (2020.03+)
 * `MDAnalysis <https://www.mdanalysis.org/>`_ (2.0+)
@@ -9,7 +11,7 @@ Installation
 * `tqdm <https://tqdm.github.io/>`_
 
 .. note::
-    | RDKit needs to be installed through `conda`_
+    | RDKit can only be installed through `conda`_
     | Once conda is installed, run the following command:
     | ``conda install -c conda-forge rdkit``  
 

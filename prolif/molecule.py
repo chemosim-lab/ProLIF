@@ -1,6 +1,6 @@
 """
-prolif.molecule
-===============
+Reading RDKit molecules --- :mod:`prolif.molecule`
+==================================================
 """
 import copy
 from collections import defaultdict
@@ -11,7 +11,8 @@ from .utils import split_mol_in_residues
 
 class Molecule(Chem.Mol):
     """Main molecule class that behaves like an RDKit :class:`~rdkit.Chem.rdchem.Mol`
-    with extra attributes (see below)
+    with extra attributes (see below). The main purpose of this class is to
+    access residues has fragments of the molecule.
 
     Parameters
     ----------
@@ -59,9 +60,6 @@ class Molecule(Chem.Mol):
 
     """
     def __init__(self, mol):
-        """RDKit-like molecule that is splitted in residues for a more
-        convenient usage
-        """
         super().__init__(mol)
         # set mapping of atoms
         for atom in self.GetAtoms():

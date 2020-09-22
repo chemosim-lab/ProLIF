@@ -1,6 +1,6 @@
 """
-prolif.residue
-==============
+Residue-related classes --- :mod:`prolif.residue`
+=================================================
 """
 import re
 from collections import UserDict
@@ -66,7 +66,7 @@ class ResidueId:
         resid_str : str
             A string in the format ``<3-letter code><residue number>.<chain>``,
             i.e. for alanine number 10 and chain B: ``ALA10.B``
-            The ".chain" is optionnal
+            The ".chain" is optionnal if your molecule doesn't have chains.
         """
         matches = re.search(_RE_RESID, resid_str)
         resname, resnumber, chain = matches.groups()
@@ -116,12 +116,32 @@ class Residue(Chem.Mol):
 
 
 class ResidueGroup(UserDict):
-    """A container to store and retrieve Residue instances easily"""
+    """A container to store and retrieve Residue instances easily
+    
+    Parameters
+    ----------
+    residues : dict or list
+        A dictionnary of :class:`Residue` indexed by :class:`ResidueId`, or a
+        list of (:class:`ResidueId`, :class:`Residue`) tuples
+
+    Attributes
+    ----------
+    data : dict
+        The underlying dictionnary that stores :class:`Residue` indexed by
+        :class:`ResidueId`
+    n_residues : int
+        Number of residues in the ResidueGroup
+    resid : list
+        List of :class:`ResidueId`, usefull to retrieve residues by index
+    
+    Notes
+    -----
+    Residues in the group can be access by index, resid string, slice, list of
+    resid or index, or :class:`ResidueId`.
+    See the :class:`~prolif.molecule.Molecule` class for an example
+    """
 
     def __init__(self, residues):
-        """Create a ResidueGroup from a dict {ResidueId: Residue} or an
-        iterable of tuples in the form (ResidueId, Residue)
-        """
         super().__init__(residues)
         self._residues_indices = list(self.keys())
 

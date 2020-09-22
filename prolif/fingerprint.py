@@ -1,8 +1,6 @@
 """
-prolif.fingerprint
-==================
-
-Calculate a Protein-Ligand Interaction Fingerprint:
+Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
+================================================================================
 
 .. ipython:: python
     :okwarning:
@@ -62,6 +60,10 @@ class Fingerprint:
         Results are stored in the form of a list of
         ``{"Frame": frame_index, ResidueId: numpy.ndarray, ...}`` dictionaries
         that contain the interaction fingerprints
+
+    Notes
+    -----
+    TODO fp.hydrophobic(lig, prot[res])
     """
 
     def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",

@@ -1,6 +1,8 @@
 """
-prolif.interactions
-===================
+Detecting interactions between residues --- :mod:`prolif.interactions`
+======================================================================
+
+TODO declaring your own interaction (close contact for example)
 """
 import copy
 from math import radians
@@ -16,15 +18,21 @@ _INTERACTIONS = {}
 
 
 class _InteractionMeta(type):
+    """Metaclass to register interactions automatically"""
     def __init__(cls, name, bases, classdict):
         type.__init__(cls, name, bases, classdict)
         _INTERACTIONS[name] = cls
 
 
 class Interaction(metaclass=_InteractionMeta):
-    """Base class for all interactions"""
+    """Base class for interactions
+
+    All interaction classes must inherit this class and define a
+    :meth:`~detect` method
+    """
     def detect(self, **kwargs):
-        raise NotImplementedError("This method must be defined by the subclass")
+        raise NotImplementedError(
+            "This method must be defined by the subclass")
 
 
 def get_mapindex(res, index):
@@ -46,15 +54,22 @@ def get_mapindex(res, index):
 
 
 class Hydrophobic(Interaction):
-    """Get the presence or absence of an hydrophobic interaction between
-    a ResidueFrame and a ligand Frame"""
-    def __init__(self, hydrophobic="[#6,S,F,Cl,Br,I;!+;!-]", distance=4.5):
+    """Hydrophobic interaction
+    
+    Parameters
+    ----------
+    hydrophobic : str
+        SMARTS query for hydrophobic atoms
+    distance : float
+        Cutoff distance for the interaction
+    """
+    def __init__(self,
+                 hydrophobic="[C&!$(C=O)&!$(C#N),S&^3,#17,#35,#53;!+;!-]",
+                 distance=4.5):
         self.hydrophobic = Chem.MolFromSmarts(hydrophobic)
         self.distance = distance
 
     def detect(self, ligand, residue):
-        """Get the presence or absence of an hydrophobic interaction between
-        a ResidueFrame and a ligand Frame"""
         # get atom tuples matching query
         lig_matches = ligand.GetSubstructMatches(self.hydrophobic)
         res_matches = residue.GetSubstructMatches(self.hydrophobic)
@@ -212,8 +227,8 @@ class Anionic(_BaseIonic):
 
 class _BaseCationPi(Interaction):
     """Base class for cation-pi interactions"""
-    def __init__(self, cation="[*+]", aromatic=["[a]1:[a]:[a]:[a]:[a]:[a]:1", 
-                 "[a]1:[a]:[a]:[a]:[a]:1"], distance=5.0, angles=(0, 30)):
+    def __init__(self, cation="[*+]", aromatic=["a1:a:a:a:a:a:1",
+                 "a1:a:a:a:a:1"], distance=5.0, angles=(0, 30)):
         self.cation = Chem.MolFromSmarts(cation)
         self.aromatic = [Chem.MolFromSmarts(s) for s in aromatic]
         self.distance = distance
@@ -264,8 +279,8 @@ class CationPi(_BaseCationPi):
 
 class _BasePiStacking(Interaction):
     """Base class for Pi-Stacking interactions"""
-    def __init__(self, distance, angles, aromatic=[
-                 "[a]1:[a]:[a]:[a]:[a]:[a]:1", "[a]1:[a]:[a]:[a]:[a]:1"]):
+    def __init__(self, distance, angles, aromatic=["a1:a:a:a:a:a:1",
+                 "a1:a:a:a:a:1"]):
         self.aromatic = [Chem.MolFromSmarts(s) for s in aromatic]
         self.distance = distance
         self.angles = tuple(radians(i) for i in angles)

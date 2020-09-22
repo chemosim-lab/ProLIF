@@ -1,6 +1,6 @@
 """
-prolif.utils
-============
+Helper functions --- :mod:`prolif.utils`
+========================================
 """
 from math import pi
 from operator import attrgetter
@@ -28,27 +28,31 @@ def get_ring_normal_vector(centroid, coordinates):
     cb = centroid.DirectionVector(b)
     # cross product between these two vectors
     normal = ca.CrossProduct(cb)
-    # note that cb.CrossProduct(ca) will the normal vector in the opposite direction
+    # cb.CrossProduct(ca) is the normal vector in the opposite direction
     return normal
 
 
 def angle_between_limits(angle, min_angle, max_angle, ring=False):
     """Check if an angle value is between min and max angles in degrees
-    If the angle to check involves a ring, include the angle that would be obtained
-    if we had used the other normal vector (same axis but opposite direction).
+    If the angle to check involves a ring, include the angle that would be
+    obtained if we had used the other normal vector (same axis but opposite
+    direction)
     """
     if ring and (angle > pi/2):
         mirror_angle = (pi/2) - (angle % (pi/2))
-        return (min_angle <= angle <= max_angle) or (min_angle <= mirror_angle <= max_angle)
+        return (min_angle <= angle <= max_angle) or (
+                min_angle <= mirror_angle <= max_angle)
     return (min_angle <= angle <= max_angle)
 
 
 def get_reference_points(mol):
     """Returns 4 rdkit Point3D objects similar to those used in the USR method:
+
     - centroid (ctd)
     - closest to ctd (cst)
     - farthest from cst (fct)
-    - farthest from fct (ftf)"""
+    - farthest from fct (ftf)
+    """
     matrix = rdmolops.Get3DDistanceMatrix(mol)
     conf = mol.GetConformer()
     coords = conf.GetPositions()
@@ -64,10 +68,10 @@ def get_reference_points(mol):
             min_dist = dist
             cst = point
             cst_idx = atom.GetIdx()
-    # farthest from cst
+    # furthest from cst
     fct_idx = np.argmax(matrix[cst_idx])
     fct = Point3D(*coords[fct_idx])
-    # farthest from fct
+    # furthest from fct
     ftf_idx = np.argmax(matrix[fct_idx])
     ftf = Point3D(*coords[ftf_idx])
     return ctd, cst, fct, ftf
@@ -75,8 +79,26 @@ def get_reference_points(mol):
 
 def get_pocket_residues(lig, prot, cutoff=6.0):
     """Detect residues close to a reference ligand
+
+    Based on the distance between the protein and a few reference points in the
+    ligand. The reference points are chosen similarly to the "Ultrafast Shape
+    Recognition" technique: centroid, closest to centroid (cst), furthest from
+    cst (fct), furthest from fct.
     
-    TODO
+    Parameters
+    ----------
+    lig : prolif.molecule.Molecule
+        Select residues that are near this ligand
+    prot : prolif.molecule.Molecule
+        Protein containing the residues
+    cutoff : float
+        If any interatomic distance between the ligand reference points and a
+        residue is below or equal to this cutoff, the residue will be selected
+
+    Returns
+    -------
+    residues : list
+        Sorted list of :class:`ResidueId` that are close to the ligand
     """
     ref_points = get_reference_points(lig)
     pocket_residues = []
