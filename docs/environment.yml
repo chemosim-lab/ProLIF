@@ -106,7 +106,7 @@ dependencies:
     - kiwisolver==1.2.0
     - MarkupSafe==1.1.1
     - matplotlib==3.3.2
-    - MDAnalysis==2.0.0
+    #- MDAnalysis==2.0.0
     - mmtf-python==1.1.2
     - msgpack==1.0.0
     - networkx==2.5

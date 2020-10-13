@@ -54,13 +54,11 @@ def get_reference_points(mol):
     - farthest from fct (ftf)
     """
     matrix = rdmolops.Get3DDistanceMatrix(mol)
-    conf = mol.GetConformer()
-    coords = conf.GetPositions()
-
+    coords = mol.xyz
     # centroid
     ctd = mol.centroid
     # closest to centroid
-    min_dist = 100
+    min_dist = 1e3
     for atom in mol.GetAtoms():
         point = Point3D(*coords[atom.GetIdx()])
         dist = ctd.Distance(point)
@@ -116,7 +114,7 @@ def split_mol_in_residues(protein):
     """
     residues = []
     peptide_bond = Chem.MolFromSmarts('N-C-C(=O)-N')
-    disulfide_bridge = Chem.MolFromSmarts('S-S')
+    disulfide_bridge = Chem.MolFromSmarts('[SX2v2]-[SX2v2]')
     for res in Chem.SplitMolByPDBResidues(protein).values():
         for frag in Chem.GetMolFrags(res, asMols=True, sanitizeFrags=False):
             # split on peptide bond
@@ -129,8 +127,8 @@ def split_mol_in_residues(protein):
 
 
 def _split_on_pattern(mol, smarts, smarts_atom_indices):
-    """Splits a molecule in fragments on a bond, given a SMARTS pattern and the
-    indices of atoms in the SMARTS pattern between which the split will be done
+    """Splits a molecule in fragments, given a SMARTS pattern and the indices
+    of atoms in the SMARTS pattern where the split will be done
     """
     bonds = [mol.GetBondBetweenAtoms(match[smarts_atom_indices[0]],
              match[smarts_atom_indices[1]]).GetIdx() for match in
@@ -155,7 +153,7 @@ def to_dataframe(ifp, fingerprint):
         contain other (key, value) pairs, such as frame numbers...etc. as long
         as the values are not numpy arrays or np.NaN
     fingerprint : prolif.fingerprint.Fingerprint
-        The fingerprint that was used to generate the fingerprint
+        The fingerprint generator that was used to obtain the fingerprint
 
     Returns
     -------
@@ -176,10 +174,13 @@ def to_dataframe(ifp, fingerprint):
 
     """
     df = pd.DataFrame(ifp)
-    resids = list(set(key for d in ifp for key, value in d.items() if isinstance(value, np.ndarray)))
+    resids = list(set(key for d in ifp
+                          for key, value in d.items()
+                          if isinstance(value, np.ndarray)))
     resids = sorted(resids, key=attrgetter("chain", "number"))
     ids = df.drop(columns=resids).columns.tolist()
-    df = df.applymap(lambda x: [False]*fingerprint.n_interactions if x is np.nan else x)
+    df = df.applymap(lambda x: [False] * fingerprint.n_interactions
+                               if x is np.nan else x)
     ifps = pd.DataFrame()
     for res in resids:
         cols = [f"{res}{i}" for i in range(fingerprint.n_interactions)]
@@ -209,10 +210,10 @@ def to_bitvectors(ifp, fingerprint):
     ifp : list
         A list of dict in the format {ResidueId: fingerprint} where
         fingerprint is a numpy.ndarray obtained by running the
-        :meth:`~prolif.fingerprint.Fingerprintrun` method of a
+        :meth:`~prolif.fingerprint.Fingerprint.run` method of a
         :class:`~prolif.fingerprint.Fingerprint`. Each dictionnary can
         contain other (key, value) pairs, such as frame numbers...etc. as long
-        as the values are not numpy arrays or np.NaN
+        as these values are not numpy arrays or np.NaN
     fingerprint : prolif.fingerprint.Fingerprint
         The fingerprint that was used to generate the fingerprint
 

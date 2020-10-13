@@ -12,7 +12,7 @@ from .utils import split_mol_in_residues
 class Molecule(Chem.Mol):
     """Main molecule class that behaves like an RDKit :class:`~rdkit.Chem.rdchem.Mol`
     with extra attributes (see below). The main purpose of this class is to
-    access residues has fragments of the molecule.
+    access residues as fragments of the molecule.
 
     Parameters
     ----------
@@ -42,6 +42,17 @@ class Molecule(Chem.Mol):
         u = mda.Universe(prolif.datafiles.TOP, prolif.datafiles.TRAJ)
         mol = u.select_atoms("protein").convert_to("RDKIT")
         mol = prolif.Molecule(mol)
+        mol
+    
+    You can also create a Molecule directly from a
+    :class:`~MDAnalysis.core.universe.Universe`:
+
+    .. ipython:: python
+        :okwarning:
+
+        mol = prolif.Molecule.from_mda(u, "protein")
+        mol
+
     
     Notes
     -----
@@ -71,6 +82,39 @@ class Molecule(Chem.Mol):
         self.residues = ResidueGroup(sorted([(resid, res)
                                      for resid, res in residues.items()],
                                      key=lambda x: (x[0].chain, x[0].number)))
+    
+    @classmethod
+    def from_mda(cls, obj, selection=None):
+        """Create a Molecule from an MDAnalysis object
+        
+        Parameters
+        ----------
+        obj : MDAnalysis.core.universe.Universe or MDAnalysis.core.groups.AtomGroup
+            The MDAnalysis object to convert
+        selection : None or str
+            Apply a selection to `obj` to create an AtomGroup. Uses all atoms
+            in `obj` if ``selection=None``
+
+        Example
+        -------
+        .. ipython:: python
+            :okwarning:
+
+            mol = prolif.Molecule.from_mda(u, "protein")
+            mol
+
+        Which is equivalent to:
+
+        .. ipython:: python
+            :okwarning:
+
+            protein = u.select_atoms("protein")
+            mol = prolif.Molecule.from_mda(protein)
+            mol
+
+        """
+        ag = obj.select_atoms(selection) if selection else obj.atoms
+        return cls(ag.convert_to("RDKIT"))
 
     def __iter__(self):
         for residue in self.residues.values():

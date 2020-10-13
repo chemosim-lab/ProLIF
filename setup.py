@@ -36,7 +36,11 @@ setup(
     keywords='science chemistry biology drug-design chemoinformatics virtual-screening',
     packages=['prolif'],
     python_requires='>=3.6',
-    install_requires=['numpy>=1.13.3', 'mdanalysis>=2.0.0', 'pandas>=1.0.0', 'tqdm'],
+    install_requires=[
+        'numpy>=1.13.3',
+        # 'mdanalysis>=2.0.0',
+        'pandas>=1.0.0',
+        'tqdm'],
     extras_require={
         'docs': ['recommonmark', 'sphinx-rtd-theme'],
     },

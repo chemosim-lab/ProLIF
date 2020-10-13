@@ -6,3 +6,5 @@ Interaction fingerprint
 
 .. automodule:: prolif.interactions
     :members:
+    :show-inheritance:
+    :private-members:

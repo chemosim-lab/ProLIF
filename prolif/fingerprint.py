@@ -30,17 +30,23 @@ from .utils import get_pocket_residues, to_dataframe, to_bitvectors
 
 logger = logging.getLogger("prolif")
 
+_BOOL_OR_NONE = (bool, type(None))
+
+
 def _only_return_bits(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         results = f(*args, **kwargs)
-        return results if isinstance(results, (bool, type(None))) else results[0]
+        return results if isinstance(results, _BOOL_OR_NONE) else results[0]
     return wrapper
 
 
 class Fingerprint:
-    """Class that generates an interaction fingerprint between a protein and a
-    ligand
+    """Class that generates an interaction fingerprint between two molecules
+
+    While in most cases the fingerprint will be generated between a ligand and
+    a protein, it is also possible to use this class for protein-protein
+    interactions, or host-guest systems.
 
     Parameters
     ----------
@@ -63,7 +69,9 @@ class Fingerprint:
 
     Notes
     -----
-    TODO fp.hydrophobic(lig, prot[res])
+    TODO You can use the fingerprint generator in multiple ways::
+    fp.hydrophobic(lig, prot[res])
+    
     """
 
     def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",
@@ -73,8 +81,8 @@ class Fingerprint:
         if interactions == "all":
             interactions = [i for i in _INTERACTIONS.keys() 
                             if not (i.startswith("_") or i == "Interaction")]
-        for interaction in interactions:
-            self.add_interaction(interaction)
+        for interaction_cls in interactions:
+            self.add_interaction(interaction_cls)
         logger.info('The following bitstring will be generated: {}'.format(
                     ' '.join(interactions)))
 
@@ -84,7 +92,7 @@ class Fingerprint:
         return f"<{name}: {params} at {id(self):#x}>"
 
     def add_interaction(self, interaction):
-        """Add an interaction to the fingerprint class"""
+        """Add an interaction class to the fingerprint generator"""
         func = _INTERACTIONS[interaction]().detect
         func = _only_return_bits(func)
         self.interactions[interaction] = func
@@ -179,24 +187,27 @@ class Fingerprint:
         -------
         ::
 
-            >>> u = mda.Universe("traj.pdb", "traj.nc")
-            >>> prot = u.select_atoms("protein")
+            >>> u = mda.Universe("top.pdb", "traj.nc")
             >>> lig = u.select_atoms("resname LIG")
-            >>> fp = prolif.Fingerprint().run(u.trajectory[:10], prot, lig)
+            >>> prot = u.select_atoms("protein")
+            >>> fp = prolif.Fingerprint().run(u.trajectory[:10], lig, prot)
 
         """
         iterator = tqdm(traj) if progress else traj
-        run_pocket = True if residues == "pocket" else False
+        # set residues
+        run_pocket = False
+        if residues == "pocket":
+            run_pocket = True
+        elif isinstance(residues, Iterable):
+            resids = residues
+        else:
+            resids = Molecule.from_mda(prot).residues
         ifp = []
         for ts in iterator:
-            lig_mol = Molecule(lig.convert_to("RDKIT"))
-            prot_mol = Molecule(prot.convert_to("RDKIT"))
+            lig_mol = Molecule.from_mda(lig)
+            prot_mol = Molecule.from_mda(prot)
             if run_pocket:
                 resids = get_pocket_residues(lig_mol, prot_mol)
-            elif isinstance(residues, Iterable):
-                resids = residues
-            else:
-                resids = prot_mol.residues
             data = {"Frame": ts.frame}
             for res in resids:
                 bs = self.get(lig_mol[0], prot_mol[res])
