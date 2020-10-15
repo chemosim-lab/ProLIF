@@ -69,8 +69,40 @@ class Fingerprint:
 
     Notes
     -----
-    TODO You can use the fingerprint generator in multiple ways::
-    fp.hydrophobic(lig, prot[res])
+    You can use the fingerprint generator in multiple ways:
+
+    - On a trajectory directly from MDAnalysis objects:
+
+    .. ipython:: python
+
+        prot = u.select_atoms("protein")
+        lig = u.select_atoms("resname ERM")
+        fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "Hydrophobic"])
+        fp.run(u.trajectory[:5], lig, prot)
+        fp.to_dataframe()
+    
+    - On a specific frame and a specific pair of residues:
+
+    .. ipython:: python
+
+        u.trajectory[0] # use the first frame
+        prot = prolif.Molecule.from_mda(prot)
+        lig = prolif.Molecule.from_mda(lig)
+        fp.bitstring(lig, prot["ASP129.0"])
+
+    - On a specific pair of residues for a specific interaction:
+
+    .. ipython:: python
+
+        fp.hbdonor(lig, prot["ASP129.0"]) # ligand-protein
+        fp.hbacceptor(prot["ASP129.0"], prot["CYS133.0"]) # protein-protein (alpha helix)
+    
+    You can also obtain the indices of atoms responsible for the interaction:
+
+    .. ipython:: python
+
+        fp.bitstring_atoms(lig, prot["ASP129.0"])
+        fp.hbdonor.__wrapped__(lig, prot["ASP129.0"])
     
     """
 
@@ -81,8 +113,14 @@ class Fingerprint:
         if interactions == "all":
             interactions = [i for i in _INTERACTIONS.keys() 
                             if not (i.startswith("_") or i == "Interaction")]
-        for interaction_cls in interactions:
-            self.add_interaction(interaction_cls)
+        for name, interaction_cls in _INTERACTIONS.items():
+            if name.startswith("_") or name == "Interaction":
+                continue
+            func = interaction_cls().detect
+            func = _only_return_bits(func)
+            setattr(self, name.lower(), func)
+            if name in interactions:
+                self.interactions[name] = func
         logger.info('The following bitstring will be generated: {}'.format(
                     ' '.join(interactions)))
 
@@ -91,27 +129,20 @@ class Fingerprint:
         params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
         return f"<{name}: {params} at {id(self):#x}>"
 
-    def add_interaction(self, interaction):
-        """Add an interaction class to the fingerprint generator"""
-        func = _INTERACTIONS[interaction]().detect
-        func = _only_return_bits(func)
-        self.interactions[interaction] = func
-        setattr(self, interaction.lower(), func)
-    
     @property
     def n_interactions(self):
         return len(self.interactions)
 
-    def get(self, res1, res2):
+    def bitstring(self, res1, res2):
         """Generates the complete bitstring for the interactions between two
         residues. To get the indices of atoms responsible for each interaction,
-        see :meth:`get_with_atoms`
+        see :meth:`bitstring_atoms`
 
         Parameters
         ----------
-        res1 : prolif.residue.Residue
+        res1 : prolif.residue.Residue or prolif.molecule.Molecule
             A residue, usually from a ligand
-        res2 : prolif.residue.Residue
+        res2 : prolif.residue.Residue or prolif.molecule.Molecule
             A residue, usually from a protein
 
         Returns
@@ -126,16 +157,16 @@ class Fingerprint:
             bitstring.append(bit)
         return np.array(bitstring, dtype=bool)
 
-    def get_with_atoms(self, res1, res2):
+    def bitstring_atoms(self, res1, res2):
         """Generates the complete bitstring for the interactions between two
         residues, and returns the indices of atoms responsible for these
         interactions
 
         Parameters
         ----------
-        res1 : prolif.residue.Residue
+        res1 : prolif.residue.Residue or prolif.molecule.Molecule
             A residue, usually from a ligand
-        res2 : prolif.residue.Residue
+        res2 : prolif.residue.Residue or prolif.molecule.Molecule
             A residue, usually from a protein
 
         Returns
@@ -210,7 +241,7 @@ class Fingerprint:
                 resids = get_pocket_residues(lig_mol, prot_mol)
             data = {"Frame": ts.frame}
             for res in resids:
-                bs = self.get(lig_mol[0], prot_mol[res])
+                bs = self.bitstring(lig_mol, prot_mol[res])
                 if bs.sum() > 0:
                     data[res] = bs
             ifp.append(data)

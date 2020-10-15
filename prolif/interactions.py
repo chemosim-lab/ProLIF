@@ -29,7 +29,7 @@ interactions available to the fingerprint generator::
     0         1         1
     >>> lig_mol = prolif.Molecule.from_mda(lig)
     >>> prot_mol = prolif.Molecule.from_mda(prot)
-    >>> fp.closecontact(lig_mol[0], prot_mol["ASP129.0"])
+    >>> fp.closecontact(lig_mol, prot_mol["ASP129.0"])
     True
 
 """

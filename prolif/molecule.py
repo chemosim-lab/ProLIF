@@ -69,6 +69,9 @@ class Molecule(Chem.Mol):
     
     See :mod:`prolif.residue` for more information on residues
 
+    When used on a ligand, this class will split it on peptide bonds (SMARTS
+    pattern ``N-C-C(=O)-N``) and disulfide bridges (``[SX2v2]-[SX2v2]``) so use
+    indexing on ligands with care: ``mol[0]`` isn't always the same as ``mol``
     """
     def __init__(self, mol):
         super().__init__(mol)

@@ -12,7 +12,7 @@ Welcome to ProLIF's documentation!
    source/changelog
 
 .. toctree::
-   :caption: Python API
+   :caption: Documentation
    :maxdepth: 2
    :glob:
    
@@ -24,6 +24,7 @@ Welcome to ProLIF's documentation!
    :maxdepth: 1
 
    source/examples
+   source/visualization
 
 Indices and tables
 ==================
