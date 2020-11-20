@@ -30,14 +30,16 @@ from .utils import get_pocket_residues, to_dataframe, to_bitvectors
 
 logger = logging.getLogger("prolif")
 
-_BOOL_OR_NONE = (bool, type(None))
 
-
-def _only_return_bits(f):
+def _return_first_element(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         results = f(*args, **kwargs)
-        return results if isinstance(results, _BOOL_OR_NONE) else results[0]
+        try:
+            value, *rest = results
+        except TypeError:
+            value = results
+        return value
     return wrapper
 
 
@@ -117,7 +119,7 @@ class Fingerprint:
             if name.startswith("_") or name == "Interaction":
                 continue
             func = interaction_cls().detect
-            func = _only_return_bits(func)
+            func = _return_first_element(func)
             setattr(self, name.lower(), func)
             if name in interactions:
                 self.interactions[name] = func

@@ -13,6 +13,9 @@ from rdkit.DataStructs import ExplicitBitVect
 from .residue import ResidueId
 
 
+_90_deg_to_rad = pi/2
+
+
 def get_centroid(coordinates):
     """Centroid for an array of XYZ coordinates"""
     return np.mean(coordinates, axis=0)
@@ -33,13 +36,13 @@ def get_ring_normal_vector(centroid, coordinates):
 
 
 def angle_between_limits(angle, min_angle, max_angle, ring=False):
-    """Check if an angle value is between min and max angles in degrees
+    """Check if an angle value is between min and max angles in radian.
     If the angle to check involves a ring, include the angle that would be
     obtained if we had used the other normal vector (same axis but opposite
     direction)
     """
-    if ring and (angle > pi/2):
-        mirror_angle = (pi/2) - (angle % (pi/2))
+    if ring and (angle > _90_deg_to_rad):
+        mirror_angle = _90_deg_to_rad - (angle % (_90_deg_to_rad))
         return (min_angle <= angle <= max_angle) or (
                 min_angle <= mirror_angle <= max_angle)
     return (min_angle <= angle <= max_angle)
