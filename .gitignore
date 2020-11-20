@@ -105,3 +105,4 @@ venv.bak/
 
 .coveragerc
 .vscode
+*.npz
