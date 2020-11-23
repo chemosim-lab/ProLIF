@@ -1,6 +1,8 @@
 import pytest
 import os
 from rdkit import Chem, RDLogger
+import numpy as np
+import MDAnalysis as mda
 import prolif
 
 # disable rdkit warnings
@@ -9,9 +11,12 @@ lg.setLevel(RDLogger.ERROR)
 
 
 def from_mol2(f):
-    path = os.path.join(os.path.dirname(__file__), "data", f)
-    mol = Chem.MolFromMol2File(path, removeHs=False)
-    return prolif.Molecule(mol, cache=False)
+    path = str(prolif.datafiles.datapath / f)
+    u = mda.Universe(path)
+    elements = [mda.topology.guessers.guess_atom_element(n)
+                for n in u.atoms.names]
+    u.add_TopologyAttr("elements", np.array(elements, dtype=object))
+    return prolif.Molecule.from_mda(u)
 
 
 class TestInteractions:
