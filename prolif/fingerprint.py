@@ -32,6 +32,30 @@ logger = logging.getLogger("prolif")
 
 
 def _return_first_element(f):
+    """Modifies the return signature of a function by forcing it to return
+    only the first element if multiple values were returned.
+
+    Notes
+    -----
+    The original return signature of the decorated function is still accessible
+    by calling ``function.__wrapped__(*args, **kwargs)``.
+
+    Example
+    -------
+    ::
+
+        >>> def foo():
+        ...     return 1, 2, 3
+        ...
+        >>> bar = _return_first_element(foo)
+        >>> foo()
+        (1, 2, 3)
+        >>> bar()
+        1
+        >>> bar.__wrapped__()
+        (1, 2, 3)
+
+    """
     @wraps(f)
     def wrapper(*args, **kwargs):
         results = f(*args, **kwargs)
