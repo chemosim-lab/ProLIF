@@ -146,23 +146,23 @@ class _BaseHBond(Interaction):
     def detect(self, acceptor, donor):
         acceptor_matches = acceptor.GetSubstructMatches(self.acceptor)
         donor_matches = donor.GetSubstructMatches(self.donor)
-        if not (acceptor_matches and donor_matches):
-            continue
-        for donor_match, acceptor_match in itertools.product(donor_matches, acceptor_matches):
-            # D-H ... A
-            d = Geometry.Point3D(*donor.xyz[donor_match[0]])
-            h = Geometry.Point3D(*donor.xyz[donor_match[1]])
-            a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
-            dist = d.Distance(a)
-            if dist <= self.distance:
-                hd = h.DirectionVector(d)
-                ha = h.DirectionVector(a)
-                # get DHA angle
-                angle = hd.AngleTo(ha)
-                if angle_between_limits(angle, *self.angles):
-                    return (True,
-                            get_mapindex(acceptor, acceptor_match[0]),
-                            get_mapindex(donor, donor_match[1]))
+        if acceptor_matches and donor_matches:
+            for donor_match, acceptor_match in itertools.product(donor_matches,
+                                                                 acceptor_matches):
+                # D-H ... A
+                d = Geometry.Point3D(*donor.xyz[donor_match[0]])
+                h = Geometry.Point3D(*donor.xyz[donor_match[1]])
+                a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
+                dist = d.Distance(a)
+                if dist <= self.distance:
+                    hd = h.DirectionVector(d)
+                    ha = h.DirectionVector(a)
+                    # get DHA angle
+                    angle = hd.AngleTo(ha)
+                    if angle_between_limits(angle, *self.angles):
+                        return (True,
+                                get_mapindex(acceptor, acceptor_match[0]),
+                                get_mapindex(donor, donor_match[1]))
         return False, None, None
 
 
@@ -211,29 +211,29 @@ class _BaseXBond(Interaction):
     def detect(self, acceptor, donor):
         acceptor_matches = acceptor.GetSubstructMatches(self.acceptor)
         donor_matches = donor.GetSubstructMatches(self.donor)
-        if not (acceptor_matches and donor_matches):
-            continue
-        for donor_match, acceptor_match in itertools.product(donor_matches, acceptor_matches):
-            # D-X ... A distance
-            d = Geometry.Point3D(*donor.xyz[donor_match[0]])
-            x = Geometry.Point3D(*donor.xyz[donor_match[1]])
-            a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
-            dist = x.Distance(a)
-            if dist <= self.distance:
-                # D-X ... A angle
-                xd = x.DirectionVector(d)
-                xa = x.DirectionVector(a)
-                angle = xd.AngleTo(xa)
-                if angle_between_limits(angle, *self.axd_angles):
-                    # X ... A-R angle
-                    r = Geometry.Point3D(*acceptor.xyz[acceptor_match[1]])
-                    ax = a.DirectionVector(x)
-                    ar = a.DirectionVector(r)
-                    angle = ax.AngleTo(ar)
-                    if angle_between_limits(angle, *self.xar_angles):
-                        return (True,
-                                get_mapindex(acceptor, acceptor_match[0]),
-                                get_mapindex(donor, donor_match[1]))
+        if acceptor_matches and donor_matches:
+            for donor_match, acceptor_match in itertools.product(donor_matches,
+                                                                 acceptor_matches):
+                # D-X ... A distance
+                d = Geometry.Point3D(*donor.xyz[donor_match[0]])
+                x = Geometry.Point3D(*donor.xyz[donor_match[1]])
+                a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
+                dist = x.Distance(a)
+                if dist <= self.distance:
+                    # D-X ... A angle
+                    xd = x.DirectionVector(d)
+                    xa = x.DirectionVector(a)
+                    angle = xd.AngleTo(xa)
+                    if angle_between_limits(angle, *self.axd_angles):
+                        # X ... A-R angle
+                        r = Geometry.Point3D(*acceptor.xyz[acceptor_match[1]])
+                        ax = a.DirectionVector(x)
+                        ar = a.DirectionVector(r)
+                        angle = ax.AngleTo(ar)
+                        if angle_between_limits(angle, *self.xar_angles):
+                            return (True,
+                                    get_mapindex(acceptor, acceptor_match[0]),
+                                    get_mapindex(donor, donor_match[1]))
         return False, None, None
 
 
@@ -270,16 +270,16 @@ class _BaseIonic(Interaction):
     def detect(self, cation, anion):
         anion_matches = anion.GetSubstructMatches(self.anion)
         cation_matches = cation.GetSubstructMatches(self.cation)
-        if not (anion_matches and cation_matches):
-            continue
-        for anion_match, cation_match in itertools.product(anion_matches, cation_matches):
-            a = Geometry.Point3D(*anion.xyz[anion_match[0]])
-            c = Geometry.Point3D(*cation.xyz[cation_match[0]])
-            dist = a.Distance(c)
-            if dist <= self.distance:
-                return (True,
-                        get_mapindex(cation, cation_match[0]),
-                        get_mapindex(anion, anion_match[0]))
+        if anion_matches and cation_matches:
+            for anion_match, cation_match in itertools.product(anion_matches,
+                                                               cation_matches):
+                a = Geometry.Point3D(*anion.xyz[anion_match[0]])
+                c = Geometry.Point3D(*cation.xyz[cation_match[0]])
+                dist = a.Distance(c)
+                if dist <= self.distance:
+                    return (True,
+                            get_mapindex(cation, cation_match[0]),
+                            get_mapindex(anion, anion_match[0]))
         return False, None, None
 
 
@@ -420,14 +420,16 @@ class _BasePiStacking(Interaction):
 
 class FaceToFace(_BasePiStacking):
     """Face-to-face Pi-Stacking interaction between a ligand and a residue"""
-    def __init__(self, centroid_distance=4.5, plane_angles=(0, 30)):
-        super().__init__(centroid_distance=centroid_distance, plane_angles=plane_angles)
+    def __init__(self, centroid_distance=4.5, plane_angles=(0, 30), **kwargs):
+        super().__init__(centroid_distance=centroid_distance,
+                         plane_angles=plane_angles, **kwargs)
 
 
 class EdgeToFace(_BasePiStacking):
     """Edge-to-face Pi-Stacking interaction between a ligand and a residue"""
-    def __init__(self, centroid_distance=6.0, plane_angles=(60, 90)):
-        super().__init__(centroid_distance=centroid_distance, plane_angles=plane_angles)
+    def __init__(self, centroid_distance=6.0, plane_angles=(60, 90), **kwargs):
+        super().__init__(centroid_distance=centroid_distance,
+                         plane_angles=plane_angles, **kwargs)
 
 
 class _BaseMetallic(Interaction):
@@ -451,16 +453,16 @@ class _BaseMetallic(Interaction):
     def detect(self, metal, ligand):
         ligand_matches = ligand.GetSubstructMatches(self.ligand)
         metal_matches = metal.GetSubstructMatches(self.metal)
-        if not (ligand_matches and metal_matches):
-            continue
-        for ligand_match, metal_match in itertools.product(ligand_matches, metal_matches):
-            ligand_atom = Geometry.Point3D(*ligand.xyz[ligand_match[0]])
-            metal_atom = Geometry.Point3D(*metal.xyz[metal_match[0]])
-            dist = ligand_atom.Distance(metal_atom)
-            if dist <= self.distance:
-                return (True,
-                        get_mapindex(metal, metal_match[0]),
-                        get_mapindex(ligand, ligand_match[0]))
+        if ligand_matches and metal_matches:
+            for ligand_match, metal_match in itertools.product(ligand_matches,
+                                                               metal_matches):
+                ligand_atom = Geometry.Point3D(*ligand.xyz[ligand_match[0]])
+                metal_atom = Geometry.Point3D(*metal.xyz[metal_match[0]])
+                dist = ligand_atom.Distance(metal_atom)
+                if dist <= self.distance:
+                    return (True,
+                            get_mapindex(metal, metal_match[0]),
+                            get_mapindex(ligand, ligand_match[0]))
         return False, None, None
 
 
