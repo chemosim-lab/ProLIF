@@ -96,8 +96,8 @@ class Hydrophobic(Interaction):
         Cutoff distance for the interaction
     """
     def __init__(self,
-                 hydrophobic="[C,S,F,Cl,Br,I,At;!+;!-;!$([*]~[#7,O])]",
-                 distance=3.9):
+                 hydrophobic="[C,S,F,Cl,Br,I,At;!+;!-]",
+                 distance=4.5):
         self.hydrophobic = Chem.MolFromSmarts(hydrophobic)
         self.distance = distance
 
