@@ -362,8 +362,8 @@ class CationPi(_BaseCationPi):
         return super().detect(ligand, residue)
 
 
-class _BasePiStacking(Interaction):
-    """Base class for Pi-Stacking interactions
+class PiStacking(Interaction):
+    """Pi-Stacking interaction between a ligand and a residue
 
     Parameters
     ----------
@@ -376,7 +376,7 @@ class _BasePiStacking(Interaction):
     pi_ring : list
         List of SMARTS for aromatic rings
     """
-    def __init__(self, centroid_distance=5.5, shortest_distance=3.8,
+    def __init__(self, centroid_distance=6.0, shortest_distance=3.8,
                  plane_angles=(0, 90),
                  pi_ring=["a1:a:a:a:a:a:1", "a1:a:a:a:a:1"]):
         self.pi_ring = [Chem.MolFromSmarts(s) for s in pi_ring]
@@ -418,16 +418,16 @@ class _BasePiStacking(Interaction):
         return False, None, None
 
 
-class FaceToFace(_BasePiStacking):
+class FaceToFace(PiStacking):
     """Face-to-face Pi-Stacking interaction between a ligand and a residue"""
-    def __init__(self, centroid_distance=4.5, plane_angles=(0, 30), **kwargs):
+    def __init__(self, centroid_distance=4.5, plane_angles=(0, 40), **kwargs):
         super().__init__(centroid_distance=centroid_distance,
                          plane_angles=plane_angles, **kwargs)
 
 
-class EdgeToFace(_BasePiStacking):
+class EdgeToFace(PiStacking):
     """Edge-to-face Pi-Stacking interaction between a ligand and a residue"""
-    def __init__(self, centroid_distance=6.0, plane_angles=(60, 90), **kwargs):
+    def __init__(self, centroid_distance=6.0, plane_angles=(50, 90), **kwargs):
         super().__init__(centroid_distance=centroid_distance,
                          plane_angles=plane_angles, **kwargs)
 
