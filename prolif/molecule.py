@@ -1,15 +1,14 @@
 """
-Reading RDKit molecules --- :mod:`prolif.molecule`
-==================================================
+Reading proteins and ligands --- :mod:`prolif.molecule`
+=======================================================
 """
 import copy
 from collections import defaultdict
-from rdkit import Chem
-from rdkit.Chem import rdMolTransforms
+from .rdkitmol import BaseRDKitMol
 from .residue import Residue, ResidueId, ResidueGroup
 from .utils import split_mol_in_residues
 
-class Molecule(Chem.Mol):
+class Molecule(BaseRDKitMol):
     """Main molecule class that behaves like an RDKit :class:`~rdkit.Chem.rdchem.Mol`
     with extra attributes (see below). The main purpose of this class is to
     access residues as fragments of the molecule.
@@ -26,10 +25,6 @@ class Molecule(Chem.Mol):
         by :class:`~prolif.residue.ResidueId`. The residue list is sorted.
     n_residues : int
         Number of residues
-    centroid : numpy.ndarray
-        XYZ coordinates of the centroid of the molecule
-    xyz : numpy.ndarray
-        XYZ coordinates of all atoms in the molecule
     
     Example
     -------
@@ -80,11 +75,10 @@ class Molecule(Chem.Mol):
             atom.SetUnsignedProp("mapindex", atom.GetIdx())
         # split in residues
         residues = split_mol_in_residues(self)
-        residues = {ResidueId.from_atom(mol.GetAtomWithIdx(0)): Residue(mol)
-                    for mol in residues}
-        self.residues = ResidueGroup(sorted([(resid, res)
-                                     for resid, res in residues.items()],
-                                     key=lambda x: (x[0].chain, x[0].number)))
+        residues = [(ResidueId.from_atom(mol.GetAtomWithIdx(0)), Residue(mol))
+                    for mol in residues]
+        residues.sort(key=lambda x: (x[0].chain, x[0].number))
+        self.residues = ResidueGroup(residues)
     
     @classmethod
     def from_mda(cls, obj, selection=None):
@@ -134,11 +128,3 @@ class Molecule(Chem.Mol):
     @property
     def n_residues(self):
         return len(self.residues)
-
-    @property
-    def centroid(self):
-        return rdMolTransforms.ComputeCentroid(self.GetConformer())
-
-    @property
-    def xyz(self):
-        return self.GetConformer().GetPositions()

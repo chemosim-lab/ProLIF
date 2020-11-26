@@ -3,13 +3,14 @@ Residue-related classes --- :mod:`prolif.residue`
 =================================================
 """
 import re
+from typing import Optional, List, Tuple
 from collections import UserDict
 from collections.abc import Iterable
-from rdkit import Chem
-from rdkit.Chem import rdMolTransforms
+import numpy as np
+from .rdkitmol import BaseRDKitMol
 
 
-_RE_RESID = r'(\w{3})(\d+)\.?(\w)?'
+_RE_RESID = re.compile(r'([A-Z]{3})?(\d*)\.?([A-Z])?')
 
 
 class ResidueId:
@@ -17,17 +18,20 @@ class ResidueId:
     
     Parameters
     ----------
-    name : str
+    name : str or None, optionnal
         3-letter residue name
-    number : int or None
+    number : int or None, optionnal
         residue number
     chain : str or None, optionnal
         1-letter protein chain
     """
-    def __init__(self, name:str, number=None, chain=None):
-        self.name = name
-        self.number = number
-        self.chain = chain
+    def __init__(self,
+                 name: Optional[str] = None,
+                 number: Optional[int] = None,
+                 chain: Optional[str] = None):
+        self.name = name or None
+        self.number = number or None
+        self.chain = chain or None
         self.resid = f"{self.name or ''}{self.number or ''}"
         if self.chain:
             self.resid += f".{self.chain}"
@@ -41,6 +45,12 @@ class ResidueId:
     def __eq__(self, other):
         return hash(self) == hash(other)
 
+    def __contains__(self, other):
+        attributes = [attr for attr in ["name", "number", "chain"]
+                      if getattr(other, attr)]
+        return all(getattr(self, attr) == getattr(other, attr)
+                   for attr in attributes)
+
     @classmethod
     def from_atom(cls, atom):
         """Creates a ResidueId from an RDKit atom
@@ -49,13 +59,14 @@ class ResidueId:
         ----------
         atom : rdkit.Chem.rdchem.Atom
             An atom that contains an RDKit :class:`~rdkit.Chem.rdchem.AtomMonomerInfo`
-            (also know as ``PDBResidueInfo``)
         """
         mi = atom.GetMonomerInfo()
         if mi:
-            resname = mi.GetResidueName() if mi.GetResidueName() else "UNK"
-            return cls(resname, mi.GetResidueNumber(), mi.GetChainId())
-        return cls("UNK", 1, "")
+            name = mi.GetResidueName()
+            number = mi.GetResidueNumber()
+            chain = mi.GetChainId()
+            return cls(name, number, chain)
+        return cls()
 
     @classmethod
     def from_string(cls, resid_str):
@@ -64,17 +75,42 @@ class ResidueId:
         Parameters
         ----------
         resid_str : str
-            A string in the format ``<3-letter code><residue number>.<chain>``,
-            i.e. for alanine number 10 and chain B: ``ALA10.B``
-            The ".chain" is optionnal if your molecule doesn't have chains.
+            A string in the format ``<3-letter code><residue number>.<chain>``
+            All arguments are optionnal, and the dot should be present only if
+            the chain identifier is also present
+        
+        Examples
+        --------
+
+        +-----------+----------------------------------+
+        | string    | Corresponding ResidueId          |
+        +===========+==================================+
+        | "ALA10.A" | ``ResidueId("ALA", 10, "A")``    |
+        +-----------+----------------------------------+
+        | "GLU33"   | ``ResidueId("GLU", 33, None)``   |
+        +-----------+----------------------------------+
+        | "LYS.B"   | ``ResidueId("LYS", None, "B")``  |
+        +-----------+----------------------------------+
+        | "ARG"     | ``ResidueId("ARG", None, None)`` |
+        +-----------+----------------------------------+
+        | "5.C"     | ``ResidueId(None, 5, "C")``      |
+        +-----------+----------------------------------+
+        | "42"      | ``ResidueId(None, 42, None)``    |
+        +-----------+----------------------------------+
+        | ".D"      | ``ResidueId(None, None, "D")``   |
+        +-----------+----------------------------------+
+        | ""        | ``ResidueId(None, None, None)``  |
+        +-----------+----------------------------------+
+
         """
-        matches = re.search(_RE_RESID, resid_str)
-        resname, resnumber, chain = matches.groups()
-        return cls(resname, int(resnumber), chain if chain else "")
+        matches = _RE_RESID.search(resid_str)
+        name, number, chain = matches.groups()
+        number = int(number) if number else None
+        return cls(name, number, chain)
 
 
-class Residue(Chem.Mol):
-    """An RDKit molecule with custom attributes
+class Residue(BaseRDKitMol):
+    """A class for residues as RDKit molecules
 
     Parameters
     ----------
@@ -85,10 +121,6 @@ class Residue(Chem.Mol):
     ----------
     resid : prolif.residue.ResidueId
         The residue identifier
-    centroid : numpy.ndarray
-        XYZ coordinates of the centroid of the molecule
-    xyz : numpy.ndarray
-        XYZ coordinates of all atoms in the molecule
     
     Notes
     -----
@@ -106,69 +138,61 @@ class Residue(Chem.Mol):
     def __str__(self):
         return str(self.resid)
 
-    @property
-    def xyz(self):
-        return self.GetConformer().GetPositions()
-
-    @property
-    def centroid(self):
-        return rdMolTransforms.ComputeCentroid(self.GetConformer())
-
 
 class ResidueGroup(UserDict):
     """A container to store and retrieve Residue instances easily
     
     Parameters
     ----------
-    residues : dict or list
-        A dictionnary of :class:`Residue` indexed by :class:`ResidueId`, or a
-        list of (:class:`ResidueId`, :class:`Residue`) tuples
+    residues : list
+        A list of (:class:`ResidueId`, :class:`Residue`) tuples
 
     Attributes
     ----------
-    data : dict
-        The underlying dictionnary that stores :class:`Residue` indexed by
-        :class:`ResidueId`
     n_residues : int
         Number of residues in the ResidueGroup
-    resid : list
-        List of :class:`ResidueId`, usefull to retrieve residues by index
     
     Notes
     -----
-    Residues in the group can be access by index, resid string, slice, list of
-    resid or index, or :class:`ResidueId`.
+    Residues in the group can be accessed by :class:`ResidueId`, string, index,
+    slice, or a list of those.
     See the :class:`~prolif.molecule.Molecule` class for an example
     """
 
-    def __init__(self, residues):
+    def __init__(self, residues: List[Tuple[ResidueId, Residue]]):
         super().__init__(residues)
-        self._residues_indices = list(self.keys())
+        _resids, _residues = zip(*residues)
+        self._resids = np.asarray(_resids, dtype=object)
+        self._residues = np.asarray(_residues, dtype=object)
 
     def __getitem__(self, key):
-        if isinstance(key, ResidueId):
-            if key.number is None:
-                return ResidueGroup((resid, self.data[resid])
-                                    for resid in self.data.keys()
-                                    if resid.name == key.name)
-            return self.data[key]
-        elif isinstance(key, int):
-            resid = self._residues_indices[key]
-            return self.data[resid]
+        if isinstance(key, [int, slice]):
+            return self._residues[key]
         elif isinstance(key, str):
             resid = ResidueId.from_string(key)
-            return self.data[resid]
-        elif isinstance(key, slice):
-            resids = self._residues_indices[key]
-            return ResidueGroup((resid, self.data[resid]) for resid in resids)
+            try:
+                return self.data[key]
+            except KeyError:
+                ix = [i for i, resid in enumerate(self.keys()) if key in resid]
+                return self._residues[ix]
+        elif isinstance(key, ResidueId):
+            try:
+                return self.data[key]
+            except KeyError:
+                ix = [i for i, resid in enumerate(self.keys()) if key in resid]
+                return self._residues[ix]
         elif isinstance(key, Iterable):
-            if isinstance(key[0], ResidueId):
-                resids = key
-            elif isinstance(key[0], int):
-                resids = [self._residues_indices[i] for i in key]
+            if isinstance(key[0], int):
+                return self._residues[key]
             elif isinstance(key[0], str):
                 resids = [ResidueId.from_string(s) for s in key]
-            return ResidueGroup((resid, self.data[resid]) for resid in resids)
+                ix = [i for i, resid in enumerate(self.keys())
+                      if any(key in resid for key in resids)]
+            elif isinstance(key[0], ResidueId):
+                resids = key
+                ix = [i for i, resid in enumerate(self.keys())
+                      if any(key in resid for key in resids)]
+            return self._residues[ix]
         raise KeyError("Expected a ResidueId, int, str, an iterable of those "
                        f"or a slice, got {type(key).__name__!r} instead")
 
@@ -176,12 +200,12 @@ class ResidueGroup(UserDict):
         if isinstance(key, ResidueId):
             resid = key
         elif isinstance(key, int):
-            resid = self._residues_indices[key]
+            resid = self._resids[key]
         elif isinstance(key, str):
             resid = ResidueId.from_string(key)
         else:
             raise KeyError("Expected a ResidueId, int or str, got "
-                           f"{type(key)} instead")
+                           f"{type(key).__name__!r} instead")
         self.data[resid] = value
 
     def __repr__(self):
@@ -191,7 +215,3 @@ class ResidueGroup(UserDict):
     @property
     def n_residues(self):
         return len(self)
-
-    @property
-    def resid(self):
-        return self._residues_indices

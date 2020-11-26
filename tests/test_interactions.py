@@ -19,6 +19,7 @@ def from_mol2(f):
     return prolif.Molecule.from_mda(u)
 
 
+@pytest.mark.skip(reason="Needs refactoring")
 class TestInteractions:
     @pytest.fixture
     def benzene(self):
