@@ -50,6 +50,9 @@ class ResidueId:
                       if getattr(other, attr)]
         return all(getattr(self, attr) == getattr(other, attr)
                    for attr in attributes)
+    
+    def __lt__(self, other):
+        return (self.chain, self.number) < (other.chain, other.number)
 
     @classmethod
     def from_atom(cls, atom):
@@ -145,7 +148,7 @@ class ResidueGroup(UserDict):
     Parameters
     ----------
     residues : list
-        A list of (:class:`ResidueId`, :class:`Residue`) tuples
+        A list of :class:`~prolif.residue.Residue`
 
     Attributes
     ----------
@@ -154,60 +157,24 @@ class ResidueGroup(UserDict):
     
     Notes
     -----
-    Residues in the group can be accessed by :class:`ResidueId`, string, index,
-    slice, or a list of those.
-    See the :class:`~prolif.molecule.Molecule` class for an example
+    Residues in the group can be accessed by :class:`ResidueId`, string, or
+    index. See the :class:`~prolif.molecule.Molecule` class for an example
     """
-
-    def __init__(self, residues: List[Tuple[ResidueId, Residue]]):
-        super().__init__(residues)
-        _resids, _residues = zip(*residues)
-        self._resids = np.asarray(_resids, dtype=object)
-        self._residues = np.asarray(_residues, dtype=object)
+    def __init__(self, residues: List[Residue]):
+        self._residues = np.asarray(residues, dtype=object)
+        super().__init__([(r.resid, r) for r in self._residues])
 
     def __getitem__(self, key):
-        if isinstance(key, [int, slice]):
+        if isinstance(key, int):
             return self._residues[key]
         elif isinstance(key, str):
-            resid = ResidueId.from_string(key)
-            try:
-                return self.data[key]
-            except KeyError:
-                ix = [i for i, resid in enumerate(self.keys()) if key in resid]
-                return self._residues[ix]
+            key = ResidueId.from_string(key)
+            return self.data[key]
         elif isinstance(key, ResidueId):
-            try:
-                return self.data[key]
-            except KeyError:
-                ix = [i for i, resid in enumerate(self.keys()) if key in resid]
-                return self._residues[ix]
-        elif isinstance(key, Iterable):
-            if isinstance(key[0], int):
-                return self._residues[key]
-            elif isinstance(key[0], str):
-                resids = [ResidueId.from_string(s) for s in key]
-                ix = [i for i, resid in enumerate(self.keys())
-                      if any(key in resid for key in resids)]
-            elif isinstance(key[0], ResidueId):
-                resids = key
-                ix = [i for i, resid in enumerate(self.keys())
-                      if any(key in resid for key in resids)]
-            return self._residues[ix]
-        raise KeyError("Expected a ResidueId, int, str, an iterable of those "
-                       f"or a slice, got {type(key).__name__!r} instead")
-
-    def __setitem__(self, key, value):
-        if isinstance(key, ResidueId):
-            resid = key
-        elif isinstance(key, int):
-            resid = self._resids[key]
-        elif isinstance(key, str):
-            resid = ResidueId.from_string(key)
-        else:
-            raise KeyError("Expected a ResidueId, int or str, got "
-                           f"{type(key).__name__!r} instead")
-        self.data[resid] = value
-
+            return self.data[key]
+        raise KeyError("Expected a ResidueId, int, or str, "
+                       f"got {type(key).__name__!r} instead")
+    
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         return f"<{name} with {self.n_residues} residues at {id(self):#x}>"

@@ -129,6 +129,16 @@ class TestResidueId:
         result = resid in ref
         assert result is expected
 
+    @pytest.mark.parametrize("res1, res2", [
+        ("ALA1.A", "ALA1.B"),
+        ("ALA2.A", "ALA3.A"),
+        ("ALA4.A", "ALA1.B"),
+    ])
+    def test_lt(self, res1, res2):
+        res1 = ResidueId.from_string(res1)
+        res2 = ResidueId.from_string(res2)
+        assert res1 < res2
+
 class TestResidue(TestBaseRDKitMol):
     @pytest.fixture(scope="class")
     def mol(self):
@@ -146,5 +156,36 @@ class TestResidue(TestBaseRDKitMol):
 
 
 class TestResidueGroup:
-    def test(self):
-        pass
+    @pytest.fixture(scope="class")
+    def residues(self):
+        sequence = "ARNDCQEGHILKMFPSTWYV"
+        protein = Chem.MolFromSequence(sequence)
+        residues = [Residue(res) for res in Chem.SplitMolByPDBResidues(protein).values()]
+        return residues
+
+    def test_init(self, residues):
+        rg = ResidueGroup(residues)
+        for rg_res, res in zip(rg._residues, residues):
+            assert rg_res is res
+        for (resid, rg_res), res in zip(rg.items(), residues):
+            assert rg_res is res
+            assert resid is rg_res.resid
+
+    def test_n_residues(self, residues):
+        rg = ResidueGroup(residues)
+        assert rg.n_residues == len(rg)
+        assert rg.n_residues == 20
+
+    @pytest.mark.parametrize("ix, resid, resid_str", [
+        (0, ("ALA", 1, "A"), "ALA1.A"),
+        (4, ("CYS", 5, "A"), "CYS5.A"),
+        (6, ("GLU", 7, "A"), "GLU7.A"),
+        (9, ("ILE", 10, "A"), "ILE10.A"),
+        (19, ("VAL", 20, "A"), "VAL20.A"),
+        (-1, ("VAL", 20, "A"), "VAL20.A"),
+    ])
+    def test_getitem(self, residues, ix, resid, resid_str):
+        rg = ResidueGroup(residues)
+        resid = ResidueId(*resid)
+        assert rg[ix] == rg[resid]
+        assert rg[ix] == rg[resid_str]

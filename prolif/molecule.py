@@ -4,9 +4,15 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 """
 import copy
 from collections import defaultdict
+from operator import attrgetter
+from MDAnalysis import _CONVERTERS
 from .rdkitmol import BaseRDKitMol
 from .residue import Residue, ResidueId, ResidueGroup
-from .utils import split_mol_in_residues
+from .utils import split_mol_by_residues
+
+
+mda_to_rdkit = _CONVERTERS["RDKIT"]().convert
+
 
 class Molecule(BaseRDKitMol):
     """Main molecule class that behaves like an RDKit :class:`~rdkit.Chem.rdchem.Mol`
@@ -57,10 +63,7 @@ class Molecule(BaseRDKitMol):
 
         mol["TYR38.0"] # by resid string (residue name + number + chain)
         mol[42] # by index
-        mol[::10] # by slice (start:stop:step)
-        mol[[0, 10, 100]] # by list of indices
-        mol[["TRP125.0", "ASP129.0"]] # by list of resid
-        mol[prolif.ResidueId("ALA")] # by ResidueId
+        mol[prolif.ResidueId("TYR", 38, "A")] # by ResidueId
     
     See :mod:`prolif.residue` for more information on residues
 
@@ -74,14 +77,13 @@ class Molecule(BaseRDKitMol):
         for atom in self.GetAtoms():
             atom.SetUnsignedProp("mapindex", atom.GetIdx())
         # split in residues
-        residues = split_mol_in_residues(self)
-        residues = [(ResidueId.from_atom(mol.GetAtomWithIdx(0)), Residue(mol))
-                    for mol in residues]
-        residues.sort(key=lambda x: (x[0].chain, x[0].number))
+        residues = split_mol_by_residues(self)
+        residues = [Residue(mol) for mol in residues]
+        residues.sort(key=attrgetter("resid"))
         self.residues = ResidueGroup(residues)
     
     @classmethod
-    def from_mda(cls, obj, selection=None):
+    def from_mda(cls, obj, selection=None, **kwargs):
         """Create a Molecule from an MDAnalysis object
         
         Parameters
@@ -91,6 +93,8 @@ class Molecule(BaseRDKitMol):
         selection : None or str
             Apply a selection to `obj` to create an AtomGroup. Uses all atoms
             in `obj` if ``selection=None``
+        **kwargs : object
+            Other arguments passed to the RDKitConverter of MDAnalysis
 
         Example
         -------
@@ -111,7 +115,8 @@ class Molecule(BaseRDKitMol):
 
         """
         ag = obj.select_atoms(selection) if selection else obj.atoms
-        return cls(ag.convert_to("RDKIT"))
+        mol = mda_to_rdkit(ag, **kwargs)
+        return cls(mol)
 
     def __iter__(self):
         for residue in self.residues.values():

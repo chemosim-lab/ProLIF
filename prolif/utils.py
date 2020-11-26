@@ -3,7 +3,6 @@ Helper functions --- :mod:`prolif.utils`
 ========================================
 """
 from math import pi
-from operator import attrgetter
 import numpy as np
 import pandas as pd
 from rdkit import Chem
@@ -99,7 +98,7 @@ def get_pocket_residues(lig, prot, cutoff=6.0):
     Returns
     -------
     residues : list
-        Sorted list of :class:`ResidueId` that are close to the ligand
+        List of :class:`ResidueId` that are close to the ligand
     """
     ref_points = get_reference_points(lig)
     pocket_residues = []
@@ -108,12 +107,13 @@ def get_pocket_residues(lig, prot, cutoff=6.0):
         indices = np.where(distances <= cutoff)[0]
         pocket_residues.extend([ResidueId.from_atom(
             prot.GetAtomWithIdx(int(i))) for i in indices])
-    return sorted(set(pocket_residues), key=attrgetter("chain", "number"))
+    return pocket_residues
 
 
-def split_mol_in_residues(protein):
-    """Splits an RDKit Mol in multiple residues
-    Code adapted from Maciek Wójcikowski on the discussion list
+def split_mol_by_residues(protein):
+    """Splits an RDKit :class:`~rdkit.Chem.rdchem.Mol` in multiple residues
+    Returns a list of RDKit :class:`~rdkit.Chem.rdchem.Mol`
+    Code adapted from Maciek Wójcikowski on the RDKit discussion list
     """
     residues = []
     peptide_bond = Chem.MolFromSmarts('N-C-C(=O)-N')
@@ -180,7 +180,7 @@ def to_dataframe(ifp, fingerprint):
     resids = list(set(key for d in ifp
                           for key, value in d.items()
                           if isinstance(value, np.ndarray)))
-    resids = sorted(resids, key=attrgetter("chain", "number"))
+    resids = sorted(resids)
     ids = df.drop(columns=resids).columns.tolist()
     df = df.applymap(lambda x: [False] * fingerprint.n_interactions
                                if x is np.nan else x)
