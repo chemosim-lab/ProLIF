@@ -1,7 +1,11 @@
 import pytest
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from MDAnalysis import Universe
+from numpy.testing import assert_equal
 from prolif.residue import ResidueId, Residue, ResidueGroup
+from prolif.datafiles import TOP, TRAJ
+from prolif.molecule import Molecule
 from .test_molecule import TestBaseRDKitMol
 
 class TestResidueId:
@@ -88,6 +92,7 @@ class TestResidueId:
         ("ALA1.B", ("ALA", 1, "B")),
         ("1.B", (None, 1, "B")),
         (".B", (None, None, "B")),
+        (".0", (None, None, "0")),
         ("1", (None, 1, None)),
         ("", (None, None, None)),
     ])
@@ -139,6 +144,7 @@ class TestResidueId:
         res2 = ResidueId.from_string(res2)
         assert res1 < res2
 
+
 class TestResidue(TestBaseRDKitMol):
     @pytest.fixture(scope="class")
     def mol(self):
@@ -163,6 +169,12 @@ class TestResidueGroup:
         residues = [Residue(res) for res in Chem.SplitMolByPDBResidues(protein).values()]
         return residues
 
+    @pytest.fixture(scope="class")
+    def protein(self):
+        u = Universe(TOP, TRAJ)
+        mol = Molecule.from_mda(u, "protein")
+        return mol
+
     def test_init(self, residues):
         rg = ResidueGroup(residues)
         for rg_res, res in zip(rg._residues, residues):
@@ -170,6 +182,20 @@ class TestResidueGroup:
         for (resid, rg_res), res in zip(rg.items(), residues):
             assert rg_res is res
             assert resid is rg_res.resid
+        resinfo = [(r.resid.name, r.resid.number, r.resid.chain)
+                   for r in residues]
+        name, number, chain = zip(*resinfo)
+        assert_equal(rg.name, name)
+        assert_equal(rg.number, number)
+        assert_equal(rg.chain, chain)
+
+    def test_init_empty(self):
+        rg = ResidueGroup([])
+        assert_equal(rg.name, [])
+        assert_equal(rg.number, [])
+        assert_equal(rg.chain, [])
+        assert_equal(rg._residues, [])
+        assert rg.data == {}
 
     def test_n_residues(self, residues):
         rg = ResidueGroup(residues)
@@ -189,3 +215,32 @@ class TestResidueGroup:
         resid = ResidueId(*resid)
         assert rg[ix] == rg[resid]
         assert rg[ix] == rg[resid_str]
+
+    def test_getitem_keyerror(self):
+        rg = ResidueGroup([])
+        with pytest.raises(KeyError,
+                           match="Expected a ResidueId, int, or str"):
+            rg[True]
+        with pytest.raises(KeyError,
+                           match="Expected a ResidueId, int, or str"):
+            rg[1.5]
+
+    def test_select(self, protein):
+        rg = protein.residues
+        assert rg.select(rg.name == "LYS").n_residues == 16
+        assert rg.select(rg.number == 300).n_residues == 1
+        assert rg.select(rg.number == 1).n_residues == 0
+        assert rg.select(rg.chain == "1").n_residues == 90
+        # and
+        assert rg.select((rg.chain == "1") & (rg.name == "ALA")).n_residues == 7
+        # or
+        assert rg.select((rg.chain == "1") | (rg.name == "ALA")).n_residues == 110
+        # xor
+        assert rg.select((rg.chain == "1") ^ (rg.name == "ALA")).n_residues == 103
+        # not
+        assert rg.select(~(rg.chain == "1")).n_residues == 212
+        
+    def test_select_sameas_getitem(self, protein):
+        rg = protein.residues
+        sel = rg.select((rg.name == "LYS") & (rg.number == 49))[0]
+        assert sel.resid is rg["LYS49.0"].resid
