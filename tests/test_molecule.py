@@ -1,15 +1,16 @@
 import pytest
 from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
+from MDAnalysis import Universe
 from numpy.testing import assert_array_almost_equal
 from prolif.molecule import Molecule
-from prolif.residue import Residue, ResidueGroup
+from prolif.residue import ResidueId, Residue, ResidueGroup
 from prolif.rdkitmol import BaseRDKitMol
 from prolif.datafiles import TOP
 
 class TestBaseRDKitMol:
     def get_pdb_mol(self):
-        return Chem.MolFromPDBFile(TOP)
+        return Chem.MolFromPDBFile(TOP, removeHs=False)
 
     @pytest.fixture(scope="class")
     def mol(self):
@@ -48,5 +49,20 @@ class TestMolecule(TestBaseRDKitMol):
         for atom in mol.GetAtoms():
             assert atom.GetUnsignedProp("mapindex") == atom.GetIdx()
 
-    def test_from_mda(self):
-        pass
+    def test_from_mda(self, mol):
+        u = Universe(mol)
+        umol = Molecule(u.select_atoms("resname ERM").convert_to("RDKIT"))
+        clsmeth_mol = Molecule.from_mda(u, "resname ERM")
+        assert umol[0].resid == clsmeth_mol[0].resid
+        assert (umol.HasSubstructMatch(clsmeth_mol) and
+                clsmeth_mol.HasSubstructMatch(umol))
+
+    @pytest.mark.parametrize("key", [
+        0, 42, -1, "LYS49.0", ResidueId("LYS", 49, "0")
+    ])
+    def test_getitem(self, mol, key):
+        assert mol[key].resid is mol.residues[key].resid
+
+    def test_iter(self, mol):
+        for i, r in enumerate(mol):
+            assert r.resid == mol[i].resid
