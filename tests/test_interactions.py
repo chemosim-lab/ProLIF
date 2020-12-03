@@ -3,7 +3,9 @@ import os
 from rdkit import Chem, RDLogger
 import numpy as np
 import MDAnalysis as mda
-import prolif
+from prolif.molecule import Molecule
+from prolif.fingerprint import Fingerprint
+
 
 # disable rdkit warnings
 lg = RDLogger.logger()
@@ -19,7 +21,7 @@ def from_mol2(f):
     return prolif.Molecule.from_mda(u)
 
 
-@pytest.mark.skip(reason="Needs refactoring")
+@pytest.mark.skip(reason="Needs refactoring (open issue mol2 needs bonds...")
 class TestInteractions:
     @pytest.fixture
     def benzene(self):

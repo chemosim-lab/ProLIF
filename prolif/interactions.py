@@ -4,14 +4,12 @@ Detecting interactions between residues --- :mod:`prolif.interactions`
 
 You can declare your own interaction class like this::
 
+    from scipy.spatial import distance_matrix
+
     class CloseContact(prolif.Interaction):
         def detect(self, res1, res2, threshold=2.0):
-            A = res1.xyz
-            B = res2.xyz
-            squared_dist_matrix = np.add.outer((A*A).sum(axis=-1), 
-                                               (B*B).sum(axis=-1)
-                                               ) - 2*np.dot(A, B.T)
-            if (squared_dist_matrix <= threshold**2).any():
+            dist_matrix = distance_matrix(res1.xyz, res2.xyz)
+            if (dist_matrix <= threshold).any():
                 return True
 
 .. warning:: Your custom class must inherit from :class:`prolif.interactions.Interaction`
@@ -42,7 +40,7 @@ from .utils import (
     get_centroid,
     get_ring_normal_vector)
 import numpy as np
-from rdkit import Chem
+from rdkit.Chem import MolFromSmarts
 from rdkit import Geometry
 
 
@@ -99,7 +97,7 @@ class Hydrophobic(Interaction):
     def __init__(self,
                  hydrophobic="[#6,#16,F,Cl,Br,I,At;!+;!-]",
                  distance=4.5):
-        self.hydrophobic = Chem.MolFromSmarts(hydrophobic)
+        self.hydrophobic = MolFromSmarts(hydrophobic)
         self.distance = distance
 
     def detect(self, ligand, residue):
@@ -138,8 +136,8 @@ class _BaseHBond(Interaction):
     """
     def __init__(self, donor="[#7,O,#16][H]", acceptor="[#7,#8,F,*-;!+]",
                  distance=3.3, angles=(130, 180)):
-        self.donor = Chem.MolFromSmarts(donor)
-        self.acceptor = Chem.MolFromSmarts(acceptor)
+        self.donor = MolFromSmarts(donor)
+        self.acceptor = MolFromSmarts(acceptor)
         self.distance = distance
         self.angles = tuple(radians(i) for i in angles)
 
@@ -202,8 +200,8 @@ class _BaseXBond(Interaction):
     def __init__(self, donor="[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
                  acceptor="[F-,Cl-,Br-,I-,#7,#8,P,S,Se,Te,a;!+][*]",
                  distance=3.5, axd_angles=(130, 180), xar_angles=(80, 140)):
-        self.donor = Chem.MolFromSmarts(donor)
-        self.acceptor = Chem.MolFromSmarts(acceptor)
+        self.donor = MolFromSmarts(donor)
+        self.acceptor = MolFromSmarts(acceptor)
         self.distance = distance
         self.axd_angles = tuple(radians(i) for i in axd_angles)
         self.xar_angles = tuple(radians(i) for i in xar_angles)
@@ -263,8 +261,8 @@ class _BaseIonic(Interaction):
         Cutoff distance
     """
     def __init__(self, cation="[*+]", anion="[*-]", distance=5.0):
-        self.cation = Chem.MolFromSmarts(cation)
-        self.anion = Chem.MolFromSmarts(anion)
+        self.cation = MolFromSmarts(cation)
+        self.anion = MolFromSmarts(anion)
         self.distance = distance
 
     def detect(self, cation, anion):
@@ -313,8 +311,8 @@ class _BaseCationPi(Interaction):
     """
     def __init__(self, cation="[*+]", pi_ring=("a1:a:a:a:a:a:1",
                  "a1:a:a:a:a:1"), distance=5.5, angles=(0, 30)):
-        self.cation = Chem.MolFromSmarts(cation)
-        self.pi_ring = [Chem.MolFromSmarts(s) for s in pi_ring]
+        self.cation = MolFromSmarts(cation)
+        self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.distance = distance
         self.angles = tuple(radians(i) for i in angles)
 
@@ -379,7 +377,7 @@ class PiStacking(Interaction):
     def __init__(self, centroid_distance=6.0, shortest_distance=3.8,
                  plane_angles=(0, 90),
                  pi_ring=["a1:a:a:a:a:a:1", "a1:a:a:a:a:1"]):
-        self.pi_ring = [Chem.MolFromSmarts(s) for s in pi_ring]
+        self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.centroid_distance = centroid_distance
         self.shortest_distance = shortest_distance**2
         self.plane_angles = tuple(radians(i) for i in plane_angles)
@@ -446,8 +444,8 @@ class _BaseMetallic(Interaction):
     """
     def __init__(self, metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]", 
                  ligand="[O,N,*-;!+]", distance=2.8):
-        self.metal = Chem.MolFromSmarts(metal)
-        self.ligand = Chem.MolFromSmarts(ligand)
+        self.metal = MolFromSmarts(metal)
+        self.ligand = MolFromSmarts(ligand)
         self.distance = distance
 
     def detect(self, metal, ligand):

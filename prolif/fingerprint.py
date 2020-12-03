@@ -19,16 +19,13 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     TanimotoSimilarity(bv[0], bv[1])
     
 """
-import logging
 from functools import wraps
 from collections.abc import Iterable
 import numpy as np
 from tqdm.auto import tqdm
 from .interactions import _INTERACTIONS
 from .molecule import Molecule
-from .utils import get_pocket_residues, to_dataframe, to_bitvectors
-
-logger = logging.getLogger("prolif")
+from .utils import get_residues_near_ligand, to_dataframe, to_bitvectors
 
 
 def _return_first_element(f):
@@ -147,8 +144,6 @@ class Fingerprint:
             setattr(self, name.lower(), func)
             if name in interactions:
                 self.interactions[name] = func
-        logger.info('The following bitstring will be generated: {}'.format(
-                    ' '.join(interactions)))
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
@@ -224,13 +219,13 @@ class Fingerprint:
             An MDAnalysis AtomGroup for the ligand
         prot : MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the protein
-        residues : list or None or `"pocket"`
+        residues : list or float or None
             A list of residues (:class:`str`, :class:`int` or
-            :class:`~prolif.residue.ResidueId`) taken into account for
+            :class:`~prolif.residue.ResidueId`) to take into account for
             the fingerprint extraction. If ``None``, all residues will be used.
-            If ``"pocket"``, the :func:`~prolif.utils.get_pocket_residues`
-            function is used to automatically extract protein residues based on
-            the ligand's position at each frame
+            If ``float``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
+            function is used to automatically use protein residues that are
+            distant of ``residues`` Å or less from the ligand.
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
@@ -251,20 +246,20 @@ class Fingerprint:
 
         """
         iterator = tqdm(traj) if progress else traj
-        # set residues
-        run_pocket = False
-        if residues == "pocket":
-            run_pocket = True
+        # set which residues to use
+        select_residues = False
+        if isinstance(residues, float):
+            select_residues = True
         elif isinstance(residues, Iterable):
             resids = residues
         else:
             resids = Molecule.from_mda(prot).residues
         ifp = []
         for ts in iterator:
-            lig_mol = Molecule.from_mda(lig)
             prot_mol = Molecule.from_mda(prot)
-            if run_pocket:
-                resids = get_pocket_residues(lig_mol, prot_mol)
+            lig_mol = Molecule.from_mda(lig)
+            if select_residues:
+                resids = get_residues_near_ligand(lig_mol, prot_mol, cutoff=residues)
             data = {"Frame": ts.frame}
             for res in resids:
                 bs = self.bitstring(lig_mol, prot_mol[res])
