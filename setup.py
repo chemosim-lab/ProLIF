@@ -38,6 +38,7 @@ setup(
     python_requires='>=3.6',
     install_requires=[
         'numpy>=1.13.3',
+        'scipy>=1.3.0'
         # 'mdanalysis>=2.0.0',
         'pandas>=1.0.0',
         'tqdm'],
