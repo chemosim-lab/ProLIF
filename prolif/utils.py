@@ -5,8 +5,11 @@ Helper functions --- :mod:`prolif.utils`
 from math import pi
 import numpy as np
 import pandas as pd
-from rdkit import Chem
-from rdkit.Chem import rdmolops
+from scipy.spatial import cKDTree
+from rdkit.Chem import (rdmolops,
+                        SplitMolByPDBResidues,
+                        GetMolFrags,
+                        FragmentOnBonds)
 from rdkit.Geometry import Point3D
 from rdkit.DataStructs import ExplicitBitVect
 from .residue import ResidueId
@@ -41,49 +44,14 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
     direction)
     """
     if ring and (angle > _90_deg_to_rad):
-        mirror_angle = _90_deg_to_rad - (angle % (_90_deg_to_rad))
+        mirror_angle = _90_deg_to_rad - (angle % _90_deg_to_rad)
         return (min_angle <= angle <= max_angle) or (
                 min_angle <= mirror_angle <= max_angle)
     return (min_angle <= angle <= max_angle)
 
 
-def get_reference_points(mol):
-    """Returns 4 rdkit Point3D objects similar to those used in the USR method:
-
-    - centroid (ctd)
-    - closest to ctd (cst)
-    - farthest from cst (fct)
-    - farthest from fct (ftf)
-    """
-    matrix = rdmolops.Get3DDistanceMatrix(mol)
-    coords = mol.xyz
-    # centroid
-    ctd = mol.centroid
-    # closest to centroid
-    min_dist = 1e3
-    for atom in mol.GetAtoms():
-        point = Point3D(*coords[atom.GetIdx()])
-        dist = ctd.Distance(point)
-        if dist < min_dist:
-            min_dist = dist
-            cst = point
-            cst_idx = atom.GetIdx()
-    # furthest from cst
-    fct_idx = np.argmax(matrix[cst_idx])
-    fct = Point3D(*coords[fct_idx])
-    # furthest from fct
-    ftf_idx = np.argmax(matrix[fct_idx])
-    ftf = Point3D(*coords[ftf_idx])
-    return ctd, cst, fct, ftf
-
-
-def get_pocket_residues(lig, prot, cutoff=6.0):
+def get_residues_near_ligand(lig, prot, cutoff=6.0):
     """Detect residues close to a reference ligand
-
-    Based on the distance between the protein and a few reference points in the
-    ligand. The reference points are chosen similarly to the "Ultrafast Shape
-    Recognition" technique: centroid, closest to centroid (cst), furthest from
-    cst (fct), furthest from fct.
     
     Parameters
     ----------
@@ -98,49 +66,66 @@ def get_pocket_residues(lig, prot, cutoff=6.0):
     Returns
     -------
     residues : list
-        List of :class:`ResidueId` that are close to the ligand
+        A list of unique :class:`~prolif.residue.ResidueId` that are close to
+        the ligand
     """
-    ref_points = get_reference_points(lig)
-    pocket_residues = []
-    for point in ref_points:
-        distances = np.linalg.norm(point - prot.xyz, axis=1)
-        indices = np.where(distances <= cutoff)[0]
-        pocket_residues.extend([ResidueId.from_atom(
-            prot.GetAtomWithIdx(int(i))) for i in indices])
-    return pocket_residues
+    tree = cKDTree(prot.xyz)
+    ix = tree.query_ball_point(lig.xyz, cutoff)
+    ix = list(set([i for lst in ix for i in lst]))
+    resids = [ResidueId.from_atom(prot.GetAtomWithIdx(i)) for i in ix]
+    return list(set(resids))
 
 
-def split_mol_by_residues(protein):
-    """Splits an RDKit :class:`~rdkit.Chem.rdchem.Mol` in multiple residues
-    Returns a list of RDKit :class:`~rdkit.Chem.rdchem.Mol`
+def split_mol_by_residues(mol):
+    """Splits a molecule in multiple fragments based on residues
+
+    Parameters
+    ----------
+    mol : rdkit.Chem.rdchem.Mol
+        The molecule to fragment
+
+    Returns
+    -------
+    residues : list
+        A list of :class:`rdkit.Chem.rdchem.Mol`
+
+    Notes
+    -----
     Code adapted from Maciek Wójcikowski on the RDKit discussion list
     """
     residues = []
-    peptide_bond = Chem.MolFromSmarts('N-C-C(=O)-N')
-    disulfide_bridge = Chem.MolFromSmarts('[SX2v2]-[SX2v2]')
-    for res in Chem.SplitMolByPDBResidues(protein).values():
-        for frag in Chem.GetMolFrags(res, asMols=True, sanitizeFrags=False):
-            # split on peptide bond
-            frags = _split_on_pattern(frag, peptide_bond, (2, 4))
-            for f in frags:
-                # split on disulfide bridge
-                mols = _split_on_pattern(f, disulfide_bridge, (0, 1))
+    for res in SplitMolByPDBResidues(mol).values():
+        for frag in GetMolFrags(res, asMols=True, sanitizeFrags=False):
+            # count number of unique residues in the fragment
+            resids = {a.GetIdx(): ResidueId.from_atom(a)
+                      for a in frag.GetAtoms()}
+            if len(set(resids.values())) > 1:
+                # split on peptide bonds
+                bonds = [b.GetIdx() for b in frag.GetBonds()
+                         if is_peptide_bond(b, resids)]
+                mols = FragmentOnBonds(frag, bonds, addDummies=False)
+                mols = GetMolFrags(mols, asMols=True, sanitizeFrags=False)
                 residues.extend(mols)
+            else:
+                residues.append(frag)
     return residues
 
 
-def _split_on_pattern(mol, smarts, smarts_atom_indices):
-    """Splits a molecule in fragments, given a SMARTS pattern and the indices
-    of atoms in the SMARTS pattern where the split will be done
+def is_peptide_bond(bond, resids):
+    """Checks if a bond is a peptide bond based on the ResidueId of the atoms
+    on each part of the bond. Also works for disulfide bridges or any bond that
+    links two residues in biopolymers.
+
+    Parameters
+    ----------
+    bond : rdkit.Chem.rdchem.Bond
+        The bond to check
+    resids : dict
+        A dictionnary of ResidueId indexed by atom index
     """
-    bonds = [mol.GetBondBetweenAtoms(match[smarts_atom_indices[0]],
-             match[smarts_atom_indices[1]]).GetIdx() for match in
-             mol.GetSubstructMatches(smarts)]
-    if bonds:
-        disconnected_aa = Chem.FragmentOnBonds(mol, bonds, addDummies=False)
-        return Chem.GetMolFrags(disconnected_aa, asMols=True,
-                                sanitizeFrags=False)
-    return (mol,)
+    if resids[bond.GetBeginAtomIdx()] == resids[bond.GetEndAtomIdx()]:
+        return False
+    return True
 
 
 def to_dataframe(ifp, fingerprint):
