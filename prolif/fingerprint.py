@@ -76,7 +76,7 @@ class Fingerprint:
     interactions : list
         List of names (str) of interaction classes as found in the
         :mod:`prolif.interactions` module
-    
+
     Attributes
     ----------
     interactions : dict
@@ -103,7 +103,7 @@ class Fingerprint:
         fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "Hydrophobic"])
         fp.run(u.trajectory[:5], lig, prot)
         fp.to_dataframe()
-    
+
     - On a specific frame and a specific pair of residues:
 
     .. ipython:: python
@@ -111,7 +111,7 @@ class Fingerprint:
         u.trajectory[0] # use the first frame
         prot = prolif.Molecule.from_mda(prot)
         lig = prolif.Molecule.from_mda(lig)
-        fp.bitstring(lig, prot["ASP129.0"])
+        fp.bitvector(lig, prot["ASP129.0"])
 
     - On a specific pair of residues for a specific interaction:
 
@@ -124,7 +124,7 @@ class Fingerprint:
 
     .. ipython:: python
 
-        fp.bitstring_atoms(lig, prot["ASP129.0"])
+        fp.bitvector_atoms(lig, prot["ASP129.0"])
         fp.hbdonor.__wrapped__(lig, prot["ASP129.0"])
     
     """
@@ -154,10 +154,10 @@ class Fingerprint:
     def n_interactions(self):
         return len(self.interactions)
 
-    def bitstring(self, res1, res2):
-        """Generates the complete bitstring for the interactions between two
+    def bitvector(self, res1, res2):
+        """Generates the complete bitvector for the interactions between two
         residues. To get the indices of atoms responsible for each interaction,
-        see :meth:`bitstring_atoms`
+        see :meth:`bitvector_atoms`
 
         Parameters
         ----------
@@ -168,18 +168,18 @@ class Fingerprint:
 
         Returns
         -------
-        bitstring : numpy.ndarray
+        bitvector : numpy.ndarray
             An array storing the encoded interactions between res1 and res2
 
         """
-        bitstring = []
+        bitvector = []
         for func in self.interactions.values():
             bit = func(res1, res2)
-            bitstring.append(bit)
-        return np.array(bitstring, dtype=bool)
+            bitvector.append(bit)
+        return np.array(bitvector, dtype=bool)
 
-    def bitstring_atoms(self, res1, res2):
-        """Generates the complete bitstring for the interactions between two
+    def bitvector_atoms(self, res1, res2):
+        """Generates the complete bitvector for the interactions between two
         residues, and returns the indices of atoms responsible for these
         interactions
 
@@ -192,23 +192,23 @@ class Fingerprint:
 
         Returns
         -------
-        bitstring : :class:`numpy.ndarray`
+        bitvector : :class:`numpy.ndarray`
             An array storing the encoded interactions between res1 and res2
         atoms : :class:`list`
             A list containing tuples of (res1_atom_index, res2_atom_index) for
             each interaction
         """
-        bitstring = []
+        bitvector = []
         atoms_lst = []
         for func in self.interactions.values():
             bit, *atoms = func.__wrapped__(res1, res2)
-            bitstring.append(bit)
+            bitvector.append(bit)
             atoms_lst.append(atoms)
-        bitstring = np.array(bitstring, dtype=bool)
-        return bitstring, atoms_lst
+        bitvector = np.array(bitvector, dtype=bool)
+        return bitvector, atoms_lst
 
     def run(self, traj, lig, prot, residues=None, progress=True):
-        """Generates the fingerprint on a trajectory for two atomgroups
+        """Generates the fingerprint on a trajectory for a ligand and a protein
 
         Parameters
         ----------
@@ -218,14 +218,15 @@ class Fingerprint:
         lig : MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the ligand
         prot : MDAnalysis.core.groups.AtomGroup
-            An MDAnalysis AtomGroup for the protein
-        residues : list or float or None
+            An MDAnalysis AtomGroup for the protein (with multiple residues)
+        residues : list or "all" or None
             A list of residues (:class:`str`, :class:`int` or
             :class:`~prolif.residue.ResidueId`) to take into account for
-            the fingerprint extraction. If ``None``, all residues will be used.
-            If ``float``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
+            the fingerprint extraction.
+            If ``"all"``, all residues will be used.
+            If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
             function is used to automatically use protein residues that are
-            distant of ``residues`` Å or less from the ligand.
+            distant of 6.0 Å or less from the ligand.
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
@@ -243,28 +244,36 @@ class Fingerprint:
             >>> lig = u.select_atoms("resname LIG")
             >>> prot = u.select_atoms("protein")
             >>> fp = prolif.Fingerprint().run(u.trajectory[:10], lig, prot)
-
+        
+        Notes
+        -----
+        The results are stored in the ``ifp`` attribute of the fingerprint as
+        a list of dictionnaries in the format ``{"Frame": frame_index,
+        ResidueId: numpy.ndarray, ...}``.
+        Residues for which no interaction were detected are not added to the
+        IFP list.
         """
         iterator = tqdm(traj) if progress else traj
         # set which residues to use
         select_residues = False
-        if isinstance(residues, float):
-            select_residues = True
+        if residues == "all":
+            resids = Molecule.from_mda(prot).residues
         elif isinstance(residues, Iterable):
             resids = residues
         else:
-            resids = Molecule.from_mda(prot).residues
+            select_residues = True
         ifp = []
         for ts in iterator:
             prot_mol = Molecule.from_mda(prot)
             lig_mol = Molecule.from_mda(lig)
             if select_residues:
-                resids = get_residues_near_ligand(lig_mol, prot_mol, cutoff=residues)
+                resids = get_residues_near_ligand(lig_mol, prot_mol)
             data = {"Frame": ts.frame}
             for res in resids:
-                bs = self.bitstring(lig_mol, prot_mol[res])
+                prot_res = prot_mol[res]
+                bs = self.bitvector(lig_mol, prot_res)
                 if bs.sum() > 0:
-                    data[res] = bs
+                    data[prot_res.resid] = bs
             ifp.append(data)
         self.ifp = ifp
         return self

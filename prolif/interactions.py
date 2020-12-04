@@ -43,7 +43,6 @@ import numpy as np
 from rdkit.Chem import MolFromSmarts
 from rdkit import Geometry
 
-
 _INTERACTIONS = {}
 
 

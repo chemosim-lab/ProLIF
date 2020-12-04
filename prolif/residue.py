@@ -44,12 +44,6 @@ class ResidueId:
 
     def __eq__(self, other):
         return hash(self) == hash(other)
-
-    def __contains__(self, other):
-        attributes = [attr for attr in ["name", "number", "chain"]
-                      if getattr(other, attr)]
-        return all(getattr(self, attr) == getattr(other, attr)
-                   for attr in attributes)
     
     def __lt__(self, other):
         return (self.chain, self.number) < (other.chain, other.number)

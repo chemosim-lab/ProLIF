@@ -107,33 +107,6 @@ class TestResidueId:
         res2 = ResidueId(name, number, chain)
         assert res1 == res2
 
-    @pytest.mark.parametrize("resid_str, expected", [
-        ("ALA1.A", True),
-        ("ALA1", True),
-        ("ALA.A", True),
-        ("ALA", True),
-        ("1.A", True),
-        (".A", True),
-        ("1", True),
-        ("ALA2.A", False),
-        ("GLU1.A", False),
-        ("ALA1.B", False),
-        ("ALA2", False),
-        ("GLU1", False),
-        ("ALA.B", False),
-        ("GLU.A", False),
-        ("GLU", False),
-        ("2.A", False),
-        ("1.B", False),
-        (".B", False),
-        ("2", False),
-    ])
-    def test_contains(self, resid_str, expected):
-        resid = ResidueId.from_string(resid_str)
-        ref = ResidueId.from_string("ALA1.A")
-        result = resid in ref
-        assert result is expected
-
     @pytest.mark.parametrize("res1, res2", [
         ("ALA1.A", "ALA1.B"),
         ("ALA2.A", "ALA3.A"),
