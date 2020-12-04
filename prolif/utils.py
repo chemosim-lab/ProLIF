@@ -165,7 +165,7 @@ def to_dataframe(ifp, fingerprint):
     resids = list(set(key for d in ifp
                           for key, value in d.items()
                           if isinstance(value, np.ndarray)))
-    resids = sorted(resids)
+    resids.sort()
     ids = df.drop(columns=resids).columns.tolist()
     df = df.applymap(lambda x: [False] * fingerprint.n_interactions
                                if x is np.nan else x)
@@ -174,7 +174,7 @@ def to_dataframe(ifp, fingerprint):
         cols = [f"{res}{i}" for i in range(fingerprint.n_interactions)]
         ifps[cols] = df[res].apply(pd.Series)
     ifps.columns = pd.MultiIndex.from_product([[str(r) for r in resids],
-                                              fingerprint.interactions],
+                                               fingerprint.interactions],
                                               names=["residue", "interaction"])
     ifps = ifps.astype(np.uint8)
     ifps = ifps.loc[:, (ifps != 0).any(axis=0)]
@@ -183,8 +183,8 @@ def to_dataframe(ifp, fingerprint):
     return pd.concat([temp, ifps], axis=1)
 
 
-def _series_to_bv(s, n_bits):
-    bv = ExplicitBitVect(n_bits)
+def _series_to_bv(s):
+    bv = ExplicitBitVect(len(s))
     on_bits = np.where(s == 1)[0].tolist()
     bv.SetBitsFromList(on_bits)
     return bv
@@ -222,7 +222,8 @@ def to_bitvectors(ifp, fingerprint):
 
     """
     df = to_dataframe(ifp, fingerprint)
-    resids = list(set(str(key) for d in ifp for key, value in d.items() if isinstance(value, np.ndarray)))
-    ids = df.drop(columns=resids).columns.tolist()
-    n_bits = len(df[resids].columns)
-    return df[resids].apply(_series_to_bv, n_bits=n_bits, axis=1).tolist()
+    resids = list(set(str(key) for d in ifp for key, value in d.items()
+                      if (isinstance(value, np.ndarray) and value.sum() > 0)))
+    if not resids:
+        raise ValueError("The input IFP only contains off bits")
+    return df[resids].apply(_series_to_bv, axis=1).tolist()
