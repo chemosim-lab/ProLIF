@@ -71,7 +71,7 @@ def get_residues_near_ligand(lig, prot, cutoff=6.0):
     """
     tree = cKDTree(prot.xyz)
     ix = tree.query_ball_point(lig.xyz, cutoff)
-    ix = list(set([i for lst in ix for i in lst]))
+    ix = set([i for lst in ix for i in lst])
     resids = [ResidueId.from_atom(prot.GetAtomWithIdx(i)) for i in ix]
     return list(set(resids))
 

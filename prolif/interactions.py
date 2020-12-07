@@ -71,7 +71,7 @@ def get_mapindex(res, index):
     Parameters
     ----------
     res : prolif.residue.Residue
-        The ligand or residue
+        The residue in the protein or ligand
     index : int
         The index of the atom in the :class:`~prolif.residue.Residue`
 
@@ -83,7 +83,39 @@ def get_mapindex(res, index):
     return res.GetAtomWithIdx(index).GetUnsignedProp("mapindex")
 
 
-class Hydrophobic(Interaction):
+class _Distance(Interaction):
+    """Generic class for distance-based interactions
+    
+    Parameters
+    ----------
+    lig_pattern : str
+        SMARTS pattern for atoms in ligand residues
+    prot_pattern : str
+        SMARTS pattern for atoms in protein residues
+    distance : float
+        Cutoff distance, measured between the first atom of each pattern
+    """
+    def __init__(self, lig_pattern, prot_pattern, distance):
+        self.lig_pattern = MolFromSmarts(lig_pattern)
+        self.prot_pattern = MolFromSmarts(prot_pattern)
+        self.distance = distance
+
+    def detect(self, lig_res, prot_res):
+        lig_matches = lig_res.GetSubstructMatches(self.lig_pattern)
+        prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
+        if lig_matches and prot_matches:
+            for lig_match, prot_match in itertools.product(lig_matches,
+                                                           prot_matches):
+                alig = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
+                aprot = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
+                if alig.Distance(aprot) <= self.distance:
+                    return (True,
+                            get_mapindex(lig_res, lig_match[0]),
+                            get_mapindex(prot_res, prot_match[0]))
+        return False, None, None
+
+
+class Hydrophobic(_Distance):
     """Hydrophobic interaction
     
     Parameters
@@ -96,27 +128,7 @@ class Hydrophobic(Interaction):
     def __init__(self,
                  hydrophobic="[#6,#16,F,Cl,Br,I,At;!+;!-]",
                  distance=4.5):
-        self.hydrophobic = MolFromSmarts(hydrophobic)
-        self.distance = distance
-
-    def detect(self, ligand, residue):
-        # get atom tuples matching query
-        lig_matches = ligand.GetSubstructMatches(self.hydrophobic)
-        res_matches = residue.GetSubstructMatches(self.hydrophobic)
-        if lig_matches and res_matches:
-            for lig_match in lig_matches:
-                # define ligand atom matching query as 3d point
-                lig_atom = Geometry.Point3D(*ligand.xyz[lig_match[0]])
-                for res_match in res_matches:
-                    # define residue atom matching query as 3d point
-                    res_atom = Geometry.Point3D(*residue.xyz[res_match[0]])
-                    # compute distance between points
-                    dist = lig_atom.Distance(res_atom)
-                    if dist <= self.distance:
-                        return (True,
-                                get_mapindex(ligand, lig_match[0]),
-                                get_mapindex(residue, res_match[0]))
-        return False, None, None
+        super().__init__(hydrophobic, hydrophobic, distance)
 
 
 class _BaseHBond(Interaction):
@@ -247,37 +259,10 @@ class XBDonor(_BaseXBond):
         return bit, ilig, ires
 
 
-class _BaseIonic(Interaction):
-    """Base class for ionic interactions
-    
-    Parameters
-    ----------
-    cation : str
-        SMARTS for cation
-    anion : str
-        SMARTS for anion
-    distance : float
-        Cutoff distance
-    """
+class _BaseIonic(_Distance):
+    """Base class for ionic interactions"""
     def __init__(self, cation="[*+]", anion="[*-]", distance=5.0):
-        self.cation = MolFromSmarts(cation)
-        self.anion = MolFromSmarts(anion)
-        self.distance = distance
-
-    def detect(self, cation, anion):
-        anion_matches = anion.GetSubstructMatches(self.anion)
-        cation_matches = cation.GetSubstructMatches(self.cation)
-        if anion_matches and cation_matches:
-            for anion_match, cation_match in itertools.product(anion_matches,
-                                                               cation_matches):
-                a = Geometry.Point3D(*anion.xyz[anion_match[0]])
-                c = Geometry.Point3D(*cation.xyz[cation_match[0]])
-                dist = a.Distance(c)
-                if dist <= self.distance:
-                    return (True,
-                            get_mapindex(cation, cation_match[0]),
-                            get_mapindex(anion, anion_match[0]))
-        return False, None, None
+        super().__init__(cation, anion, distance)
 
 
 class Cationic(_BaseIonic):
@@ -303,7 +288,7 @@ class _BaseCationPi(Interaction):
     pi_ring : tuple
         SMARTS for aromatic rings (5 and 6 membered rings only)
     distance : float
-        Cutoff distance
+        Cutoff distance between the centroid and the cation
     angles : tuple
         Min and max values for the angle between the vector normal to the ring
         plane and the vector going from the centroid to the cation
@@ -429,7 +414,7 @@ class EdgeToFace(PiStacking):
                          plane_angles=plane_angles, **kwargs)
 
 
-class _BaseMetallic(Interaction):
+class _BaseMetallic(_Distance):
     """Base class for metal complexation
     
     Parameters
@@ -443,24 +428,7 @@ class _BaseMetallic(Interaction):
     """
     def __init__(self, metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]", 
                  ligand="[O,N,*-;!+]", distance=2.8):
-        self.metal = MolFromSmarts(metal)
-        self.ligand = MolFromSmarts(ligand)
-        self.distance = distance
-
-    def detect(self, metal, ligand):
-        ligand_matches = ligand.GetSubstructMatches(self.ligand)
-        metal_matches = metal.GetSubstructMatches(self.metal)
-        if ligand_matches and metal_matches:
-            for ligand_match, metal_match in itertools.product(ligand_matches,
-                                                               metal_matches):
-                ligand_atom = Geometry.Point3D(*ligand.xyz[ligand_match[0]])
-                metal_atom = Geometry.Point3D(*metal.xyz[metal_match[0]])
-                dist = ligand_atom.Distance(metal_atom)
-                if dist <= self.distance:
-                    return (True,
-                            get_mapindex(metal, metal_match[0]),
-                            get_mapindex(ligand, ligand_match[0]))
-        return False, None, None
+        super().__init__(metal, ligand, distance)
 
 
 class MetalDonor(_BaseMetallic):
