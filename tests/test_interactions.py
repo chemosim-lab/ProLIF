@@ -13,64 +13,66 @@ lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
 
+def from_mol2(f):
+    path = str(datapath / f)
+    u = Universe(path)
+    elements = [guess_atom_element(n) for n in u.atoms.names]
+    u.add_TopologyAttr("elements", np.array(elements, dtype=object))
+    u.atoms.types = np.array([x.upper() for x in u.atoms.types], dtype=object)
+    return Molecule.from_mda(u)
+
+
 class MolFactory:
-    def from_mol2(self, f):
-        path = str(datapath / f)
-        u = Universe(path)
-        elements = [guess_atom_element(n) for n in u.atoms.names]
-        u.add_TopologyAttr("elements", np.array(elements, dtype=object))
-        return Molecule.from_mda(u)
+    def benzene():
+        return from_mol2("benzene.mol2")
 
-    def benzene(self):
-        return self.from_mol2("benzene.mol2")
+    def cation():
+        return from_mol2("cation.mol2")
 
-    def cation(self):
-        return self.from_mol2("cation.mol2")
+    def cation_false():
+        return from_mol2("cation_false.mol2")
 
-    def cation_false(self):
-        return self.from_mol2("cation_false.mol2")
+    def anion():
+        return from_mol2("anion.mol2")
 
-    def anion(self):
-        return self.from_mol2("anion.mol2")
+    def ftf():
+        return from_mol2("facetoface.mol2")
 
-    def ftf(self):
-        return self.from_mol2("facetoface.mol2")
+    def etf():
+        return from_mol2("edgetoface.mol2")
 
-    def etf(self):
-        return self.from_mol2("edgetoface.mol2")
+    def chlorine():
+        return from_mol2("chlorine.mol2")
 
-    def chlorine(self):
-        return self.from_mol2("chlorine.mol2")
+    def hb_donor():
+        return from_mol2("donor.mol2")
 
-    def hb_donor(self):
-        return self.from_mol2("donor.mol2")
+    def hb_acceptor():
+        return from_mol2("acceptor.mol2")
 
-    def hb_acceptor(self):
-        return self.from_mol2("acceptor.mol2")
+    def hb_acceptor_false():
+        return from_mol2("acceptor_false.mol2")
 
-    def hb_acceptor_false(self):
-        return self.from_mol2("acceptor_false.mol2")
+    def xb_donor():
+        return from_mol2("xbond_donor.mol2")
 
-    def xb_donor(self):
-        return self.from_mol2("xbond_donor.mol2")
+    def xb_acceptor():
+        return from_mol2("xbond_acceptor.mol2")
 
-    def xb_acceptor(self):
-        return self.from_mol2("xbond_acceptor.mol2")
+    def xb_acceptor_false_xar():
+        return from_mol2("xbond_acceptor_false_xar.mol2")
 
-    def xb_acceptor_false_xar(self):
-        return self.from_mol2("xbond_acceptor_false_xar.mol2")
+    def xb_acceptor_false_axd():
+        return from_mol2("xbond_acceptor_false_axd.mol2")
 
-    def xb_acceptor_false_axd(self):
-        return self.from_mol2("xbond_acceptor_false_axd.mol2")
+    def ligand():
+        return from_mol2("ligand.mol2")
 
-    def ligand(self):
-        return self.from_mol2("ligand.mol2")
+    def metal():
+        return from_mol2("metal.mol2")
 
-    def metal(self):
-        return self.from_mol2("metal.mol2")
-
-    def metal_false(self):
-        return self.from_mol2("metal_false.mol2")
+    def metal_false():
+        return from_mol2("metal_false.mol2")
 
 
 @pytest.fixture(scope="module")
@@ -122,20 +124,20 @@ class TestInteractions:
         ("hydrophobic", "benzene", "chlorine", True),
         ("hydrophobic", "benzene", "anion", False),
         ("hydrophobic", "benzene", "cation", False),
-        ("hbdonor", "donor", "acceptor", True),
-        ("hbdonor", "donor", "acceptor_false", False),
-        ("hbdonor", "acceptor", "donor", False),
-        ("hbacceptor", "acceptor", "donor", True),
-        ("hbacceptor", "acceptor_false", "donor", False),
-        ("hbacceptor", "donor", "acceptor", False),
-        ("xbdonor", "donor", "acceptor", True),
-        ("xbdonor", "donor", "acceptor_false_xar", False),
-        ("xbdonor", "donor", "acceptor_false_axd", False),
-        ("xbdonor", "acceptor", "donor", False),
-        ("xbacceptor", "acceptor", "donor", True),
-        ("xbacceptor", "acceptor_false_xar", "donor", False),
-        ("xbacceptor", "acceptor_false_axd", "donor", False),
-        ("xbacceptor", "donor", "acceptor", False),
+        ("hbdonor", "hb_donor", "hb_acceptor", True),
+        ("hbdonor", "hb_donor", "hb_acceptor_false", False),
+        ("hbdonor", "hb_acceptor", "hb_donor", False),
+        ("hbacceptor", "hb_acceptor", "hb_donor", True),
+        ("hbacceptor", "hb_acceptor_false", "hb_donor", False),
+        ("hbacceptor", "hb_donor", "hb_acceptor", False),
+        ("xbdonor", "xb_donor", "xb_acceptor", True),
+        ("xbdonor", "xb_donor", "xb_acceptor_false_xar", False),
+        ("xbdonor", "xb_donor", "xb_acceptor_false_axd", False),
+        ("xbdonor", "xb_acceptor", "xb_donor", False),
+        ("xbacceptor", "xb_acceptor", "xb_donor", True),
+        ("xbacceptor", "xb_acceptor_false_xar", "xb_donor", False),
+        ("xbacceptor", "xb_acceptor_false_axd", "xb_donor", False),
+        ("xbacceptor", "xb_donor", "xb_acceptor", False),
         ("metaldonor", "metal", "ligand", True),
         ("metaldonor", "metal_false", "ligand", False),
         ("metaldonor", "ligand", "metal", False),
