@@ -1,7 +1,7 @@
 ProLIF
 ======
 
-|pypi-version| |build-status| |docs| |license|
+|pypi-version| |build-status| |codecov| |docs| |license|
 
 .. |pypi-version| image:: https://img.shields.io/pypi/v/prolif.svg
    :target: https://pypi.python.org/pypi/prolif
@@ -10,52 +10,35 @@ ProLIF
 .. |build-status| image:: https://img.shields.io/travis/chemosim-lab/ProLIF
     :alt: Travis build status
 
+.. |codecov| image:: https://codecov.io/gh/chemosim-lab/ProLIF/branch/master/graph/badge.svg?token=2FCHV08G8A
+    :target: https://codecov.io/gh/chemosim-lab/ProLIF
+
+.. |docs| image:: https://readthedocs.org/projects/prolif/badge/?version=latest
+    :target: https://prolif.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
 .. |license| image:: https://img.shields.io/pypi/l/prolif
     :alt: License
-
-.. |docs| image:: https://img.shields.io/readthedocs/prolif
-    :alt: Documentation Status
 
 Description
 -----------
 
-ProLIF (*Protein-Ligand Interaction Fingerprints*) is a tool designed to generate interaction fingerprints for protein-ligand interactions extracted from molecular dynamics trajectories and docking simulations.
-
-Installing dependencies
------------------------
-
-* Python 3.6+
-* `RDKit <https://www.rdkit.org/docs/>`_ (2020.03+)
-* `MDAnalysis <https://www.mdanalysis.org/>`_ (2.0+)
-* `Pandas <https://pandas.pydata.org/>`_ (1.0+)
-* `NumPy <https://numpy.org/>`_
-* `SciPy <https://www.scipy.org/scipylib/index.html>`_
-* `tqdm <https://tqdm.github.io/>`_
-
-RDKit needs to be installed through `conda`_
-Once conda is installed, run the following command::
-
-    conda install -c conda-forge rdkit
-
-You also need to install the MDAnalysis 2.0+ which is currently only available through their GitHub page::
-
-    pip install cython
-    pip install 'git+https://github.com/MDAnalysis/mdanalysis.git#subdirectory=package'
-
-The rest of the dependencies are automatically installed through pip when installing prolif::
-
-    pip install prolif
-
-Alternatively, you can install the latest development version::
-
-    pip install git+https://github.com/chemosim-lab/ProLIF.git@dev
-
-.. _conda: https://docs.conda.io/projects/conda/en/latest/user-guide/index.html
+ProLIF (*Protein-Ligand Interaction Fingerprints*) is a tool designed to generate interaction fingerprints for protein-ligand and protein-protein interactions extracted from molecular dynamics trajectories and docking simulations.
 
 Documentation
 -------------
 
-The documentation can be found online on `ReadTheDocs <https://prolif.readthedocs.io/en/latest/>`_
+The documentation and tutorials can be found online on `ReadTheDocs <https://prolif.readthedocs.io/en/latest/>`_.
+
+Issues
+------
+
+If you have found a bug, please open an issue on the `GitHub Issues <https://github.com/chemosim-lab/ProLIF/issues>`_ page.
+
+Discussion
+----------
+
+If you have questions on how to use ProLIF, or if you want to give feedback or share ideas and new features, please head to the `GitHub Discussions <https://github.com/chemosim-lab/ProLIF/discussions>`_ page.
 
 License
 -------

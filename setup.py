@@ -37,22 +37,24 @@ setup(
     packages=['prolif'],
     python_requires='>=3.6',
     install_requires=[
-        'numpy>=1.13.3',
-        'scipy>=1.3.0'
-        # 'mdanalysis>=2.0.0',
         'pandas>=1.0.0',
+        'numpy>=1.13.3',
+        'scipy>=1.3.0',
+        'mdanalysis @ git+https://github.com/MDAnalysis/mdanalysis.git#subdirectory=package',
         'tqdm'],
     extras_require={
-        'docs': ['recommonmark', 'sphinx-rtd-theme'],
+        'tests': ['pytest>=6.1.2', 'pytest-cov', 'codecov'],
+        'docs': ['sphinx>=3.2.1', 'recommonmark', 'sphinx-rtd-theme'],
     },
     test_suite="tests",
-    tests_require="pytest",
     package_data={
         'tests': ['*.mol2'],
     },
     include_package_data=True,
     project_urls={
-        'Bug Reports':  'https://github.com/chemosim-lab/ProLIF/issues',
+        'Issues':  'https://github.com/chemosim-lab/ProLIF/issues',
+        'Discussions': 'https://github.com/chemosim-lab/ProLIF/discussions',
+        'Documentation': 'https://prolif.readthedocs.io/en/latest/',
     },
     zip_safe=False,
 )

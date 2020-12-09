@@ -18,5 +18,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Aromatic interactions not detected properly
 
-## [0.3.0] - 2019-10-02
+## [0.2.1] - 2019-10-02
 Base version for this changelog
