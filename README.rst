@@ -1,15 +1,19 @@
 ProLIF
 ======
 
-|pypi-version| |build-status| |codecov| |docs| |lgtm| |license|
+|pypi-version| |build| |tests| |codecov| |docs| |lgtm| |license|
 
 .. |pypi-version| image:: https://img.shields.io/pypi/v/prolif.svg
    :target: https://pypi.python.org/pypi/prolif
    :alt: Pypi Version
 
-.. |build-status| image:: https://github.com/chemosim-lab/ProLIF/workflows/tests/badge.svg
+.. |build| image:: https://github.com/chemosim-lab/ProLIF/workflows/build/badge.svg
     :target: https://github.com/chemosim-lab/ProLIF/actions
     :alt: Build status
+
+.. |tests| image:: https://github.com/chemosim-lab/ProLIF/workflows/tests/badge.svg?branch=master
+    :target: https://github.com/chemosim-lab/ProLIF/actions
+    :alt: Tests status
 
 .. |codecov| image:: https://codecov.io/gh/chemosim-lab/ProLIF/branch/master/graph/badge.svg?token=2FCHV08G8A
     :target: https://codecov.io/gh/chemosim-lab/ProLIF

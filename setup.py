@@ -4,17 +4,13 @@ from codecs import open
 
 here = path.abspath(path.dirname(__file__))
 
-# get version from version.py
-__version__ = None
-exec(open('prolif/version.py').read())
-
 # Get the long description from the README file
 with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
     name='prolif',
-    version=__version__,
+    version=os.environ.get('PROLIF_VERSION', '0.0.0'),,
     description='Protein-Ligand Interaction Fingerprints',
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -48,7 +44,7 @@ setup(
     },
     test_suite="tests",
     package_data={
-        'tests': ['*.mol2'],
+        'tests': ['*.mol2', '*.pdb', '*.xtc'],
     },
     include_package_data=True,
     project_urls={

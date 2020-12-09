@@ -17,16 +17,16 @@ defaults:
     shell: bash -l {0}
 
 env:
-  PLF_CONDA_DEPS: "rdkit ipython"
+  PLF_CONDA_DEPS: "rdkit cython"
 
 jobs:
   run_tests:
-    name:  Test on ${{ matrix.os }}, Python ${{ matrix.python-version }}
+    name: Test on ${{ matrix.os }}, Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:
         matrix:
           os: [ubuntu-latest]
-          python-version: [3.6, 3.8]
+          python-version: [3.6, 3.8, 3.9]
 
     steps:
     - uses: actions/checkout@v2
@@ -46,7 +46,6 @@ jobs:
         PLF_CONDA_FULL_DEPS: "${{ env.PLF_CONDA_DEPS }}"
       run: |
         conda install ${PLF_CONDA_FULL_DEPS}
-        python -m pip install cython
 
     - name: Install package through pip
       run: |
