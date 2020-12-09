@@ -2,12 +2,10 @@
 Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
-import copy
-from collections import defaultdict
 from operator import attrgetter
 from MDAnalysis import _CONVERTERS
 from .rdkitmol import BaseRDKitMol
-from .residue import Residue, ResidueId, ResidueGroup
+from .residue import Residue, ResidueGroup
 from .utils import split_mol_by_residues
 
 

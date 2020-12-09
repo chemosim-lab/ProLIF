@@ -3,8 +3,6 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from numpy.testing import assert_equal
 from prolif.residue import ResidueId, Residue, ResidueGroup
-from prolif.datafiles import TOP
-from prolif.molecule import Molecule
 from .test_base import TestBaseRDKitMol, protein_mol
 
 
@@ -81,9 +79,9 @@ class TestResidueId:
     def test_from_atom_no_mi(self):
         atom = Chem.Atom(1)
         resid = ResidueId.from_atom(atom)
-        assert resid.name == None
-        assert resid.number == None
-        assert resid.chain == None
+        assert resid.name is None
+        assert resid.number is None
+        assert resid.chain is None
 
     @pytest.mark.parametrize("resid_str, expected", [
         ("ALA", ("ALA", None, None)),

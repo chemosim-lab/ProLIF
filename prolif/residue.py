@@ -3,9 +3,8 @@ Residue-related classes --- :mod:`prolif.residue`
 =================================================
 """
 import re
-from typing import Optional, List, Tuple
+from typing import Optional, List,
 from collections import UserDict
-from collections.abc import Iterable
 import numpy as np
 from .rdkitmol import BaseRDKitMol
 

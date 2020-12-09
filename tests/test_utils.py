@@ -1,11 +1,9 @@
 from math import radians
 import pytest
 from rdkit import Chem
-from MDAnalysis import Universe
 import numpy as np
 from numpy.testing import assert_equal
 from prolif.residue import ResidueId, Residue, ResidueGroup
-from prolif.molecule import Molecule
 from prolif.utils import (get_centroid,
                           angle_between_limits,
                           get_residues_near_ligand,
@@ -141,4 +139,4 @@ def test_to_bv_raise_no_bits():
             "ALA1": np.array([False, False, False]),
             "GLU2": np.array([False, False, False])}]
     with pytest.raises(ValueError, match="input IFP only contains off bits"):
-        bvs = to_bitvectors(ifp, fp)
+        to_bitvectors(ifp, fp)

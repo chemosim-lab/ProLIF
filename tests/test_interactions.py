@@ -1,6 +1,5 @@
 import pytest
-import os
-from rdkit import Chem, RDLogger
+from rdkit import RDLogger
 import numpy as np
 from MDAnalysis import Universe
 from MDAnalysis.topology.guessers import guess_atom_element
@@ -164,4 +163,4 @@ class TestInteractions:
             pass
         with pytest.raises(TypeError,
                            match="Can't instantiate abstract class Dummy"):
-            foo = Dummy()
+            Dummy()
