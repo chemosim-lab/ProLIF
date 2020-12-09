@@ -7,6 +7,7 @@ from MDAnalysis.topology.guessers import guess_atom_element
 from prolif.molecule import Molecule
 from prolif.fingerprint import Fingerprint
 from prolif.datafiles import datapath
+from prolif.interactions import _INTERACTIONS, Interaction
 
 # disable rdkit warnings
 lg = RDLogger.logger()
@@ -148,3 +149,20 @@ class TestInteractions:
     def test_interaction(self, fingerprint, func_name, mol1, mol2, expected):
         interaction = getattr(fingerprint, func_name)
         assert interaction(mol1, mol2) is expected
+
+    def test_warning_supersede(self):
+        old = id(_INTERACTIONS["Hydrophobic"])
+        with pytest.warns(UserWarning,
+                          match="interaction has been superseded"):
+            class Hydrophobic(Interaction):
+                pass
+        new = id(_INTERACTIONS["Hydrophobic"])
+        assert old != new
+
+    def test_error_no_detect(self):
+        class Dummy(Interaction):
+            pass
+        foo = Dummy()
+        with pytest.raises(NotImplementedError,
+                           match="class must define its own `detect` method"):
+            foo.detect()

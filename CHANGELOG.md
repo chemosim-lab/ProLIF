@@ -7,14 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Input from MDAnalysis Universe and AtomGroups objects
-- Documentation
+- Proper documentation and tests
 ### Changed
-- All the API and the underlying code has been modified
-- Tests now use pytest
+- All the API and the underlying code have been modified
 - Repository has been moved from GitHub user @cbouy to organisation @chemosim-lab
 ### Deprecated
 ### Removed
-- Support for MOL2 files
+- Custom MOL2 file reader
 - Command-line interface
 ### Fixed
 - Aromatic interactions not detected properly

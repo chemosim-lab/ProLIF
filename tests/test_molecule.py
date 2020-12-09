@@ -15,7 +15,7 @@ class TestMolecule(TestBaseRDKitMol):
 
     def test_from_mda(self):
         rdkit_mol = Molecule(ligand_rdkit)
-        mda_mol = Molecule.from_mda(u, "resname ERM")
+        mda_mol = Molecule.from_mda(u, "resname LIG")
         assert rdkit_mol[0].resid == mda_mol[0].resid
         assert (rdkit_mol.HasSubstructMatch(mda_mol) and
                 mda_mol.HasSubstructMatch(rdkit_mol))
@@ -24,8 +24,8 @@ class TestMolecule(TestBaseRDKitMol):
         0,
         42,
         -1,
-        "LYS49.0",
-        ResidueId("LYS", 49, "0")
+        "LYS49.A",
+        ResidueId("LYS", 49, "A")
     ])
     def test_getitem(self, mol, key):
         assert mol[key].resid is mol.residues[key].resid

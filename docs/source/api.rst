@@ -22,7 +22,7 @@ Interaction fingerprint
 An interaction fingerprint decomposes the interactions between two molecules
 in a binary vector. The interactions are detected by looking up for predefined
 molecular patterns (like SMARTS queries) that satisfy geometrical
-constraints (distance, angles, dihedral...).
+constraints (distance, angle, dihedral...).
 To learn more on how these interactions are defined and how to use prolif to
 extract fingerprints, please refer to the
 :ref:`source/modules/interaction-fingerprint:Interaction fingerprint` section.

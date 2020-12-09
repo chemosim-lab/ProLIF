@@ -183,7 +183,7 @@ def to_dataframe(ifp, fingerprint):
     return pd.concat([temp, ifps], axis=1)
 
 
-def _series_to_bv(s):
+def pandas_series_to_bv(s):
     bv = ExplicitBitVect(len(s))
     on_bits = np.where(s == 1)[0].tolist()
     bv.SetBitsFromList(on_bits)
@@ -226,4 +226,4 @@ def to_bitvectors(ifp, fingerprint):
                       if (isinstance(value, np.ndarray) and value.sum() > 0)))
     if not resids:
         raise ValueError("The input IFP only contains off bits")
-    return df[resids].apply(_series_to_bv, axis=1).tolist()
+    return df[resids].apply(pandas_series_to_bv, axis=1).tolist()

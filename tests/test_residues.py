@@ -210,4 +210,4 @@ class TestResidueGroup:
     def test_select_sameas_getitem(self):
         rg = protein_mol.residues
         sel = rg.select((rg.name == "LYS") & (rg.number == 49))[0]
-        assert sel.resid is rg["LYS49.0"].resid
+        assert sel.resid is rg["LYS49.A"].resid

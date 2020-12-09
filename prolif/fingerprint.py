@@ -10,9 +10,9 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     import prolif
     u = mda.Universe(prolif.datafiles.TOP, prolif.datafiles.TRAJ)
     prot = u.select_atoms("protein")
-    lig = u.select_atoms("resname ERM")
+    lig = u.select_atoms("resname LIG")
     fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "CationPi", "Cationic"])
-    fp.run(u.trajectory[::2], lig, prot)
+    fp.run(u.trajectory[::10], lig, prot)
     df = fp.to_dataframe()
     df
     bv = fp.to_bitvectors()
@@ -80,7 +80,7 @@ class Fingerprint:
     Attributes
     ----------
     interactions : dict
-        Dictionnary of interaction functions index by class name. For more
+        Dictionnary of interaction functions indexed by class name. For more
         details, see :mod:`prolif.interactions`
     n_interactions : int
         Number of interaction functions registered by the fingerprint
@@ -99,7 +99,7 @@ class Fingerprint:
     .. ipython:: python
 
         prot = u.select_atoms("protein")
-        lig = u.select_atoms("resname ERM")
+        lig = u.select_atoms("resname LIG")
         fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "Hydrophobic"])
         fp.run(u.trajectory[:5], lig, prot)
         fp.to_dataframe()
@@ -111,21 +111,21 @@ class Fingerprint:
         u.trajectory[0] # use the first frame
         prot = prolif.Molecule.from_mda(prot)
         lig = prolif.Molecule.from_mda(lig)
-        fp.bitvector(lig, prot["ASP129.0"])
+        fp.bitvector(lig, prot["ASP129.A"])
 
     - On a specific pair of residues for a specific interaction:
 
     .. ipython:: python
 
-        fp.hbdonor(lig, prot["ASP129.0"]) # ligand-protein
-        fp.hbacceptor(prot["ASP129.0"], prot["CYS133.0"]) # protein-protein (alpha helix)
+        fp.hbdonor(lig, prot["ASP129.A"]) # ligand-protein
+        fp.hbacceptor(prot["ASP129.A"], prot["CYS133.A"]) # protein-protein (alpha helix)
     
     You can also obtain the indices of atoms responsible for the interaction:
 
     .. ipython:: python
 
-        fp.bitvector_atoms(lig, prot["ASP129.0"])
-        fp.hbdonor.__wrapped__(lig, prot["ASP129.0"])
+        fp.bitvector_atoms(lig, prot["ASP129.A"])
+        fp.hbdonor.__wrapped__(lig, prot["ASP129.A"])
     
     """
 

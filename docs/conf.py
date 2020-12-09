@@ -68,10 +68,11 @@ pygments_style = 'sphinx'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-intersphinx_mapping = {'https://docs.python.org/': None,
-                       'https://docs.scipy.org/doc/numpy/': None,
+intersphinx_mapping = {'https://docs.python.org/3/': None,
+                       'https://numpy.org/doc/stable/': None,
                        'https://docs.mdanalysis.org/2.0.0-dev0/': None,
                        'https://www.rdkit.org/docs/': None,
+                       'https://pandas.pydata.org/docs/': None,
                        }
 
 # app setup hook

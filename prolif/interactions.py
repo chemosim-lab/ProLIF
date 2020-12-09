@@ -19,20 +19,21 @@ interactions available to the fingerprint generator::
 
     >>> u = mda.Universe(prolif.datafiles.TOP, prolif.datafiles.TRAJ)
     >>> prot = u.select_atoms("protein")
-    >>> lig = u.select_atoms("resname ERM")
+    >>> lig = u.select_atoms("resname LIG")
     >>> fp = prolif.Fingerprint(interactions="all")
     >>> df = fp.run(u.trajectory[0:1], lig, prot).to_dataframe()
     >>> df.xs("CloseContact", level=1, axis=1)
-       ASP129.0  VAL201.0
+       ASP129.A  VAL201.A
     0         1         1
-    >>> lig_mol = prolif.Molecule.from_mda(lig)
-    >>> prot_mol = prolif.Molecule.from_mda(prot)
-    >>> fp.closecontact(lig_mol, prot_mol["ASP129.0"])
+    >>> lmol = prolif.Molecule.from_mda(lig)
+    >>> pmol = prolif.Molecule.from_mda(prot)
+    >>> fp.closecontact(lmol, pmol["ASP129.A"])
     True
 
 """
 
 import itertools
+import warnings
 from math import radians
 from abc import ABC, ABCMeta, abstractmethod
 from .utils import (
@@ -50,6 +51,9 @@ class _InteractionMeta(ABCMeta):
     """Metaclass to register interactions automatically"""
     def __init__(cls, name, bases, classdict):
         type.__init__(cls, name, bases, classdict)
+        if name in _INTERACTIONS.keys():
+            warnings.warn(f"The {name!r} interaction has been superseded by a "
+                          f"new class with id {id(cls):#x}")
         _INTERACTIONS[name] = cls
 
 
@@ -126,8 +130,8 @@ class Hydrophobic(_Distance):
         Cutoff distance for the interaction
     """
     def __init__(self,
-                 hydrophobic="[#6,#16,F,Cl,Br,I,At;!+;!-]",
-                 distance=4.5):
+                 hydrophobic="[#6,#16,F,Cl,Br,I,At;!$([+{1-},-{1-}])]",
+                 distance=4.2):
         super().__init__(hydrophobic, hydrophobic, distance)
 
 
@@ -145,8 +149,11 @@ class _BaseHBond(Interaction):
     angles : tuple
         Min and max values for the ``[Donor]-[Hydrogen]...[Acceptor]`` angle
     """
-    def __init__(self, donor="[#7,O,#16][H]", acceptor="[#7,#8,F,*-;!+]",
-                 distance=3.3, angles=(130, 180)):
+    def __init__(self,
+                 donor="[#7,#8,#16][H]",
+                 acceptor="[N,O,F,-{1-};!+{1-}]",
+                 distance=3.5,
+                 angles=(130, 180)):
         self.donor = MolFromSmarts(donor)
         self.acceptor = MolFromSmarts(acceptor)
         self.distance = distance
@@ -162,8 +169,7 @@ class _BaseHBond(Interaction):
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 h = Geometry.Point3D(*donor.xyz[donor_match[1]])
                 a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
-                dist = d.Distance(a)
-                if dist <= self.distance:
+                if d.Distance(a) <= self.distance:
                     hd = h.DirectionVector(d)
                     ha = h.DirectionVector(a)
                     # get DHA angle
@@ -208,9 +214,12 @@ class _BaseXBond(Interaction):
     -----
     Distance and angle adapted from Auffinger et al. PNAS 2004
     """
-    def __init__(self, donor="[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
-                 acceptor="[F-,Cl-,Br-,I-,#7,#8,P,S,Se,Te,a;!+][*]",
-                 distance=3.5, axd_angles=(130, 180), xar_angles=(80, 140)):
+    def __init__(self,
+                 donor="[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
+                 acceptor="[#7,#8,P,S,Se,Te,a;!+{1-}][*]",
+                 distance=3.5,
+                 axd_angles=(130, 180),
+                 xar_angles=(80, 140)):
         self.donor = MolFromSmarts(donor)
         self.acceptor = MolFromSmarts(acceptor)
         self.distance = distance
@@ -261,7 +270,10 @@ class XBDonor(_BaseXBond):
 
 class _BaseIonic(_Distance):
     """Base class for ionic interactions"""
-    def __init__(self, cation="[*+]", anion="[*-]", distance=5.0):
+    def __init__(self,
+                 cation="[*+]",
+                 anion="[*-]",
+                 distance=4.5):
         super().__init__(cation, anion, distance)
 
 
@@ -293,8 +305,11 @@ class _BaseCationPi(Interaction):
         Min and max values for the angle between the vector normal to the ring
         plane and the vector going from the centroid to the cation
     """
-    def __init__(self, cation="[*+]", pi_ring=("a1:a:a:a:a:a:1",
-                 "a1:a:a:a:a:1"), distance=5.5, angles=(0, 30)):
+    def __init__(self,
+                 cation="[*+]",
+                 pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1"),
+                 distance=4.5,
+                 angles=(0, 30)):
         self.cation = MolFromSmarts(cation)
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.distance = distance
@@ -358,9 +373,11 @@ class PiStacking(Interaction):
     pi_ring : list
         List of SMARTS for aromatic rings
     """
-    def __init__(self, centroid_distance=6.0, shortest_distance=3.8,
+    def __init__(self,
+                 centroid_distance=6.0,
+                 shortest_distance=3.8,
                  plane_angles=(0, 90),
-                 pi_ring=["a1:a:a:a:a:a:1", "a1:a:a:a:a:1"]):
+                 pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1")):
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.centroid_distance = centroid_distance
         self.shortest_distance = shortest_distance**2
@@ -426,8 +443,10 @@ class _BaseMetallic(_Distance):
     distance : float
         Cutoff distance
     """
-    def __init__(self, metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]", 
-                 ligand="[O,N,*-;!+]", distance=2.8):
+    def __init__(self,
+                 metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]", 
+                 ligand="[O,N,-{1-};!+{1-}]",
+                 distance=2.8):
         super().__init__(metal, ligand, distance)
 
 

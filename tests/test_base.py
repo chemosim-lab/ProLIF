@@ -10,7 +10,7 @@ from prolif.rdkitmol import BaseRDKitMol
 
 u = Universe(TOP, TRAJ)
 rdkit_mol = Chem.MolFromPDBFile(TOP, removeHs=False)
-ligand_ag = u.select_atoms("resname ERM")
+ligand_ag = u.select_atoms("resname LIG")
 ligand_rdkit = mda_to_rdkit(ligand_ag)
 ligand_mol = Molecule.from_mda(ligand_ag)
 protein_ag = u.select_atoms("protein")

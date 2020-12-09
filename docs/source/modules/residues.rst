@@ -8,12 +8,7 @@ Residues
 
     .. autoclass:: ResidueId
         :members:
-    
-    Residue
-    -------
 
-    .. autoclass:: Residue
-        :members:
     
     ResidueGroup
     ------------

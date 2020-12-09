@@ -16,8 +16,8 @@ mda_to_rdkit = _CONVERTERS["RDKIT"]().convert
 
 class Molecule(BaseRDKitMol):
     """Main molecule class that behaves like an RDKit :class:`~rdkit.Chem.rdchem.Mol`
-    with extra attributes (see below). The main purpose of this class is to
-    access residues as fragments of the molecule.
+    with extra attributes (see examples below). The main purpose of this class
+    is to access residues as fragments of the molecule.
 
     Parameters
     ----------
@@ -32,8 +32,8 @@ class Molecule(BaseRDKitMol):
     n_residues : int
         Number of residues
     
-    Example
-    -------
+    Examples
+    --------
 
     .. ipython:: python
         :okwarning:
@@ -61,7 +61,7 @@ class Molecule(BaseRDKitMol):
         
     .. ipython:: python
 
-        mol["TYR38.0"] # by resid string (residue name + number + chain)
+        mol["TYR38.A"] # by resid string (residue name + number + chain)
         mol[42] # by index (from 0 to n_residues-1)
         mol[prolif.ResidueId("TYR", 38, "A")] # by ResidueId
     

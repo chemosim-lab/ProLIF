@@ -11,7 +11,7 @@ from prolif.utils import (get_centroid,
                           get_residues_near_ligand,
                           split_mol_by_residues,
                           is_peptide_bond,
-                          _series_to_bv,
+                          pandas_series_to_bv,
                           to_dataframe,
                           to_bitvectors)
 from .test_base import ligand_mol, protein_mol
@@ -49,17 +49,17 @@ def test_angle_limits(angle, mina, maxa, ring, expected):
 
 def test_pocket_residues():
     resids = get_residues_near_ligand(ligand_mol, protein_mol)
-    residues = ["TYR38.0",  "TYR40.0",  "GLN41.0",  "VAL102.0", "SER106.0",
-                "TYR109.0", "THR110.0", "TRP115.0", "TRP125.0", "LEU126.0",
-                "ASP129.0", "ILE130.0", "THR131.0", "CYS133.0", "THR134.0",
-                "ILE137.0", "ILE180.0", "GLU198.0", "CYS199.0", "VAL200.0",
-                "VAL201.0", "ASN202.0", "THR203.0", "TYR208.0", "THR209.0",
-                "VAL210.0", "TYR211.0", "SER212.0", "THR213.0", "VAL214.0",
-                "GLY215.0", "ALA216.0", "PHE217.0", "TRP327.1", "PHE330.1",
-                "PHE331.1", "ILE333.1", "SER334.1", "LEU335.1", "MET337.1",
-                "PRO338.1", "LEU348.1", "ALA349.1", "ILE350.1", "PHE351.1",
-                "ASP352.1", "PHE353.1", "PHE354.1", "THR355.1", "TRP356.1",
-                "GLY358.1", "TYR359.1"]
+    residues = ["TYR38.A",  "TYR40.A",  "GLN41.A",  "VAL102.A", "SER106.A",
+                "TYR109.A", "THR110.A", "TRP115.A", "TRP125.A", "LEU126.A",
+                "ASP129.A", "ILE130.A", "THR131.A", "CYS133.A", "THR134.A",
+                "ILE137.A", "ILE180.A", "GLU198.A", "CYS199.A", "VAL200.A",
+                "VAL201.A", "ASN202.A", "THR203.A", "TYR208.A", "THR209.A",
+                "VAL210.A", "TYR211.A", "SER212.A", "THR213.A", "VAL214.A",
+                "GLY215.A", "ALA216.A", "PHE217.A", "TRP327.B", "PHE330.B",
+                "PHE331.B", "ILE333.B", "SER334.B", "LEU335.B", "MET337.B",
+                "PRO338.B", "LEU348.B", "ALA349.B", "ILE350.B", "PHE351.B",
+                "ASP352.B", "PHE353.B", "PHE354.B", "THR355.B", "TRP356.B",
+                "GLY358.B", "TYR359.B"]
     for res in residues:
         r = ResidueId.from_string(res)
         assert r in resids
@@ -95,7 +95,7 @@ def test_is_peptide_bond():
 
 def test_series_to_bv():
     v = np.array([0,1,1,0,1])
-    bv = _series_to_bv(v)
+    bv = pandas_series_to_bv(v)
     assert bv.GetNumBits() == len(v)
     assert bv.GetNumOnBits() == 3
 

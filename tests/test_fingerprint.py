@@ -54,7 +54,7 @@ class TestFingerprint:
         assert fp.dummy.__wrapped__("foo", "bar") == (1, 2, 3)
 
     def test_bitvector(self, fp):
-        bv = fp.bitvector(ligand_mol, protein_mol["ASP129.0"])
+        bv = fp.bitvector(ligand_mol, protein_mol["ASP129.A"])
         assert len(bv) == fp.n_interactions
         assert bv.sum() > 0
 
@@ -71,20 +71,20 @@ class TestFingerprint:
                      residues="all", progress=False)
         assert hasattr(fp_class, "ifp")
         assert len(fp_class.ifp) == 1
-        res = ResidueId.from_string("LEU126.0")
+        res = ResidueId.from_string("LEU126.A")
         assert res in fp_class.ifp[0].keys()
         fp_class.run(u.trajectory[1:2], ligand_ag, protein_ag,
-                     residues=["ASP129.0"], progress=False)
+                     residues=["ASP129.A"], progress=False)
         assert hasattr(fp_class, "ifp")
         assert len(fp_class.ifp) == 1
-        res = ResidueId.from_string("ASP129.0")
+        res = ResidueId.from_string("ASP129.A")
         assert res in fp_class.ifp[0].keys()
         fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
                      residues=None, progress=False)
         assert hasattr(fp_class, "ifp")
         assert len(fp_class.ifp) == 3
         assert len(fp_class.ifp[0]) > 1
-        res = ResidueId.from_string("VAL201.0")
+        res = ResidueId.from_string("VAL201.A")
         assert res in fp_class.ifp[0].keys()
         u.trajectory[0]
 
