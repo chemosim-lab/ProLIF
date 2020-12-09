@@ -1,4 +1,4 @@
-name: CI
+name: tests
 on:
   push:
     branches:
@@ -20,7 +20,7 @@ env:
   PLF_CONDA_DEPS: "rdkit ipython"
 
 jobs:
-  test:
+  run_tests:
     name:  Test on ${{ matrix.os }}, Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     strategy:

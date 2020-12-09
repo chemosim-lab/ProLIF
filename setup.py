@@ -40,7 +40,7 @@ setup(
         'pandas>=1.0.0',
         'numpy>=1.13.3',
         'scipy>=1.3.0',
-        'mdanalysis @ git+https://github.com/MDAnalysis/mdanalysis.git#subdirectory=package',
+        'mdanalysis @ git+https://github.com/cbouy/mdanalysis.git@prolif#subdirectory=package',
         'tqdm'],
     extras_require={
         'tests': ['pytest>=6.1.2', 'pytest-cov', 'codecov'],

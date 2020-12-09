@@ -1,14 +1,15 @@
 ProLIF
 ======
 
-|pypi-version| |build-status| |codecov| |docs| |license|
+|pypi-version| |build-status| |codecov| |docs| |lgtm| |license|
 
 .. |pypi-version| image:: https://img.shields.io/pypi/v/prolif.svg
    :target: https://pypi.python.org/pypi/prolif
    :alt: Pypi Version
 
-.. |build-status| image:: https://img.shields.io/travis/chemosim-lab/ProLIF
-    :alt: Travis build status
+.. |build-status| image:: https://github.com/chemosim-lab/ProLIF/workflows/tests/badge.svg
+    :target: https://github.com/chemosim-lab/ProLIF/actions
+    :alt: Build status
 
 .. |codecov| image:: https://codecov.io/gh/chemosim-lab/ProLIF/branch/master/graph/badge.svg?token=2FCHV08G8A
     :target: https://codecov.io/gh/chemosim-lab/ProLIF
@@ -16,6 +17,10 @@ ProLIF
 .. |docs| image:: https://readthedocs.org/projects/prolif/badge/?version=latest
     :target: https://prolif.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
+
+.. |lgtm| image:: https://img.shields.io/lgtm/grade/python/g/chemosim-lab/ProLIF.svg?logo=lgtm&logoWidth=18
+    :target: https://lgtm.com/projects/g/chemosim-lab/ProLIF/context:python
+    :alt: Code quality
 
 .. |license| image:: https://img.shields.io/pypi/l/prolif
     :alt: License
