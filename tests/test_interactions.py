@@ -163,6 +163,5 @@ class TestInteractions:
         class Dummy(Interaction):
             pass
         with pytest.raises(TypeError,
-                           match="Can't instantiate abstract class Dummy "
-                                 "with abstract methods detect"):
+                           match="Can't instantiate abstract class Dummy"):
             foo = Dummy()
