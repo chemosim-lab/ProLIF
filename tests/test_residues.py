@@ -197,15 +197,15 @@ class TestResidueGroup:
         assert rg.select(rg.name == "LYS").n_residues == 16
         assert rg.select(rg.number == 300).n_residues == 1
         assert rg.select(rg.number == 1).n_residues == 0
-        assert rg.select(rg.chain == "1").n_residues == 90
+        assert rg.select(rg.chain == "B").n_residues == 90
         # and
-        assert rg.select((rg.chain == "1") & (rg.name == "ALA")).n_residues == 7
+        assert rg.select((rg.chain == "B") & (rg.name == "ALA")).n_residues == 7
         # or
-        assert rg.select((rg.chain == "1") | (rg.name == "ALA")).n_residues == 110
+        assert rg.select((rg.chain == "B") | (rg.name == "ALA")).n_residues == 110
         # xor
-        assert rg.select((rg.chain == "1") ^ (rg.name == "ALA")).n_residues == 103
+        assert rg.select((rg.chain == "B") ^ (rg.name == "ALA")).n_residues == 103
         # not
-        assert rg.select(~(rg.chain == "1")).n_residues == 212
+        assert rg.select(~(rg.chain == "B")).n_residues == 212
         
     def test_select_sameas_getitem(self):
         rg = protein_mol.residues

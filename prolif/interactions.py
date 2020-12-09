@@ -65,8 +65,7 @@ class Interaction(ABC, metaclass=_InteractionMeta):
     """
     @abstractmethod
     def detect(self, **kwargs):
-        raise NotImplementedError(
-            "Your custom class must define its own `detect` method")
+        pass
 
 
 def get_mapindex(res, index):
@@ -236,8 +235,7 @@ class _BaseXBond(Interaction):
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 x = Geometry.Point3D(*donor.xyz[donor_match[1]])
                 a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
-                dist = x.Distance(a)
-                if dist <= self.distance:
+                if x.Distance(a) <= self.distance:
                     # D-X ... A angle
                     xd = x.DirectionVector(d)
                     xa = x.DirectionVector(a)
@@ -271,8 +269,8 @@ class XBDonor(_BaseXBond):
 class _BaseIonic(_Distance):
     """Base class for ionic interactions"""
     def __init__(self,
-                 cation="[*+]",
-                 anion="[*-]",
+                 cation="[+{1-}]",
+                 anion="[-{1-}]",
                  distance=4.5):
         super().__init__(cation, anion, distance)
 
@@ -306,7 +304,7 @@ class _BaseCationPi(Interaction):
         plane and the vector going from the centroid to the cation
     """
     def __init__(self,
-                 cation="[*+]",
+                 cation="[+{1-}]",
                  pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1"),
                  distance=4.5,
                  angles=(0, 30)):
@@ -328,8 +326,7 @@ class _BaseCationPi(Interaction):
                 # centroid of pi-system as 3d point
                 centroid  = Geometry.Point3D(*get_centroid(pi_coords))
                 # distance between cation and centroid
-                dist = cat.Distance(centroid)
-                if dist > self.distance:
+                if cat.Distance(centroid) > self.distance:
                     continue
                 # vector normal to ring plane
                 normal = get_ring_normal_vector(centroid, pi_coords)

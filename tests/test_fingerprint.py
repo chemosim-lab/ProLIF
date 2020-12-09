@@ -59,7 +59,7 @@ class TestFingerprint:
         assert bv.sum() > 0
 
     def test_bitvector_atoms(self, fp):
-        bv, atoms = fp.bitvector_atoms(ligand_mol, protein_mol["ASP129.0"])
+        bv, atoms = fp.bitvector_atoms(ligand_mol, protein_mol["ASP129.A"])
         assert len(bv) == fp.n_interactions
         assert len(atoms) == fp.n_interactions
         assert bv.sum() > 0
@@ -71,7 +71,7 @@ class TestFingerprint:
                      residues="all", progress=False)
         assert hasattr(fp_class, "ifp")
         assert len(fp_class.ifp) == 1
-        res = ResidueId.from_string("LEU126.A")
+        res = ResidueId.from_string("LYS387.B")
         assert res in fp_class.ifp[0].keys()
         fp_class.run(u.trajectory[1:2], ligand_ag, protein_ag,
                      residues=["ASP129.A"], progress=False)

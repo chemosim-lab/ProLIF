@@ -20,7 +20,7 @@ def from_mol2(f):
     elements = [guess_atom_element(n) for n in u.atoms.names]
     u.add_TopologyAttr("elements", np.array(elements, dtype=object))
     u.atoms.types = np.array([x.upper() for x in u.atoms.types], dtype=object)
-    return Molecule.from_mda(u)
+    return Molecule.from_mda(u, force=True)
 
 
 class MolFactory:
@@ -162,7 +162,7 @@ class TestInteractions:
     def test_error_no_detect(self):
         class Dummy(Interaction):
             pass
-        foo = Dummy()
-        with pytest.raises(NotImplementedError,
-                           match="class must define its own `detect` method"):
-            foo.detect()
+        with pytest.raises(TypeError,
+                           match="Can't instantiate abstract class Dummy "
+                                 "with abstract methods detect"):
+            foo = Dummy()

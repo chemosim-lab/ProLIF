@@ -257,7 +257,7 @@ class Fingerprint:
         # set which residues to use
         select_residues = False
         if residues == "all":
-            resids = Molecule.from_mda(prot).residues
+            resids = Molecule.from_mda(prot).residues.keys()
         elif isinstance(residues, Iterable):
             resids = residues
         else:
@@ -272,8 +272,7 @@ class Fingerprint:
             for res in resids:
                 prot_res = prot_mol[res]
                 bs = self.bitvector(lig_mol, prot_res)
-                if bs.sum() > 0:
-                    data[prot_res.resid] = bs
+                data[prot_res.resid] = bs
             ifp.append(data)
         self.ifp = ifp
         return self
