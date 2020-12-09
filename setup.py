@@ -10,7 +10,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
 
 setup(
     name='prolif',
-    version=os.environ.get('PROLIF_VERSION', '0.0.0'),,
+    version=os.environ.get('PROLIF_VERSION', '0.0.0'),
     description='Protein-Ligand Interaction Fingerprints',
     long_description=long_description,
     long_description_content_type='text/x-rst',

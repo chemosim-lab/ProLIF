@@ -8,11 +8,11 @@ ProLIF
    :alt: Pypi Version
 
 .. |build| image:: https://github.com/chemosim-lab/ProLIF/workflows/build/badge.svg
-    :target: https://github.com/chemosim-lab/ProLIF/actions
+    :target: https://github.com/chemosim-lab/ProLIF/actions?query=workflow%3Abuild
     :alt: Build status
 
 .. |tests| image:: https://github.com/chemosim-lab/ProLIF/workflows/tests/badge.svg?branch=master
-    :target: https://github.com/chemosim-lab/ProLIF/actions
+    :target: https://github.com/chemosim-lab/ProLIF/actions?query=workflow%3Atests
     :alt: Tests status
 
 .. |codecov| image:: https://codecov.io/gh/chemosim-lab/ProLIF/branch/master/graph/badge.svg?token=2FCHV08G8A
