@@ -46,6 +46,7 @@ jobs:
         PLF_CONDA_FULL_DEPS: "${{ env.PLF_CONDA_DEPS }}"
       run: |
         conda install ${PLF_CONDA_FULL_DEPS}
+        python -m pip install cython
 
     - name: Install package through pip
       run: |
