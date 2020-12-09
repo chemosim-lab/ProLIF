@@ -23,6 +23,8 @@ jobs:
   run_tests:
     name: Test on ${{ matrix.os }}, Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+    # only run once if internal PR
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
         matrix:
           os: [ubuntu-latest]
