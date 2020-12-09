@@ -15,4 +15,6 @@ formats:
 # Optionally set the version of Python and requirements required to build your docs
 conda:
   environment: docs/environment.yml
-  
+
+python:
+   setup_py_install: true
