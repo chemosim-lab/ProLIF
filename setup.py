@@ -19,16 +19,16 @@ setup(
     license='Apache License, Version 2.0',
     classifiers=[
         'Development Status :: 4 - Beta',
-        'Environment :: Console',
         'Operating System :: OS Independent',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.8',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         'Topic :: Scientific/Engineering :: Chemistry',
     ],
-    keywords='science chemistry biology drug-design chemoinformatics virtual-screening',
+    keywords='science chemistry biology drug-design chemoinformatics molecular-dynamics',
     packages=['prolif'],
     python_requires='>=3.6',
     install_requires=[
@@ -41,9 +41,8 @@ setup(
         'tests': ['pytest>=6.1.2', 'pytest-cov', 'codecov'],
         'docs': ['sphinx>=3.2.1', 'recommonmark', 'sphinx-rtd-theme'],
     },
-    test_suite="tests",
     package_data={
-        'tests': ['*.mol2', '*.pdb', '*.xtc'],
+        'prolif': ['*.mol2', '*.pdb', '*.xtc'],
     },
     include_package_data=True,
     project_urls={

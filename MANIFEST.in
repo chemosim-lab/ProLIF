@@ -4,5 +4,7 @@ include README.md
 # License
 include LICENSE
 
+# Files
+global-include *.pdb *.xtc
 # Files for tests
-recursive-include tests *.mol2 *.pdb *.xtc
+recursive-include tests *.mol2
