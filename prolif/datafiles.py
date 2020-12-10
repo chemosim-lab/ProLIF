@@ -1,6 +1,8 @@
 from pathlib import Path
+import importlib.resources
 
-datapath = Path(__file__).parents[1] / "data"
+with importlib.resources.path("data", "") as p:
+    datapath = p
 
 TOP = str(datapath / "top.pdb")
 TRAJ = str(datapath / "traj.xtc")

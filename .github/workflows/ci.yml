@@ -27,8 +27,8 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
         matrix:
-          os: [ubuntu-latest]
-          python-version: [3.6, 3.8, 3.9]
+          os: [ubuntu-18.04]
+          python-version: [3.7, 3.8, 3.9]
 
     steps:
     - uses: actions/checkout@v2

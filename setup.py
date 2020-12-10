@@ -30,7 +30,7 @@ setup(
     ],
     keywords='science chemistry biology drug-design chemoinformatics molecular-dynamics',
     packages=['prolif'],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     install_requires=[
         'pandas>=1.0.0',
         'numpy>=1.13.3',
