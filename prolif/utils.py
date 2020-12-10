@@ -1,170 +1,229 @@
-import re
+"""
+Helper functions --- :mod:`prolif.utils`
+========================================
+"""
 from math import pi
-from functools import wraps
 import numpy as np
-from rdkit import Chem
-from rdkit import Geometry as rdGeometry
-# optionnal imports
-try:
-    import sklearn
-except ImportError:
-    _has_sklearn = False
-else:
-    _has_sklearn = True
-try:
-    import seaborn
-except ImportError:
-    _has_seaborn = False
-else:
-    _has_seaborn = True
-try:
-    from openbabel import pybel
-except ImportError:
-    _has_pybel = False
-else:
-    _has_pybel = True
+import pandas as pd
+from scipy.spatial import cKDTree
+from rdkit.Chem import (rdmolops,
+                        SplitMolByPDBResidues,
+                        GetMolFrags,
+                        FragmentOnBonds)
+from rdkit.Geometry import Point3D
+from rdkit.DataStructs import ExplicitBitVect
+from .residue import ResidueId
 
 
-PERIODIC_TABLE = Chem.GetPeriodicTable()
-BONDTYPE_TO_RDKIT = {
-    "AROMATIC": Chem.BondType.AROMATIC,
-    'SINGLE': Chem.BondType.SINGLE,
-    'DOUBLE': Chem.BondType.DOUBLE,
-    'TRIPLE': Chem.BondType.TRIPLE,
-}
-BONDORDER_TO_RDKIT = {
-    1: Chem.BondType.SINGLE,
-    2: Chem.BondType.DOUBLE,
-    3: Chem.BondType.TRIPLE,
-}
+_90_deg_to_rad = pi/2
 
-def requires_sklearn(func):
-    """Decorator for when sklearn is required in a function"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not _has_sklearn:
-            raise ImportError("sklearn is required for this function, but isn't installed")
-        return func(*args, **kwargs)
-    return wrapper
-
-def requires_seaborn(func):
-    """Decorator for when seaborn is required in a function"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not _has_seaborn:
-            raise ImportError("seaborn is required for this function, but isn't installed")
-        return func(*args, **kwargs)
-    return wrapper
-
-def requires_pybel(func):
-    """Decorator for when openbabel's pybel is required in a function"""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not _has_pybel:
-            raise ImportError("pybel (openbabel) is required for this function, but isn't installed")
-        return func(*args, **kwargs)
-    return wrapper
-
-def requires_config(func):
-    """Check if the dataframe has been configured with a FingerprintFactory"""
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        assert self._configured, "The Dataframe needs to be configured with df.configure()"
-        return func(self, *args, **kwargs)
-    return wrapper
-
-@requires_pybel
-def pdbqt_to_mol2(path):
-    mols = []
-    for m in pybel.readfile("pdbqt", path):
-        # necessary to properly add H
-        mH = pybel.readstring("pdb", m.write("pdb"))
-        mH.addh()
-        # need to reassign old charges to mol
-        mH.OBMol.SetPartialChargesPerceived(True)
-        for i, (atom, old) in enumerate(zip(mH.atoms, m.atoms)):
-            if i == len(m.atoms): # stop at new hydrogens
-                break
-            # assign old charges
-            atom.OBAtom.SetPartialCharge(old.partialcharge)
-        mols.append(mH)
-    return [x.write("mol2") for x in mols]
-
-def update_bonds_and_charges(mol):
-    """mdtraj and pytraj don't keep information on bond order, and formal charges.
-    Since the given molecule should have all hydrogens added, we can infer
-    bond order and charges from the valence."""
-
-    for atom in mol.GetAtoms():
-        vtot = atom.GetTotalValence()
-        valences = PERIODIC_TABLE.GetValenceList(atom.GetAtomicNum())
-        electrons = [ v - vtot for v in valences ]
-        # if numbers in the electrons array are >0, the atom is missing bonds or
-        # formal charges. If it's <0, it has too many bonds and we must add the
-        # corresponding formal charge (we cannot break bonds present in the topology).
-
-        # if the only option is to add a positive charge
-        if (len(electrons)==1) and (electrons[0]<0):
-            charge = -electrons[0] # positive
-            atom.SetFormalCharge(charge)
-            mol.UpdatePropertyCache(strict=False)
-        else:
-            set_electrons = set(electrons)
-            neighbors = atom.GetNeighbors()
-            # check if neighbor can accept a double / triple bond
-            for i,na in enumerate(neighbors, start=1):
-                na_vtot = na.GetTotalValence()
-                na_valences = PERIODIC_TABLE.GetValenceList(na.GetAtomicNum())
-                na_electrons = [ v - na_vtot for v in na_valences ]
-                common_electrons = min(set_electrons.intersection(na_electrons), default=np.nan)
-                if common_electrons != 0:
-                    # if they have no valence need in common but it's the last option
-                    if common_electrons is np.nan:
-                        if i == len(neighbors): # if it's the last option available
-                            charge = -electrons[0] # negative
-                            atom.SetFormalCharge(charge)
-                            mol.UpdatePropertyCache(strict=False)
-                    # if they both need a supplementary bond
-                    else:
-                        bond = mol.GetBondBetweenAtoms(atom.GetIdx(), na.GetIdx())
-                        if common_electrons == 1:
-                            bond.SetBondType(Chem.BondType.DOUBLE)
-                        elif common_electrons == 2:
-                            bond.SetBondType(Chem.BondType.TRIPLE)
-                        mol.UpdatePropertyCache(strict=False)
-                        break # out of neighbors loop
-    Chem.SanitizeMol(mol)
-
-def get_resnumber(resname):
-    pattern = re.search(r'(\d+)', resname)
-    return int(pattern.group(1))
 
 def get_centroid(coordinates):
     """Centroid for an array of XYZ coordinates"""
     return np.mean(coordinates, axis=0)
 
+
 def get_ring_normal_vector(centroid, coordinates):
     """Returns a vector that is normal to the ring plane"""
     # A & B are two edges of the ring
-    a = rdGeometry.Point3D(*coordinates[0])
-    b = rdGeometry.Point3D(*coordinates[1])
+    a = Point3D(*coordinates[0])
+    b = Point3D(*coordinates[1])
     # vectors between centroid and these edges
     ca = centroid.DirectionVector(a)
     cb = centroid.DirectionVector(b)
     # cross product between these two vectors
     normal = ca.CrossProduct(cb)
-    # note that cb.CrossProduct(ca) will the normal vector in the opposite direction
+    # cb.CrossProduct(ca) is the normal vector in the opposite direction
     return normal
 
+
 def angle_between_limits(angle, min_angle, max_angle, ring=False):
+    """Check if an angle value is between min and max angles in radian.
+    If the angle to check involves a ring, include the angle that would be
+    obtained if we had used the other normal vector (same axis but opposite
+    direction)
     """
-    Check if an angle value is between min and max angles in degrees.
-    If the angle to check involves a ring, include the angle that would be obtained
-    if we had used the other normal vector (same axis but opposite direction).
+    if ring and (angle > _90_deg_to_rad):
+        mirror_angle = _90_deg_to_rad - (angle % _90_deg_to_rad)
+        return (min_angle <= angle <= max_angle) or (
+                min_angle <= mirror_angle <= max_angle)
+    return (min_angle <= angle <= max_angle)
+
+
+def get_residues_near_ligand(lig, prot, cutoff=6.0):
+    """Detect residues close to a reference ligand
+    
+    Parameters
+    ----------
+    lig : prolif.molecule.Molecule
+        Select residues that are near this ligand
+    prot : prolif.molecule.Molecule
+        Protein containing the residues
+    cutoff : float
+        If any interatomic distance between the ligand reference points and a
+        residue is below or equal to this cutoff, the residue will be selected
+
+    Returns
+    -------
+    residues : list
+        A list of unique :class:`~prolif.residue.ResidueId` that are close to
+        the ligand
     """
-    if ring and (angle > pi/2):
-        mirror_angle = (pi/2) - (angle % (pi/2))
-        condition = (min_angle <= angle <= max_angle) or (min_angle <= mirror_angle <= max_angle)
-    else:
-        condition = (min_angle <= angle <= max_angle)
-    return condition
+    tree = cKDTree(prot.xyz)
+    ix = tree.query_ball_point(lig.xyz, cutoff)
+    ix = set([i for lst in ix for i in lst])
+    resids = [ResidueId.from_atom(prot.GetAtomWithIdx(i)) for i in ix]
+    return list(set(resids))
+
+
+def split_mol_by_residues(mol):
+    """Splits a molecule in multiple fragments based on residues
+
+    Parameters
+    ----------
+    mol : rdkit.Chem.rdchem.Mol
+        The molecule to fragment
+
+    Returns
+    -------
+    residues : list
+        A list of :class:`rdkit.Chem.rdchem.Mol`
+
+    Notes
+    -----
+    Code adapted from Maciek Wójcikowski on the RDKit discussion list
+    """
+    residues = []
+    for res in SplitMolByPDBResidues(mol).values():
+        for frag in GetMolFrags(res, asMols=True, sanitizeFrags=False):
+            # count number of unique residues in the fragment
+            resids = {a.GetIdx(): ResidueId.from_atom(a)
+                      for a in frag.GetAtoms()}
+            if len(set(resids.values())) > 1:
+                # split on peptide bonds
+                bonds = [b.GetIdx() for b in frag.GetBonds()
+                         if is_peptide_bond(b, resids)]
+                mols = FragmentOnBonds(frag, bonds, addDummies=False)
+                mols = GetMolFrags(mols, asMols=True, sanitizeFrags=False)
+                residues.extend(mols)
+            else:
+                residues.append(frag)
+    return residues
+
+
+def is_peptide_bond(bond, resids):
+    """Checks if a bond is a peptide bond based on the ResidueId of the atoms
+    on each part of the bond. Also works for disulfide bridges or any bond that
+    links two residues in biopolymers.
+
+    Parameters
+    ----------
+    bond : rdkit.Chem.rdchem.Bond
+        The bond to check
+    resids : dict
+        A dictionnary of ResidueId indexed by atom index
+    """
+    if resids[bond.GetBeginAtomIdx()] == resids[bond.GetEndAtomIdx()]:
+        return False
+    return True
+
+
+def to_dataframe(ifp, fingerprint):
+    """Convert IFPs to a pandas DataFrame
+
+    Parameters
+    ----------
+    ifp : list
+        A list of dict in the format {ResidueId: fingerprint} where
+        fingerprint is a numpy.ndarray obtained by running the
+        :meth:`~prolif.fingerprint.Fingerprintrun` method of a
+        :class:`~prolif.fingerprint.Fingerprint`. Each dictionnary can
+        contain other (key, value) pairs, such as frame numbers...etc. as long
+        as the values are not numpy arrays or np.NaN
+    fingerprint : prolif.fingerprint.Fingerprint
+        The fingerprint generator that was used to obtain the fingerprint
+
+    Returns
+    -------
+    df : pandas.DataFrame
+        A DataFrame where each residue and interaction type are in separate
+        columns
+
+    Example
+    -------
+    ::
+
+        >>> df = prolif.to_dataframe(results, fp)
+        >>> print(df)
+        Frame     ILE59                  ILE55       TYR93
+                Hydrophobic HBAcceptor Hydrophobic Hydrophobic PiStacking
+        0      0           1          0           0           0          0
+        ...
+
+    """
+    df = pd.DataFrame(ifp)
+    resids = list(set(key for d in ifp
+                          for key, value in d.items()
+                          if isinstance(value, np.ndarray)))
+    resids.sort()
+    ids = df.drop(columns=resids).columns.tolist()
+    df = df.applymap(lambda x: [False] * fingerprint.n_interactions
+                               if x is np.nan else x)
+    ifps = pd.DataFrame()
+    for res in resids:
+        cols = [f"{res}{i}" for i in range(fingerprint.n_interactions)]
+        ifps[cols] = df[res].apply(pd.Series)
+    ifps.columns = pd.MultiIndex.from_product([[str(r) for r in resids],
+                                               fingerprint.interactions],
+                                              names=["residue", "interaction"])
+    ifps = ifps.astype(np.uint8)
+    ifps = ifps.loc[:, (ifps != 0).any(axis=0)]
+    temp = df[ids].copy()
+    temp.columns = pd.MultiIndex.from_product([ids, [""]])
+    return pd.concat([temp, ifps], axis=1)
+
+
+def pandas_series_to_bv(s):
+    bv = ExplicitBitVect(len(s))
+    on_bits = np.where(s == 1)[0].tolist()
+    bv.SetBitsFromList(on_bits)
+    return bv
+
+
+def to_bitvectors(ifp, fingerprint):
+    """Convert IFPs to a list of RDKit BitVector
+
+    Parameters
+    ----------
+    ifp : list
+        A list of dict in the format {ResidueId: fingerprint} where
+        fingerprint is a numpy.ndarray obtained by running the
+        :meth:`~prolif.fingerprint.Fingerprint.run` method of a
+        :class:`~prolif.fingerprint.Fingerprint`. Each dictionnary can
+        contain other (key, value) pairs, such as frame numbers...etc. as long
+        as these values are not numpy arrays or np.NaN
+    fingerprint : prolif.fingerprint.Fingerprint
+        The fingerprint that was used to generate the fingerprint
+
+    Returns
+    -------
+    bv : list
+        A list of :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect`
+        for each frame
+
+    Example
+    -------
+    ::
+
+        >>> from rdkit.DataStructs import TanimotoSimilarity
+        >>> bv = prolif.to_bitvectors(results, fp)
+        >>> TanimotoSimilarity(bv[0], bv[1])
+        0.42
+
+    """
+    df = to_dataframe(ifp, fingerprint)
+    resids = list(set(str(key) for d in ifp for key, value in d.items()
+                      if (isinstance(value, np.ndarray) and value.sum() > 0)))
+    if not resids:
+        raise ValueError("The input IFP only contains off bits")
+    return df[resids].apply(pandas_series_to_bv, axis=1).tolist()

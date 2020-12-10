@@ -1,0 +1,8 @@
+@<TRIPOS>MOLECULE
+cation
+1 0 1                   
+SMALL
+USER_CHARGES
+@<TRIPOS>ATOM
+1	 Na1	0.020	-0.054	1.524	Na	1	UNK1	1.000	
+@<TRIPOS>BOND

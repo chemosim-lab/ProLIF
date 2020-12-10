@@ -1,341 +1,337 @@
-import logging, copy
-from os import path
-from collections import OrderedDict
-from math import radians
-from rdkit import Chem
-from rdkit import Geometry as rdGeometry
-from .parameters import RULES
-from .utils import (
-    angle_between_limits,
-    get_resnumber,
-    get_centroid,
-    get_ring_normal_vector)
+"""
+Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
+================================================================================
 
-logger = logging.getLogger("prolif")
+.. ipython:: python
+    :okwarning:
 
-class FingerprintFactory:
-    """Class that generates an interaction fingerprint between a protein and a ligand"""
+    import MDAnalysis as mda
+    from rdkit.DataStructs import TanimotoSimilarity
+    import prolif
+    u = mda.Universe(prolif.datafiles.TOP, prolif.datafiles.TRAJ)
+    prot = u.select_atoms("protein")
+    lig = u.select_atoms("resname LIG")
+    fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "CationPi", "Cationic"])
+    fp.run(u.trajectory[::10], lig, prot)
+    df = fp.to_dataframe()
+    df
+    bv = fp.to_bitvectors()
+    TanimotoSimilarity(bv[0], bv[1])
+    
+"""
+from functools import wraps
+from collections.abc import Iterable
+import numpy as np
+from tqdm.auto import tqdm
+from .interactions import _INTERACTIONS
+from .molecule import Molecule
+from .utils import get_residues_near_ligand, to_dataframe, to_bitvectors
 
-    def __init__(self, rules=None,
-        interactions=['HBdonor','HBacceptor','Cation','Anion','PiCation','PiStacking','Hydrophobic']):
-        # read parameters
-        if rules:
-            logger.debug("Using supplied geometric rules")
-            self.rules = rules
-        else:
-            _path = path.join(path.dirname(__file__), 'parameters.py')
-            logger.debug(f"Using default geometric rules from {_path}")
-            self.rules = copy.deepcopy(RULES)
-        # convert angles from degrees to radian
-        for i in range(2):
-            for key in ["HBond", "CationPi"]:
-                self.rules[key]["angle"][i] = radians(self.rules[key]["angle"][i])
-            for key in ["AXD","XAR"]:
-                self.rules["XBond"]["angle"][key][i] = radians(self.rules["XBond"]["angle"][key][i])
-            for key in ["FaceToFace", "EdgeToFace"]:
-                self.rules["Aromatic"][key]["angle"][i] = radians(self.rules["Aromatic"][key]["angle"][i])
-        # create SMARTS
-        self.SMARTS = {
-            "Aromatic": [Chem.MolFromSmarts(s) for s in self.rules["Aromatic"]["smarts"]],
-            "Hydrophobic": Chem.MolFromSmarts(self.rules["Hydrophobic"]["smarts"]),
-            "HBdonor": Chem.MolFromSmarts(self.rules["HBond"]["donor"]),
-            "HBacceptor": Chem.MolFromSmarts(self.rules["HBond"]["acceptor"]),
-            "XBdonor": Chem.MolFromSmarts(self.rules["XBond"]["donor"]),
-            "XBacceptor": Chem.MolFromSmarts(self.rules["XBond"]["acceptor"]),
-            "Cation": Chem.MolFromSmarts(self.rules["Ionic"]["cation"]),
-            "Anion": Chem.MolFromSmarts(self.rules["Ionic"]["anion"]),
-            "Metal": Chem.MolFromSmarts(self.rules["Metallic"]["metal"]),
-            "Ligand": Chem.MolFromSmarts(self.rules["Metallic"]["ligand"]),
-        }
-        for smarts in self.SMARTS.values():
-            if isinstance(smarts, list):
-                for s in smarts:
-                    s.UpdatePropertyCache()
-                    Chem.GetSymmSSSR(s)
-            else:
-                smarts.UpdatePropertyCache()
-                Chem.GetSymmSSSR(smarts)
+
+def _return_first_element(f):
+    """Modifies the return signature of a function by forcing it to return
+    only the first element if multiple values were returned.
+
+    Notes
+    -----
+    The original return signature of the decorated function is still accessible
+    by calling ``function.__wrapped__(*args, **kwargs)``.
+
+    Example
+    -------
+    ::
+
+        >>> def foo():
+        ...     return 1, 2, 3
+        ...
+        >>> bar = _return_first_element(foo)
+        >>> foo()
+        (1, 2, 3)
+        >>> bar()
+        1
+        >>> bar.__wrapped__()
+        (1, 2, 3)
+
+    """
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        results = f(*args, **kwargs)
+        try:
+            value, *rest = results
+        except TypeError:
+            value = results
+        return value
+    return wrapper
+
+
+class Fingerprint:
+    """Class that generates an interaction fingerprint between two molecules
+
+    While in most cases the fingerprint will be generated between a ligand and
+    a protein, it is also possible to use this class for protein-protein
+    interactions, or host-guest systems.
+
+    Parameters
+    ----------
+    interactions : list
+        List of names (str) of interaction classes as found in the
+        :mod:`prolif.interactions` module
+
+    Attributes
+    ----------
+    interactions : dict
+        Dictionnary of interaction functions indexed by class name. For more
+        details, see :mod:`prolif.interactions`
+    n_interactions : int
+        Number of interaction functions registered by the fingerprint
+    ifp : list, optionnal
+        List of interactions fingerprints for the given trajectory.
+        Results are stored in the form of a list of
+        ``{"Frame": frame_index, ResidueId: numpy.ndarray, ...}`` dictionaries
+        that contain the interaction fingerprints
+
+    Notes
+    -----
+    You can use the fingerprint generator in multiple ways:
+
+    - On a trajectory directly from MDAnalysis objects:
+
+    .. ipython:: python
+
+        prot = u.select_atoms("protein")
+        lig = u.select_atoms("resname LIG")
+        fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "Hydrophobic"])
+        fp.run(u.trajectory[:5], lig, prot)
+        fp.to_dataframe()
+
+    - On a specific frame and a specific pair of residues:
+
+    .. ipython:: python
+
+        u.trajectory[0] # use the first frame
+        prot = prolif.Molecule.from_mda(prot)
+        lig = prolif.Molecule.from_mda(lig)
+        fp.bitvector(lig, prot["ASP129.A"])
+
+    - On a specific pair of residues for a specific interaction:
+
+    .. ipython:: python
+
+        fp.hbdonor(lig, prot["ASP129.A"]) # ligand-protein
+        fp.hbacceptor(prot["ASP129.A"], prot["CYS133.A"]) # protein-protein (alpha helix)
+    
+    You can also obtain the indices of atoms responsible for the interaction:
+
+    .. ipython:: python
+
+        fp.bitvector_atoms(lig, prot["ASP129.A"])
+        fp.hbdonor.__wrapped__(lig, prot["ASP129.A"])
+    
+    """
+
+    def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",
+                 "PiStacking", "Anionic", "Cationic", "CationPi", "PiCation"]):
         # read interactions to compute
-        logger.info('The fingerprint factory will generate the following bitstring: {}'.format(' '.join(interactions)))
-        self.n_interactions = len(interactions)
-        self.interactions = OrderedDict()
-        for interaction in interactions:
-            if   interaction == 'HBdonor':
-                self.interactions[interaction] = self.get_hbond_donor
-            elif interaction == 'HBacceptor':
-                self.interactions[interaction] = self.get_hbond_acceptor
-            elif interaction == 'XBdonor':
-                self.interactions[interaction] = self.get_xbond_donor
-            elif interaction == 'XBacceptor':
-                self.interactions[interaction] = self.get_xbond_acceptor
-            elif interaction == 'Cation':
-                self.interactions[interaction] = self.get_cationic
-            elif interaction == 'Anion':
-                self.interactions[interaction] = self.get_anionic
-            elif interaction == 'PiStacking':
-                self.interactions[interaction] = self.get_pi_stacking
-            elif interaction == 'FaceToFace':
-                self.interactions[interaction] = self.get_face_to_face
-            elif interaction == 'EdgeToFace':
-                self.interactions[interaction] = self.get_edge_to_face
-            elif interaction == 'PiCation':
-                self.interactions[interaction] = self.get_pi_cation
-            elif interaction == 'CationPi':
-                self.interactions[interaction] = self.get_cation_pi
-            elif interaction == 'Hydrophobic':
-                self.interactions[interaction] = self.get_hydrophobic
-            elif interaction == 'MBdonor':
-                self.interactions[interaction] = self.get_metal_donor
-            elif interaction == 'MBacceptor':
-                self.interactions[interaction] = self.get_metal_acceptor
+        self.interactions = {}
+        if interactions == "all":
+            interactions = [i for i in _INTERACTIONS.keys() 
+                            if not (i.startswith("_") or i == "Interaction")]
+        for name, interaction_cls in _INTERACTIONS.items():
+            if name.startswith("_") or name == "Interaction":
+                continue
+            func = interaction_cls().detect
+            func = _return_first_element(func)
+            setattr(self, name.lower(), func)
+            if name in interactions:
+                self.interactions[name] = func
 
     def __repr__(self):
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
-        return f"<{name}: {params} at 0x{id(self):02x}>"
+        return f"<{name}: {params} at {id(self):#x}>"
 
-    def get_hydrophobic(self, ligand, residue):
-        """Get the presence or absence of an hydrophobic interaction between
-        a ResidueFrame and a ligand Frame"""
-        # define SMARTS query as hydrophobic
-        hydrophobic = self.SMARTS["Hydrophobic"]
-        # get atom tuples matching query
-        lig_matches = ligand.GetSubstructMatches(hydrophobic)
-        res_matches = residue.GetSubstructMatches(hydrophobic)
-        if lig_matches and res_matches:
-            for lig_match in lig_matches:
-                # define ligand atom matching query as 3d point
-                lig_atom = rdGeometry.Point3D(*ligand.xyz[lig_match[0]])
-                for res_match in res_matches:
-                    # define residue atom matching query as 3d point
-                    res_atom = rdGeometry.Point3D(*residue.xyz[res_match[0]])
-                    # compute distance between points
-                    dist = lig_atom.Distance(res_atom)
-                    if dist <= self.rules["Hydrophobic"]["distance"]:
-                        return 1
-        return 0
+    @property
+    def n_interactions(self):
+        return len(self.interactions)
 
-    def get_hbond_donor(self, ligand, residue):
-        """Get the presence or absence of a H-bond interaction between
-        a residue as an acceptor and a ligand as a donor"""
-        return self._get_hbond(residue, ligand)
+    def bitvector(self, res1, res2):
+        """Generates the complete bitvector for the interactions between two
+        residues. To get the indices of atoms responsible for each interaction,
+        see :meth:`bitvector_atoms`
 
-    def get_hbond_acceptor(self, ligand, residue):
-        """Get the presence or absence of a H-bond interaction between
-        a residue as a donor and a ligand as an acceptor"""
-        return self._get_hbond(ligand, residue)
+        Parameters
+        ----------
+        res1 : prolif.residue.Residue or prolif.molecule.Molecule
+            A residue, usually from a ligand
+        res2 : prolif.residue.Residue or prolif.molecule.Molecule
+            A residue, usually from a protein
 
-    def _get_hbond(self, acceptor_frame, donor_frame):
-        """Get the presence or absence of a Hydrogen Bond between two frames"""
-        donor = self.SMARTS["HBdonor"]
-        acceptor = self.SMARTS["HBacceptor"]
-        acceptor_matches = acceptor_frame.GetSubstructMatches(acceptor)
-        donor_matches = donor_frame.GetSubstructMatches(donor)
-        if acceptor_matches and donor_matches:
-            for donor_match in donor_matches:
-                # D-H ... A
-                d = rdGeometry.Point3D(*donor_frame.xyz[donor_match[0]])
-                h = rdGeometry.Point3D(*donor_frame.xyz[donor_match[1]])
-                for acceptor_match in acceptor_matches:
-                    a = rdGeometry.Point3D(*acceptor_frame.xyz[acceptor_match[0]])
-                    dist = h.Distance(a)
-                    if dist <= self.rules["HBond"]["distance"]:
-                        hd = h.DirectionVector(d)
-                        ha = h.DirectionVector(a)
-                        # get DHA angle
-                        angle = hd.AngleTo(ha)
-                        if angle_between_limits(angle, *self.rules["HBond"]["angle"]):
-                            return 1
-        return 0
+        Returns
+        -------
+        bitvector : numpy.ndarray
+            An array storing the encoded interactions between res1 and res2
 
-    def get_xbond_donor(self, ligand, residue):
-        """Get the presence or absence of a Halogen Bond where the ligand acts as
-        a donor"""
-        return self._get_xbond(residue, ligand)
+        """
+        bitvector = []
+        for func in self.interactions.values():
+            bit = func(res1, res2)
+            bitvector.append(bit)
+        return np.array(bitvector, dtype=bool)
 
-    def get_xbond_acceptor(self, ligand, residue):
-        """Get the presence or absence of a Halogen Bond where the residue acts as
-        a donor"""
-        return self._get_xbond(ligand, residue)
+    def bitvector_atoms(self, res1, res2):
+        """Generates the complete bitvector for the interactions between two
+        residues, and returns the indices of atoms responsible for these
+        interactions
 
-    def _get_xbond(self, acceptor_frame, donor_frame):
-        """Get the presence or absence of a Halogen Bond between two frames"""
-        donor = self.SMARTS["XBdonor"]
-        acceptor = self.SMARTS["XBacceptor"]
-        acceptor_matches = acceptor_frame.GetSubstructMatches(acceptor)
-        donor_matches = donor_frame.GetSubstructMatches(donor)
-        if acceptor_matches and donor_matches:
-            for donor_match in donor_matches:
-                # D-X ... A
-                d = rdGeometry.Point3D(*donor_frame.xyz[donor_match[0]])
-                x = rdGeometry.Point3D(*donor_frame.xyz[donor_match[1]])
-                for acceptor_match in acceptor_matches:
-                    a = rdGeometry.Point3D(*acceptor_frame.xyz[acceptor_match[0]])
-                    dist = x.Distance(a)
-                    if dist <= self.rules["XBond"]["distance"]:
-                        xd = x.DirectionVector(d)
-                        xa = x.DirectionVector(a)
-                        angle = xd.AngleTo(xa)
-                        if angle_between_limits(angle, *self.rules["XBond"]["angle"]["AXD"]):
-                            r = rdGeometry.Point3D(*acceptor_frame.xyz[acceptor_match[1]])
-                            ax = a.DirectionVector(x)
-                            ar = a.DirectionVector(r)
-                            angle = ax.AngleTo(ar)
-                            if angle_between_limits(angle, *self.rules["XBond"]["angle"]["XAR"]):
-                                return 1
-        return 0
+        Parameters
+        ----------
+        res1 : prolif.residue.Residue or prolif.molecule.Molecule
+            A residue, usually from a ligand
+        res2 : prolif.residue.Residue or prolif.molecule.Molecule
+            A residue, usually from a protein
 
-    def get_cationic(self, ligand, residue):
-        """Get the presence or absence of an ionic interaction between a residue
-        as an anion and a ligand as a cation"""
-        return self._get_ionic(ligand, residue)
+        Returns
+        -------
+        bitvector : :class:`numpy.ndarray`
+            An array storing the encoded interactions between res1 and res2
+        atoms : :class:`list`
+            A list containing tuples of (res1_atom_index, res2_atom_index) for
+            each interaction
+        """
+        bitvector = []
+        atoms_lst = []
+        for func in self.interactions.values():
+            bit, *atoms = func.__wrapped__(res1, res2)
+            bitvector.append(bit)
+            atoms_lst.append(atoms)
+        bitvector = np.array(bitvector, dtype=bool)
+        return bitvector, atoms_lst
 
-    def get_anionic(self, ligand, residue):
-        """Get the presence or absence of an ionic interaction between a residue
-        as a cation and a ligand as an anion"""
-        return self._get_ionic(residue, ligand)
+    def run(self, traj, lig, prot, residues=None, progress=True):
+        """Generates the fingerprint on a trajectory for a ligand and a protein
 
-    def _get_ionic(self, cation_frame, anion_frame):
-        """Get the presence or absence of an ionic interaction between two frames"""
-        cation = self.SMARTS["Cation"]
-        anion  = self.SMARTS["Anion"]
-        anion_matches = anion_frame.GetSubstructMatches(anion)
-        cation_matches = cation_frame.GetSubstructMatches(cation)
-        if anion_matches and cation_matches:
-            for anion_match in anion_matches:
-                a = rdGeometry.Point3D(*anion_frame.xyz[anion_match[0]])
-                for cation_match in cation_matches:
-                    c = rdGeometry.Point3D(*cation_frame.xyz[cation_match[0]])
-                    dist = a.Distance(c)
-                    if dist <= self.rules["Ionic"]["distance"]:
-                        return 1
-        return 0
+        Parameters
+        ----------
+        traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced
+            Iterate over this Universe trajectory or sliced trajectory object
+            to extract the frames used for the fingerprint extraction
+        lig : MDAnalysis.core.groups.AtomGroup
+            An MDAnalysis AtomGroup for the ligand
+        prot : MDAnalysis.core.groups.AtomGroup
+            An MDAnalysis AtomGroup for the protein (with multiple residues)
+        residues : list or "all" or None
+            A list of residues (:class:`str`, :class:`int` or
+            :class:`~prolif.residue.ResidueId`) to take into account for
+            the fingerprint extraction.
+            If ``"all"``, all residues will be used.
+            If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
+            function is used to automatically use protein residues that are
+            distant of 6.0 Å or less from the ligand.
+        progress : bool
+            Use the `tqdm <https://tqdm.github.io/>`_ package to display a
+            progressbar while running the calculation
 
-    def get_pi_cation(self, ligand, residue):
-        """Get the presence or absence of an interaction between a residue as
-        a cation and a ligand as a pi system"""
-        return self._get_cation_pi(residue, ligand)
+        Returns
+        -------
+        prolif.fingerprint.Fingerprint
+            The Fingerprint instance that generated the fingerprint
+        
+        Example
+        -------
+        ::
 
-    def get_cation_pi(self, ligand, residue):
-        """Get the presence or absence of an interaction between a residue as a
-        pi system and a ligand as a cation"""
-        return self._get_cation_pi(ligand, residue)
+            >>> u = mda.Universe("top.pdb", "traj.nc")
+            >>> lig = u.select_atoms("resname LIG")
+            >>> prot = u.select_atoms("protein")
+            >>> fp = prolif.Fingerprint().run(u.trajectory[:10], lig, prot)
+        
+        Notes
+        -----
+        The results are stored in the ``ifp`` attribute of the fingerprint as
+        a list of dictionnaries in the format ``{"Frame": frame_index,
+        ResidueId: numpy.ndarray, ...}``.
+        Residues for which no interaction were detected are not added to the
+        IFP list.
+        """
+        iterator = tqdm(traj) if progress else traj
+        # set which residues to use
+        select_residues = False
+        if residues == "all":
+            resids = Molecule.from_mda(prot).residues.keys()
+        elif isinstance(residues, Iterable):
+            resids = residues
+        else:
+            select_residues = True
+        ifp = []
+        for ts in iterator:
+            prot_mol = Molecule.from_mda(prot)
+            lig_mol = Molecule.from_mda(lig)
+            if select_residues:
+                resids = get_residues_near_ligand(lig_mol, prot_mol)
+            data = {"Frame": ts.frame}
+            for res in resids:
+                prot_res = prot_mol[res]
+                bs = self.bitvector(lig_mol, prot_res)
+                data[prot_res.resid] = bs
+            ifp.append(data)
+        self.ifp = ifp
+        return self
 
-    def _get_cation_pi(self, cation_frame, pi_frame):
-        """Get the presence or absence of a cation-pi interaction between two frames"""
-        # check for matches with cation smarts query
-        cation = self.SMARTS["Cation"]
-        cation_matches = cation_frame.GetSubstructMatches(cation)
-        for pi in self.SMARTS["Aromatic"]:
-            pi_matches = pi_frame.GetSubstructMatches(pi)
-            if cation_matches and pi_matches:
-                for cation_match in cation_matches:
-                    cat = rdGeometry.Point3D(*cation_frame.xyz[cation_match[0]])
-                    for pi_match in pi_matches:
-                        # get coordinates of atoms matching pi-system
-                        pi_coords = pi_frame.xyz[list(pi_match)]
-                        # centroid of pi-system as 3d point
-                        centroid  = rdGeometry.Point3D(*get_centroid(pi_coords))
-                        # distance between cation and centroid
-                        dist = cat.Distance(centroid)
-                        if dist <= self.rules["CationPi"]["distance"]:
-                            # vector normal to ring plane
-                            normal = get_ring_normal_vector(centroid, pi_coords)
-                            # vector between the centroid and the charge
-                            centroid_cation = centroid.DirectionVector(cat)
-                            # compute angle between normal to ring plane and centroid-cation
-                            angle = normal.AngleTo(centroid_cation)
-                            if angle_between_limits(angle, *self.rules["CationPi"]["angle"], ring=True):
-                                return 1
-        return 0
+    def to_dataframe(self):
+        """Converts fingerprints to a pandas DataFrame
 
-    def get_pi_stacking(self, ligand, residue):
-        """Get the presence of any kind of pi-stacking interaction"""
-        return self.get_face_to_face(ligand, residue) or self.get_edge_to_face(ligand, residue)
+        Returns
+        -------
+        df : pandas.DataFrame
+            A DataFrame storing the results frame by frame and residue by
+            residue. See :meth:`~prolif.utils.to_dataframe` for more
+            information
 
-    def get_face_to_face(self, ligand, residue):
-        """Get the presence or absence of an aromatic face to face interaction
-        between a residue and a ligand"""
-        return self._get_pi_stacking(ligand, residue, kind="FaceToFace")
+        Raises
+        ------
+        AttributeError
+            If the :meth:`run` method hasn't been used
+        
+        Example
+        -------
+        ::
 
-    def get_edge_to_face(self, ligand, residue):
-        """Get the presence or absence of an aromatic face to edge interaction
-        between a residue and a ligand"""
-        return self._get_pi_stacking(ligand, residue, kind="EdgeToFace")
+            >>> df = fp.to_dataframe()
+            >>> print(df)
+            Frame     ILE59                  ILE55       TYR93
+                    Hydrophobic HBAcceptor Hydrophobic Hydrophobic PiStacking
+            0      0           1          0           0           0          0
+            ...
 
-    def _get_pi_stacking(self, ligand, residue, kind="FaceToFace"):
-        """Get the presence or absence of pi-stacking interaction
-        between a residue and a ligand"""
-        for pi in self.SMARTS["Aromatic"]:
-            res_matches = residue.GetSubstructMatches(pi)
-            lig_matches = ligand.GetSubstructMatches(pi)
-            if lig_matches and res_matches:
-                for lig_match in lig_matches:
-                    lig_pi_coords = ligand.xyz[list(lig_match)]
-                    lig_centroid  = rdGeometry.Point3D(*get_centroid(lig_pi_coords))
-                    for res_match in res_matches:
-                        res_pi_coords = residue.xyz[list(res_match)]
-                        res_centroid  = rdGeometry.Point3D(*get_centroid(res_pi_coords))
-                        dist = lig_centroid.Distance(res_centroid)
-                        if dist <= self.rules["Aromatic"][kind]["distance"]:
-                            # ligand
-                            lig_normal = get_ring_normal_vector(lig_centroid, lig_pi_coords)
-                            # residue
-                            res_normal = get_ring_normal_vector(res_centroid, res_pi_coords)
-                            # angle
-                            angle = res_normal.AngleTo(lig_normal)
-                            if angle_between_limits(angle, *self.rules["Aromatic"][kind]["angle"], ring=True):
-                                return 1
-        return 0
+        """
+        if hasattr(self, "ifp"):
+            return to_dataframe(self.ifp, self)
+        raise AttributeError("Please use the run method before")
 
-    def get_metal_donor(self, ligand, residue):
-        """Get the presence or absence of a metal complexation where the ligand is a metal"""
-        return self._get_metallic(ligand, residue)
+    def to_bitvectors(self):
+        """Converts fingerprints to a list of RDKit ExplicitBitVector
 
-    def get_metal_acceptor(self, ligand, residue):
-        """Get the presence or absence of a metal complexation where the residue is a metal"""
-        return self._get_metallic(residue, ligand)
+        Returns
+        -------
+        bvs : list
+            A list of :class:`~rdkit.DataStructs.cDataStructs.ExplicitBitVect`
+            for each frame
 
-    def _get_metallic(self, metal_frame, ligand_frame):
-        """Get the presence or absence of a metal complexation"""
-        metal = self.SMARTS["Metal"]
-        ligand = self.SMARTS["Ligand"]
-        ligand_matches = ligand_frame.GetSubstructMatches(ligand)
-        metal_matches = metal_frame.GetSubstructMatches(metal)
-        if ligand_matches and metal_matches:
-            for ligand_match in ligand_matches:
-                ligand_atom = rdGeometry.Point3D(*ligand_frame.xyz[ligand_match[0]])
-                for metal_match in metal_matches:
-                    metal_atom = rdGeometry.Point3D(*metal_frame.xyz[metal_match[0]])
-                    dist = ligand_atom.Distance(metal_atom)
-                    if dist <= self.rules["Metallic"]["distance"]:
-                        return 1
-        return 0
+        Raises
+        ------
+        AttributeError
+            If the :meth:`run` method hasn't been used
 
-    def generate_bitstring(self, ligand, residue):
-        """Generate the complete bitstring for the interactions of a residue with a ligand"""
-        bitstring = []
-        for interaction_function in self.interactions.values():
-            bitstring.append(interaction_function(ligand, residue))
-        return bitstring
+        Example
+        -------
+        ::
 
-    def generate_ifp(self, ligand_frame, protein_frame):
-        """Generates the complete IFP between two Frames"""
-        ifp = dict()
-        for ligand_resframe in ligand_frame:
-            data = {
-                "Ligand name": ligand_frame.name,
-                "Ligand frame": ligand_frame.n_frame,
-                "Ligand residue": ligand_resframe.resname,
-                "Protein name": protein_frame.name,
-                "Protein frame": protein_frame.n_frame,
-            }
-            for resname in protein_frame.pocket_residues:
-                residue_frame = protein_frame.get_residue(resname)
-                data[resname] = self.generate_bitstring(ligand_resframe, residue_frame)
-            for key in data.keys():
-                if key not in ifp:
-                    ifp[key] = [data[key]]
-                else:
-                    ifp[key].append(data[key])
-        return ifp
+            >>> from rdkit.DataStructs import TanimotoSimilarity
+            >>> bv = fp.to_bitvectors()
+            >>> TanimotoSimilarity(bv[0], bv[1])
+            0.42
+
+        """
+        if hasattr(self, "ifp"):
+            return to_bitvectors(self.ifp, self)
+        raise AttributeError("Please use the run method before")

@@ -1,8 +1,5 @@
 # README
-include README.md
+include README.rst
 
 # License
 include LICENSE
-
-# Files for tests
-recursive-include tests *.mol2
