@@ -1,10 +1,5 @@
 # README
-include README.md
+include README.rst
 
 # License
 include LICENSE
-
-# Files
-global-include *.pdb *.xtc
-# Files for tests
-recursive-include tests *.mol2

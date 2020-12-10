@@ -42,7 +42,7 @@ setup(
         'docs': ['sphinx>=3.2.1', 'recommonmark', 'sphinx-rtd-theme'],
     },
     package_data={
-        'prolif': ['*.mol2', '*.pdb', '*.xtc'],
+        'data': ['*.mol2', '*.pdb', '*.xtc'],
     },
     include_package_data=True,
     project_urls={
