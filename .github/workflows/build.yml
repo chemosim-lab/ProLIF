@@ -23,7 +23,14 @@ jobs:
         channels: conda-forge, defaults
         add-pip-as-python-dependency: true
         architecture: x64
-        
+    
+    - name: Check conda and pip
+      run: |
+        which python
+        python --version
+        pip --version
+        conda --version
+
     - name: Install conda dependencies
       env:
         PLF_CONDA_FULL_DEPS: "${{ env.PLF_CONDA_DEPS }}"
@@ -32,21 +39,20 @@ jobs:
 
     - name: Install package through pip
       run: |
-        python -m pip install .
+        pip install .
     
     - name: Check setup
       run: |
-        which python
-        which pip
         pip list
-        conda info
         conda list
     
     - name: Install packaging tools
       run: |
-        python -m pip install setuptools wheel
+        pip install setuptools wheel
 
     - name: Build
+      env:
+        PROLIF_VERSION: ${{ github.event.release.tag_name }}
       run: |
         python setup.py sdist bdist_wheel
     
@@ -54,5 +60,3 @@ jobs:
       uses: pypa/gh-action-pypi-publish@master
       with:
         password: ${{ secrets.PYPI_TOKEN }}
-      env:
-        PROLIF_VERSION: ${{ github.event.release.tag_name }}

@@ -4,19 +4,29 @@ import os
 here = os.path.abspath(os.path.dirname(__file__))
 
 # Get the long description from the README file
-with open(os.path.join(here, 'README.rst')) as f:
-    long_description = f.read().decode("utf-8")
+with open(os.path.join(here, 'README.rst'), "r") as f:
+    long_description = f.read()
+
+# generate the metadata file
+__version__ = os.environ.get('PROLIF_VERSION', '0.0.0')
+__license__ = 'Apache License, Version 2.0'
+__author__ = 'Cédric Bouysset'
+metadata = f"""__version__ = {__version__!r}
+__author__ = {__author__!r}
+__license__ = {__license__!r}"""
+with open(os.path.join(here, "prolif", "__about__.py"), "w") as f:
+    f.write(metadata)
 
 setup(
     name='prolif',
-    version=os.environ.get('PROLIF_VERSION', '0.0.0'),
+    version=__version__,
     description='Protein-Ligand Interaction Fingerprints',
     long_description=long_description,
     long_description_content_type='text/x-rst',
     url='https://github.com/chemosim-lab/ProLIF',
-    author='Cédric Bouysset',
+    author=__author__,
     author_email='bouysset.cedric@gmail.com',
-    license='Apache License, Version 2.0',
+    license=__license__,
     classifiers=[
         'Development Status :: 4 - Beta',
         'Operating System :: OS Independent',
@@ -39,7 +49,7 @@ setup(
         'tqdm'],
     extras_require={
         'tests': ['pytest>=6.1.2', 'pytest-cov', 'codecov'],
-        'docs': ['sphinx>=3.2.1', 'recommonmark', 'sphinx-rtd-theme'],
+        'docs': ['sphinx>=3.2.1', 'recommonmark', 'sphinx-rtd-theme', 'ipython'],
     },
     package_data={
         'prolif': ['data/*.mol2', 'data/*.pdb', 'data/*.xtc'],

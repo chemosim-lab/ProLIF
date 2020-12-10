@@ -42,7 +42,14 @@ jobs:
         channels: conda-forge, defaults
         add-pip-as-python-dependency: true
         architecture: x64
-        
+
+    - name: Check conda and pip
+      run: |
+        which python
+        python --version
+        pip --version
+        conda --version
+
     - name: Install conda dependencies
       env:
         PLF_CONDA_FULL_DEPS: "${{ env.PLF_CONDA_DEPS }}"
@@ -51,14 +58,11 @@ jobs:
 
     - name: Install package through pip
       run: |
-        python -m pip install .[tests]
+        pip install .[tests]
     
     - name: Check setup
       run: |
-        which python
-        which pip
         pip list
-        conda info
         conda list
 
     - name: Run tests
