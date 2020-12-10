@@ -1,7 +1,8 @@
 ProLIF
 ======
 
-|pypi-version| |build| |tests| |codecov| |docs| |lgtm| |license|
+|pypi-version| |build| |tests| |codecov| |docs| |lgtm|
+|license| |binder|
 
 .. |pypi-version| image:: https://img.shields.io/pypi/v/prolif.svg
    :target: https://pypi.python.org/pypi/prolif
@@ -29,10 +30,16 @@ ProLIF
 .. |license| image:: https://img.shields.io/pypi/l/prolif
     :alt: License
 
+.. |binder| image:: https://mybinder.org/badge_logo.svg
+    :target: https://mybinder.org/v2/gh/chemosim-lab/ProLIF/HEAD
+    :alt: Try it on binder
+
 Description
 -----------
 
 ProLIF (*Protein-Ligand Interaction Fingerprints*) is a tool designed to generate interaction fingerprints for protein-ligand and protein-protein interactions extracted from molecular dynamics trajectories and docking simulations.
+
+You can play with the example notebooks live on `Binder <https://mybinder.org/v2/gh/chemosim-lab/ProLIF/HEAD>`_.
 
 Documentation
 -------------
