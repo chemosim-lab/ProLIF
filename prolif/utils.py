@@ -6,8 +6,7 @@ from math import pi
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
-from rdkit.Chem import (rdmolops,
-                        SplitMolByPDBResidues,
+from rdkit.Chem import (SplitMolByPDBResidues,
                         GetMolFrags,
                         FragmentOnBonds)
 from rdkit.Geometry import Point3D
