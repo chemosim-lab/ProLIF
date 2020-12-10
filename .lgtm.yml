@@ -1,0 +1,18 @@
+path_classifiers:
+    test:
+        - exclude: tests
+    docs:
+        - docs
+    notebooks:
+        - notebooks
+extraction:
+    python:
+        python_setup:
+            requirements:
+                - cython
+            version: 3.6
+            setup_py: setup.py
+        index:
+            include:
+                - prolif
+                - tests
