@@ -69,37 +69,40 @@ class TestFingerprint:
     def test_run(self, fp_class):
         fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
                      residues="all", progress=False)
+        lig_id = ResidueId.from_string("LIG1.G")
         assert hasattr(fp_class, "ifp")
         assert len(fp_class.ifp) == 1
         res = ResidueId.from_string("LYS387.B")
-        assert res in fp_class.ifp[0].keys()
+        assert (lig_id, res) in fp_class.ifp[0].keys()
         fp_class.run(u.trajectory[1:2], ligand_ag, protein_ag,
                      residues=["ASP129.A"], progress=False)
         assert hasattr(fp_class, "ifp")
         assert len(fp_class.ifp) == 1
         res = ResidueId.from_string("ASP129.A")
-        assert res in fp_class.ifp[0].keys()
+        assert (lig_id, res) in fp_class.ifp[0].keys()
         fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
                      residues=None, progress=False)
         assert hasattr(fp_class, "ifp")
         assert len(fp_class.ifp) == 3
         assert len(fp_class.ifp[0]) > 1
         res = ResidueId.from_string("VAL201.A")
-        assert res in fp_class.ifp[0].keys()
+        assert (lig_id, res) in fp_class.ifp[0].keys()
         u.trajectory[0]
 
     def test_to_df(self, fp, fp_class):
-        # depends on successfull test_run
         with pytest.raises(AttributeError, match="use the run method"):
             fp.to_dataframe()
+        fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
+                     residues=None, progress=False)
         df = fp_class.to_dataframe()
         assert isinstance(df, DataFrame)
         assert len(df) == 3
 
     def test_to_bv(self, fp, fp_class):
-        # depends on successfull test_run
         with pytest.raises(AttributeError, match="use the run method"):
             fp.to_bitvectors()
+        fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
+                     residues=None, progress=False)
         bvs = fp_class.to_bitvectors()
         assert isinstance(bvs[0], ExplicitBitVect)
         assert len(bvs) == 3

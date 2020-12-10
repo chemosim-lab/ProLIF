@@ -98,45 +98,27 @@ def test_series_to_bv():
     assert bv.GetNumOnBits() == 3
 
 
-class DummyFp:
-    interactions = ["A", "B", "C"]
-    n_interactions = 3
-
 ifp = [{"Frame": 0,
-        "foo": "bar",
-        "ALA1": np.array([True, False, False]),
-        "GLU2": np.array([False, True, False])},
+        ("LIG", "ALA1"): np.array([True, False, False]),
+        ("LIG", "GLU2"): np.array([False, True, False])},
        {"Frame": 1,
-        "foo": "bar",
-        "ALA1": np.array([True, True, False]),
-        "ASP3": np.array([False, True, False])}]
+        ("LIG", "ALA1"): np.array([True, True, False]),
+        ("LIG", "ASP3"): np.array([False, True, False])}]
 
 
 def test_to_df():
-    fp = DummyFp()
-    df = to_dataframe(ifp, fp)
-    assert df.shape == (2, 6)
-    assert ("Frame", "") in df.columns
-    assert ("foo", "") in df.columns
-    assert ("ALA1", "A") in df.columns
-    assert ("ALA1", "B") in df.columns
-    assert ("ALA1", "C") not in df.columns
-    assert ("GLU2", "A") not in df.columns
-    assert ("ASP3", "B") in df.columns
+    df = to_dataframe(ifp, ["A", "B", "C"])
+    assert df.shape == (2, 4)
+    assert df.index.name == "Frame"
+    assert ("LIG", "ALA1", "A") in df.columns
+    assert ("LIG", "ALA1", "B") in df.columns
+    assert ("LIG", "ALA1", "C") not in df.columns
+    assert ("LIG", "GLU2", "A") not in df.columns
+    assert ("LIG", "ASP3", "B") in df.columns
 
 
 def test_to_bv():
-    fp = DummyFp()
-    bvs = to_bitvectors(ifp, fp)
+    df = to_dataframe(ifp, ["A", "B", "C"])
+    bvs = to_bitvectors(df)
     assert len(bvs) == 2
     assert bvs[0].GetNumOnBits() == 2
-
-
-def test_to_bv_raise_no_bits():
-    fp = DummyFp()
-    ifp = [{"Frame": 0,
-            "foo": "bar",
-            "ALA1": np.array([False, False, False]),
-            "GLU2": np.array([False, False, False])}]
-    with pytest.raises(ValueError, match="input IFP only contains off bits"):
-        to_bitvectors(ifp, fp)

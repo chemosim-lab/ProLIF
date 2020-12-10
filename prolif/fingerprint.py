@@ -86,9 +86,6 @@ class Fingerprint:
         Number of interaction functions registered by the fingerprint
     ifp : list, optionnal
         List of interactions fingerprints for the given trajectory.
-        Results are stored in the form of a list of
-        ``{"Frame": frame_index, ResidueId: numpy.ndarray, ...}`` dictionaries
-        that contain the interaction fingerprints
 
     Notes
     -----
@@ -220,13 +217,13 @@ class Fingerprint:
         prot : MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the protein (with multiple residues)
         residues : list or "all" or None
-            A list of residues (:class:`str`, :class:`int` or
+            A list of protein residues (:class:`str`, :class:`int` or
             :class:`~prolif.residue.ResidueId`) to take into account for
             the fingerprint extraction.
             If ``"all"``, all residues will be used.
             If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
             function is used to automatically use protein residues that are
-            distant of 6.0 Å or less from the ligand.
+            distant of 6.0 Å or less from each ligand residue.
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
@@ -244,14 +241,7 @@ class Fingerprint:
             >>> lig = u.select_atoms("resname LIG")
             >>> prot = u.select_atoms("protein")
             >>> fp = prolif.Fingerprint().run(u.trajectory[:10], lig, prot)
-        
-        Notes
-        -----
-        The results are stored in the ``ifp`` attribute of the fingerprint as
-        a list of dictionnaries in the format ``{"Frame": frame_index,
-        ResidueId: numpy.ndarray, ...}``.
-        Residues for which no interaction were detected are not added to the
-        IFP list.
+
         """
         iterator = tqdm(traj) if progress else traj
         # set which residues to use
@@ -266,13 +256,13 @@ class Fingerprint:
         for ts in iterator:
             prot_mol = Molecule.from_mda(prot)
             lig_mol = Molecule.from_mda(lig)
-            if select_residues:
-                resids = get_residues_near_ligand(lig_mol, prot_mol)
             data = {"Frame": ts.frame}
-            for res in resids:
-                prot_res = prot_mol[res]
-                bs = self.bitvector(lig_mol, prot_res)
-                data[prot_res.resid] = bs
+            for lresid, lres in lig_mol.residues.items():
+                if select_residues:
+                    resids = get_residues_near_ligand(lres, prot_mol)
+                for presid in resids:
+                    pres = prot_mol[presid]
+                    data[(lresid, pres.resid)] = self.bitvector(lres, pres)
             ifp.append(data)
         self.ifp = ifp
         return self
@@ -305,7 +295,7 @@ class Fingerprint:
 
         """
         if hasattr(self, "ifp"):
-            return to_dataframe(self.ifp, self)
+            return to_dataframe(self.ifp, self.interactions.keys())
         raise AttributeError("Please use the run method before")
 
     def to_bitvectors(self):
@@ -333,5 +323,6 @@ class Fingerprint:
 
         """
         if hasattr(self, "ifp"):
-            return to_bitvectors(self.ifp, self)
+            df = self.to_dataframe()
+            return to_bitvectors(df)
         raise AttributeError("Please use the run method before")

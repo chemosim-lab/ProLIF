@@ -128,32 +128,34 @@ def is_peptide_bond(bond, resids):
     return True
 
 
-def to_dataframe(ifp, fingerprint):
+def to_dataframe(ifp, interactions, index_col="Frame"):
     """Convert IFPs to a pandas DataFrame
 
     Parameters
     ----------
     ifp : list
-        A list of dict in the format {ResidueId: fingerprint} where
-        fingerprint is a numpy.ndarray obtained by running the
-        :meth:`~prolif.fingerprint.Fingerprintrun` method of a
-        :class:`~prolif.fingerprint.Fingerprint`. Each dictionnary can
-        contain other (key, value) pairs, such as frame numbers...etc. as long
-        as the values are not numpy arrays or np.NaN
-    fingerprint : prolif.fingerprint.Fingerprint
-        The fingerprint generator that was used to obtain the fingerprint
+        A list of dict in the format {key: bitvector} where
+        "bitvector" is a numpy.ndarray obtained by running the
+        :meth:`~prolif.fingerprint.Fingerprint.bitvector` method of a
+        :class:`~prolif.fingerprint.Fingerprint`, and "key" is a tuple of
+        ligand and protein ResidueId. Each dictionnary must also contain an
+        entry that will be used as an index, typically a frame number.
+    interactions : list
+        A list of interactions, in the same order as the bitvector.
+    index_col : str
+        The dictionnary key that will be used as an index in the DataFrame
 
     Returns
     -------
     df : pandas.DataFrame
-        A DataFrame where each residue and interaction type are in separate
-        columns
+        A 3-levels DataFrame where each ligand residue, protein residue, and
+        interaction type are in separate columns
 
     Example
     -------
     ::
 
-        >>> df = prolif.to_dataframe(results, fp)
+        >>> df = prolif.to_dataframe(results, fp.interactions.keys())
         >>> print(df)
         Frame     ILE59                  ILE55       TYR93
                 Hydrophobic HBAcceptor Hydrophobic Hydrophobic PiStacking
@@ -161,49 +163,39 @@ def to_dataframe(ifp, fingerprint):
         ...
 
     """
-    df = pd.DataFrame(ifp)
-    resids = list(set(key for d in ifp
-                          for key, value in d.items()
-                          if isinstance(value, np.ndarray)))
-    resids.sort()
-    ids = df.drop(columns=resids).columns.tolist()
-    df = df.applymap(lambda x: [False] * fingerprint.n_interactions
-                               if x is np.nan else x)
-    ifps = pd.DataFrame()
-    for res in resids:
-        cols = [f"{res}{i}" for i in range(fingerprint.n_interactions)]
-        ifps[cols] = df[res].apply(pd.Series)
-    ifps.columns = pd.MultiIndex.from_product([[str(r) for r in resids],
-                                               fingerprint.interactions],
-                                              names=["residue", "interaction"])
-    ifps = ifps.astype(np.uint8)
-    ifps = ifps.loc[:, (ifps != 0).any(axis=0)]
-    temp = df[ids].copy()
-    temp.columns = pd.MultiIndex.from_product([ids, [""]])
-    return pd.concat([temp, ifps], axis=1)
+    n_interactions = len(interactions)
+    data = pd.DataFrame(ifp)
+    data.set_index(index_col, inplace=True)
+    data.sort_index(axis=1, inplace=True)
+    data.columns = pd.MultiIndex.from_tuples(data.columns)
+    data = data.applymap(lambda x: [False] * n_interactions
+                         if x is np.nan else x)
+    df = pd.DataFrame()
+    for l, p in data.columns:
+        cols = [(str(l), str(p), i) for i in interactions]
+        df[cols] = data[(l, p)].apply(pd.Series)
+    df.columns = pd.MultiIndex.from_tuples(
+        df.columns, names=["ligand", "protein", "interaction"])
+    df = df.astype(np.uint8)
+    df = df.loc[:, (df != 0).any(axis=0)]
+    return df
 
 
 def pandas_series_to_bv(s):
     bv = ExplicitBitVect(len(s))
-    on_bits = np.where(s == 1)[0].tolist()
+    on_bits = np.where(s >= 1)[0].tolist()
     bv.SetBitsFromList(on_bits)
     return bv
 
 
-def to_bitvectors(ifp, fingerprint):
-    """Convert IFPs to a list of RDKit BitVector
+def to_bitvectors(df):
+    """Convert an interaction DataFrame to a list of RDKit BitVector
 
     Parameters
     ----------
-    ifp : list
-        A list of dict in the format {ResidueId: fingerprint} where
-        fingerprint is a numpy.ndarray obtained by running the
-        :meth:`~prolif.fingerprint.Fingerprint.run` method of a
-        :class:`~prolif.fingerprint.Fingerprint`. Each dictionnary can
-        contain other (key, value) pairs, such as frame numbers...etc. as long
-        as these values are not numpy arrays or np.NaN
-    fingerprint : prolif.fingerprint.Fingerprint
-        The fingerprint that was used to generate the fingerprint
+    df : pandas.DataFrame
+        A DataFrame where each column corresponds to an interaction between two
+        residues 
 
     Returns
     -------
@@ -216,14 +208,9 @@ def to_bitvectors(ifp, fingerprint):
     ::
 
         >>> from rdkit.DataStructs import TanimotoSimilarity
-        >>> bv = prolif.to_bitvectors(results, fp)
+        >>> bv = prolif.to_bitvectors(df)
         >>> TanimotoSimilarity(bv[0], bv[1])
         0.42
 
     """
-    df = to_dataframe(ifp, fingerprint)
-    resids = list(set(str(key) for d in ifp for key, value in d.items()
-                      if (isinstance(value, np.ndarray) and value.sum() > 0)))
-    if not resids:
-        raise ValueError("The input IFP only contains off bits")
-    return df[resids].apply(pandas_series_to_bv, axis=1).tolist()
+    return df.apply(pandas_series_to_bv, axis=1).tolist()
