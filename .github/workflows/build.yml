@@ -3,6 +3,10 @@ on:
   release:
     types: [released]
 
+defaults:
+  run:
+    shell: bash -l {0}
+
 env:
   PLF_CONDA_DEPS: "rdkit cython"
 
