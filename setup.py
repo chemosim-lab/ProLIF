@@ -4,8 +4,8 @@ import os
 here = os.path.abspath(os.path.dirname(__file__))
 
 # Get the long description from the README file
-with open(os.path.join(here, 'README.rst'), encoding='utf-8') as f:
-    long_description = f.read()
+with open(os.path.join(here, 'README.rst')) as f:
+    long_description = f.read().decode("utf-8")
 
 setup(
     name='prolif',
