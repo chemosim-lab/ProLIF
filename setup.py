@@ -30,7 +30,7 @@ setup(
     ],
     keywords='science chemistry biology drug-design chemoinformatics molecular-dynamics',
     packages=['prolif'],
-    python_requires='>=3.7',
+    python_requires='>=3.6',
     install_requires=[
         'pandas>=1.0.0',
         'numpy>=1.13.3',
@@ -42,7 +42,7 @@ setup(
         'docs': ['sphinx>=3.2.1', 'recommonmark', 'sphinx-rtd-theme'],
     },
     package_data={
-        'data': ['*.mol2', '*.pdb', '*.xtc'],
+        'prolif': ['data/*.mol2', 'data/*.pdb', 'data/*.xtc'],
     },
     include_package_data=True,
     project_urls={
