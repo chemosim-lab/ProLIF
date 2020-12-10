@@ -14,6 +14,7 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('./source/'))
+sys.path.insert(0, os.path.abspath('./notebooks/'))
 from recommonmark.transform import AutoStructify
 
 # -- Project information -----------------------------------------------------
@@ -37,6 +38,7 @@ extensions = ['sphinx.ext.autodoc', 'sphinx.ext.intersphinx',
               'sphinx_rtd_theme', 'recommonmark',
               'IPython.sphinxext.ipython_console_highlighting',
               'IPython.sphinxext.ipython_directive',
+              'nbsphinx'
 ]
 
 mathjax_path = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
@@ -51,7 +53,7 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-source_suffix = ['.rst', '.md']
+source_suffix = ['.rst', '.md', '.ipynb']
 
 # -- Options for HTML output -------------------------------------------------
 

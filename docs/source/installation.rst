@@ -14,19 +14,16 @@ Requirements:
 RDKit needs to be installed through `conda`_
 Once conda is installed, run the following command::
 
-    conda install -c conda-forge rdkit
-
-You also need to install the MDAnalysis 2.0+ which is currently only available through their GitHub page::
-
-    pip install cython
-    pip install 'git+https://github.com/MDAnalysis/mdanalysis.git#subdirectory=package'
+    conda install -c conda-forge rdkit cython
 
 The rest of the dependencies are automatically installed through pip when installing prolif::
 
-    pip install prolif
+    pip install git+https://github.com/chemosim-lab/ProLIF.git
 
 Alternatively, you can install the latest development version::
 
     pip install git+https://github.com/chemosim-lab/ProLIF.git@dev
+
+.. note:: Until MDAnalysis version 2.0.0 is out, ProLIF can only be installed through this GitHub repository. Once v2.0.0 is out, it will be made available as a standard PyPI package and installable with ``pip install prolif``.
 
 .. _conda: https://docs.conda.io/projects/conda/en/latest/user-guide/index.html

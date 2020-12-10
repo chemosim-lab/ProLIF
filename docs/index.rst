@@ -8,7 +8,7 @@ Welcome to ProLIF's documentation!
    :maxdepth: 2
 
    source/installation
-   source/quickstart
+   notebooks/quickstart
    source/changelog
 
 .. toctree::
@@ -22,9 +22,9 @@ Welcome to ProLIF's documentation!
 .. toctree::
    :caption: Demo
    :maxdepth: 1
+   :glob:
 
-   source/examples
-   source/visualization
+   notebooks/*
 
 Indices and tables
 ==================

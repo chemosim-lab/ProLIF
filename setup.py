@@ -8,7 +8,7 @@ with open(os.path.join(here, 'README.rst'), "r") as f:
     long_description = f.read()
 
 # generate the metadata file
-__version__ = os.environ.get('PROLIF_VERSION', '0.0.0')
+__version__ = os.environ.get('PROLIF_VERSION', '0.3.0')
 __license__ = 'Apache License, Version 2.0'
 __author__ = 'Cédric Bouysset'
 metadata = f"""__version__ = {__version__!r}
@@ -49,7 +49,6 @@ setup(
         'tqdm'],
     extras_require={
         'tests': ['pytest>=6.1.2', 'pytest-cov', 'codecov'],
-        'docs': ['sphinx>=3.2.1', 'recommonmark', 'sphinx-rtd-theme', 'ipython'],
     },
     package_data={
         'prolif': ['data/*.mol2', 'data/*.pdb', 'data/*.xtc'],
