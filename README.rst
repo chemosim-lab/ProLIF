@@ -39,7 +39,7 @@ Description
 
 ProLIF (*Protein-Ligand Interaction Fingerprints*) is a tool designed to generate interaction fingerprints for protein-ligand and protein-protein interactions extracted from molecular dynamics trajectories and docking simulations.
 
-You can play with the example notebooks live on `Binder <https://mybinder.org/v2/gh/chemosim-lab/ProLIF/HEAD>`_.
+You can play with the example notebooks live on `Binder <https://mybinder.org/v2/gh/chemosim-lab/ProLIF/HEAD?filepath=docs%2Fnotebooks>`_.
 
 Documentation
 -------------

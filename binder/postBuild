@@ -2,5 +2,4 @@
 
 set -e
 
-echo "postBuild path is $PATH"
 pip install .
