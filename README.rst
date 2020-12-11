@@ -31,7 +31,7 @@ ProLIF
     :alt: License
 
 .. |binder| image:: https://mybinder.org/badge_logo.svg
-    :target: https://mybinder.org/v2/gh/chemosim-lab/ProLIF/HEAD?filepath=docs/2Fnotebooks
+    :target: https://mybinder.org/v2/gh/chemosim-lab/ProLIF/HEAD?filepath=docs%2Fnotebooks
     :alt: Try it on binder
 
 Description
