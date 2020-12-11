@@ -175,8 +175,12 @@ def to_dataframe(ifp, interactions, index_col="Frame"):
         df[cols] = data[(l, p)].apply(pd.Series)
     df.columns = pd.MultiIndex.from_tuples(
         df.columns, names=["ligand", "protein", "interaction"])
-    df = df.astype(np.uint8)
-    df = df.loc[:, (df != 0).any(axis=0)]
+    try:
+        df = df.astype(np.uint8)
+    except ValueError:
+        pass
+    else:
+        df = df.loc[:, (df != 0).any(axis=0)]
     return df
 
 
