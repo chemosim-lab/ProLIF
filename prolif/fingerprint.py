@@ -142,7 +142,7 @@ class Fingerprint:
             if name in interactions:
                 self.interactions[name] = func
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
         return f"<{name}: {params} at {id(self):#x}>"
@@ -173,7 +173,7 @@ class Fingerprint:
         for func in self.interactions.values():
             bit = func(res1, res2)
             bitvector.append(bit)
-        return np.array(bitvector, dtype=bool)
+        return np.array(bitvector)
 
     def bitvector_atoms(self, res1, res2):
         """Generates the complete bitvector for the interactions between two
@@ -189,9 +189,9 @@ class Fingerprint:
 
         Returns
         -------
-        bitvector : :class:`numpy.ndarray`
+        bitvector : numpy.ndarray
             An array storing the encoded interactions between res1 and res2
-        atoms : :class:`list`
+        atoms : list
             A list containing tuples of (res1_atom_index, res2_atom_index) for
             each interaction
         """
@@ -201,10 +201,11 @@ class Fingerprint:
             bit, *atoms = func.__wrapped__(res1, res2)
             bitvector.append(bit)
             atoms_lst.append(atoms)
-        bitvector = np.array(bitvector, dtype=bool)
+        bitvector = np.array(bitvector)
         return bitvector, atoms_lst
 
-    def run(self, traj, lig, prot, residues=None, progress=True):
+    def run(self, traj, lig, prot, residues=None, return_atoms=False,
+            progress=True):
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
         Parameters
@@ -224,6 +225,9 @@ class Fingerprint:
             If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
             function is used to automatically use protein residues that are
             distant of 6.0 Å or less from each ligand residue.
+        return_atoms : bool
+            For each residue pair and interaction, return indices of atoms
+            responsible for the interaction instead of bits.
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
@@ -260,15 +264,27 @@ class Fingerprint:
             for lresid, lres in lig_mol.residues.items():
                 if select_residues:
                     resids = get_residues_near_ligand(lres, prot_mol)
-                for presid in resids:
-                    pres = prot_mol[presid]
-                    data[(lresid, pres.resid)] = self.bitvector(lres, pres)
+                for prot_key in resids:
+                    pres = prot_mol[prot_key]
+                    if return_atoms:
+                        bv, value = self.bitvector_atoms(lres, pres)
+                    else:
+                        value = self.bitvector(lres, pres)
+                    data[(lresid, pres.resid)] = value
             ifp.append(data)
         self.ifp = ifp
         return self
 
-    def to_dataframe(self):
+    def to_dataframe(self, **kwargs):
         """Converts fingerprints to a pandas DataFrame
+
+        Parameters
+        ----------
+        dtype : object or None
+            Cast the input of each bit in the bitvector to this type. If None,
+            keep the data as is
+        drop_empty : bool
+            Drop columns with only empty values
 
         Returns
         -------
@@ -286,16 +302,18 @@ class Fingerprint:
         -------
         ::
 
-            >>> df = fp.to_dataframe()
+            >>> df = fp.to_dataframe(dtype=np.uint8)
             >>> print(df)
-            Frame     ILE59                  ILE55       TYR93
-                    Hydrophobic HBAcceptor Hydrophobic Hydrophobic PiStacking
-            0      0           1          0           0           0          0
+            ligand             LIG1.G
+            protein             ILE59                  ILE55       TYR93
+            interaction   Hydrophobic HBAcceptor Hydrophobic Hydrophobic PiStacking
+            Frame
+            0                       0          1           0           0          0
             ...
 
         """
         if hasattr(self, "ifp"):
-            return to_dataframe(self.ifp, self.interactions.keys())
+            return to_dataframe(self.ifp, self.interactions.keys(), **kwargs)
         raise AttributeError("Please use the run method before")
 
     def to_bitvectors(self):
