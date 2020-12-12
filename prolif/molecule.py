@@ -119,7 +119,7 @@ class Molecule(BaseRDKitMol):
     def __getitem__(self, key):
         return self.residues[key]
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         params = f"{self.n_residues} residues and {self.GetNumAtoms()} atoms"
         return f"<{name} with {params} at {id(self):#x}>"

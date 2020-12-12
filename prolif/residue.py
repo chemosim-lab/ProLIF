@@ -127,7 +127,7 @@ class Residue(BaseRDKitMol):
         super().__init__(mol)
         self.resid = ResidueId.from_atom(mol.GetAtomWithIdx(0))
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         return f"<{name} {self.resid} at {id(self):#x}>"
 
@@ -228,7 +228,7 @@ class ResidueGroup(UserDict):
         """
         return ResidueGroup(self._residues[mask])
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         return f"<{name} with {self.n_residues} residues at {id(self):#x}>"
 

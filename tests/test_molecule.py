@@ -33,3 +33,6 @@ class TestMolecule(TestBaseRDKitMol):
     def test_iter(self, mol):
         for i, r in enumerate(mol):
             assert r.resid == mol[i].resid
+
+    def test_n_residues(self, mol):
+        assert mol.n_residues == mol.residues.n_residues
