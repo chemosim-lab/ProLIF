@@ -105,16 +105,57 @@ ifp = [{"Frame": 0,
         ("LIG", "ALA1"): np.array([True, True, False]),
         ("LIG", "ASP3"): np.array([False, True, False])}]
 
+ifp_atoms = [{"Frame": 0,
+              ("LIG", "ALA1"): [[0, 1], [None, None], [None, None]],
+              ("LIG", "GLU2"): [[None, None], [1, 3], [None, None]]},
+             {"Frame": 1,
+              ("LIG", "ALA1"): [[2, 4], [2, 5], [None, None]],
+              ("LIG", "ASP3"): [[None, None], [8, 10], [None, None]]}]
+
 
 def test_to_df():
     df = to_dataframe(ifp, ["A", "B", "C"])
     assert df.shape == (2, 4)
+    assert df.dtypes[0].type is np.bool_
     assert df.index.name == "Frame"
     assert ("LIG", "ALA1", "A") in df.columns
+    assert df[("LIG", "ALA1", "A")][0] is np.bool_(True)
     assert ("LIG", "ALA1", "B") in df.columns
+    assert df[("LIG", "ALA1", "B")][0] is np.bool_(False)
     assert ("LIG", "ALA1", "C") not in df.columns
     assert ("LIG", "GLU2", "A") not in df.columns
     assert ("LIG", "ASP3", "B") in df.columns
+    assert df[("LIG", "ASP3", "B")][0] is np.bool_(False)
+
+
+def test_to_df_atom_pairs():
+    df = to_dataframe(ifp_atoms, ["A", "B", "C"])
+    assert df.shape == (2, 4)
+    assert df.index.name == "Frame"
+    assert ("LIG", "ALA1", "A") in df.columns
+    assert df[("LIG", "ALA1", "A")][0] == [0, 1]
+    assert ("LIG", "ALA1", "B") in df.columns
+    assert df[("LIG", "ALA1", "B")][0] == [None, None]
+    assert ("LIG", "ALA1", "C") not in df.columns
+    assert ("LIG", "GLU2", "A") not in df.columns
+    assert ("LIG", "ASP3", "B") in df.columns
+    assert df[("LIG", "ASP3", "B")][0] == [None, None]
+
+
+@pytest.mark.parametrize("dtype", [
+    np.uint8, np.int16, np.bool_,
+])
+def test_to_df_dtype(dtype):
+    df = to_dataframe(ifp, ["A", "B", "C"], dtype=dtype)
+    assert df.dtypes[0].type is dtype
+    assert df[("LIG", "ALA1", "A")][0] == dtype(True)
+    assert df[("LIG", "ALA1", "B")][0] == dtype(False)
+    assert df[("LIG", "ASP3", "B")][0] == dtype(False)
+
+
+def test_to_df_drop_empty():
+    df = to_dataframe(ifp, ["A", "B", "C"], drop_empty=False)
+    assert df.shape == (2, 9)
 
 
 def test_to_bv():

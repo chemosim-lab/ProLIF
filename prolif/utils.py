@@ -3,6 +3,7 @@ Helper functions --- :mod:`prolif.utils`
 ========================================
 """
 from math import pi
+from collections.abc import Iterable
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
@@ -37,7 +38,7 @@ def get_ring_normal_vector(centroid, coordinates):
 
 
 def angle_between_limits(angle, min_angle, max_angle, ring=False):
-    """Check if an angle value is between min and max angles in radian.
+    """Checks if an angle value is between min and max angles in radian.
     If the angle to check involves a ring, include the angle that would be
     obtained if we had used the other normal vector (same axis but opposite
     direction)
@@ -50,7 +51,7 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
 
 
 def get_residues_near_ligand(lig, prot, cutoff=6.0):
-    """Detect residues close to a reference ligand
+    """Detects residues close to a reference ligand
     
     Parameters
     ----------
@@ -127,8 +128,9 @@ def is_peptide_bond(bond, resids):
     return True
 
 
-def to_dataframe(ifp, interactions, index_col="Frame"):
-    """Convert IFPs to a pandas DataFrame
+def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
+                 drop_empty=True):
+    """Converts IFPs to a pandas DataFrame
 
     Parameters
     ----------
@@ -143,6 +145,11 @@ def to_dataframe(ifp, interactions, index_col="Frame"):
         A list of interactions, in the same order as the bitvector.
     index_col : str
         The dictionnary key that will be used as an index in the DataFrame
+    dtype : object or None
+        Cast the input of each bit in the bitvector to this type. If None, keep
+        the data as is.
+    drop_empty : bool
+        Drop columns with only empty values
 
     Returns
     -------
@@ -154,45 +161,58 @@ def to_dataframe(ifp, interactions, index_col="Frame"):
     -------
     ::
 
-        >>> df = prolif.to_dataframe(results, fp.interactions.keys())
+        >>> df = prolif.to_dataframe(results, fp.interactions.keys(), dtype=int)
         >>> print(df)
-        Frame     ILE59                  ILE55       TYR93
-                Hydrophobic HBAcceptor Hydrophobic Hydrophobic PiStacking
-        0      0           1          0           0           0          0
+        ligand             LIG1.G
+        protein             ILE59                  ILE55       TYR93
+        interaction   Hydrophobic HBAcceptor Hydrophobic Hydrophobic PiStacking
+        Frame
+        0                       0          1           0           0          0
         ...
 
     """
     n_interactions = len(interactions)
     data = pd.DataFrame(ifp)
     data.set_index(index_col, inplace=True)
+    # sort columns by ResidueIds and interaction
     data.sort_index(axis=1, inplace=True)
     data.columns = pd.MultiIndex.from_tuples(data.columns)
-    data = data.applymap(lambda x: [False] * n_interactions
+    # check if dealing with single values or atom indices
+    value = data.values[0, 0][0]
+    is_iterable = isinstance(value, Iterable)
+    # replace NaNs with appropriate values
+    empty_value = dtype(False) if dtype else False
+    fill_value = [None, None] if is_iterable else empty_value
+    data = data.applymap(lambda x: [fill_value] * n_interactions
                          if x is np.nan else x)
+    # split each bitvector in separate columns for each interaction
     df = pd.DataFrame()
     for l, p in data.columns:
         cols = [(str(l), str(p), i) for i in interactions]
         df[cols] = data[(l, p)].apply(pd.Series)
     df.columns = pd.MultiIndex.from_tuples(
         df.columns, names=["ligand", "protein", "interaction"])
-    try:
-        df = df.astype(np.uint8)
-    except ValueError:
-        pass
-    else:
-        df = df.loc[:, (df != 0).any(axis=0)]
+    if dtype:
+        df = df.astype(dtype)
+    if drop_empty:
+        if is_iterable:
+            mask = df.apply(lambda s:
+                            ~(s.map(tuple).isin([(None, None)]).all()), axis=0)
+        else:
+            mask = (df != empty_value).any(axis=0)
+        df = df.loc[:, mask]
     return df
 
 
 def pandas_series_to_bv(s):
     bv = ExplicitBitVect(len(s))
-    on_bits = np.where(s >= 1)[0].tolist()
+    on_bits = np.where(s >= True)[0].tolist()
     bv.SetBitsFromList(on_bits)
     return bv
 
 
 def to_bitvectors(df):
-    """Convert an interaction DataFrame to a list of RDKit BitVector
+    """Converts an interaction DataFrame to a list of RDKit ExplicitBitVector
 
     Parameters
     ----------

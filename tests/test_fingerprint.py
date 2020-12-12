@@ -14,12 +14,19 @@ class Dummy(Interaction):
         return 1, 2, 3
 
 
+def func_return_single_val():
+    return 0
+
+
 def test_wrapper_return():
     foo = Dummy().detect
     bar = _return_first_element(foo)
     assert foo("foo", "bar") == (1, 2, 3)
     assert bar("foo", "bar") == 1
     assert bar.__wrapped__("foo", "bar") == (1, 2, 3)
+    baz = _return_first_element(func_return_single_val)
+    assert baz() == 0
+    assert baz.__wrapped__() == 0
 
 
 class TestFingerprint:
@@ -66,7 +73,7 @@ class TestFingerprint:
         ids = np.where(bv == 1)[0]
         assert atoms[ids[0]] != (None, None)
 
-    def test_run(self, fp_class):
+    def test_run_residues(self, fp_class):
         fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
                      residues="all", progress=False)
         lig_id = ResidueId.from_string("LIG1.G")
@@ -89,6 +96,15 @@ class TestFingerprint:
         assert (lig_id, res) in fp_class.ifp[0].keys()
         u.trajectory[0]
 
+    def test_run_return_atoms(self, fp_class):
+        fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
+                     residues=None, progress=False, return_atoms=True)
+        assert hasattr(fp_class, "ifp")
+        ifp = fp_class.ifp[0]
+        ifp.pop("Frame")
+        atom_pair = list(ifp.values())[0]
+        assert isinstance(atom_pair, list)
+
     def test_to_df(self, fp, fp_class):
         with pytest.raises(AttributeError, match="use the run method"):
             fp.to_dataframe()
@@ -97,6 +113,16 @@ class TestFingerprint:
         df = fp_class.to_dataframe()
         assert isinstance(df, DataFrame)
         assert len(df) == 3
+
+    def test_to_df_kwargs(self, fp_class):
+        fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
+                     residues=None, progress=False)
+        df = fp_class.to_dataframe(dtype=np.uint8)
+        assert df.dtypes[0].type is np.uint8
+        df = fp_class.to_dataframe(drop_empty=False)
+        resids = set([key for d in fp_class.ifp for key in d.keys()
+                  if key != "Frame"])
+        assert df.shape == (3, len(resids))
 
     def test_to_bv(self, fp, fp_class):
         with pytest.raises(AttributeError, match="use the run method"):
