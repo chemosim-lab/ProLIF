@@ -11,3 +11,6 @@ extraction:
             include:
                 - prolif
                 - tests
+            exclude:
+                - versioneer.py
+                - prolif/_version.py
