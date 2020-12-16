@@ -34,16 +34,6 @@ jobs:
         python --version
         pip --version
         conda --version
-
-    - name: Install conda dependencies
-      env:
-        PLF_CONDA_FULL_DEPS: "${{ env.PLF_CONDA_DEPS }}"
-      run: |
-        conda install ${PLF_CONDA_FULL_DEPS}
-
-    - name: Install package through pip
-      run: |
-        pip install .
     
     - name: Check setup
       run: |
@@ -55,8 +45,6 @@ jobs:
         pip install setuptools wheel
 
     - name: Build
-      env:
-        PROLIF_VERSION: ${{ github.event.release.tag_name }}
       run: |
         python setup.py sdist bdist_wheel
     
