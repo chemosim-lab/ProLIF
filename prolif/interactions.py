@@ -130,7 +130,7 @@ class Hydrophobic(_Distance):
     """
     def __init__(self,
                  hydrophobic="[#6,#16,F,Cl,Br,I,At;!$([+{1-},-{1-}])]",
-                 distance=4.2):
+                 distance=4.5):
         super().__init__(hydrophobic, hydrophobic, distance)
 
 
