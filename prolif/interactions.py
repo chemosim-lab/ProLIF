@@ -112,9 +112,7 @@ class _Distance(Interaction):
                 alig = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
                 aprot = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
                 if alig.Distance(aprot) <= self.distance:
-                    return (True,
-                            get_mapindex(lig_res, lig_match[0]),
-                            get_mapindex(prot_res, prot_match[0]))
+                    return True, lig_match[0], prot_match[0]
         return False, None, None
 
 
@@ -174,9 +172,7 @@ class _BaseHBond(Interaction):
                     # get DHA angle
                     angle = hd.AngleTo(ha)
                     if angle_between_limits(angle, *self.angles):
-                        return (True,
-                                get_mapindex(acceptor, acceptor_match[0]),
-                                get_mapindex(donor, donor_match[1]))
+                        return True, acceptor_match[0], donor_match[1]
         return False, None, None
 
 
@@ -247,9 +243,7 @@ class _BaseXBond(Interaction):
                         ar = a.DirectionVector(r)
                         angle = ax.AngleTo(ar)
                         if angle_between_limits(angle, *self.xar_angles):
-                            return (True,
-                                    get_mapindex(acceptor, acceptor_match[0]),
-                                    get_mapindex(donor, donor_match[1]))
+                            return True, acceptor_match[0], donor_match[1]
         return False, None, None
 
 
@@ -335,9 +329,7 @@ class _BaseCationPi(Interaction):
                 # compute angle between normal to ring plane and centroid-cation
                 angle = normal.AngleTo(centroid_cation)
                 if angle_between_limits(angle, *self.angles, ring=True):
-                    return (True,
-                            get_mapindex(cation, cation_match[0]),
-                            get_mapindex(pi, pi_match[0]))
+                    return True, cation_match[0], pi_match[0]
         return False, None, None
 
 
@@ -408,9 +400,7 @@ class PiStacking(Interaction):
                 # angle between planes
                 plane_angle = lig_normal.AngleTo(res_normal)
                 if angle_between_limits(plane_angle, *self.plane_angles, ring=True):
-                    return (True,
-                            get_mapindex(ligand, lig_match[0]),
-                            get_mapindex(residue, res_match[0]))
+                    return True, lig_match[0], res_match[0]
         return False, None, None
 
 
