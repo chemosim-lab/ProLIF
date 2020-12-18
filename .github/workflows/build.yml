@@ -7,9 +7,6 @@ defaults:
   run:
     shell: bash -l {0}
 
-env:
-  PLF_CONDA_DEPS: "rdkit cython"
-
 jobs:
   build-n-publish:
     name: Build and publish to PyPI
@@ -34,11 +31,6 @@ jobs:
         python --version
         pip --version
         conda --version
-    
-    - name: Check setup
-      run: |
-        pip list
-        conda list
     
     - name: Install packaging tools
       run: |
