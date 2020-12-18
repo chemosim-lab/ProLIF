@@ -15,28 +15,21 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Setup Conda
-      uses: conda-incubator/setup-miniconda@v2
+    - uses: actions/setup-python@v2
       with:
-        python-version: 3.6
-        auto-update-conda: true
-        channel-priority: flexible
-        channels: conda-forge, defaults
-        add-pip-as-python-dependency: true
+        python-version: pypy-3.6
         architecture: x64
+      run: |
+        pip install setuptools wheel
     
-    - name: Check conda and pip
+    - name: Check python installation
       run: |
         which python
         python --version
         pip --version
-        conda --version
-    
-    - name: Install packaging tools
-      run: |
-        pip install setuptools wheel
+        pip list
 
-    - name: Build
+    - name: Build package
       run: |
         python setup.py sdist bdist_wheel
     

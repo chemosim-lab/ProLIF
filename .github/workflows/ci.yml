@@ -17,7 +17,7 @@ defaults:
     shell: bash -l {0}
 
 jobs:
-  setup:
+  tests:
     name: Setup ${{ matrix.os }} on Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     # only run once if internal PR
@@ -58,14 +58,6 @@ jobs:
         pip install .[tests]
         pip list
 
-  tests:
-    needs: setup
-    name: Run tests
-    runs-on: ubuntu-18.04
-    # only run once if internal PR
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
-
-    steps:
     - name: Run tests
       run: |
         pytest --color=yes --disable-pytest-warnings --cov=prolif --cov-report=xml tests/
@@ -77,21 +69,13 @@ jobs:
         fail_ci_if_error: True
         verbose: True
 
-  build:
-    needs: tests
-    name: Test building sdist and wheel for PyPI
-    runs-on: ubuntu-18.04
-    # only run once if internal PR
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
-
-    steps:
-    - name: Remove previous install
-      run: |
-        pip uninstall prolif
-
     - name: Build
       run: |
         python setup.py sdist bdist_wheel
+    
+    - name: Remove previous ProLIF install
+      run: |
+        pip uninstall prolif
 
     - name: Install from tar.gz
       run: |
@@ -106,7 +90,7 @@ jobs:
         assert os.path.isfile(prolif.datafiles.TOP)
         EOF
 
-    - name: Remove previous install
+    - name: Remove previous ProLIF install
       run: |
         pip uninstall prolif
 
