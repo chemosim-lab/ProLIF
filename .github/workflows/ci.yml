@@ -18,7 +18,7 @@ defaults:
 
 jobs:
   tests:
-    name: Setup ${{ matrix.os }} on Python ${{ matrix.python-version }}
+    name: CI on ${{ matrix.os }} with Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     # only run once if internal PR
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
@@ -75,7 +75,7 @@ jobs:
     
     - name: Remove previous ProLIF install
       run: |
-        pip uninstall prolif
+        pip uninstall -y prolif
 
     - name: Install from tar.gz
       run: |
@@ -92,7 +92,7 @@ jobs:
 
     - name: Remove previous ProLIF install
       run: |
-        pip uninstall prolif
+        pip uninstall -y prolif
 
     - name: Install from wheel
       run: |

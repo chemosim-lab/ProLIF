@@ -12,6 +12,6 @@ path_classifiers:
 extraction:
     python:
         index:
-            include:
-                - prolif
-                - tests
+            exclude:
+                - prolif/_version.py
+                - versioneer.py
