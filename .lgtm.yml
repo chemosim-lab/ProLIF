@@ -1,16 +1,17 @@
 path_classifiers:
+    # include test files in analysis
     test:
         - exclude: tests
     docs:
         - docs
     notebooks:
         - notebooks
+    versioneer:
+        - prolif/_version.py
+        - versioneer.py
 extraction:
     python:
         index:
             include:
                 - prolif
                 - tests
-            exclude:
-                - versioneer.py
-                - prolif/_version.py
