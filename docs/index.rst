@@ -8,8 +8,17 @@ Welcome to ProLIF's documentation!
    :maxdepth: 2
 
    source/installation
-   notebooks/quickstart
    source/changelog
+
+.. toctree::
+   :caption: Examples
+   :maxdepth: 2
+   :numbered:
+
+   notebooks/quickstart
+   notebooks/how-to
+   notebooks/protein-protein_interactions
+   notebooks/visualisation
 
 .. toctree::
    :caption: Documentation
@@ -18,13 +27,6 @@ Welcome to ProLIF's documentation!
    
    source/api
    source/modules/*
-
-.. toctree::
-   :caption: Demo
-   :maxdepth: 1
-   :glob:
-
-   notebooks/*
 
 Indices and tables
 ==================

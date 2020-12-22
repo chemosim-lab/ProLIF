@@ -1,7 +1,8 @@
 import pytest
 from rdkit import RDLogger
 from prolif.fingerprint import Fingerprint
-from prolif.interactions import _INTERACTIONS, Interaction
+from prolif.interactions import _INTERACTIONS, Interaction, get_mapindex
+from .test_base import ligand_mol
 from . import mol2factory
 
 # disable rdkit warnings
@@ -96,3 +97,10 @@ class TestInteractions:
         with pytest.raises(TypeError,
                            match="Can't instantiate abstract class Dummy"):
             Dummy()
+
+    @pytest.mark.parametrize("index", [
+        0, 1, 3, 42, 78
+    ])
+    def test_get_mapindex(self, index):
+        parent_index = get_mapindex(ligand_mol[0], index)
+        assert parent_index == index

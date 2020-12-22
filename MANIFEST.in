@@ -1,5 +1,4 @@
-# README
-include README.rst
-
-# License
-include LICENSE
+include README.rst LICENSE CHANGELOG.md
+recursive-include prolif/data *
+include versioneer.py
+include prolif/_version.py
