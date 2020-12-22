@@ -8,12 +8,11 @@ Welcome to ProLIF's documentation!
    :maxdepth: 2
 
    source/installation
-   notebooks/quickstart
    source/changelog
 
 .. toctree::
    :caption: Examples
-   :maxdepth: 1
+   :maxdepth: 2
    :numbered:
 
    notebooks/quickstart
