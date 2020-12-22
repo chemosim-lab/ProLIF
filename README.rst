@@ -1,38 +1,10 @@
 ProLIF
 ======
 
-|pypi-version| |build| |tests| |codecov| |docs| |lgtm|
-|license| |binder|
-
-.. |pypi-version| image:: https://img.shields.io/pypi/v/prolif.svg
-   :target: https://pypi.python.org/pypi/prolif
-   :alt: Pypi Version
-
-.. |build| image:: https://github.com/chemosim-lab/ProLIF/workflows/build/badge.svg
-    :target: https://github.com/chemosim-lab/ProLIF/actions?query=workflow%3Abuild
-    :alt: Build status
-
-.. |tests| image:: https://github.com/chemosim-lab/ProLIF/workflows/tests/badge.svg?branch=master
-    :target: https://github.com/chemosim-lab/ProLIF/actions?query=workflow%3Atests
-    :alt: Tests status
-
-.. |codecov| image:: https://codecov.io/gh/chemosim-lab/ProLIF/branch/master/graph/badge.svg?token=2FCHV08G8A
-    :target: https://codecov.io/gh/chemosim-lab/ProLIF
-
-.. |docs| image:: https://readthedocs.org/projects/prolif/badge/?version=latest
-    :target: https://prolif.readthedocs.io/en/latest/?badge=latest
-    :alt: Documentation Status
-
-.. |lgtm| image:: https://img.shields.io/lgtm/grade/python/g/chemosim-lab/ProLIF.svg?logo=lgtm&logoWidth=18
-    :target: https://lgtm.com/projects/g/chemosim-lab/ProLIF/context:python
-    :alt: Code quality
-
-.. |license| image:: https://img.shields.io/pypi/l/prolif
-    :alt: License
-
-.. |binder| image:: https://mybinder.org/badge_logo.svg
-    :target: https://mybinder.org/v2/gh/chemosim-lab/ProLIF/HEAD?filepath=docs%2Fnotebooks
-    :alt: Try it on binder
+| |pypi-version| |build| |binder|
+| |tests| |codecov| |lgtm|
+| |docs|
+| |license|
 
 Description
 -----------
@@ -74,3 +46,35 @@ Unless otherwise noted, all files in this directory and all subdirectories are d
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
+
+
+.. |pypi-version| image:: https://img.shields.io/pypi/v/prolif.svg
+   :target: https://pypi.python.org/pypi/prolif
+   :alt: Pypi Version
+
+.. |build| image:: https://github.com/chemosim-lab/ProLIF/workflows/build/badge.svg
+    :target: https://github.com/chemosim-lab/ProLIF/actions?query=workflow%3Abuild
+    :alt: Build status
+
+.. |tests| image:: https://github.com/chemosim-lab/ProLIF/workflows/tests/badge.svg?branch=master
+    :target: https://github.com/chemosim-lab/ProLIF/actions?query=workflow%3Atests
+    :alt: Tests status
+
+.. |codecov| image:: https://codecov.io/gh/chemosim-lab/ProLIF/branch/master/graph/badge.svg?token=2FCHV08G8A
+    :target: https://codecov.io/gh/chemosim-lab/ProLIF
+
+.. |docs| image:: https://readthedocs.org/projects/prolif/badge/?version=latest
+    :target: https://prolif.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
+.. |lgtm| image:: https://img.shields.io/lgtm/grade/python/g/chemosim-lab/ProLIF.svg?logo=lgtm&logoWidth=18
+    :target: https://lgtm.com/projects/g/chemosim-lab/ProLIF/context:python
+    :alt: Code quality
+
+.. |license| image:: https://img.shields.io/pypi/l/prolif
+    :target: http://www.apache.org/licenses/LICENSE-2.0
+    :alt: License
+
+.. |binder| image:: https://mybinder.org/badge_logo.svg
+    :target: https://mybinder.org/v2/gh/chemosim-lab/ProLIF/HEAD?filepath=docs%2Fnotebooks
+    :alt: Try it on binder
