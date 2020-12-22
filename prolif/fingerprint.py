@@ -147,6 +147,21 @@ class Fingerprint:
         params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
         return f"<{name}: {params} at {id(self):#x}>"
 
+    @staticmethod
+    def list_available(show_hidden=False):
+        """List interactions available to the Fingerprint class.
+        
+        Parameters
+        ----------
+        show_hidden : bool
+            Show hidden classes (usually base classes whose name starts with an
+            underscore ``_``. Those are not supposed to be called directly)
+        """
+        if show_hidden:
+            return [name for name in _INTERACTIONS.keys()]
+        return [name for name in _INTERACTIONS.keys()
+                if not (name.startswith("_") or name == "Interaction")]
+
     @property
     def n_interactions(self):
         return len(self.interactions)

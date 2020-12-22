@@ -132,3 +132,15 @@ class TestFingerprint:
         bvs = fp_class.to_bitvectors()
         assert isinstance(bvs[0], ExplicitBitVect)
         assert len(bvs) == 3
+
+    def test_list_avail(self):
+        avail = Fingerprint.list_available()
+        assert "Hydrophobic" in avail
+        assert "HBDonor" in avail
+        assert "_BaseHBond" not in avail
+        avail = Fingerprint.list_available(show_hidden=True)
+        assert "Hydrophobic" in avail
+        assert "HBDonor" in avail
+        assert "_BaseHBond" in avail
+        assert "_Distance" in avail
+        assert "Interaction" in avail
