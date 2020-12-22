@@ -11,9 +11,9 @@ Requirements:
 * `SciPy <https://www.scipy.org/scipylib/index.html>`_
 * `tqdm <https://tqdm.github.io/>`_
 
-The simplest way to install ProLIF dependencies is to use `conda`_:
+The simplest way to install ProLIF dependencies is to use `conda`_::
 
-    # create a sperate virtual environment
+    # create a separate virtual environment
     conda create -n prolif
     # activate it
     conda activate prolif
