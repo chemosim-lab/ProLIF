@@ -8,6 +8,7 @@ Welcome to ProLIF's documentation!
    :maxdepth: 2
 
    source/installation
+   source/citation
    source/changelog
 
 .. toctree::
