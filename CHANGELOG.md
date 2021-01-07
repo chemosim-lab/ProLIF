@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Zenodo to automatically generate a DOI for new releases
 - Citation page
+### Changed
+- The visualisation notebook now displays the protein with py3Dmol. Some examples for
+  creating and displaying a graph from the interaction dataframe have been added
+- Updated the installation instructions to show how to install a specific release
+### Deprecated
+### Removed
+### Fixed
 
 ## [0.3.0] - 2020-12-23
 ### Added

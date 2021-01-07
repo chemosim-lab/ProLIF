@@ -27,9 +27,9 @@ The rest of the dependencies are automatically installed through pip when instal
 
     pip install git+https://github.com/chemosim-lab/ProLIF.git
 
-Alternatively, you can install the latest development version::
+Alternatively, you can install a specific release version as follow::
 
-    pip install git+https://github.com/chemosim-lab/ProLIF.git@dev
+    pip install https://github.com/chemosim-lab/ProLIF/archive/v0.3.0.zip
 
 .. note:: Until MDAnalysis version 2.0.0 is out, ProLIF can only be installed through our GitHub repository. Once MDAnalysis v2.0.0 is out, it will be made available as a standard PyPI package and installable with ``pip install prolif``.
 
