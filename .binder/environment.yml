@@ -15,6 +15,7 @@ dependencies:
     - nbsphinx
     - networkx
     - py3Dmol
+    - pyvis
     - recommonmark
     - seaborn
     - sphinx
