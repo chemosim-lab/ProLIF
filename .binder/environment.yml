@@ -1,6 +1,7 @@
-name: prolif-docs
+name: prolif
 channels:
   - conda-forge
+  - anaconda
   - defaults
 dependencies:
   - ipykernel
@@ -10,13 +11,13 @@ dependencies:
   - pip
   - python
   - rdkit
+  - cython
+  - nbsphinx
+  - networkx
+  - recommonmark
+  - seaborn
+  - sphinx
+  - tqdm
   - pip:
-    - cython
-    - nbsphinx
-    - networkx
-    - py3Dmol
     - pyvis
-    - recommonmark
-    - seaborn
-    - sphinx
-    - tqdm
+    - py3Dmol

@@ -12,7 +12,7 @@ Welcome to ProLIF's documentation!
    source/changelog
 
 .. toctree::
-   :caption: Examples
+   :caption: Tutorials
    :maxdepth: 2
    :numbered:
 
