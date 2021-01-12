@@ -1,0 +1,162 @@
+HEADER    
+TITLE     MDANALYSIS FRAME 0: Created by PDBWriter
+CRYST1   89.691   87.957  102.020  90.00  90.00  90.00 P 1           1
+ATOM      1  C1  LIG G   1       2.230  -4.250   3.900  1.00  0.00      LIG  C
+ATOM      2  N1  LIG G   1       3.240  -5.170   4.400  1.00  0.00      LIG  N
+ATOM      3  O1  LIG G   1       2.910   0.770  10.480  1.00  0.00      LIG  O
+ATOM      4  C10 LIG G   1       4.000  -3.600   8.190  1.00  0.00      LIG  C
+ATOM      5  C11 LIG G   1       4.600  -4.760   7.880  1.00  0.00      LIG  C
+ATOM      6  C12 LIG G   1       4.400  -5.430   6.610  1.00  0.00      LIG  C
+ATOM      7  C13 LIG G   1       3.590  -4.850   5.700  1.00  0.00      LIG  C
+ATOM      8  C14 LIG G   1       2.900  -3.650   5.980  1.00  0.00      LIG  C
+ATOM      9  C15 LIG G   1       0.670   1.070   5.420  1.00  0.00      LIG  C
+ATOM     10  C16 LIG G   1       1.750   0.590  10.170  1.00  0.00      LIG  C
+ATOM     11  C17 LIG G   1       0.930   1.660  12.200  1.00  0.00      LIG  C
+ATOM     12  C18 LIG G   1       1.840   0.940  13.260  1.00  0.00      LIG  C
+ATOM     13  C19 LIG G   1       3.440   1.670  14.930  1.00  0.00      LIG  C
+ATOM     14  N2  LIG G   1       0.980   0.020   6.550  1.00  0.00      LIG  N
+ATOM     15  C2  LIG G   1       2.020  -3.370   4.860  1.00  0.00      LIG  C
+ATOM     16  O2  LIG G   1       1.730   2.840  11.920  1.00  0.00      LIG  O
+ATOM     17  C20 LIG G   1       3.420   3.070  15.700  1.00  0.00      LIG  C
+ATOM     18  C21 LIG G   1       3.350   5.560  15.550  1.00  0.00      LIG  C
+ATOM     19  C22 LIG G   1       2.680   6.410  14.500  1.00  0.00      LIG  C
+ATOM     20  C23 LIG G   1       2.650   5.590  13.220  1.00  0.00      LIG  C
+ATOM     21  C24 LIG G   1       2.550   4.120  13.830  1.00  0.00      LIG  C
+ATOM     22  C25 LIG G   1       2.850   2.940  12.850  1.00  0.00      LIG  C
+ATOM     23  C26 LIG G   1      -0.290   1.850  13.120  1.00  0.00      LIG  C
+ATOM     24  C27 LIG G   1       4.890   1.170  14.930  1.00  0.00      LIG  C
+ATOM     25  C28 LIG G   1       5.190  -0.050  14.150  1.00  0.00      LIG  C
+ATOM     26  C29 LIG G   1       6.010   0.040  12.970  1.00  0.00      LIG  C
+ATOM     27  C3  LIG G   1       1.130  -2.120   5.140  1.00  0.00      LIG  C
+ATOM     28  N3  LIG G   1       0.720   1.070  10.990  1.00  0.00      LIG  N
+ATOM     29  O3  LIG G   1       1.640  -0.180  13.800  1.00  0.00      LIG  O
+ATOM     30  C30 LIG G   1       6.510  -1.100  12.350  1.00  0.00      LIG  C
+ATOM     31  C31 LIG G   1       6.310  -2.370  12.890  1.00  0.00      LIG  C
+ATOM     32  C32 LIG G   1       5.530  -2.440  14.090  1.00  0.00      LIG  C
+ATOM     33  C33 LIG G   1       4.940  -1.290  14.680  1.00  0.00      LIG  C
+ATOM     34  C4  LIG G   1       1.760  -1.150   6.180  1.00  0.00      LIG  C
+ATOM     35  N4  LIG G   1       2.910   1.770  13.600  1.00  0.00      LIG  N
+ATOM     36  O4  LIG G   1       3.540   2.990  16.920  1.00  0.00      LIG  O
+ATOM     37  C5  LIG G   1       1.410   0.780   7.750  1.00  0.00      LIG  C
+ATOM     38  N5  LIG G   1       3.340   4.180  14.980  1.00  0.00      LIG  N
+ATOM     39  O5  LIG G   1       4.030   2.920  12.120  1.00  0.00      LIG  O
+ATOM     40  C6  LIG G   1       1.260  -0.170   8.960  1.00  0.00      LIG  C
+ATOM     41  C7  LIG G   1       2.060  -1.420   8.760  1.00  0.00      LIG  C
+ATOM     42  C8  LIG G   1       2.290  -1.810   7.520  1.00  0.00      LIG  C
+ATOM     43  C9  LIG G   1       3.060  -3.070   7.230  1.00  0.00      LIG  C
+ATOM     44  H1  LIG G   1       1.700  -4.400   2.960  1.00  0.00      LIG  H
+ATOM     45  HN1 LIG G   1       3.520  -6.020   3.930  1.00  0.00      LIG  H
+ATOM     46  H10 LIG G   1       4.170  -3.090   9.120  1.00  0.00      LIG  H
+ATOM     47  H11 LIG G   1       5.220  -5.270   8.600  1.00  0.00      LIG  H
+ATOM     48  H12 LIG G   1       5.000  -6.260   6.280  1.00  0.00      LIG  H
+ATOM     49 H15X LIG G   1       0.020   0.560   4.670  1.00  0.00      LIG  H
+ATOM     50 H15Y LIG G   1       1.630   1.470   5.040  1.00  0.00      LIG  H
+ATOM     51 H15Z LIG G   1       0.040   1.740   6.050  1.00  0.00      LIG  H
+ATOM     52  H19 LIG G   1       2.840   1.010  15.590  1.00  0.00      LIG  H
+ATOM     53  HN2 LIG G   1       0.010  -0.320   6.750  1.00  0.00      LIG  H
+ATOM     54 H21X LIG G   1       4.400   5.840  15.690  1.00  0.00      LIG  H
+ATOM     55 H21Y LIG G   1       2.900   5.700  16.550  1.00  0.00      LIG  H
+ATOM     56 H22X LIG G   1       1.690   6.750  14.850  1.00  0.00      LIG  H
+ATOM     57 H22Y LIG G   1       3.230   7.330  14.230  1.00  0.00      LIG  H
+ATOM     58 H23X LIG G   1       1.790   5.870  12.600  1.00  0.00      LIG  H
+ATOM     59 H23Y LIG G   1       3.540   5.650  12.570  1.00  0.00      LIG  H
+ATOM     60  H24 LIG G   1       1.470   4.080  14.090  1.00  0.00      LIG  H
+ATOM     61 H26X LIG G   1      -1.030   2.430  12.540  1.00  0.00      LIG  H
+ATOM     62 H26Y LIG G   1       0.090   2.500  13.930  1.00  0.00      LIG  H
+ATOM     63 H26Z LIG G   1      -0.690   0.890  13.520  1.00  0.00      LIG  H
+ATOM     64 H27X LIG G   1       5.560   2.000  14.630  1.00  0.00      LIG  H
+ATOM     65 H27Y LIG G   1       5.340   0.890  15.910  1.00  0.00      LIG  H
+ATOM     66  H29 LIG G   1       6.310   1.020  12.610  1.00  0.00      LIG  H
+ATOM     67  H3X LIG G   1       1.090  -1.570   4.180  1.00  0.00      LIG  H
+ATOM     68  H3Y LIG G   1       0.130  -2.440   5.500  1.00  0.00      LIG  H
+ATOM     69  HN3 LIG G   1      -0.210   0.950  10.640  1.00  0.00      LIG  H
+ATOM     70  H30 LIG G   1       6.990  -1.030  11.390  1.00  0.00      LIG  H
+ATOM     71  H31 LIG G   1       6.760  -3.280  12.540  1.00  0.00      LIG  H
+ATOM     72  H32 LIG G   1       5.250  -3.420  14.450  1.00  0.00      LIG  H
+ATOM     73  H33 LIG G   1       4.270  -1.370  15.520  1.00  0.00      LIG  H
+ATOM     74  H4  LIG G   1       2.640  -0.730   5.640  1.00  0.00      LIG  H
+ATOM     75  H5X LIG G   1       2.420   1.200   7.570  1.00  0.00      LIG  H
+ATOM     76  H5Y LIG G   1       0.740   1.650   7.810  1.00  0.00      LIG  H
+ATOM     77  HO5 LIG G   1       4.060   2.000  11.830  1.00  0.00      LIG  H
+ATOM     78  H6  LIG G   1       0.180  -0.420   9.060  1.00  0.00      LIG  H
+ATOM     79  H7  LIG G   1       2.530  -1.880   9.640  1.00  0.00      LIG  H
+CONECT    1    2   15   44
+CONECT    2    1    7   45
+CONECT    3   10
+CONECT    4    5   43   46
+CONECT    5    4    6   47
+CONECT    6    5    7   48
+CONECT    7    2    6    8
+CONECT    8    7   15   43
+CONECT    9   14   49   50   51
+CONECT   10    3   28   40
+CONECT   11   12   16   23   28
+CONECT   12   11   29   35
+CONECT   13   17   24   35   52
+CONECT   14    9   34   37   53
+CONECT   15    1    8   27
+CONECT   16   11   22
+CONECT   17   13   36   38
+CONECT   18   19   38   54   55
+CONECT   19   18   20   56   57
+CONECT   20   19   21   58   59
+CONECT   21   20   22   38   60
+CONECT   22   16   21   35   39
+CONECT   23   11   61   62   63
+CONECT   24   13   25   64   65
+CONECT   25   24   26   33
+CONECT   26   25   30   66
+CONECT   27   15   34   67   68
+CONECT   28   10   11   69
+CONECT   29   12
+CONECT   30   26   31   70
+CONECT   31   30   32   71
+CONECT   32   31   33   72
+CONECT   33   25   32   73
+CONECT   34   14   27   42   74
+CONECT   35   12   13   22
+CONECT   36   17
+CONECT   37   14   40   75   76
+CONECT   38   17   18   21
+CONECT   39   22   77
+CONECT   40   10   37   41   78
+CONECT   41   40   42   79
+CONECT   42   34   41   43
+CONECT   43    4    8   42
+CONECT   44    1
+CONECT   45    2
+CONECT   46    4
+CONECT   47    5
+CONECT   48    6
+CONECT   49    9
+CONECT   50    9
+CONECT   51    9
+CONECT   52   13
+CONECT   53   14
+CONECT   54   18
+CONECT   55   18
+CONECT   56   19
+CONECT   57   19
+CONECT   58   20
+CONECT   59   20
+CONECT   60   21
+CONECT   61   23
+CONECT   62   23
+CONECT   63   23
+CONECT   64   24
+CONECT   65   24
+CONECT   66   26
+CONECT   67   27
+CONECT   68   27
+CONECT   69   28
+CONECT   70   30
+CONECT   71   31
+CONECT   72   32
+CONECT   73   33
+CONECT   74   34
+CONECT   75   37
+CONECT   76   37
+CONECT   77   39
+CONECT   78   40
+CONECT   79   41
+END
