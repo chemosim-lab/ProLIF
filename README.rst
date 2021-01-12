@@ -6,7 +6,7 @@ ProLIF
 
     * - **Documentation**
       - |docs|
-    * - **Examples**
+    * - **Tutorials**
       - |binder|
     * - **CI**
       - |tests| |codecov| |lgtm|
@@ -25,7 +25,7 @@ You can try it out prior to any installation on `Binder <https://mybinder.org/v2
 Documentation
 -------------
 
-The documentation and tutorials can be found online on `ReadTheDocs <https://prolif.readthedocs.io/en/latest/>`_.
+The installation instructions, documentation and tutorials can be found online on `ReadTheDocs <https://prolif.readthedocs.io/en/latest/>`_.
 
 Issues
 ------
@@ -47,7 +47,7 @@ License
 
 Unless otherwise noted, all files in this directory and all subdirectories are distributed under the Apache License, Version 2.0 ::
 
-    Copyright 2017-2020 Cédric BOUYSSET
+    Copyright 2017-2021 Cédric BOUYSSET
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
