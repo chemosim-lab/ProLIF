@@ -38,6 +38,7 @@ class TestResidueId:
         ("ALA", 1, None),
         ("ALA", None, "B"),
         ("ALA", 1, "B"),
+        ("DA", 1, None),
         (None, 1, "B"),
         (None, None, "B"),
         (None, 1, None),
@@ -93,6 +94,9 @@ class TestResidueId:
         (".0", (None, None, "0")),
         ("1", (None, 1, None)),
         ("", (None, None, None)),
+        ("DA2.A", ("DA", 2, "A")),
+        ("DA2", ("DA", 2, None)),
+        ("DA", ("DA", None, None)),
     ])
     def test_string_methods(self, resid_str, expected):
         resid = ResidueId.from_string(resid_str)
