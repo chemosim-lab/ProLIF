@@ -133,13 +133,13 @@ def test_to_df_atom_pairs():
     assert df.shape == (2, 4)
     assert df.index.name == "Frame"
     assert ("LIG", "ALA1", "A") in df.columns
-    assert df[("LIG", "ALA1", "A")][0] == [0, 1]
+    assert df[("LIG", "ALA1", "A")][0] == (0, 1)
     assert ("LIG", "ALA1", "B") in df.columns
-    assert df[("LIG", "ALA1", "B")][0] == [None, None]
+    assert df[("LIG", "ALA1", "B")][0] == (None, None)
     assert ("LIG", "ALA1", "C") not in df.columns
     assert ("LIG", "GLU2", "A") not in df.columns
     assert ("LIG", "ASP3", "B") in df.columns
-    assert df[("LIG", "ASP3", "B")][0] == [None, None]
+    assert df[("LIG", "ASP3", "B")][0] == (None, None)
 
 
 @pytest.mark.parametrize("dtype", [

@@ -185,8 +185,10 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
     is_atompair = isinstance(ifp[0][k][0], Iterable)
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
-    fill_value = [None, None] if is_atompair else empty_value
-    empty_arr = np.array([fill_value] * n_interactions)
+    if is_atompair:
+        empty_arr =  [[None, None]] * n_interactions
+    else:
+        empty_arr = np.array([empty_value] * n_interactions)
     # sparse to dense
     data = defaultdict(list)
     index = []
@@ -198,19 +200,26 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
             except KeyError:
                 data[key].append(empty_arr)
     # create dataframes
-    values = np.array([np.hstack([a[i] for a in data.values()])
-                       for i in range(len(index))])
-    columns = pd.MultiIndex.from_tuples([(str(k[0]), str(k[1]), i) for k in keys
-                                         for i in interactions],
+    values = np.array([np.hstack([np.ravel(a[i]) for a in data.values()])
+                    for i in range(len(index))])
+    if is_atompair:
+        columns = pd.MultiIndex.from_tuples([(str(k[0]), str(k[1]), i, a) for k in keys
+                                        for i in interactions for a in ["ligand", "protein"]],
+                                        names=["ligand", "protein", "interaction", "atom"])
+    else:
+        columns = pd.MultiIndex.from_tuples([(str(k[0]), str(k[1]), i) for k in keys
+                                        for i in interactions],
                                         names=["ligand", "protein", "interaction"])
     index = pd.Series(index, name=index_col)
     df = pd.DataFrame(values, columns=columns, index=index)
+    if is_atompair:
+        df = df.groupby(axis=1, level=["ligand", "protein", "interaction"]).agg(tuple)
     if dtype:
         df = df.astype(dtype)
     if drop_empty:
         if is_atompair:
             mask = df.apply(lambda s:
-                            ~(s.map(tuple).isin([(None, None)]).all()), axis=0)
+                            ~(s.isin([(None, None)]).all()), axis=0)
         else:
             mask = (df != empty_value).any(axis=0)
         df = df.loc[:, mask]
