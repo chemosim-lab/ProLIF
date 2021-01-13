@@ -3,7 +3,9 @@ Helper functions --- :mod:`prolif.utils`
 ========================================
 """
 from math import pi
+from collections import defaultdict
 from collections.abc import Iterable
+from copy import deepcopy
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
@@ -171,33 +173,53 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
         ...
 
     """
+    ifp = deepcopy(ifp)
     n_interactions = len(interactions)
-    data = pd.DataFrame(ifp)
-    data.set_index(index_col, inplace=True)
-    # sort columns by ResidueIds and interaction
-    data.sort_index(axis=1, inplace=True)
-    data.columns = pd.MultiIndex.from_tuples(data.columns)
-    # check if dealing with single values or atom indices
-    value = data.values[0, 0][0]
-    is_iterable = isinstance(value, Iterable)
-    # replace NaNs with appropriate values
     empty_value = dtype(False) if dtype else False
-    fill_value = [None, None] if is_iterable else empty_value
-    data = data.applymap(lambda x: [fill_value] * n_interactions
-                         if x is np.nan else x)
-    # split each bitvector in separate columns for each interaction
-    df = pd.DataFrame()
-    for l, p in data.columns:
-        cols = [(str(l), str(p), i) for i in interactions]
-        df[cols] = data[(l, p)].apply(pd.Series)
-    df.columns = pd.MultiIndex.from_tuples(
-        df.columns, names=["ligand", "protein", "interaction"])
+    # residue pairs
+    keys = sorted(set([k for d in ifp for k in d.keys() if k != index_col]))
+    # check if each interaction value is a list of atom indices or smthg else
+    for k in keys:
+        if k in ifp[0].keys():
+            break
+    is_atompair = isinstance(ifp[0][k][0], Iterable)
+    # create empty array for each residue pair interaction that doesn't exist
+    # in a particular frame
+    if is_atompair:
+        empty_arr =  [[None, None]] * n_interactions
+    else:
+        empty_arr = np.array([empty_value] * n_interactions)
+    # sparse to dense
+    data = defaultdict(list)
+    index = []
+    for d in ifp:
+        index.append(d.pop(index_col))
+        for key in keys:
+            try:
+                data[key].append(d[key])
+            except KeyError:
+                data[key].append(empty_arr)
+    # create dataframes
+    values = np.array([np.hstack([np.ravel(a[i]) for a in data.values()])
+                    for i in range(len(index))])
+    if is_atompair:
+        columns = pd.MultiIndex.from_tuples([(str(k[0]), str(k[1]), i, a) for k in keys
+                                        for i in interactions for a in ["ligand", "protein"]],
+                                        names=["ligand", "protein", "interaction", "atom"])
+    else:
+        columns = pd.MultiIndex.from_tuples([(str(k[0]), str(k[1]), i) for k in keys
+                                        for i in interactions],
+                                        names=["ligand", "protein", "interaction"])
+    index = pd.Series(index, name=index_col)
+    df = pd.DataFrame(values, columns=columns, index=index)
+    if is_atompair:
+        df = df.groupby(axis=1, level=["ligand", "protein", "interaction"]).agg(tuple)
     if dtype:
         df = df.astype(dtype)
     if drop_empty:
-        if is_iterable:
+        if is_atompair:
             mask = df.apply(lambda s:
-                            ~(s.map(tuple).isin([(None, None)]).all()), axis=0)
+                            ~(s.isin([(None, None)]).all()), axis=0)
         else:
             mask = (df != empty_value).any(axis=0)
         df = df.loc[:, mask]
