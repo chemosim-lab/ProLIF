@@ -119,6 +119,17 @@ class TestResidueId:
         res2 = ResidueId.from_string(res2)
         assert res1 < res2
 
+    @pytest.mark.parametrize("resid_str", [
+        "ALA1.A",
+        "DA2.B",
+        "HIS3",
+        "GLU",
+    ])
+    def test_repr(self, resid_str):
+        resid = ResidueId.from_string(resid_str)
+        expected = f"ResidueId({resid.name}, {resid.number}, {resid.chain})"
+        assert repr(resid) == expected
+
 
 class TestResidue(TestBaseRDKitMol):
     @pytest.fixture(scope="class")
