@@ -14,9 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The visualisation notebook now displays the protein with py3Dmol. Some examples for
   creating and displaying a graph from the interaction dataframe have been added
 - Updated the installation instructions to show how to install a specific release
+- The previous repr method of `ResidueId` was easy to confuse with a string, especially
+  when trying to access the `Fingerprint.ifp` results by string. The new repr method is
+  now more explicit.
 ### Deprecated
 ### Removed
 ### Fixed
+- `Fingerprint.to_dataframe` is now much faster (Issue #7)
 
 ## [0.3.0] - 2020-12-23
 ### Added
