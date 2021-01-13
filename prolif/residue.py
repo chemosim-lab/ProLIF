@@ -9,7 +9,7 @@ import numpy as np
 from .rdkitmol import BaseRDKitMol
 
 
-_RE_RESID = re.compile(r'([A-Z]{3})?(\d*)\.?(\w)?')
+_RE_RESID = re.compile(r'([A-Z]{,3})?(\d*)\.?(\w)?')
 
 
 class ResidueId:

@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 ### Removed
 ### Fixed
+- `ResidueId.from_string` method now supports 1-letter and 2-letter codes for RNA/DNA
+  (Issue #8)
 
 ## [0.3.0] - 2020-12-23
 ### Added
