@@ -3,13 +3,15 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
 from operator import attrgetter
-from MDAnalysis import _CONVERTERS
+import MDAnalysis as mda
+from rdkit import Chem
+from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
 from .rdkitmol import BaseRDKitMol
 from .residue import Residue, ResidueGroup
 from .utils import split_mol_by_residues
 
 
-mda_to_rdkit = _CONVERTERS["RDKIT"]().convert
+mda_to_rdkit = mda._CONVERTERS["RDKIT"]().convert
 
 
 class Molecule(BaseRDKitMol):
@@ -127,3 +129,135 @@ class Molecule(BaseRDKitMol):
     @property
     def n_residues(self):
         return len(self.residues)
+
+
+def pdbqt_supplier(paths, template):
+    """Supplies molecules, given a path to PDBQT files
+
+    Parameters
+    ----------
+    paths : list
+        A list (or any iterable) of PDBQT files
+    template : rdkit.Chem.rdchem.Mol
+        A template molecule with the correct bond orders and charges. It must
+        match exactly the molecule inside the PDBQT file.
+
+    Returns
+    -------
+    suppl : generator
+        A generator object that will provide the :class:`Molecule` object as
+        you iterate over it.
+
+    Example
+    -------
+    The supplier is typically used like this::
+
+        >>> lig_suppl = pdbqt_supplier("docking/ligand1/*.pdbqt", template)
+        >>> for lig in lig_suppl:
+        ...     # do something with each ligand
+
+    """
+    for pdbqt_path in paths:
+        pdbqt = mda.Universe(pdbqt_path)
+        # set attributes needed by the converter
+        elements = [mda.topology.guessers.guess_atom_element(x)
+                    for x in pdbqt.atoms.names]
+        pdbqt.add_TopologyAttr("elements", elements)
+        pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
+        pdbqt.atoms.types = pdbqt.atoms.elements
+        # convert without infering bond orders and charges
+        mol = mda_to_rdkit(pdbqt.atoms, NoImplicit=False)
+        # assign BO from template then add hydrogens
+        mol = Chem.RemoveHs(mol, sanitize=False)
+        mol = AssignBondOrdersFromTemplate(template, mol)
+        mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)
+        yield Molecule(mol)
+
+
+def _patch_rdkit_mol(mol, resname="UNL", resnumber=1, chain=""):
+    """Patch an RDKit molecule with PDBResidueInfo for every atom"""
+    for atom in mol.GetAtoms():
+        mi = Chem.AtomPDBResidueInfo(atom.GetSymbol(),
+                                     residueName=resname,
+                                     residueNumber=resnumber,
+                                     chainId=chain)
+        atom.SetMonomerInfo(mi)
+
+
+def sdf_supplier(path, **kwargs):
+    """Supplies molecules, given a path to an SDFile
+    
+    Parameters
+    ----------
+    path : str
+        A path to the .sdf file
+    resname : str
+        Residue name for every ligand
+    resnumber : int
+        Residue number for every ligand
+    chain : str
+        Chain ID for every ligand
+
+    Returns
+    -------
+    suppl : generator
+        A generator object that will provide the :class:`Molecule` object as
+        you iterate over it.
+
+    Example
+    -------
+    The supplier is typically used like this::
+
+        >>> lig_suppl = sdf_supplier("docking/output.sdf")
+        >>> for lig in lig_suppl:
+        ...     # do something with each ligand
+
+    """
+    suppl = Chem.SDMolSupplier(path, removeHs=False)
+    for mol in suppl:
+        _patch_rdkit_mol(mol, **kwargs)
+        yield Molecule(mol)
+
+
+def mol2_supplier(path, **kwargs):
+    """Generates prolif.Molecule objects from a MOL2 file
+    
+    Parameters
+    ----------
+    path : str
+        A path to the .mol2 file
+    resname : str
+        Residue name for every ligand
+    resnumber : int
+        Residue number for every ligand
+    chain : str
+        Chain ID for every ligand
+
+    Returns
+    -------
+    suppl : generator
+        A generator object that will provide the :class:`Molecule` object as
+        you iterate over it.
+
+    Example
+    -------
+    The supplier is typically used like this::
+
+        >>> lig_suppl = mol2_supplier("docking/output.mol2")
+        >>> for lig in lig_suppl:
+        ...     # do something with each ligand
+
+    """
+    block = []
+    with open(path, "r") as f:
+        for line in f:
+            if block and line.startswith("@<TRIPOS>MOLECULE"):
+                mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
+                _patch_rdkit_mol(mol, **kwargs)
+                yield Molecule(mol)
+                block = []
+            block.append(line)
+        mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
+        _patch_rdkit_mol(mol, **kwargs)
+        yield Molecule(mol)
+                

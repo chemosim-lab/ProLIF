@@ -1,5 +1,9 @@
 import pytest
-from prolif.molecule import Molecule
+from prolif.molecule import (Molecule,
+                             pdbqt_supplier,
+                             mol2_supplier,
+                             sdf_supplier,
+                             _patch_rdkit_mol)
 from prolif.residue import ResidueId
 from .test_base import TestBaseRDKitMol, rdkit_mol, ligand_rdkit, u
 
