@@ -2,6 +2,7 @@
 Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
+import copy
 from operator import attrgetter
 import MDAnalysis as mda
 from rdkit import Chem
@@ -80,7 +81,7 @@ class Molecule(BaseRDKitMol):
     
     @classmethod
     def from_mda(cls, obj, selection=None, **kwargs):
-        """Create a Molecule from an MDAnalysis object
+        """Creates a Molecule from an MDAnalysis object
         
         Parameters
         ----------
@@ -112,6 +113,42 @@ class Molecule(BaseRDKitMol):
         """
         ag = obj.select_atoms(selection) if selection else obj.atoms
         mol = mda_to_rdkit(ag, **kwargs)
+        return cls(mol)
+    
+    @classmethod
+    def from_rdkit(cls, mol, resname="UNL", resnumber=1, chain=""):
+        """Creates a Molecule from an RDKit molecule
+        
+        While directly instantiating a molecule with ``prolif.Molecule(mol)``
+        would also work, this method insures that every atom is linked to an
+        AtomPDBResidueInfo which is required by ProLIF
+        
+        Parameters
+        ----------
+        mol : rdkit.Chem.rdchem.Mol
+            The input RDKit molecule
+        resname : str
+            The default residue name that is used if none was found
+        resnumber : int
+            The default residue number that is used if none was found
+        chain : str
+            The default chain Id that is used if none was found
+        
+        Notes
+        -----
+        This method only checks for an existing AtomPDBResidueInfo in the first
+        atom. If none was found, it will patch all atoms with the one created
+        from the method's arguments (resname, resnumber, chain).
+        """
+        if mol.GetAtomWithIdx(0).GetMonomerInfo():
+            return cls(mol)
+        mol = copy.deepcopy(mol)
+        for atom in mol.GetAtoms():
+            mi = Chem.AtomPDBResidueInfo(f" {atom.GetSymbol():<3.3}",
+                                         residueName=resname,
+                                         residueNumber=resnumber,
+                                         chainId=chain)
+            atom.SetMonomerInfo(mi)
         return cls(mol)
 
     def __iter__(self):
@@ -152,7 +189,9 @@ def pdbqt_supplier(paths, template):
     -------
     The supplier is typically used like this::
 
-        >>> lig_suppl = pdbqt_supplier("docking/ligand1/*.pdbqt", template)
+        >>> import glob
+        >>> pdbqts = glob.glob("docking/ligand1/*.pdbqt")
+        >>> lig_suppl = pdbqt_supplier(pdbqts, template)
         >>> for lig in lig_suppl:
         ...     # do something with each ligand
 
@@ -172,16 +211,6 @@ def pdbqt_supplier(paths, template):
         mol = AssignBondOrdersFromTemplate(template, mol)
         mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)
         yield Molecule(mol)
-
-
-def _patch_rdkit_mol(mol, resname="UNL", resnumber=1, chain=""):
-    """Patch an RDKit molecule with PDBResidueInfo for every atom"""
-    for atom in mol.GetAtoms():
-        mi = Chem.AtomPDBResidueInfo(atom.GetSymbol(),
-                                     residueName=resname,
-                                     residueNumber=resnumber,
-                                     chainId=chain)
-        atom.SetMonomerInfo(mi)
 
 
 def sdf_supplier(path, **kwargs):
@@ -215,8 +244,7 @@ def sdf_supplier(path, **kwargs):
     """
     suppl = Chem.SDMolSupplier(path, removeHs=False)
     for mol in suppl:
-        _patch_rdkit_mol(mol, **kwargs)
-        yield Molecule(mol)
+        yield Molecule.from_rdkit(mol, **kwargs)
 
 
 def mol2_supplier(path, **kwargs):
@@ -253,11 +281,9 @@ def mol2_supplier(path, **kwargs):
         for line in f:
             if block and line.startswith("@<TRIPOS>MOLECULE"):
                 mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
-                _patch_rdkit_mol(mol, **kwargs)
-                yield Molecule(mol)
+                yield Molecule.from_rdkit(mol, **kwargs)
                 block = []
             block.append(line)
         mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
-        _patch_rdkit_mol(mol, **kwargs)
-        yield Molecule(mol)
+        yield Molecule.from_rdkit(mol, **kwargs)
                 
