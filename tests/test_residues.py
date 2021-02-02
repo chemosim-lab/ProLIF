@@ -38,6 +38,7 @@ class TestResidueId:
         ("ALA", 1, None),
         ("ALA", None, "B"),
         ("ALA", 1, "B"),
+        ("DA", 1, None),
         (None, 1, "B"),
         (None, None, "B"),
         (None, 1, None),
@@ -93,6 +94,9 @@ class TestResidueId:
         (".0", (None, None, "0")),
         ("1", (None, 1, None)),
         ("", (None, None, None)),
+        ("DA2.A", ("DA", 2, "A")),
+        ("DA2", ("DA", 2, None)),
+        ("DA", ("DA", None, None)),
     ])
     def test_string_methods(self, resid_str, expected):
         resid = ResidueId.from_string(resid_str)
@@ -114,6 +118,17 @@ class TestResidueId:
         res1 = ResidueId.from_string(res1)
         res2 = ResidueId.from_string(res2)
         assert res1 < res2
+
+    @pytest.mark.parametrize("resid_str", [
+        "ALA1.A",
+        "DA2.B",
+        "HIS3",
+        "GLU",
+    ])
+    def test_repr(self, resid_str):
+        resid = ResidueId.from_string(resid_str)
+        expected = f"ResidueId({resid.name}, {resid.number}, {resid.chain})"
+        assert repr(resid) == expected
 
 
 class TestResidue(TestBaseRDKitMol):

@@ -9,7 +9,7 @@ import numpy as np
 from .rdkitmol import BaseRDKitMol
 
 
-_RE_RESID = re.compile(r'([A-Z]{3})?(\d*)\.?(\w)?')
+_RE_RESID = re.compile(r'([A-Z]{,3})?(\d*)\.?(\w)?')
 
 
 class ResidueId:
@@ -36,6 +36,9 @@ class ResidueId:
             self.resid += f".{self.chain}"
 
     def __repr__(self):
+        return f"ResidueId({self.name}, {self.number}, {self.chain})"
+
+    def __str__(self):
         return self.resid
 
     def __hash__(self):
