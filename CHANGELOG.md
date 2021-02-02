@@ -6,14 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Zenodo to automatically generate a DOI for new releases
+- Integration with Zenodo to automatically generate a DOI for new releases
 - Citation page
-- PDBQT section in the "How-to" notebook
-- Example PDBQT files from Vina in the data folder
+- Docking section in the Quickstart notebook (Issue #11)
+- PDBQT, MOL2 and SDF molecule suppliers to make it easier for users to use docking
+  results as input (Issue #11)
+- `Molecule.from_rdkit` classmethod to easily prepare RDKit molecules for ProLIF
 ### Changed
 - The visualisation notebook now displays the protein with py3Dmol. Some examples for
   creating and displaying a graph from the interaction dataframe have been added
 - Updated the installation instructions to show how to install a specific release
+- Added the `Fingerprint.run_from_iterable` method, which uses the new supplier functions
+  to quickly generate a fingerprint.
+- Sorted the output of `Fingerprint.list_available`
 ### Deprecated
 ### Removed
 ### Fixed
