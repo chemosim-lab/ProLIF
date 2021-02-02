@@ -158,9 +158,12 @@ class Fingerprint:
             underscore ``_``. Those are not supposed to be called directly)
         """
         if show_hidden:
-            return [name for name in _INTERACTIONS.keys()]
-        return [name for name in _INTERACTIONS.keys()
-                if not (name.startswith("_") or name == "Interaction")]
+            interactions = [name for name in _INTERACTIONS.keys()]
+        else:
+            interactions = [name for name in _INTERACTIONS.keys()
+                            if not (name.startswith("_")
+                                    or name == "Interaction")]
+        return sorted(interactions)
 
     @property
     def n_interactions(self):
@@ -286,6 +289,74 @@ class Fingerprint:
                     else:
                         value = self.bitvector(lres, pres)
                     data[(lresid, pres.resid)] = value
+            ifp.append(data)
+        self.ifp = ifp
+        return self
+
+    def run_from_iterable(self, lig_iterable, prot_mol, residues=None,
+            return_atoms=False, progress=True):
+        """Generates the fingerprint between a list of ligands and a protein
+
+        Parameters
+        ----------
+        lig_iterable : list or generator
+            An iterable yielding ligands as :class:`~prolif.molecule.Molecule`
+            objects
+        prot_mol : prolif.molecule.Molecule
+            The protein
+        residues : list or "all" or None
+            A list of protein residues (:class:`str`, :class:`int` or
+            :class:`~prolif.residue.ResidueId`) to take into account for
+            the fingerprint extraction.
+            If ``"all"``, all residues will be used.
+            If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
+            function is used to automatically use protein residues that are
+            distant of 6.0 Å or less from each ligand residue.
+        return_atoms : bool
+            For each residue pair and interaction, return indices of atoms
+            responsible for the interaction instead of bits.
+        progress : bool
+            Use the `tqdm <https://tqdm.github.io/>`_ package to display a
+            progressbar while running the calculation
+
+        Returns
+        -------
+        prolif.fingerprint.Fingerprint
+            The Fingerprint instance that generated the fingerprint
+        
+        Example
+        -------
+        ::
+
+            >>> prot = mda.Universe("protein.pdb")
+            >>> prot = plf.Molecule.from_mda(prot)
+            >>> lig_iter = plf.mol2_supplier("docking_output.mol2")
+            >>> fp = plf.Fingerprint()
+            >>> fp.run_from_iterable(lig_iter, prot)
+
+        """
+        iterator = tqdm(lig_iterable) if progress else lig_iterable
+        # set which residues to use
+        select_residues = False
+        if residues == "all":
+            resids = prot_mol.residues.keys()
+        elif isinstance(residues, Iterable):
+            resids = residues
+        else:
+            select_residues = True
+        ifp = []
+        for i, lig_mol in enumerate(iterator):
+            data = {"Frame": i}
+            lres = lig_mol[0]
+            if select_residues:
+                resids = get_residues_near_ligand(lres, prot_mol)
+            for prot_key in resids:
+                pres = prot_mol[prot_key]
+                if return_atoms:
+                    bv, value = self.bitvector_atoms(lres, pres)
+                else:
+                    value = self.bitvector(lres, pres)
+                data[(lres.resid, pres.resid)] = value
             ifp.append(data)
         self.ifp = ifp
         return self

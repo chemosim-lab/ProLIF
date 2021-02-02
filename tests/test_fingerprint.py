@@ -6,6 +6,8 @@ from prolif.fingerprint import (Fingerprint,
                                 _return_first_element)
 from prolif.interactions import Interaction
 from prolif.residue import ResidueId
+from prolif.datafiles import datapath
+from prolif.molecule import sdf_supplier
 from .test_base import protein_mol, ligand_mol, u, ligand_ag, protein_ag
 
 
@@ -104,6 +106,12 @@ class TestFingerprint:
         ifp.pop("Frame")
         atom_pair = list(ifp.values())[0]
         assert isinstance(atom_pair, list)
+    
+    def test_run_from_iterable(self, fp):
+        path = str(datapath / "vina" / "vina_output.sdf")
+        lig_suppl = list(sdf_supplier(path))
+        fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
+        assert len(fp.ifp) == 2
 
     def test_to_df(self, fp, fp_class):
         with pytest.raises(AttributeError, match="use the run method"):
