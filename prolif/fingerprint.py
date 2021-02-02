@@ -158,9 +158,12 @@ class Fingerprint:
             underscore ``_``. Those are not supposed to be called directly)
         """
         if show_hidden:
-            return [name for name in _INTERACTIONS.keys()]
-        return [name for name in _INTERACTIONS.keys()
-                if not (name.startswith("_") or name == "Interaction")]
+            interactions = [name for name in _INTERACTIONS.keys()]
+        else:
+            interactions = [name for name in _INTERACTIONS.keys()
+                            if not (name.startswith("_")
+                                    or name == "Interaction")]
+        return sorted(interactions)
 
     @property
     def n_interactions(self):
