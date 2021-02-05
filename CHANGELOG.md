@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+
+## [0.3.1] - 2021-02-02
+### Added
 - Integration with Zenodo to automatically generate a DOI for new releases
 - Citation page
 - Docking section in the Quickstart notebook (Issue #11)
