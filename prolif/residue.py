@@ -10,6 +10,7 @@ from .rdkitmol import BaseRDKitMol
 
 
 _RE_RESID = re.compile(r'([A-Z]{,3})?(\d*)\.?(\w)?')
+NoneType = type(None)
 
 
 class ResidueId:
@@ -17,29 +18,29 @@ class ResidueId:
     
     Parameters
     ----------
-    name : str or None, optionnal
+    name : str
         3-letter residue name
-    number : int or None, optionnal
+    number : int
         residue number
     chain : str or None, optionnal
         1-letter protein chain
     """
     def __init__(self,
-                 name: Optional[str] = None,
-                 number: Optional[int] = None,
+                 name: str = "UNK",
+                 number: int = 0,
                  chain: Optional[str] = None):
-        self.name = name or None
-        self.number = number or None
+        self.name = name or "UNK"
+        self.number = number or 0
         self.chain = chain or None
-        self.resid = f"{self.name or ''}{self.number or ''}"
-        if self.chain:
-            self.resid += f".{self.chain}"
 
     def __repr__(self):
         return f"ResidueId({self.name}, {self.number}, {self.chain})"
 
     def __str__(self):
-        return self.resid
+        resid = f"{self.name}{self.number}"
+        if self.chain:
+            resid += f".{self.chain}"
+        return resid
 
     def __hash__(self):
         return hash((self.name, self.number, self.chain))
@@ -88,23 +89,23 @@ class ResidueId:
         +-----------+----------------------------------+
         | "GLU33"   | ``ResidueId("GLU", 33, None)``   |
         +-----------+----------------------------------+
-        | "LYS.B"   | ``ResidueId("LYS", None, "B")``  |
+        | "LYS.B"   | ``ResidueId("LYS", 0, "B")``     |
         +-----------+----------------------------------+
-        | "ARG"     | ``ResidueId("ARG", None, None)`` |
+        | "ARG"     | ``ResidueId("ARG", 0, None)``    |
         +-----------+----------------------------------+
-        | "5.C"     | ``ResidueId(None, 5, "C")``      |
+        | "5.C"     | ``ResidueId("UNK", 5, "C")``     |
         +-----------+----------------------------------+
-        | "42"      | ``ResidueId(None, 42, None)``    |
+        | "42"      | ``ResidueId("UNK", 42, None)``   |
         +-----------+----------------------------------+
-        | ".D"      | ``ResidueId(None, None, "D")``   |
+        | ".D"      | ``ResidueId("UNK", 0, "D")``     |
         +-----------+----------------------------------+
-        | ""        | ``ResidueId(None, None, None)``  |
+        | ""        | ``ResidueId("UNK", 0, None)``    |
         +-----------+----------------------------------+
 
         """
         matches = _RE_RESID.search(resid_str)
         name, number, chain = matches.groups()
-        number = int(number) if number else None
+        number = int(number) if number else 0
         return cls(name, number, chain)
 
 
