@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- Default residue name and number: `UNK` and `0` are now the default values if `None` or
+  `''` is given
 ### Deprecated
 ### Removed
 ### Fixed
+- Residues with a resnumber of `0` are not converted to `None` anymore (Issue #13)
 
 ## [0.3.1] - 2021-02-02
 ### Added

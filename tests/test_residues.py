@@ -10,32 +10,30 @@ class TestResidueId:
     @pytest.mark.parametrize("name, number, chain", [
         ("ALA", None, None),
         ("ALA", 1, None),
+        ("ALA", 0, None),
         ("ALA", None, "B"),
         ("ALA", 1, "B"),
         (None, 1, "B"),
         (None, None, "B"),
         (None, 1, None),
         (None, None, None),
+        ("", None, None),
+        (None, None, ""),
+        ("", None, ""),
     ])
     def test_init(self, name, number, chain):
         resid = ResidueId(name, number, chain)
+        name = name or "UNK"
+        number = number or 0
+        chain = chain or None
         assert resid.name == name
         assert resid.number == number
         assert resid.chain == chain
-    
-    @pytest.mark.parametrize("name, number, chain", [
-        ("", None, None),
-        (None, 0, None),
-        (None, None, ""),
-        (None, None, None),
-    ])
-    def test_init_empty(self, name, number, chain):
-        resid = ResidueId(name, number, chain)
-        assert resid == ResidueId()
 
     @pytest.mark.parametrize("name, number, chain", [
         ("ALA", None, None),
         ("ALA", 1, None),
+        ("ALA", 0, None),
         ("ALA", None, "B"),
         ("ALA", 1, "B"),
         ("DA", 1, None),
@@ -43,28 +41,11 @@ class TestResidueId:
         (None, None, "B"),
         (None, 1, None),
         (None, None, None),
+        ("", None, None),
+        (None, None, ""),
+        ("", None, ""),
     ])
     def test_from_atom(self, name, number, chain):
-        atom = Chem.Atom(1)
-        mi = Chem.AtomPDBResidueInfo()
-        if name:
-            mi.SetResidueName(name)
-        if number:
-            mi.SetResidueNumber(number)
-        if chain:
-            mi.SetChainId(chain)
-        atom.SetMonomerInfo(mi)
-        resid = ResidueId.from_atom(atom)
-        assert resid.name == name
-        assert resid.number == number
-        assert resid.chain == chain
-
-    @pytest.mark.parametrize("name, number, chain", [
-        ("", None, None),
-        (None, 0, None),
-        (None, None, ""),
-    ])
-    def test_from_atom_empty(self, name, number, chain):
         atom = Chem.Atom(1)
         mi = Chem.AtomPDBResidueInfo()
         if name is not None:
@@ -75,33 +56,37 @@ class TestResidueId:
             mi.SetChainId(chain)
         atom.SetMonomerInfo(mi)
         resid = ResidueId.from_atom(atom)
-        assert resid == ResidueId()
+        name = name or "UNK"
+        number = number or 0
+        chain = chain or None
+        assert resid.name == name
+        assert resid.number == number
+        assert resid.chain == chain
 
     def test_from_atom_no_mi(self):
         atom = Chem.Atom(1)
         resid = ResidueId.from_atom(atom)
-        assert resid.name is None
-        assert resid.number is None
+        assert resid.name is "UNK"
+        assert resid.number is 0
         assert resid.chain is None
 
     @pytest.mark.parametrize("resid_str, expected", [
-        ("ALA", ("ALA", None, None)),
+        ("ALA", ("ALA", 0, None)),
         ("ALA1", ("ALA", 1, None)),
-        ("ALA.B", ("ALA", None, "B")),
+        ("ALA.B", ("ALA", 0, "B")),
         ("ALA1.B", ("ALA", 1, "B")),
-        ("1.B", (None, 1, "B")),
-        (".B", (None, None, "B")),
-        (".0", (None, None, "0")),
-        ("1", (None, 1, None)),
-        ("", (None, None, None)),
+        ("1.B", ("UNK", 1, "B")),
+        (".B", ("UNK", 0, "B")),
+        (".0", ("UNK", 0, "0")),
+        ("1", ("UNK", 1, None)),
+        ("", ("UNK", 0, None)),
         ("DA2.A", ("DA", 2, "A")),
         ("DA2", ("DA", 2, None)),
-        ("DA", ("DA", None, None)),
+        ("DA", ("DA", 0, None)),
     ])
-    def test_string_methods(self, resid_str, expected):
+    def test_from_string(self, resid_str, expected):
         resid = ResidueId.from_string(resid_str)
         assert resid == ResidueId(*expected)
-        assert str(resid) == resid_str
 
     def test_eq(self):
         name, number, chain = "ALA", 1, "A"
@@ -123,12 +108,13 @@ class TestResidueId:
         "ALA1.A",
         "DA2.B",
         "HIS3",
-        "GLU",
+        "UNK0"
     ])
     def test_repr(self, resid_str):
         resid = ResidueId.from_string(resid_str)
         expected = f"ResidueId({resid.name}, {resid.number}, {resid.chain})"
         assert repr(resid) == expected
+        assert str(resid) == resid_str
 
 
 class TestResidue(TestBaseRDKitMol):
