@@ -5,6 +5,8 @@ Helper functions --- :mod:`prolif.utils`
 from math import pi
 from collections import defaultdict
 from collections.abc import Iterable
+from functools import wraps
+from importlib.util import find_spec
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -18,6 +20,19 @@ from .residue import ResidueId
 
 
 _90_deg_to_rad = pi/2
+
+
+def requires(module):
+    def inner(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if find_spec(module):
+                return func(*args, **kwargs)
+            raise ModuleNotFoundError(
+                f"The module {module!r} is required to use {func.__name__!r} "
+                "but it is not installed!")
+        return wrapper
+    return inner
 
 
 def get_centroid(coordinates):
