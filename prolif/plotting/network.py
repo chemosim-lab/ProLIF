@@ -26,8 +26,15 @@ class LigNetwork:
             "Hydrophobic": "#59e382",
             "HBAcceptor": "#59bee3",
             "HBDonor": "#59bee3",
+            "XBAcceptor": "#59bee3",
+            "XBDonor": "#59bee3",
             "Cationic": "#e35959",
+            "Anionic": "#5979e3",
+            "CationPi": "#e359d8",
+            "PiCation": "#e359d8",
             "PiStacking": "#b559e3",
+            "EdgeToFace": "#b559e3",
+            "FaceToFace": "#b559e3",
         },
         "atoms": {
             "C": "black",
@@ -44,7 +51,7 @@ class LigNetwork:
             "Aliphatic": "#59e382",
             "Aromatic": "#b559e3",
             "Acidic": "#e35959",
-            "Basic": "#5979e",
+            "Basic": "#5979e3",
             "Polar": "#59bee3",
             "Sulfur": "#e3ce59"
         }
@@ -63,12 +70,20 @@ class LigNetwork:
         'GLU': "Acidic",
         'ARG': "Basic",
         'HIS': "Basic",
+        'HID': "Basic",
+        'HIE': "Basic",
+        'HIP': "Basic",
+        'HSD': "Basic",
+        'HSE': "Basic",
+        'HSP': "Basic",
         'LYS': "Basic",
         'SER': "Polar",
         'THR': "Polar",
         'ASN': "Polar",
         'GLN': "Polar",
         'CYS': "Sulfur",
+        'CYM': "Sulfur",
+        'CYX': "Sulfur",
         'MET': "Sulfur",
     }
     _LIG_PI_INTERACTIONS = ["EdgeToFace", "FaceToFace", "PiStacking", "PiCation"]
@@ -121,7 +136,8 @@ class LigNetwork:
         Parameters
         ----------
         df : pandas.DataFrame
-            Dataframe with ligand atom indices
+            Dataframe with a 4-level index (ligand, protein, interaction, atom)
+            and a weight column for values
         lig_mol : rdkit.Chem.rdChem.Mol
             Ligand molecule
         gen2D : bool
@@ -173,9 +189,25 @@ class LigNetwork:
         self.mol = mol
         self._multiplier = molsize
         self.options = {}
+        self._max_interaction_width = 6
+        self._avoidOverlap = .8
+        self._springConstant = .1
+        self._bond_color = "black"
         self._default_atom_color = "grey"
         self._default_residue_color = "#dbdbdb"
         self._default_interaction_color = "#dbdbdb"
+        # regroup interactions of the same color
+        temp = defaultdict(list)
+        interactions = set(df.index.get_level_values("interaction").unique())
+        for interaction, color in self.COLORS["interactions"].items():
+            if interaction in interactions:
+                temp[color].append(interaction)
+        self._interaction_types = {i: "/".join(t) for c, t in temp.items()
+                                                  for i in t}
+
+    @classmethod
+    def from_ifp(cls, obj):
+        pass
     
     def _make_carbon(self):
         return deepcopy(self._carbon)
@@ -184,7 +216,7 @@ class LigNetwork:
         """Prepare ligand atoms"""
         idx = atom.GetIdx()
         elem = atom.GetSymbol()
-        if (elem == "H") and (idx not in self.df.values):
+        if (elem == "H") and (idx not in self.df.index.get_level_values("atom")):
             self.exclude.append(idx)
             return
         charge = atom.GetFormalCharge()
@@ -216,7 +248,7 @@ class LigNetwork:
         })
         self.nodes[idx] = node
 
-    def _make_lig_edge(self, bond, color="black"):
+    def _make_lig_edge(self, bond):
         """Prepare ligand bonds"""
         idx = [bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()]
         if any(i in self.exclude for i in idx):
@@ -225,7 +257,7 @@ class LigNetwork:
         if btype == 1:
             self.edges.append({
                 'from': idx[0], 'to': idx[1],
-                'color': color,
+                'color': self._bond_color,
                 'physics': False,
                 'group': "ligand",
                 'width': 4,
@@ -233,7 +265,7 @@ class LigNetwork:
         else:
             self._make_non_single_bond(idx, btype)
     
-    def _make_non_single_bond(self, ids, btype, color="black", bdist=.06,
+    def _make_non_single_bond(self, ids, btype, bdist=.06,
         dash=[10]):
         """Prepare double, triple and aromatic bonds"""
         xyz = self.xyz[ids]
@@ -256,13 +288,13 @@ class LigNetwork:
         l1, l2, r1, r2 = nodes
         self.edges.extend([
             {'from': l1, 'to': l2,
-             'color': color,
+             'color': self._bond_color,
              'physics': False,
              'dashes': dashes,
              'group': "ligand",
              'width': 4},
             {'from': r1, 'to': r2,
-             'color': color,
+             'color': self._bond_color,
              'physics': False,
              'dashes': dashes,
              'group': "ligand",
@@ -271,7 +303,7 @@ class LigNetwork:
         if btype == 3:
             self.edges.append({
                 'from': ids[0], 'to': ids[1],
-                'color': color,
+                'color': self._bond_color,
                 'physics': False,
                 'group': "ligand",
                 'width': 4
@@ -295,10 +327,10 @@ class LigNetwork:
                 'physics': True,
                 'mass': mass,
                 'group': "protein",
-                'restype': restype,
+                'residue_type': restype,
             }
             self.nodes[prot_res] = node
-        for (lig_res, prot_res, interaction), (lig_id,) in self.df.iterrows():
+        for (lig_res, prot_res, interaction, lig_id), (weight,) in self.df.iterrows():
             if interaction in self._LIG_PI_INTERACTIONS:
                 centroid = self._get_ring_centroid(lig_id)
                 origin = str((lig_res, prot_res, interaction))
@@ -311,13 +343,14 @@ class LigNetwork:
             edge = {
                 'from': origin, 'to': prot_res,
                 'title': interaction,
+                'interaction_type': self._interaction_types[interaction],
                 'color': self.COLORS["interactions"].get(interaction,
                          self._default_interaction_color),
                 'smooth': {
                     'type': 'cubicBezier',
                     'roundness': .2},
                 'dashes': [10],
-                'width': 5,
+                'width': weight * self._max_interaction_width,
                 'group': "interaction",
             }
             self.edges.append(edge)
@@ -368,7 +401,7 @@ class LigNetwork:
         self.nodes = list(self.nodes.values())
     
     def _get_js(self, width="100%", height="500px", div_id="mynetwork",
-        fontsize=20, avoidOverlap=.1, springConstant=.1):
+        fontsize=20):
         """Returns the JavaScript code to draw the network"""
         self.width = width
         self.height = height
@@ -377,14 +410,12 @@ class LigNetwork:
             "width": width,
             "height": height,
             "nodes": {
-                "font": {
-                    "size": fontsize
-                },
+                "font": { "size": fontsize },
             },
             "physics": {
                 "barnesHut": {
-                    "avoidOverlap": avoidOverlap,
-                    "springConstant": springConstant
+                    "avoidOverlap": self._avoidOverlap,
+                    "springConstant": self._springConstant,
                 }
             }
         }
@@ -404,7 +435,8 @@ class LigNetwork:
         available = {}
         buttons = []
         map_color_restype = {c: t for t, c in self.COLORS["residues"].items()}
-        map_color_interactions = {c: i for i, c in self.COLORS["interactions"].items()}
+        map_color_interactions = {self.COLORS["interactions"][i]: t
+                                  for i, t in self._interaction_types.items()}
         # residues
         for node in self.nodes:
             if node.get("group", "") == "protein":
@@ -449,7 +481,7 @@ class LigNetwork:
                 edge_update = [];
             if (this.classList.contains("residues")) {
                 nodes.forEach((node) => {
-                    if (node.restype === this.innerHTML) {
+                    if (node.residue_type === this.innerHTML) {
                         node.hidden = !node.hidden;
                         node_update.push(node);
                     }
@@ -457,7 +489,7 @@ class LigNetwork:
                 ifp.body.data.nodes.update(node_update);
             } else {
                 edges.forEach((edge) => {
-                    if (edge.title === this.innerHTML) {
+                    if (edge.interaction_type === this.innerHTML) {
                         edge.hidden = !edge.hidden;
                         edge_update.push(edge);
                         var num_visible = edges.filter(x => x.to === edge.to)
@@ -496,7 +528,7 @@ class LigNetwork:
                 "border-radius": "5px",
                 "padding": "5px",
                 "margin": "5px",
-                "font": "16px 'Arial', sans-serif",
+                "font": "14px 'Arial', sans-serif",
             });
             button.onclick = legend_callback;
         });
