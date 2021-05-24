@@ -6,7 +6,6 @@ import re
 from html import escape
 import pandas as pd
 import numpy as np
-from IPython.display import HTML
 from rdkit import Chem
 from rdkit.Chem import rdDepictor
 from ..residue import ResidueId
@@ -108,6 +107,7 @@ class LigNetwork:
         <html>
         <head>
         <script type="text/javascript" src="https://unpkg.com/vis-network@9.0.4/dist/vis-network.min.js"></script>
+        <link href="https://unpkg.com/vis-network@9.0.4/dist/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
         <style type="text/css">
             body { padding: 0; margin: 0; }
             .legend-btn.residues.disabled {
