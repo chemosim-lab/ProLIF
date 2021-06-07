@@ -617,7 +617,7 @@ class LigNetwork:
 
     @requires("IPython.display")
     def show(self, filename, **kwargs):
-        """Save and display the network"""
+        """Save the network as HTML and display the resulting file"""
         html = self._get_html(**kwargs)
         with open(filename, "w") as f:
             f.write(html)
@@ -625,3 +625,9 @@ class LigNetwork:
                   'src="{filename}"></iframe>')
         return HTML(iframe.format(width=self.width, height=self.height,
                                   filename=filename))
+
+    def save(self, filename, **kwargs):
+        """Save the network to an HTML file"""
+        html = self._get_html(**kwargs)
+        with open(filename, "w") as f:
+            f.write(html)
