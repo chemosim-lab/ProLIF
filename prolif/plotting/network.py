@@ -132,7 +132,8 @@ class LigNetwork:
     
     def __init__(self, df, lig_mol, gen2D=False, kekulize=False, molsize=35,
         rotation=0, carbon=.16):
-        """
+        """Creates a ligand interaction diagram
+
         Parameters
         ----------
         df : pandas.DataFrame
@@ -206,8 +207,76 @@ class LigNetwork:
                                                   for i in t}
 
     @classmethod
-    def from_ifp(cls, obj):
-        pass
+    def from_ifp(cls, ifp, kind="aggregate", frame=0, threshold=.3, **kwargs):
+        """Creates a ligand interaction diagram from an IFP
+
+        Notes
+        -----
+        Two kinds of diagrams can be rendered: either for a designated frame or
+        by aggregating the results on the whole IFP and optionnally discarding
+        interactions that occur less frequently than a threshold. In the latter
+        case (aggregate), only the most frequent ligand atom interaction is
+        rendered.
+        
+        Parameters
+        ----------
+        ifp : pandas.DataFrame
+            The result of ``fp.to_dataframe()``
+        kind : str
+            One of "aggregate" or "frame"
+        frame : int or str
+            Frame number, as read in ``ifp.index``. Only applicable for
+            ``kind="frame"``
+        threshold : float
+            Frequency threshold, between 0 and 1. Only applicable for
+            ``kind="aggregate"``
+        kwargs : object
+            Other arguments passed to the :class:`LigNetwork` class
+        """
+        if kind == "aggregate":
+            data = (pd.get_dummies(ifp.applymap(lambda x: x[0])
+                                      .astype(object),
+                                   prefix_sep=", ")
+                      .rename(columns=lambda x:
+                              x.translate({ord(c): None for c in "()'"}))
+                      .mean()
+            )
+            index = [i.split(", ") for i in data.index]
+            index = [[j for j in i[:-1]+[int(float(i[-1]))]] for i in index]
+            data.index = pd.MultiIndex.from_tuples(index,
+                names=["ligand", "protein", "interaction", "atom"])
+            data = data.to_frame()
+            data.rename(columns={data.columns[-1]: "weight"}, inplace=True)
+            # merge different ligand atoms before applying the threshold
+            data = data.join(
+                data.groupby(level=["ligand", "protein", "interaction"]).sum(),
+                rsuffix="_total")
+            # threshold and keep most occuring atom
+            data = (data
+                    .loc[data["weight_total"] >= threshold]
+                    .drop(columns="weight_total")
+                    .sort_values("weight", ascending=False)
+                    .groupby(level=["ligand", "protein", "interaction"])
+                    .head(1)
+                    .sort_index()
+            )
+            return cls(data, **kwargs)
+        elif kind == "frame":
+            data = (ifp
+                    .loc[ifp.index == frame]
+                    .T
+                    .applymap(lambda x: x[0])
+                    .dropna()
+                    .astype(int)
+                    .reset_index()
+            )
+            data.rename(columns={data.columns[-1]: "atom"}, inplace=True)
+            data["weight"] = 1
+            data.set_index(["ligand", "protein", "interaction", "atom"],
+                        inplace=True)
+            return cls(data, **kwargs)
+        else:
+            raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
     
     def _make_carbon(self):
         return deepcopy(self._carbon)
@@ -431,7 +500,7 @@ class LigNetwork:
         """Returns the HTML code to draw the network"""
         return self._HTML_TEMPLATE % dict(js=self._get_js(**kwargs))
     
-    def _get_legend(self, width="100%", height="90px", **kwargs):
+    def _get_legend(self, height="90px"):
         available = {}
         buttons = []
         map_color_restype = {c: t for t, c in self.COLORS["residues"].items()}
@@ -493,9 +562,9 @@ class LigNetwork:
                         edge.hidden = !edge.hidden;
                         edge_update.push(edge);
                         var num_visible = edges.filter(x => x.to === edge.to)
-                                                .map(x => Boolean(x.hidden))
-                                                .filter(x => !x)
-                                                .length;
+                                               .map(x => Boolean(x.hidden))
+                                               .filter(x => !x)
+                                               .length;
                         var ix = nodes.findIndex(x => x.id === edge.to);
                         if ((num_visible === 0) || (nodes[ix].hidden)) {
                             nodes[ix].hidden = !nodes[ix].hidden;
@@ -545,3 +614,14 @@ class LigNetwork:
                   'srcdoc="{doc}"></iframe>')
         return HTML(iframe.format(width=self.width, height=self.height,
                                   doc=escape(html)))
+
+    @requires("IPython.display")
+    def show(self, filename, **kwargs):
+        """Save and display the network"""
+        html = self._get_html(**kwargs)
+        with open(filename, "w") as f:
+            f.write(html)
+        iframe = ('<iframe width="{width}" height="{height}" frameborder="0" '
+                  'src="{filename}"></iframe>')
+        return HTML(iframe.format(width=self.width, height=self.height,
+                                  filename=html))
