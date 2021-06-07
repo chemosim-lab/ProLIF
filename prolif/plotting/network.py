@@ -207,7 +207,8 @@ class LigNetwork:
                                                   for i in t}
 
     @classmethod
-    def from_ifp(cls, ifp, kind="aggregate", frame=0, threshold=.3, **kwargs):
+    def from_ifp(cls, ifp, lig, kind="aggregate", frame=0, threshold=.3,
+        **kwargs):
         """Creates a ligand interaction diagram from an IFP
 
         Notes
@@ -222,6 +223,8 @@ class LigNetwork:
         ----------
         ifp : pandas.DataFrame
             The result of ``fp.to_dataframe()``
+        lig : MDAnalysis.core.groups.AtomGroup
+            Ligand AtomGroup
         kind : str
             One of "aggregate" or "frame"
         frame : int or str
@@ -233,6 +236,8 @@ class LigNetwork:
         kwargs : object
             Other arguments passed to the :class:`LigNetwork` class
         """
+        # ligand mol
+        mol = lig.convert_to.rdkit()
         if kind == "aggregate":
             data = (pd.get_dummies(ifp.applymap(lambda x: x[0])
                                       .astype(object),
@@ -260,7 +265,7 @@ class LigNetwork:
                     .head(1)
                     .sort_index()
             )
-            return cls(data, **kwargs)
+            return cls(data, mol, **kwargs)
         elif kind == "frame":
             data = (ifp
                     .loc[ifp.index == frame]
@@ -274,7 +279,7 @@ class LigNetwork:
             data["weight"] = 1
             data.set_index(["ligand", "protein", "interaction", "atom"],
                         inplace=True)
-            return cls(data, **kwargs)
+            return cls(data, mol, **kwargs)
         else:
             raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
     
@@ -626,8 +631,17 @@ class LigNetwork:
         return HTML(iframe.format(width=self.width, height=self.height,
                                   filename=filename))
 
-    def save(self, filename, **kwargs):
-        """Save the network to an HTML file"""
+    def save(self, fp, **kwargs):
+        """Save the network to an HTML file
+        
+        Parameters
+        ----------
+        fp : str or file-like object
+            Name of the output file, or file-like object
+        """
         html = self._get_html(**kwargs)
-        with open(filename, "w") as f:
-            f.write(html)
+        try:
+            fp.write(html)
+        except AttributeError:
+            with open(fp, "w") as f:
+                f.write(html)
