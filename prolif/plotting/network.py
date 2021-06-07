@@ -624,4 +624,4 @@ class LigNetwork:
         iframe = ('<iframe width="{width}" height="{height}" frameborder="0" '
                   'src="{filename}"></iframe>')
         return HTML(iframe.format(width=self.width, height=self.height,
-                                  filename=html))
+                                  filename=filename))
