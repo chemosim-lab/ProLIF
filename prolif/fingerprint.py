@@ -209,17 +209,24 @@ class Fingerprint:
         -------
         bitvector : numpy.ndarray
             An array storing the encoded interactions between res1 and res2
-        atoms : list
-            A list containing tuples of (res1_atom_index, res2_atom_index) for
+        lig_atoms : list
+            A list containing indices for the ligand atoms responsible for each
+            interaction
+        pro_atoms : list
+            A list containing indices for the protein atoms responsible for
             each interaction
         """
         bitvector = []
-        atoms_lst = []
+        lig_atoms = []
+        prot_atoms = []
         for func in self.interactions.values():
-            bit, *atoms = func.__wrapped__(res1, res2)
+            bit, la, pa = func.__wrapped__(res1, res2)
             bitvector.append(bit)
-            atoms_lst.append(atoms)
+            lig_atoms.append(la)
+            prot_atoms.append(pa)
         bitvector = np.array(bitvector)
+        return bitvector, lig_atoms, prot_atoms
+
     def generate(self, lig, prot, residues=None, return_atoms=False):
         """Generates the interaction fingerprint between 2 molecules
 
@@ -279,8 +286,7 @@ class Fingerprint:
         return ifp
                 
 
-    def run(self, traj, lig, prot, residues=None, return_atoms=False,
-            progress=True):
+    def run(self, traj, lig, prot, residues=None, progress=True):
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
         Parameters
@@ -300,9 +306,6 @@ class Fingerprint:
             If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
             function is used to automatically use protein residues that are
             distant of 6.0 Å or less from each ligand residue.
-        return_atoms : bool
-            For each residue pair and interaction, return indices of atoms
-            responsible for the interaction instead of bits.
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
@@ -321,10 +324,11 @@ class Fingerprint:
             >>> prot = u.select_atoms("protein")
             >>> fp = prolif.Fingerprint().run(u.trajectory[:10], lig, prot)
 
+        .. versionchanged : 0.3.2
+            Moved the ``return_atoms`` parameter from the ``run`` method to the
+            dataframe conversion code
         """
         iterator = tqdm(traj) if progress else traj
-        # set which residues to use
-        select_residues = False
         if residues == "all":
             residues = Molecule.from_mda(prot).residues.keys()
         ifp = []
@@ -339,7 +343,7 @@ class Fingerprint:
         return self
 
     def run_from_iterable(self, lig_iterable, prot_mol, residues=None,
-            return_atoms=False, progress=True):
+        progress=True):
         """Generates the fingerprint between a list of ligands and a protein
 
         Parameters
@@ -357,9 +361,6 @@ class Fingerprint:
             If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
             function is used to automatically use protein residues that are
             distant of 6.0 Å or less from each ligand residue.
-        return_atoms : bool
-            For each residue pair and interaction, return indices of atoms
-            responsible for the interaction instead of bits.
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
@@ -379,6 +380,14 @@ class Fingerprint:
             >>> fp = plf.Fingerprint()
             >>> fp.run_from_iterable(lig_iter, prot)
 
+        Notes
+        -----
+        See :meth:`~Fingerprint.generate` to generate the fingerprint between
+        two single structures
+
+        .. versionchanged : 0.3.2
+            Moved the ``return_atoms`` parameter from the ``run_from_iterable``
+            method to the dataframe conversion code
         """
         iterator = tqdm(lig_iterable) if progress else lig_iterable
         # set which residues to use
@@ -404,6 +413,9 @@ class Fingerprint:
             keep the data as is
         drop_empty : bool
             Drop columns with only empty values
+        return_atoms : bool
+            For each residue pair and interaction, return indices of atoms
+            responsible for the interaction instead of bits
 
         Returns
         -------
@@ -433,7 +445,7 @@ class Fingerprint:
         """
         if hasattr(self, "ifp"):
             return to_dataframe(self.ifp, self.interactions.keys(), **kwargs)
-        raise AttributeError("Please use the run method before")
+        raise AttributeError("Please use the `run` method before")
 
     def to_bitvectors(self):
         """Converts fingerprints to a list of RDKit ExplicitBitVector
@@ -462,4 +474,4 @@ class Fingerprint:
         if hasattr(self, "ifp"):
             df = self.to_dataframe()
             return to_bitvectors(df)
-        raise AttributeError("Please use the run method before")
+        raise AttributeError("Please use the `run` method before")
