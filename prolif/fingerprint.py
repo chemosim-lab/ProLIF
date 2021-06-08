@@ -220,7 +220,64 @@ class Fingerprint:
             bitvector.append(bit)
             atoms_lst.append(atoms)
         bitvector = np.array(bitvector)
-        return bitvector, atoms_lst
+    def generate(self, lig, prot, residues=None, return_atoms=False):
+        """Generates the interaction fingerprint between 2 molecules
+
+        Parameters
+        ----------
+        lig : prolif.molecule.Molecule
+            Molecule for the ligand
+        prot : prolif.molecule.Molecule
+            Molecule for the protein
+        residues : list or "all" or None
+            A list of protein residues (:class:`str`, :class:`int` or
+            :class:`~prolif.residue.ResidueId`) to take into account for
+            the fingerprint extraction.
+            If ``"all"``, all residues will be used.
+            If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
+            function is used to automatically use protein residues that are
+            distant of 6.0 Å or less from each ligand residue.
+        return_atoms : bool
+            For each residue pair and interaction, return indices of atoms
+            responsible for the interaction instead of bits.
+
+        Returns
+        -------
+        ifp : dict
+            A dictionnary indexed by ``(ligand, protein)`` residue pairs. The
+            format for values will depend on ``return_atoms``:
+
+            - A single bitvector if ``return_atoms=False``
+            - A tuple of bitvector, ligand atom indices and protein atom
+              indices if``return_atoms=True``
+
+        Example
+        -------
+        ::
+
+            >>> u = mda.Universe("complex.pdb")
+            >>> lig = plf.Molecule.from_mda(u, "resname LIG")
+            >>> prot = plf.Molecule.from_mda(u, "protein")
+            >>> fp = prolif.Fingerprint()
+            >>> ifp = fp.generate(lig, prot)
+
+        .. versionadded: 0.3.2
+        """
+        ifp = {}
+        if residues == "all":
+            residues = prot.residues.keys()
+        for lresid, lres in lig.residues.items():
+            if residues is None:
+                residues = get_residues_near_ligand(lres, prot)
+            for prot_key in residues:
+                pres = prot[prot_key]
+                key = (lresid, pres.resid)
+                if return_atoms:
+                    ifp[key] = self.bitvector_atoms(lres, pres)
+                else:
+                    ifp[key] = self.bitvector(lres, pres)
+        return ifp
+                
 
     def run(self, traj, lig, prot, residues=None, return_atoms=False,
             progress=True):
@@ -269,26 +326,14 @@ class Fingerprint:
         # set which residues to use
         select_residues = False
         if residues == "all":
-            resids = Molecule.from_mda(prot).residues.keys()
-        elif isinstance(residues, Iterable):
-            resids = residues
-        else:
-            select_residues = True
+            residues = Molecule.from_mda(prot).residues.keys()
         ifp = []
         for ts in iterator:
             prot_mol = Molecule.from_mda(prot)
             lig_mol = Molecule.from_mda(lig)
-            data = {"Frame": ts.frame}
-            for lresid, lres in lig_mol.residues.items():
-                if select_residues:
-                    resids = get_residues_near_ligand(lres, prot_mol)
-                for prot_key in resids:
-                    pres = prot_mol[prot_key]
-                    if return_atoms:
-                        bv, value = self.bitvector_atoms(lres, pres)
-                    else:
-                        value = self.bitvector(lres, pres)
-                    data[(lresid, pres.resid)] = value
+            data = self.generate(lig_mol, prot_mol, residues=residues,
+                                 return_atoms=True)
+            data["Frame"] = ts.frame
             ifp.append(data)
         self.ifp = ifp
         return self
@@ -339,24 +384,12 @@ class Fingerprint:
         # set which residues to use
         select_residues = False
         if residues == "all":
-            resids = prot_mol.residues.keys()
-        elif isinstance(residues, Iterable):
-            resids = residues
-        else:
-            select_residues = True
+            residues = prot_mol.residues.keys()
         ifp = []
         for i, lig_mol in enumerate(iterator):
-            data = {"Frame": i}
-            lres = lig_mol[0]
-            if select_residues:
-                resids = get_residues_near_ligand(lres, prot_mol)
-            for prot_key in resids:
-                pres = prot_mol[prot_key]
-                if return_atoms:
-                    bv, value = self.bitvector_atoms(lres, pres)
-                else:
-                    value = self.bitvector(lres, pres)
-                data[(lres.resid, pres.resid)] = value
+            data = self.generate(lig_mol, prot_mol, residues=residues,
+                                 return_atoms=True)
+            data["Frame"] = i
             ifp.append(data)
         self.ifp = ifp
         return self

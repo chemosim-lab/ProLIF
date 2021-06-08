@@ -98,7 +98,12 @@ class TestFingerprint:
         assert (lig_id, res) in fp_class.ifp[0].keys()
         u.trajectory[0]
 
-    def test_run_return_atoms(self, fp_class):
+    def test_generate(self, fp_class):
+        ifp = fp_class.generate(ligand_mol, protein_mol)
+        key = (ResidueId("LIG", 1, "G"), ResidueId("THR", 355, "B"))
+        bv = ifp[key]
+        assert isinstance(bv, np.ndarray)
+        assert bv[0] == True
         fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
                      residues=None, progress=False, return_atoms=True)
         assert hasattr(fp_class, "ifp")
