@@ -1,3 +1,7 @@
+"""
+Plot a Ligand Interaction Network --- :mod:`prolif.plotting.network`
+====================================================================
+"""
 from copy import deepcopy
 from collections import defaultdict
 import warnings
@@ -209,7 +213,8 @@ class LigNetwork:
     @classmethod
     def from_ifp(cls, ifp, lig, kind="aggregate", frame=0, threshold=.3,
         **kwargs):
-        """Creates a ligand interaction diagram from an IFP
+        """Helper method to create a ligand interaction diagram from an IFP
+        DataFrame obtained with ``fp.to_dataframe(return_atoms=True)``
 
         Notes
         -----
@@ -222,7 +227,7 @@ class LigNetwork:
         Parameters
         ----------
         ifp : pandas.DataFrame
-            The result of ``fp.to_dataframe()``
+            The result of ``fp.to_dataframe(return_atoms=True)``
         lig : MDAnalysis.core.groups.AtomGroup
             Ligand AtomGroup
         kind : str
