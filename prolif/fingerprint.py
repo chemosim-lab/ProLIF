@@ -20,7 +20,6 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     
 """
 from functools import wraps
-from collections.abc import Iterable
 import numpy as np
 from tqdm.auto import tqdm
 from .interactions import _INTERACTIONS
@@ -390,8 +389,6 @@ class Fingerprint:
             method to the dataframe conversion code
         """
         iterator = tqdm(lig_iterable) if progress else lig_iterable
-        # set which residues to use
-        select_residues = False
         if residues == "all":
             residues = prot_mol.residues.keys()
         ifp = []
