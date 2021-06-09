@@ -8,7 +8,6 @@ from .utils import (get_residues_near_ligand,
                     to_dataframe,
                     to_bitvectors)
 from . import datafiles
-from . import plotting
 from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
