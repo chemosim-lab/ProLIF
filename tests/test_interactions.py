@@ -98,6 +98,10 @@ class TestInteractions:
         with pytest.raises(TypeError,
                            match="Can't instantiate abstract class Dummy"):
             Dummy()
+        # fix Dummy class being instanciated in later unrelated tests
+        class Dummy(Interaction):
+            def detect(self):
+                pass
 
     @pytest.mark.parametrize("index", [
         0, 1, 3, 42, 78
