@@ -13,7 +13,7 @@ defaults:
     shell: bash -l {0}
 
 concurrency:
-  group: "${{ github.repository }}-${{ github.ref }}"
+  group: "${{ github.ref }}-${{ github.head_ref }}"
   cancel-in-progress: true
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
 
     - name: GitHub Actions
       run: |
-        echo "${{ github.repository }}-${{ github.ref }}"
+        echo "${{ github.ref }}-${{ github.head_ref }}"
 
     - name: Setup Conda
       uses: conda-incubator/setup-miniconda@v2
