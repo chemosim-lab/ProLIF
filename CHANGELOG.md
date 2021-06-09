@@ -6,9 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- LigNetwork: an interaction diagram with atomistic details for the ligand and
+  residue-level details for the protein, fully interactive in a browser/notebook, inspired
+  from LigPlot (PR #19)
+- `fp.generate`: a method to get the IFP between two `prolif.Molecule` objects (PR #19)
 ### Changed
 - Default residue name and number: `UNK` and `0` are now the default values if `None` or
   `''` is given
+- The Hydrophobic interaction now uses `+0` (no charge) instead of `!$([+{1-},-{1-}])`
+  (not negatively or positively charged) for part of its SMARTS pattern (PR #19)
+- Moved the `return_atoms` parameter from the `run` methods to `to_dataframe` to avoid
+  recalculating the IFP if one wants to display it with atomic details (PR #19)
 ### Deprecated
 ### Removed
 ### Fixed
