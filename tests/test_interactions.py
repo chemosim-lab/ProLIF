@@ -2,6 +2,7 @@ import pytest
 from rdkit import RDLogger
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import _INTERACTIONS, Interaction, get_mapindex
+import prolif
 from .test_base import ligand_mol
 from . import mol2factory
 
@@ -91,6 +92,9 @@ class TestInteractions:
                     pass
         new = id(_INTERACTIONS["Hydrophobic"])
         assert old != new
+        # fix dummy Hydrophobic class being reused in later unrelated tests
+        class Hydrophobic(prolif.interactions.Hydrophobic):
+            pass
 
     def test_error_no_detect(self):
         class Dummy(Interaction):
@@ -98,7 +102,7 @@ class TestInteractions:
         with pytest.raises(TypeError,
                            match="Can't instantiate abstract class Dummy"):
             Dummy()
-        # fix Dummy class being instanciated in later unrelated tests
+        # fix Dummy class being reused in later unrelated tests
         class Dummy(Interaction):
             def detect(self):
                 pass
