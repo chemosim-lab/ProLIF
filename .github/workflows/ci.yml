@@ -12,6 +12,10 @@ defaults:
   run:
     shell: bash -l {0}
 
+concurrency:
+  group: "${{ github.repository }}-${{ github.ref }}"
+  cancel-in-progress: true
+
 jobs:
   tests:
     name: CI on ${{ matrix.os }} with Python ${{ matrix.python-version }}
@@ -25,6 +29,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+
+    - name: GitHub Actions
+      run: |
+        echo "${{ github.repository }}-${{ github.ref }}"
 
     - name: Setup Conda
       uses: conda-incubator/setup-miniconda@v2
