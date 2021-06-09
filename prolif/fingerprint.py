@@ -270,12 +270,13 @@ class Fingerprint:
         .. versionadded: 0.3.2
         """
         ifp = {}
+        resids = residues
         if residues == "all":
-            residues = prot.residues.keys()
+            resids = prot.residues.keys()
         for lresid, lres in lig.residues.items():
             if residues is None:
-                residues = get_residues_near_ligand(lres, prot)
-            for prot_key in residues:
+                resids = get_residues_near_ligand(lres, prot)
+            for prot_key in resids:
                 pres = prot[prot_key]
                 key = (lresid, pres.resid)
                 if return_atoms:
