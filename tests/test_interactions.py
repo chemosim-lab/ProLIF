@@ -87,7 +87,8 @@ class TestInteractions:
         with pytest.warns(UserWarning,
                           match="interaction has been superseded"):
             class Hydrophobic(Interaction):
-                pass
+                def detect(self):
+                    pass
         new = id(_INTERACTIONS["Hydrophobic"])
         assert old != new
 
