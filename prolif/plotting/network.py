@@ -59,7 +59,7 @@ class LigNetwork:
             "Sulfur": "#e3ce59"
         }
     }
-    RESIDUES_TYPES = {
+    RESIDUE_TYPES = {
         'ALA': "Aliphatic",
         'GLY': "Aliphatic",
         'ILE': "Aliphatic",
@@ -113,7 +113,11 @@ class LigNetwork:
         <script type="text/javascript" src="https://unpkg.com/vis-network@9.0.4/dist/vis-network.min.js"></script>
         <link href="https://unpkg.com/vis-network@9.0.4/dist/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
         <style type="text/css">
-            body { padding: 0; margin: 0; }
+            body {
+                padding: 0;
+                margin: 0;
+                background: #fff;
+            }
             .legend-btn.residues.disabled {
                 background: #b4b4b4 !important;
                 color: #555 !important;
@@ -138,6 +142,20 @@ class LigNetwork:
         rotation=0, carbon=.16):
         """Creates a ligand interaction diagram
 
+        Attributes
+        ----------
+        COLORS : dict
+            Dictionnary of colors used in the diagram. Subdivided in several
+            dictionaries:
+
+            - "interactions": mapping between interactions types and colors
+            - "atoms": mapping between atom symbol and colors
+            - "residues": mapping between residues types and colors
+
+        RESIDUE_TYPES : dict
+            Mapping between residue names (3 letter code) and types. The types
+            are then used to define how each residue should be colored.
+
         Parameters
         ----------
         df : pandas.DataFrame
@@ -158,6 +176,14 @@ class LigNetwork:
         carbon : float
             Size of the carbon atom dots on the depiction. Use `0` to hide the
             carbon dots
+
+        Notes
+        -----
+        You can customize the diagram by tweaking :attr:`LigNetwork.COLORS` and
+        :attr:`LigNetwork.RESIDUE_TYPES` by adding or modifying the
+        dictionaries inplace.
+
+        .. versionadded: 0.3.2
         """
         self.df = df
         mol = deepcopy(lig_mol)
@@ -228,8 +254,8 @@ class LigNetwork:
         ----------
         ifp : pandas.DataFrame
             The result of ``fp.to_dataframe(return_atoms=True)``
-        lig : MDAnalysis.core.groups.AtomGroup
-            Ligand AtomGroup
+        lig : rdkit.Chem.rdChem.Mol
+            Ligand molecule
         kind : str
             One of "aggregate" or "frame"
         frame : int or str
@@ -241,8 +267,6 @@ class LigNetwork:
         kwargs : object
             Other arguments passed to the :class:`LigNetwork` class
         """
-        # ligand mol
-        mol = lig.convert_to.rdkit()
         if kind == "aggregate":
             data = (pd.get_dummies(ifp.applymap(lambda x: x[0])
                                       .astype(object),
@@ -270,7 +294,7 @@ class LigNetwork:
                     .head(1)
                     .sort_index()
             )
-            return cls(data, mol, **kwargs)
+            return cls(data, lig, **kwargs)
         elif kind == "frame":
             data = (ifp
                     .loc[ifp.index == frame]
@@ -284,7 +308,7 @@ class LigNetwork:
             data["weight"] = 1
             data.set_index(["ligand", "protein", "interaction", "atom"],
                         inplace=True)
-            return cls(data, mol, **kwargs)
+            return cls(data, lig, **kwargs)
         else:
             raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
     
@@ -393,7 +417,7 @@ class LigNetwork:
         restypes = {}
         for prot_res in self.df.index.get_level_values("protein").unique():
             resname = ResidueId.from_string(prot_res).name
-            restype = self.RESIDUES_TYPES.get(resname)
+            restype = self.RESIDUE_TYPES.get(resname)
             restypes[prot_res] = restype
             color = self.COLORS["residues"].get(restype,
                     self._default_residue_color)

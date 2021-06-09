@@ -12,6 +12,7 @@ def lignetwork_data():
     fp = plf.Fingerprint(["Hydrophobic"])
     fp.run(u.trajectory, lig, prot)
     df = fp.to_dataframe(return_atoms=True)
+    lig = plf.Molecule.from_mda(lig)
     return lig, df
 
 
