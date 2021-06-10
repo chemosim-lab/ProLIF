@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   tests:
-    name: CI on ${{ matrix.os }} with Python ${{ matrix.python-version }}
+    name: CI - ${{ matrix.os }} / Py${{ matrix.python-version }} / {{ matrix.rdkit-version }}
     runs-on: ${{ matrix.os }}
     # only run once if internal PR
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
