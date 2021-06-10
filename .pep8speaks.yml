@@ -1,0 +1,6 @@
+scanner:
+  diff_only: False
+  linter: pycodestyle  # Alternative option - flake8
+
+pycodestyle:
+  max-line-length: 79
