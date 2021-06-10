@@ -105,7 +105,7 @@ class TestFingerprint:
         key = (ResidueId("LIG", 1, "G"), ResidueId("THR", 355, "B"))
         bv = ifp[key]
         assert isinstance(bv, np.ndarray)
-        assert bv[0] is True
+        assert bv[0] is np.True_
 
     def test_run(self, fp_class):
         fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
