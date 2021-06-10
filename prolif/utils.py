@@ -22,7 +22,7 @@ from .residue import ResidueId
 _90_deg_to_rad = pi/2
 
 
-def requires(module):
+def requires(module):  # pragma: no cover
     def inner(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
