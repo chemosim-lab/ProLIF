@@ -21,7 +21,7 @@ from jupyter_client import kernelspec
 # -- Project information -----------------------------------------------------
 
 project = 'ProLIF'
-copyright = '2020, Cédric Bouysset'
+copyright = '2020-2021, Cédric Bouysset'
 author = 'Cédric Bouysset'
 
 
