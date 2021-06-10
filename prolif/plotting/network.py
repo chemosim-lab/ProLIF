@@ -1,6 +1,10 @@
 """
 Plot a Ligand Interaction Network --- :mod:`prolif.plotting.network`
 ====================================================================
+
+.. autoclass:: LigNetwork
+   :members:
+
 """
 from copy import deepcopy
 from collections import defaultdict
@@ -275,8 +279,7 @@ class LigNetwork:
                                    prefix_sep=", ")
                       .rename(columns=lambda x:
                               x.translate({ord(c): None for c in "()'"}))
-                      .mean()
-                   )
+                      .mean())
             index = [i.split(", ") for i in data.index]
             index = [[j for j in i[:-1]+[int(float(i[-1]))]] for i in index]
             data.index = pd.MultiIndex.from_tuples(
@@ -295,8 +298,7 @@ class LigNetwork:
                     .sort_values("weight", ascending=False)
                     .groupby(level=["ligand", "protein", "interaction"])
                     .head(1)
-                    .sort_index()
-                   )
+                    .sort_index())
             return cls(data, lig, **kwargs)
         elif kind == "frame":
             data = (ifp
@@ -305,8 +307,7 @@ class LigNetwork:
                     .applymap(lambda x: x[0])
                     .dropna()
                     .astype(int)
-                    .reset_index()
-                   )
+                    .reset_index())
             data.rename(columns={data.columns[-1]: "atom"}, inplace=True)
             data["weight"] = 1
             data.set_index(["ligand", "protein", "interaction", "atom"],
@@ -553,7 +554,7 @@ class LigNetwork:
                 color = node["color"]
                 available[color] = map_color_restype.get(color, "Unknown")
         available = {k: v for k, v in sorted(available.items(),
-                                             key=lambda item: item[1])}       
+                                             key=lambda item: item[1])}   
         for i, (color, restype) in enumerate(available.items()):
             buttons.append({
                 "index": i,
