@@ -190,7 +190,7 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
         ...
 
     .. versionchanged:: 0.3.2
-        Moved the `return_atoms` parameter from the `run` methods to the
+        Moved the ``return_atoms`` parameter from the ``run`` methods to the
         dataframe conversion code
     """
     if dtype and return_atoms:

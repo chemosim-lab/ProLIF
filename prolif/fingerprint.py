@@ -188,7 +188,6 @@ class Fingerprint:
         -------
         bitvector : numpy.ndarray
             An array storing the encoded interactions between res1 and res2
-
         """
         bitvector = []
         for func in self.interactions.values():
@@ -218,6 +217,10 @@ class Fingerprint:
         pro_atoms : list
             A list containing indices for the protein atoms responsible for
             each interaction
+        
+        .. versionchanged:: 0.3.2
+            Returns atom indices as two separate lists instead of a single list
+            of tuples
         """
         bitvector = []
         lig_atoms = []
@@ -259,7 +262,7 @@ class Fingerprint:
 
             - A single bitvector if ``return_atoms=False``
             - A tuple of bitvector, ligand atom indices and protein atom
-              indices if``return_atoms=True``
+              indices if ``return_atoms=True``
 
         Example
         -------

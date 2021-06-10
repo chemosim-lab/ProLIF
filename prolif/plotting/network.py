@@ -28,6 +28,52 @@ else:
 
 
 class LigNetwork:
+    """Creates a ligand interaction diagram
+
+    Attributes
+    ----------
+    COLORS : dict
+        Dictionnary of colors used in the diagram. Subdivided in several
+        dictionaries:
+
+        - "interactions": mapping between interactions types and colors
+        - "atoms": mapping between atom symbol and colors
+        - "residues": mapping between residues types and colors
+
+    RESIDUE_TYPES : dict
+        Mapping between residue names (3 letter code) and types. The types
+        are then used to define how each residue should be colored.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Dataframe with a 4-level index (ligand, protein, interaction, atom)
+        and a weight column for values
+    lig_mol : rdkit.Chem.rdChem.Mol
+        Ligand molecule
+    match3D : bool
+        If ``True``, generates 2D coordines that are constrained to fit the
+        3D conformation of the ligand as best as possible. Else, generate 2D
+        coordinates from scratch
+    kekulize : bool
+        Kekulize the ligand
+    molsize : int
+        Multiply the coordinates by this number to create a bigger and
+        more readable depiction
+    rotation : int
+        Rotate the structure on the XY plane
+    carbon : float
+        Size of the carbon atom dots on the depiction. Use `0` to hide the
+        carbon dots
+
+    Notes
+    -----
+    You can customize the diagram by tweaking :attr:`LigNetwork.COLORS` and
+    :attr:`LigNetwork.RESIDUE_TYPES` by adding or modifying the
+    dictionaries inplace.
+
+    .. versionadded:: 0.3.2
+    """
     COLORS = {
         "interactions": {
             "Hydrophobic": "#59e382",
@@ -143,63 +189,18 @@ class LigNetwork:
         </html>
     """
 
-    def __init__(self, df, lig_mol, gen2D=False, kekulize=False, molsize=35,
+    def __init__(self, df, lig_mol, match3D=True, kekulize=False, molsize=35,
                  rotation=0, carbon=.16):
-        """Creates a ligand interaction diagram
-
-        Attributes
-        ----------
-        COLORS : dict
-            Dictionnary of colors used in the diagram. Subdivided in several
-            dictionaries:
-
-            - "interactions": mapping between interactions types and colors
-            - "atoms": mapping between atom symbol and colors
-            - "residues": mapping between residues types and colors
-
-        RESIDUE_TYPES : dict
-            Mapping between residue names (3 letter code) and types. The types
-            are then used to define how each residue should be colored.
-
-        Parameters
-        ----------
-        df : pandas.DataFrame
-            Dataframe with a 4-level index (ligand, protein, interaction, atom)
-            and a weight column for values
-        lig_mol : rdkit.Chem.rdChem.Mol
-            Ligand molecule
-        gen2D : bool
-            Generate new 2D coordines (`True`) or create 2D coordinates that
-            are constrained to fit the existing 3D ones (default)
-        kekulize : bool
-            Kekulize the ligand
-        molsize : int
-            Multiply the coordinates by this number to create a bigger and
-            more readable depiction
-        rotation : int
-            Rotate the structure on the XY plane
-        carbon : float
-            Size of the carbon atom dots on the depiction. Use `0` to hide the
-            carbon dots
-
-        Notes
-        -----
-        You can customize the diagram by tweaking :attr:`LigNetwork.COLORS` and
-        :attr:`LigNetwork.RESIDUE_TYPES` by adding or modifying the
-        dictionaries inplace.
-
-        .. versionadded:: 0.3.2
-        """
         self.df = df
         mol = deepcopy(lig_mol)
         Chem.SanitizeMol(mol, Chem.SanitizeFlags.SANITIZE_SETAROMATICITY)
         self._ring_info = mol.GetRingInfo()
         if kekulize:
             Chem.Kekulize(mol)
-        if gen2D:
-            rdDepictor.Compute2DCoords(mol, clearConfs=True)
-        else:
+        if match3D:
             rdDepictor.GenerateDepictionMatching3DStructure(mol, lig_mol)
+        else:
+            rdDepictor.Compute2DCoords(mol, clearConfs=True)
         xyz = mol.GetConformer().GetPositions()
         if rotation:
             theta = np.radians(rotation)
