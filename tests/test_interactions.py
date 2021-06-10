@@ -10,9 +10,11 @@ from . import mol2factory
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
+
 @pytest.fixture(scope="module")
 def mol1(request):
     return getattr(mol2factory, request.param)()
+
 
 @pytest.fixture(scope="module")
 def mol2(request):
@@ -93,6 +95,7 @@ class TestInteractions:
         new = id(_INTERACTIONS["Hydrophobic"])
         assert old != new
         # fix dummy Hydrophobic class being reused in later unrelated tests
+
         class Hydrophobic(prolif.interactions.Hydrophobic):
             pass
 
@@ -103,9 +106,7 @@ class TestInteractions:
                            match="Can't instantiate abstract class Dummy"):
             Dummy()
         # fix Dummy class being reused in later unrelated tests
-        class Dummy(Interaction):
-            def detect(self):
-                pass
+        del prolif.interactions._INTERACTIONS["Dummy"]
 
     @pytest.mark.parametrize("index", [
         0, 1, 3, 42, 78

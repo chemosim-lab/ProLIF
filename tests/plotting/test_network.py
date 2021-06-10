@@ -4,6 +4,7 @@ import prolif as plf
 from prolif.plotting.network import LigNetwork
 import pytest
 
+
 class TestLigNetwork:
     @pytest.fixture(scope="class")
     def lignetwork_data(self):
@@ -16,7 +17,6 @@ class TestLigNetwork:
         lig = plf.Molecule.from_mda(lig)
         return lig, df
 
-
     def test_integration_frame(self, lignetwork_data):
         lig, df = lignetwork_data
         net = LigNetwork.from_ifp(df, lig, kind="frame", frame=0)
@@ -25,7 +25,6 @@ class TestLigNetwork:
             buffer.seek(0)
             html = buffer.read()
         assert "PHE331.B" in html
-
 
     def test_integration_agg(self, lignetwork_data):
         lig, df = lignetwork_data
@@ -36,7 +35,6 @@ class TestLigNetwork:
             html = buffer.read()
         assert "PHE331.B" in html
 
-
     def test_kwargs(self, lignetwork_data):
         lig, df = lignetwork_data
         net = LigNetwork.from_ifp(df, lig, kekulize=True, gen2D=True,
@@ -46,7 +44,6 @@ class TestLigNetwork:
             buffer.seek(0)
             html = buffer.read()
         assert "PHE331.B" in html
-
 
     def test_from_ifp_raises_kind(self, lignetwork_data):
         lig, df = lignetwork_data

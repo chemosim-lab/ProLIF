@@ -16,12 +16,12 @@ from .test_base import ligand_mol, protein_mol
 
 
 def test_centroid():
-    xyz = np.array([(0,0,0),
-                    (0,0,0),
-                    (0,0,0),
-                    (2,2,2),
-                    (2,2,2),
-                    (2,2,2)],
+    xyz = np.array([(0, 0, 0),
+                    (0, 0, 0),
+                    (0, 0, 0),
+                    (2, 2, 2),
+                    (2, 2, 2),
+                    (2, 2, 2)],
                    dtype=np.float32)
     ctd = get_centroid(xyz)
     assert ctd.shape == (3,)
@@ -92,7 +92,7 @@ def test_is_peptide_bond():
 
 
 def test_series_to_bv():
-    v = np.array([0,1,1,0,1])
+    v = np.array([0, 1, 1, 0, 1])
     bv = pandas_series_to_bv(v)
     assert bv.GetNumBits() == len(v)
     assert bv.GetNumOnBits() == 3
@@ -159,9 +159,10 @@ def test_to_df_drop_empty():
 
 
 def test_to_df_raise_dtype_return_atoms():
-    with pytest.raises(ValueError,
+    with pytest.raises(
+        ValueError,
         match="`dtype` cannot be used with `return_atoms=True`"
-        ):
+    ):
         to_dataframe(ifp_atoms, ["A", "B", "C"], dtype=int, return_atoms=True)
 
 

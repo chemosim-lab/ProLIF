@@ -32,7 +32,7 @@ interactions available to the fingerprint generator::
 
 """
 
-import itertools
+from itertools import product
 import warnings
 from math import radians
 from abc import ABC, ABCMeta, abstractmethod
@@ -88,7 +88,7 @@ def get_mapindex(res, index):
 
 class _Distance(Interaction):
     """Generic class for distance-based interactions
-    
+
     Parameters
     ----------
     lig_pattern : str
@@ -107,7 +107,7 @@ class _Distance(Interaction):
         lig_matches = lig_res.GetSubstructMatches(self.lig_pattern)
         prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
         if lig_matches and prot_matches:
-            for lig_match, prot_match in itertools.product(lig_matches,
+            for lig_match, prot_match in product(lig_matches,
                                                            prot_matches):
                 alig = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
                 aprot = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
@@ -118,7 +118,7 @@ class _Distance(Interaction):
 
 class Hydrophobic(_Distance):
     """Hydrophobic interaction
-    
+
     Parameters
     ----------
     hydrophobic : str
@@ -134,7 +134,7 @@ class Hydrophobic(_Distance):
 
 class _BaseHBond(Interaction):
     """Base class for Hydrogen bond interactions
-    
+
     Parameters
     ----------
     donor : str
@@ -160,8 +160,8 @@ class _BaseHBond(Interaction):
         acceptor_matches = acceptor.GetSubstructMatches(self.acceptor)
         donor_matches = donor.GetSubstructMatches(self.donor)
         if acceptor_matches and donor_matches:
-            for donor_match, acceptor_match in itertools.product(donor_matches,
-                                                                 acceptor_matches):
+            for donor_match, acceptor_match in product(donor_matches,
+                                                       acceptor_matches):
                 # D-H ... A
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 h = Geometry.Point3D(*donor.xyz[donor_match[1]])
@@ -204,7 +204,7 @@ class _BaseXBond(Interaction):
         Min and max values for the ``[Acceptor]...[Halogen]-[Donor]`` angle
     xar_angles : tuple
         Min and max values for the ``[R]-[Acceptor]...[Halogen]`` angle
-    
+
     Notes
     -----
     Distance and angle adapted from Auffinger et al. PNAS 2004
@@ -225,8 +225,8 @@ class _BaseXBond(Interaction):
         acceptor_matches = acceptor.GetSubstructMatches(self.acceptor)
         donor_matches = donor.GetSubstructMatches(self.donor)
         if acceptor_matches and donor_matches:
-            for donor_match, acceptor_match in itertools.product(donor_matches,
-                                                                 acceptor_matches):
+            for donor_match, acceptor_match in product(donor_matches,
+                                                       acceptor_matches):
                 # D-X ... A distance
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 x = Geometry.Point3D(*donor.xyz[donor_match[1]])
@@ -284,7 +284,7 @@ class Anionic(_BaseIonic):
 
 class _BaseCationPi(Interaction):
     """Base class for cation-pi interactions
-    
+
     Parameters
     ----------
     cation : str
@@ -313,12 +313,12 @@ class _BaseCationPi(Interaction):
             pi_matches = pi.GetSubstructMatches(pi_ring)
             if not (cation_matches and pi_matches):
                 continue
-            for cation_match, pi_match in itertools.product(cation_matches, pi_matches):
+            for cation_match, pi_match in product(cation_matches, pi_matches):
                 cat = Geometry.Point3D(*cation.xyz[cation_match[0]])
                 # get coordinates of atoms matching pi-system
                 pi_coords = pi.xyz[list(pi_match)]
                 # centroid of pi-system as 3d point
-                centroid  = Geometry.Point3D(*get_centroid(pi_coords))
+                centroid = Geometry.Point3D(*get_centroid(pi_coords))
                 # distance between cation and centroid
                 if cat.Distance(centroid) > self.distance:
                     continue
@@ -326,7 +326,8 @@ class _BaseCationPi(Interaction):
                 normal = get_ring_normal_vector(centroid, pi_coords)
                 # vector between the centroid and the charge
                 centroid_cation = centroid.DirectionVector(cat)
-                # compute angle between normal to ring plane and centroid-cation
+                # compute angle between normal to ring plane and
+                # centroid-cation
                 angle = normal.AngleTo(centroid_cation)
                 if angle_between_limits(angle, *self.angles, ring=True):
                     return True, cation_match[0], pi_match[0]
@@ -373,16 +374,16 @@ class PiStacking(Interaction):
         self.plane_angles = tuple(radians(i) for i in plane_angles)
 
     def detect(self, ligand, residue):
-        for pi_rings in itertools.product(self.pi_ring, repeat=2):
+        for pi_rings in product(self.pi_ring, repeat=2):
             res_matches = residue.GetSubstructMatches(pi_rings[0])
             lig_matches = ligand.GetSubstructMatches(pi_rings[1])
             if not (lig_matches and res_matches):
                 continue
-            for lig_match, res_match in itertools.product(lig_matches, res_matches):
+            for lig_match, res_match in product(lig_matches, res_matches):
                 lig_pi_coords = ligand.xyz[list(lig_match)]
-                lig_centroid  = Geometry.Point3D(*get_centroid(lig_pi_coords))
+                lig_centroid = Geometry.Point3D(*get_centroid(lig_pi_coords))
                 res_pi_coords = residue.xyz[list(res_match)]
-                res_centroid  = Geometry.Point3D(*get_centroid(res_pi_coords))
+                res_centroid = Geometry.Point3D(*get_centroid(res_pi_coords))
                 cdist = lig_centroid.Distance(res_centroid)
                 if cdist > self.centroid_distance:
                     continue
@@ -394,12 +395,15 @@ class PiStacking(Interaction):
                 if shortest_dist > self.shortest_distance:
                     continue
                 # ligand
-                lig_normal = get_ring_normal_vector(lig_centroid, lig_pi_coords)
+                lig_normal = get_ring_normal_vector(lig_centroid,
+                                                    lig_pi_coords)
                 # residue
-                res_normal = get_ring_normal_vector(res_centroid, res_pi_coords)
+                res_normal = get_ring_normal_vector(res_centroid,
+                                                    res_pi_coords)
                 # angle between planes
                 plane_angle = lig_normal.AngleTo(res_normal)
-                if angle_between_limits(plane_angle, *self.plane_angles, ring=True):
+                if angle_between_limits(plane_angle, *self.plane_angles,
+                                        ring=True):
                     return True, lig_match[0], res_match[0]
         return False, None, None
 
@@ -420,7 +424,7 @@ class EdgeToFace(PiStacking):
 
 class _BaseMetallic(_Distance):
     """Base class for metal complexation
-    
+
     Parameters
     ----------
     metal : str
@@ -431,20 +435,20 @@ class _BaseMetallic(_Distance):
         Cutoff distance
     """
     def __init__(self,
-                 metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]", 
+                 metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
                  ligand="[O,N,-{1-};!+{1-}]",
                  distance=2.8):
         super().__init__(metal, ligand, distance)
 
 
 class MetalDonor(_BaseMetallic):
-    """Metallic interaction between a ligand (metal) and a residue (chelated)"""
+    """Metallic interaction between a metal and a residue (chelated)"""
     def detect(self, ligand, residue):
         return super().detect(ligand, residue)
 
 
 class MetalAcceptor(_BaseMetallic):
-    """Metallic interaction between a ligand (chelated) and a residue (metal)"""
+    """Metallic interaction between a ligand (chelated) and a metal residue"""
     def detect(self, ligand, residue):
         bit, ires, ilig = super().detect(residue, ligand)
         return bit, ilig, ires

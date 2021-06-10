@@ -19,7 +19,7 @@ try:
 except ModuleNotFoundError:
     pass
 else:
-    warnings.filterwarnings("ignore",
+    warnings.filterwarnings("ignore",  # pragma: no cover
                             "Consider using IPython.display.IFrame instead")
 
 
@@ -89,7 +89,8 @@ class LigNetwork:
         'CYX': "Sulfur",
         'MET': "Sulfur",
     }
-    _LIG_PI_INTERACTIONS = ["EdgeToFace", "FaceToFace", "PiStacking", "PiCation"]
+    _LIG_PI_INTERACTIONS = ["EdgeToFace", "FaceToFace", "PiStacking",
+                            "PiCation"]
     _JS_TEMPLATE = """
         var ifp, legend, nodes, edges, legend_buttons;
         function drawGraph(_id, nodes, edges, options) {
@@ -137,9 +138,9 @@ class LigNetwork:
         </body>
         </html>
     """
-    
+
     def __init__(self, df, lig_mol, gen2D=False, kekulize=False, molsize=35,
-        rotation=0, carbon=.16):
+                 rotation=0, carbon=.16):
         """Creates a ligand interaction diagram
 
         Attributes
@@ -183,7 +184,7 @@ class LigNetwork:
         :attr:`LigNetwork.RESIDUE_TYPES` by adding or modifying the
         dictionaries inplace.
 
-        .. versionadded: 0.3.2
+        .. versionadded:: 0.3.2
         """
         self.df = df
         mol = deepcopy(lig_mol)
@@ -233,12 +234,13 @@ class LigNetwork:
         for interaction, color in self.COLORS["interactions"].items():
             if interaction in interactions:
                 temp[color].append(interaction)
-        self._interaction_types = {i: "/".join(t) for c, t in temp.items()
-                                                  for i in t}
+        self._interaction_types = {i: "/".join(t)
+                                   for c, t in temp.items()
+                                   for i in t}
 
     @classmethod
     def from_ifp(cls, ifp, lig, kind="aggregate", frame=0, threshold=.3,
-        **kwargs):
+                 **kwargs):
         """Helper method to create a ligand interaction diagram from an IFP
         DataFrame obtained with ``fp.to_dataframe(return_atoms=True)``
 
@@ -249,7 +251,7 @@ class LigNetwork:
         interactions that occur less frequently than a threshold. In the latter
         case (aggregate), only the most frequent ligand atom interaction is
         rendered.
-        
+
         Parameters
         ----------
         ifp : pandas.DataFrame
@@ -274,10 +276,11 @@ class LigNetwork:
                       .rename(columns=lambda x:
                               x.translate({ord(c): None for c in "()'"}))
                       .mean()
-            )
+                   )
             index = [i.split(", ") for i in data.index]
             index = [[j for j in i[:-1]+[int(float(i[-1]))]] for i in index]
-            data.index = pd.MultiIndex.from_tuples(index,
+            data.index = pd.MultiIndex.from_tuples(
+                index,
                 names=["ligand", "protein", "interaction", "atom"])
             data = data.to_frame()
             data.rename(columns={data.columns[-1]: "weight"}, inplace=True)
@@ -293,7 +296,7 @@ class LigNetwork:
                     .groupby(level=["ligand", "protein", "interaction"])
                     .head(1)
                     .sort_index()
-            )
+                   )
             return cls(data, lig, **kwargs)
         elif kind == "frame":
             data = (ifp
@@ -303,23 +306,23 @@ class LigNetwork:
                     .dropna()
                     .astype(int)
                     .reset_index()
-            )
+                   )
             data.rename(columns={data.columns[-1]: "atom"}, inplace=True)
             data["weight"] = 1
             data.set_index(["ligand", "protein", "interaction", "atom"],
-                        inplace=True)
+                           inplace=True)
             return cls(data, lig, **kwargs)
         else:
             raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
-    
+
     def _make_carbon(self):
         return deepcopy(self._carbon)
-        
+
     def _make_lig_node(self, atom):
         """Prepare ligand atoms"""
         idx = atom.GetIdx()
         elem = atom.GetSymbol()
-        if (elem == "H") and (idx not in self.df.index.get_level_values("atom")):
+        if elem == "H" and idx not in self.df.index.get_level_values("atom"):
             self.exclude.append(idx)
             return
         charge = atom.GetFormalCharge()
@@ -338,8 +341,10 @@ class LigNetwork:
                 'label': label,
                 'shape': shape,
                 'color': "white",
-                'font': {'color': self.COLORS["atoms"].get(elem,
-                                  self._default_atom_color)}
+                'font': {
+                    'color': self.COLORS["atoms"].get(elem,
+                                                      self._default_atom_color)
+                }
             }
         node.update({
             'id': idx,
@@ -367,9 +372,9 @@ class LigNetwork:
             })
         else:
             self._make_non_single_bond(idx, btype)
-    
+
     def _make_non_single_bond(self, ids, btype, bdist=.06,
-        dash=[10]):
+                              dash=[10]):
         """Prepare double, triple and aromatic bonds"""
         xyz = self.xyz[ids]
         d = xyz[1, :2] - xyz[0, :2]
@@ -411,7 +416,7 @@ class LigNetwork:
                 'group': "ligand",
                 'width': 4
             })
-    
+
     def _make_interactions(self, mass=2):
         """Prepare lig-prot interactions"""
         restypes = {}
@@ -420,7 +425,7 @@ class LigNetwork:
             restype = self.RESIDUE_TYPES.get(resname)
             restypes[prot_res] = restype
             color = self.COLORS["residues"].get(restype,
-                    self._default_residue_color)
+                                                self._default_residue_color)
             node = {
                 'id': prot_res,
                 'label': prot_res,
@@ -433,7 +438,8 @@ class LigNetwork:
                 'residue_type': restype,
             }
             self.nodes[prot_res] = node
-        for (lig_res, prot_res, interaction, lig_id), (weight,) in self.df.iterrows():
+        for ((lig_res, prot_res, interaction, lig_id),
+             (weight,)) in self.df.iterrows():
             if interaction in self._LIG_PI_INTERACTIONS:
                 centroid = self._get_ring_centroid(lig_id)
                 origin = str((lig_res, prot_res, interaction))
@@ -447,8 +453,9 @@ class LigNetwork:
                 'from': origin, 'to': prot_res,
                 'title': interaction,
                 'interaction_type': self._interaction_types[interaction],
-                'color': self.COLORS["interactions"].get(interaction,
-                         self._default_interaction_color),
+                'color': self.COLORS["interactions"].get(
+                    interaction,
+                    self._default_interaction_color),
                 'smooth': {
                     'type': 'cubicBezier',
                     'roundness': .2},
@@ -457,7 +464,7 @@ class LigNetwork:
                 'group': "interaction",
             }
             self.edges.append(edge)
-    
+
     def _get_ring_centroid(self, index):
         """Find ring coordinates using the index of one of the ring atoms"""
         for r in self._ring_info.AtomRings():
@@ -467,10 +474,10 @@ class LigNetwork:
             raise ValueError("No ring containing this atom index was found in "
                              "the given molecule")
         return self.xyz[list(r)].mean(axis=0)
-    
+
     def _patch_hydrogens(self):
         """Patch hydrogens on heteroatoms
-        
+
         Hydrogen atoms that aren't part of any interaction have been hidden at
         this stage, but they should be added to the label of the heteroatom for
         clarity
@@ -487,7 +494,7 @@ class LigNetwork:
             label = re.sub(r'(\w+)(.*)', fr'\1{h_str}\2', node["label"])
             node["label"] = label
             node["shape"] = "ellipse"
-    
+
     def _make_graph_data(self):
         """Prepares the nodes and edges"""
         self.exclude = []
@@ -502,9 +509,9 @@ class LigNetwork:
             self._make_lig_edge(bond)
         self._patch_hydrogens()
         self.nodes = list(self.nodes.values())
-    
+
     def _get_js(self, width="100%", height="500px", div_id="mynetwork",
-        fontsize=20):
+                fontsize=20):
         """Returns the JavaScript code to draw the network"""
         self.width = width
         self.height = height
@@ -513,7 +520,7 @@ class LigNetwork:
             "width": width,
             "height": height,
             "nodes": {
-                "font": { "size": fontsize },
+                "font": {"size": fontsize},
             },
             "physics": {
                 "barnesHut": {
@@ -529,11 +536,11 @@ class LigNetwork:
                                       options=json.dumps(options))
         js += self._get_legend()
         return js
-    
+
     def _get_html(self, **kwargs):
         """Returns the HTML code to draw the network"""
         return self._HTML_TEMPLATE % dict(js=self._get_js(**kwargs))
-    
+
     def _get_legend(self, height="90px"):
         available = {}
         buttons = []
@@ -546,7 +553,7 @@ class LigNetwork:
                 color = node["color"]
                 available[color] = map_color_restype.get(color, "Unknown")
         available = {k: v for k, v in sorted(available.items(),
-                                             key=lambda item: item[1])}        
+                                             key=lambda item: item[1])}       
         for i, (color, restype) in enumerate(available.items()):
             buttons.append({
                 "index": i,
@@ -638,7 +645,7 @@ class LigNetwork:
         legend.appendChild(div1);
         legend.appendChild(div2);
         """ % dict(div_id="networklegend",
-                   buttons=json.dumps(buttons)) 
+                   buttons=json.dumps(buttons))
 
     @requires("IPython.display")
     def display(self, **kwargs):
@@ -662,7 +669,7 @@ class LigNetwork:
 
     def save(self, fp, **kwargs):
         """Save the network to an HTML file
-        
+
         Parameters
         ----------
         fp : str or file-like object

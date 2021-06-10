@@ -105,7 +105,7 @@ class TestFingerprint:
         key = (ResidueId("LIG", 1, "G"), ResidueId("THR", 355, "B"))
         bv = ifp[key]
         assert isinstance(bv, np.ndarray)
-        assert bv[0] == True
+        assert bv[0] is True
 
     def test_run(self, fp_class):
         fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
@@ -117,7 +117,7 @@ class TestFingerprint:
         assert isinstance(data[0], np.ndarray)
         assert isinstance(data[1], list)
         assert isinstance(data[2], list)
-    
+
     def test_run_from_iterable(self, fp):
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
@@ -140,7 +140,7 @@ class TestFingerprint:
         assert df.dtypes[0].type is np.uint8
         df = fp_class.to_dataframe(drop_empty=False)
         resids = set([key for d in fp_class.ifp for key in d.keys()
-                  if key != "Frame"])
+                      if key != "Frame"])
         assert df.shape == (3, len(resids))
 
     def test_to_bv(self, fp, fp_class):

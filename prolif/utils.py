@@ -69,7 +69,7 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
 
 def get_residues_near_ligand(lig, prot, cutoff=6.0):
     """Detects residues close to a reference ligand
-    
+
     Parameters
     ----------
     lig : prolif.molecule.Molecule
@@ -189,7 +189,7 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
         0                       0          1           0           0          0
         ...
 
-    .. versionchanged : 0.3.2
+    .. versionchanged:: 0.3.2
         Moved the `return_atoms` parameter from the `run` methods to the
         dataframe conversion code
     """
@@ -211,7 +211,7 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
     if is_atompair and return_atoms:
-        empty_arr =  [[None, None]] * n_interactions
+        empty_arr = [[None, None]] * n_interactions
     else:
         empty_arr = np.array([empty_value] * n_interactions)
     # sparse to dense
@@ -277,7 +277,7 @@ def to_bitvectors(df):
     ----------
     df : pandas.DataFrame
         A DataFrame where each column corresponds to an interaction between two
-        residues 
+        residues
 
     Returns
     -------
