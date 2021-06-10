@@ -87,6 +87,7 @@ jobs:
         import prolif
         import os
         print(prolif.__version__)
+        from prolif.plotting.network import LigNetwork
         assert os.path.isfile(prolif.datafiles.TOP)
         EOF
 
@@ -104,5 +105,6 @@ jobs:
         import prolif
         import os
         print(prolif.__version__)
+        from prolif.plotting.network import LigNetwork
         assert os.path.isfile(prolif.datafiles.TOP)
         EOF
