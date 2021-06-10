@@ -30,20 +30,6 @@ else:
 class LigNetwork:
     """Creates a ligand interaction diagram
 
-    Attributes
-    ----------
-    COLORS : dict
-        Dictionnary of colors used in the diagram. Subdivided in several
-        dictionaries:
-
-        - "interactions": mapping between interactions types and colors
-        - "atoms": mapping between atom symbol and colors
-        - "residues": mapping between residues types and colors
-
-    RESIDUE_TYPES : dict
-        Mapping between residue names (3 letter code) and types. The types
-        are then used to define how each residue should be colored.
-
     Parameters
     ----------
     df : pandas.DataFrame
@@ -65,6 +51,20 @@ class LigNetwork:
     carbon : float
         Size of the carbon atom dots on the depiction. Use `0` to hide the
         carbon dots
+
+    Attributes
+    ----------
+    COLORS : dict
+        Dictionnary of colors used in the diagram. Subdivided in several
+        dictionaries:
+
+        - "interactions": mapping between interactions types and colors
+        - "atoms": mapping between atom symbol and colors
+        - "residues": mapping between residues types and colors
+
+    RESIDUE_TYPES : dict
+        Mapping between residue names (3 letter code) and types. The types
+        are then used to define how each residue should be colored.
 
     Notes
     -----
@@ -555,7 +555,7 @@ class LigNetwork:
                 color = node["color"]
                 available[color] = map_color_restype.get(color, "Unknown")
         available = {k: v for k, v in sorted(available.items(),
-                                             key=lambda item: item[1])}   
+                                             key=lambda item: item[1])}
         for i, (color, restype) in enumerate(available.items()):
             buttons.append({
                 "index": i,

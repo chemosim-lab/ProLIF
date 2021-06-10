@@ -217,7 +217,7 @@ class Fingerprint:
         pro_atoms : list
             A list containing indices for the protein atoms responsible for
             each interaction
-        
+
         .. versionchanged:: 0.3.2
             Returns atom indices as two separate lists instead of a single list
             of tuples

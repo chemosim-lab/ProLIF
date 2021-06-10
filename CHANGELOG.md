@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (not negatively or positively charged) for part of its SMARTS pattern (PR #19)
 - Moved the `return_atoms` parameter from the `run` methods to `to_dataframe` to avoid
   recalculating the IFP if one wants to display it with atomic details (PR #19)
+- Changed the values returned by `fp.bitvector_atoms`: the atom indices have been
+  separated in two lists, one for the ligand and one for the protein (PR #19)
 ### Deprecated
 ### Removed
 ### Fixed
