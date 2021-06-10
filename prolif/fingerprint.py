@@ -11,16 +11,16 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     u = mda.Universe(prolif.datafiles.TOP, prolif.datafiles.TRAJ)
     prot = u.select_atoms("protein")
     lig = u.select_atoms("resname LIG")
-    fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "CationPi", "Cationic"])
+    fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "CationPi",
+                             "Cationic"])
     fp.run(u.trajectory[::10], lig, prot)
     df = fp.to_dataframe()
     df
     bv = fp.to_bitvectors()
     TanimotoSimilarity(bv[0], bv[1])
-    
+
 """
 from functools import wraps
-from collections.abc import Iterable
 import numpy as np
 from tqdm.auto import tqdm
 from .interactions import _INTERACTIONS
@@ -97,7 +97,8 @@ class Fingerprint:
 
         prot = u.select_atoms("protein")
         lig = u.select_atoms("resname LIG")
-        fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "Hydrophobic"])
+        fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking",
+                                 "Hydrophobic"])
         fp.run(u.trajectory[:5], lig, prot)
         fp.to_dataframe()
 
@@ -114,16 +115,18 @@ class Fingerprint:
 
     .. ipython:: python
 
-        fp.hbdonor(lig, prot["ASP129.A"]) # ligand-protein
-        fp.hbacceptor(prot["ASP129.A"], prot["CYS133.A"]) # protein-protein (alpha helix)
-    
+        # ligand-protein
+        fp.hbdonor(lig, prot["ASP129.A"])
+        # protein-protein (alpha helix)
+        fp.hbacceptor(prot["ASP129.A"], prot["CYS133.A"])
+
     You can also obtain the indices of atoms responsible for the interaction:
 
     .. ipython:: python
 
         fp.bitvector_atoms(lig, prot["ASP129.A"])
         fp.hbdonor.__wrapped__(lig, prot["ASP129.A"])
-    
+
     """
 
     def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",
@@ -131,7 +134,7 @@ class Fingerprint:
         # read interactions to compute
         self.interactions = {}
         if interactions == "all":
-            interactions = [i for i in _INTERACTIONS.keys() 
+            interactions = [i for i in _INTERACTIONS.keys()
                             if not (i.startswith("_") or i == "Interaction")]
         for name, interaction_cls in _INTERACTIONS.items():
             if name.startswith("_") or name == "Interaction":
@@ -142,7 +145,7 @@ class Fingerprint:
             if name in interactions:
                 self.interactions[name] = func
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
         return f"<{name}: {params} at {id(self):#x}>"
@@ -150,7 +153,7 @@ class Fingerprint:
     @staticmethod
     def list_available(show_hidden=False):
         """List interactions available to the Fingerprint class.
-        
+
         Parameters
         ----------
         show_hidden : bool
@@ -185,7 +188,6 @@ class Fingerprint:
         -------
         bitvector : numpy.ndarray
             An array storing the encoded interactions between res1 and res2
-
         """
         bitvector = []
         for func in self.interactions.values():
@@ -209,21 +211,88 @@ class Fingerprint:
         -------
         bitvector : numpy.ndarray
             An array storing the encoded interactions between res1 and res2
-        atoms : list
-            A list containing tuples of (res1_atom_index, res2_atom_index) for
+        lig_atoms : list
+            A list containing indices for the ligand atoms responsible for each
+            interaction
+        pro_atoms : list
+            A list containing indices for the protein atoms responsible for
             each interaction
+
+        .. versionchanged:: 0.3.2
+            Returns atom indices as two separate lists instead of a single list
+            of tuples
         """
         bitvector = []
-        atoms_lst = []
+        lig_atoms = []
+        prot_atoms = []
         for func in self.interactions.values():
-            bit, *atoms = func.__wrapped__(res1, res2)
+            bit, la, pa = func.__wrapped__(res1, res2)
             bitvector.append(bit)
-            atoms_lst.append(atoms)
+            lig_atoms.append(la)
+            prot_atoms.append(pa)
         bitvector = np.array(bitvector)
-        return bitvector, atoms_lst
+        return bitvector, lig_atoms, prot_atoms
 
-    def run(self, traj, lig, prot, residues=None, return_atoms=False,
-            progress=True):
+    def generate(self, lig, prot, residues=None, return_atoms=False):
+        """Generates the interaction fingerprint between 2 molecules
+
+        Parameters
+        ----------
+        lig : prolif.molecule.Molecule
+            Molecule for the ligand
+        prot : prolif.molecule.Molecule
+            Molecule for the protein
+        residues : list or "all" or None
+            A list of protein residues (:class:`str`, :class:`int` or
+            :class:`~prolif.residue.ResidueId`) to take into account for
+            the fingerprint extraction. If ``"all"``, all residues will be
+            used. If ``None``, at each frame the
+            :func:`~prolif.utils.get_residues_near_ligand` function is used to
+            automatically use protein residues that are distant of 6.0 Å or
+            less from each ligand residue.
+        return_atoms : bool
+            For each residue pair and interaction, return indices of atoms
+            responsible for the interaction instead of bits.
+
+        Returns
+        -------
+        ifp : dict
+            A dictionnary indexed by ``(ligand, protein)`` residue pairs. The
+            format for values will depend on ``return_atoms``:
+
+            - A single bitvector if ``return_atoms=False``
+            - A tuple of bitvector, ligand atom indices and protein atom
+              indices if ``return_atoms=True``
+
+        Example
+        -------
+        ::
+
+            >>> u = mda.Universe("complex.pdb")
+            >>> lig = plf.Molecule.from_mda(u, "resname LIG")
+            >>> prot = plf.Molecule.from_mda(u, "protein")
+            >>> fp = prolif.Fingerprint()
+            >>> ifp = fp.generate(lig, prot)
+
+        .. versionadded:: 0.3.2
+        """
+        ifp = {}
+        resids = residues
+        if residues == "all":
+            resids = prot.residues.keys()
+        for lresid, lres in lig.residues.items():
+            if residues is None:
+                resids = get_residues_near_ligand(lres, prot)
+            for prot_key in resids:
+                pres = prot[prot_key]
+                key = (lresid, pres.resid)
+                if return_atoms:
+                    ifp[key] = self.bitvector_atoms(lres, pres)
+                else:
+                    ifp[key] = self.bitvector(lres, pres)
+        return ifp
+
+    def run(self, traj, lig, prot, residues=None, progress=True):
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
         Parameters
@@ -238,14 +307,11 @@ class Fingerprint:
         residues : list or "all" or None
             A list of protein residues (:class:`str`, :class:`int` or
             :class:`~prolif.residue.ResidueId`) to take into account for
-            the fingerprint extraction.
-            If ``"all"``, all residues will be used.
-            If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
-            function is used to automatically use protein residues that are
-            distant of 6.0 Å or less from each ligand residue.
-        return_atoms : bool
-            For each residue pair and interaction, return indices of atoms
-            responsible for the interaction instead of bits.
+            the fingerprint extraction. If ``"all"``, all residues will be
+            used. If ``None``, at each frame the
+            :func:`~prolif.utils.get_residues_near_ligand` function is used to
+            automatically use protein residues that are distant of 6.0 Å or
+            less from each ligand residue.
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
@@ -264,37 +330,26 @@ class Fingerprint:
             >>> prot = u.select_atoms("protein")
             >>> fp = prolif.Fingerprint().run(u.trajectory[:10], lig, prot)
 
+        .. versionchanged:: 0.3.2
+            Moved the ``return_atoms`` parameter from the ``run`` method to the
+            dataframe conversion code
         """
         iterator = tqdm(traj) if progress else traj
-        # set which residues to use
-        select_residues = False
         if residues == "all":
-            resids = Molecule.from_mda(prot).residues.keys()
-        elif isinstance(residues, Iterable):
-            resids = residues
-        else:
-            select_residues = True
+            residues = Molecule.from_mda(prot).residues.keys()
         ifp = []
         for ts in iterator:
             prot_mol = Molecule.from_mda(prot)
             lig_mol = Molecule.from_mda(lig)
-            data = {"Frame": ts.frame}
-            for lresid, lres in lig_mol.residues.items():
-                if select_residues:
-                    resids = get_residues_near_ligand(lres, prot_mol)
-                for prot_key in resids:
-                    pres = prot_mol[prot_key]
-                    if return_atoms:
-                        bv, value = self.bitvector_atoms(lres, pres)
-                    else:
-                        value = self.bitvector(lres, pres)
-                    data[(lresid, pres.resid)] = value
+            data = self.generate(lig_mol, prot_mol, residues=residues,
+                                 return_atoms=True)
+            data["Frame"] = ts.frame
             ifp.append(data)
         self.ifp = ifp
         return self
 
     def run_from_iterable(self, lig_iterable, prot_mol, residues=None,
-            return_atoms=False, progress=True):
+                          progress=True):
         """Generates the fingerprint between a list of ligands and a protein
 
         Parameters
@@ -307,14 +362,11 @@ class Fingerprint:
         residues : list or "all" or None
             A list of protein residues (:class:`str`, :class:`int` or
             :class:`~prolif.residue.ResidueId`) to take into account for
-            the fingerprint extraction.
-            If ``"all"``, all residues will be used.
-            If ``None``, at each frame the :func:`~prolif.utils.get_residues_near_ligand`
-            function is used to automatically use protein residues that are
-            distant of 6.0 Å or less from each ligand residue.
-        return_atoms : bool
-            For each residue pair and interaction, return indices of atoms
-            responsible for the interaction instead of bits.
+            the fingerprint extraction. If ``"all"``, all residues will be
+            used. If ``None``, at each frame the
+            :func:`~prolif.utils.get_residues_near_ligand` function is used to
+            automatically use protein residues that are distant of 6.0 Å or
+            less from each ligand residue.
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
@@ -323,7 +375,7 @@ class Fingerprint:
         -------
         prolif.fingerprint.Fingerprint
             The Fingerprint instance that generated the fingerprint
-        
+
         Example
         -------
         ::
@@ -334,29 +386,23 @@ class Fingerprint:
             >>> fp = plf.Fingerprint()
             >>> fp.run_from_iterable(lig_iter, prot)
 
+        Notes
+        -----
+        See :meth:`~Fingerprint.generate` to generate the fingerprint between
+        two single structures
+
+        .. versionchanged:: 0.3.2
+            Moved the ``return_atoms`` parameter from the ``run_from_iterable``
+            method to the dataframe conversion code
         """
         iterator = tqdm(lig_iterable) if progress else lig_iterable
-        # set which residues to use
-        select_residues = False
         if residues == "all":
-            resids = prot_mol.residues.keys()
-        elif isinstance(residues, Iterable):
-            resids = residues
-        else:
-            select_residues = True
+            residues = prot_mol.residues.keys()
         ifp = []
         for i, lig_mol in enumerate(iterator):
-            data = {"Frame": i}
-            lres = lig_mol[0]
-            if select_residues:
-                resids = get_residues_near_ligand(lres, prot_mol)
-            for prot_key in resids:
-                pres = prot_mol[prot_key]
-                if return_atoms:
-                    bv, value = self.bitvector_atoms(lres, pres)
-                else:
-                    value = self.bitvector(lres, pres)
-                data[(lres.resid, pres.resid)] = value
+            data = self.generate(lig_mol, prot_mol, residues=residues,
+                                 return_atoms=True)
+            data["Frame"] = i
             ifp.append(data)
         self.ifp = ifp
         return self
@@ -371,6 +417,9 @@ class Fingerprint:
             keep the data as is
         drop_empty : bool
             Drop columns with only empty values
+        return_atoms : bool
+            For each residue pair and interaction, return indices of atoms
+            responsible for the interaction instead of bits
 
         Returns
         -------
@@ -383,7 +432,7 @@ class Fingerprint:
         ------
         AttributeError
             If the :meth:`run` method hasn't been used
-        
+
         Example
         -------
         ::
@@ -400,7 +449,7 @@ class Fingerprint:
         """
         if hasattr(self, "ifp"):
             return to_dataframe(self.ifp, self.interactions.keys(), **kwargs)
-        raise AttributeError("Please use the run method before")
+        raise AttributeError("Please use the `run` method before")
 
     def to_bitvectors(self):
         """Converts fingerprints to a list of RDKit ExplicitBitVector
@@ -429,4 +478,4 @@ class Fingerprint:
         if hasattr(self, "ifp"):
             df = self.to_dataframe()
             return to_bitvectors(df)
-        raise AttributeError("Please use the run method before")
+        raise AttributeError("Please use the `run` method before")

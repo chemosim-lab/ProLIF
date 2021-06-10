@@ -1,0 +1,10 @@
+scanner:
+  diff_only: True
+  linter: pycodestyle  # Alternative option - flake8
+
+pycodestyle:
+  max-line-length: 79
+  exclude:
+    - docs/conf.py
+    - prolif/_version.py
+    - versioneer.py

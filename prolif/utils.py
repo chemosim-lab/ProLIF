@@ -5,6 +5,8 @@ Helper functions --- :mod:`prolif.utils`
 from math import pi
 from collections import defaultdict
 from collections.abc import Iterable
+from functools import wraps
+from importlib.util import find_spec
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -18,6 +20,19 @@ from .residue import ResidueId
 
 
 _90_deg_to_rad = pi/2
+
+
+def requires(module):  # pragma: no cover
+    def inner(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if find_spec(module):
+                return func(*args, **kwargs)
+            raise ModuleNotFoundError(
+                f"The module {module!r} is required to use {func.__name__!r} "
+                "but it is not installed!")
+        return wrapper
+    return inner
 
 
 def get_centroid(coordinates):
@@ -54,7 +69,7 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
 
 def get_residues_near_ligand(lig, prot, cutoff=6.0):
     """Detects residues close to a reference ligand
-    
+
     Parameters
     ----------
     lig : prolif.molecule.Molecule
@@ -131,27 +146,29 @@ def is_peptide_bond(bond, resids):
 
 
 def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
-                 drop_empty=True):
+                 drop_empty=True, return_atoms=False):
     """Converts IFPs to a pandas DataFrame
 
     Parameters
     ----------
     ifp : list
-        A list of dict in the format {key: bitvector} where
-        "bitvector" is a numpy.ndarray obtained by running the
-        :meth:`~prolif.fingerprint.Fingerprint.bitvector` method of a
-        :class:`~prolif.fingerprint.Fingerprint`, and "key" is a tuple of
-        ligand and protein ResidueId. Each dictionnary must also contain an
-        entry that will be used as an index, typically a frame number.
+        A list of dict in the format {key: bitvector}. "key" is a tuple of
+        ligand and protein ResidueId. "bitvector" is either a numpy.ndarray
+        of bits, or a list of bitarray, ligand atom indices, and protein atom
+        indices. Each dictionnary must also contain an entry that will be used
+        as an index, typically a frame number.
     interactions : list
         A list of interactions, in the same order as the bitvector.
     index_col : str
         The dictionnary key that will be used as an index in the DataFrame
     dtype : object or None
         Cast the input of each bit in the bitvector to this type. If None, keep
-        the data as is.
+        the data as is. Not compatible with ``return_atoms=True``
     drop_empty : bool
         Drop columns with only empty values
+    return_atoms : bool
+        For each residue pair and interaction, return indices of atoms
+        responsible for the interaction instead of bits
 
     Returns
     -------
@@ -172,7 +189,12 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
         0                       0          1           0           0          0
         ...
 
+    .. versionchanged:: 0.3.2
+        Moved the ``return_atoms`` parameter from the ``run`` methods to the
+        dataframe conversion code
     """
+    if dtype and return_atoms:
+        raise ValueError("`dtype` cannot be used with `return_atoms=True`")
     ifp = deepcopy(ifp)
     n_interactions = len(interactions)
     empty_value = dtype(False) if dtype else False
@@ -183,10 +205,13 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
         if k in ifp[0].keys():
             break
     is_atompair = isinstance(ifp[0][k][0], Iterable)
+    if return_atoms and not is_atompair:
+        raise ValueError("The IFP either doesn't contain atom indices or is "
+                         "formatted incorrectly")
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
-    if is_atompair:
-        empty_arr =  [[None, None]] * n_interactions
+    if is_atompair and return_atoms:
+        empty_arr = [[None, None]] * n_interactions
     else:
         empty_arr = np.array([empty_value] * n_interactions)
     # sparse to dense
@@ -196,28 +221,40 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
         index.append(d.pop(index_col))
         for key in keys:
             try:
-                data[key].append(d[key])
+                arr = d[key]
             except KeyError:
                 data[key].append(empty_arr)
+            else:
+                if is_atompair and return_atoms:
+                    arr = list(zip(*arr[1:]))
+                elif is_atompair:
+                    arr = arr[0]
+                data[key].append(arr)
+    index = pd.Series(index, name=index_col)
     # create dataframes
     values = np.array([np.hstack([np.ravel(a[i]) for a in data.values()])
-                    for i in range(len(index))])
-    if is_atompair:
-        columns = pd.MultiIndex.from_tuples([(str(k[0]), str(k[1]), i, a) for k in keys
-                                        for i in interactions for a in ["ligand", "protein"]],
-                                        names=["ligand", "protein", "interaction", "atom"])
+                       for i in range(len(index))])
+    if is_atompair and return_atoms:
+        columns = pd.MultiIndex.from_tuples(
+            [(str(k[0]), str(k[1]), i, a)
+             for k in keys
+             for i in interactions
+             for a in ["ligand", "protein"]],
+            names=["ligand", "protein", "interaction", "atom"])
     else:
-        columns = pd.MultiIndex.from_tuples([(str(k[0]), str(k[1]), i) for k in keys
-                                        for i in interactions],
-                                        names=["ligand", "protein", "interaction"])
-    index = pd.Series(index, name=index_col)
+        columns = pd.MultiIndex.from_tuples(
+            [(str(k[0]), str(k[1]), i)
+             for k in keys
+             for i in interactions],
+            names=["ligand", "protein", "interaction"])
     df = pd.DataFrame(values, columns=columns, index=index)
-    if is_atompair:
-        df = df.groupby(axis=1, level=["ligand", "protein", "interaction"]).agg(tuple)
+    if is_atompair and return_atoms:
+        df = (df.groupby(axis=1, level=["ligand", "protein", "interaction"])
+                .agg(tuple))
     if dtype:
         df = df.astype(dtype)
     if drop_empty:
-        if is_atompair:
+        if is_atompair and return_atoms:
             mask = df.apply(lambda s:
                             ~(s.isin([(None, None)]).all()), axis=0)
         else:
@@ -240,7 +277,7 @@ def to_bitvectors(df):
     ----------
     df : pandas.DataFrame
         A DataFrame where each column corresponds to an interaction between two
-        residues 
+        residues
 
     Returns
     -------

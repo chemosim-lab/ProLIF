@@ -12,16 +12,26 @@ defaults:
   run:
     shell: bash -l {0}
 
+concurrency:
+  group: "${{ github.ref }}-${{ github.head_ref }}"
+  cancel-in-progress: true
+
 jobs:
   tests:
-    name: CI on ${{ matrix.os }} with Python ${{ matrix.python-version }}
+    name: CI - ${{ matrix.os }} / Py${{ matrix.python-version }} / ${{ matrix.rdkit-version }}
     runs-on: ${{ matrix.os }}
     # only run once if internal PR
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
         matrix:
-          os: [ubuntu-18.04]
+          os: [ubuntu-latest]
           python-version: [3.6, 3.8, 3.9]
+          rdkit-version: ["rdkit>=2020.09.1"]
+          include:
+          - name: RDKit min version
+            os: ubuntu-latest
+            python-version: 3.6
+            rdkit-version: "rdkit==2020.03.1"
 
     steps:
     - uses: actions/checkout@v2
@@ -46,7 +56,7 @@ jobs:
     - name: Install conda dependencies
       run: |
         conda install mamba
-        mamba install rdkit cython wheel
+        mamba install ${{ matrix.rdkit-version }} cython wheel
         conda list
 
     - name: Install package through pip
@@ -83,6 +93,7 @@ jobs:
         import prolif
         import os
         print(prolif.__version__)
+        from prolif.plotting.network import LigNetwork
         assert os.path.isfile(prolif.datafiles.TOP)
         EOF
 
@@ -100,5 +111,6 @@ jobs:
         import prolif
         import os
         print(prolif.__version__)
+        from prolif.plotting.network import LigNetwork
         assert os.path.isfile(prolif.datafiles.TOP)
         EOF

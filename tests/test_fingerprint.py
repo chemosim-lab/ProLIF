@@ -68,12 +68,14 @@ class TestFingerprint:
         assert bv.sum() > 0
 
     def test_bitvector_atoms(self, fp):
-        bv, atoms = fp.bitvector_atoms(ligand_mol, protein_mol["ASP129.A"])
+        bv, lig_ix, prot_ix = fp.bitvector_atoms(ligand_mol,
+                                                 protein_mol["ASP129.A"])
         assert len(bv) == fp.n_interactions
-        assert len(atoms) == fp.n_interactions
+        assert len(lig_ix) == fp.n_interactions
+        assert len(prot_ix) == fp.n_interactions
         assert bv.sum() > 0
         ids = np.where(bv == 1)[0]
-        assert atoms[ids[0]] != (None, None)
+        assert (lig_ix[ids[0]] is not None and prot_ix[ids[0]] is not None)
 
     def test_run_residues(self, fp_class):
         fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
@@ -98,15 +100,24 @@ class TestFingerprint:
         assert (lig_id, res) in fp_class.ifp[0].keys()
         u.trajectory[0]
 
-    def test_run_return_atoms(self, fp_class):
+    def test_generate(self, fp_class):
+        ifp = fp_class.generate(ligand_mol, protein_mol)
+        key = (ResidueId("LIG", 1, "G"), ResidueId("THR", 355, "B"))
+        bv = ifp[key]
+        assert isinstance(bv, np.ndarray)
+        assert bv[0] is np.True_
+
+    def test_run(self, fp_class):
         fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
-                     residues=None, progress=False, return_atoms=True)
+                     residues=None, progress=False)
         assert hasattr(fp_class, "ifp")
         ifp = fp_class.ifp[0]
         ifp.pop("Frame")
-        atom_pair = list(ifp.values())[0]
-        assert isinstance(atom_pair, list)
-    
+        data = list(ifp.values())[0]
+        assert isinstance(data[0], np.ndarray)
+        assert isinstance(data[1], list)
+        assert isinstance(data[2], list)
+
     def test_run_from_iterable(self, fp):
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
@@ -114,7 +125,7 @@ class TestFingerprint:
         assert len(fp.ifp) == 2
 
     def test_to_df(self, fp, fp_class):
-        with pytest.raises(AttributeError, match="use the run method"):
+        with pytest.raises(AttributeError, match="use the `run` method"):
             fp.to_dataframe()
         fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
                      residues=None, progress=False)
@@ -129,11 +140,11 @@ class TestFingerprint:
         assert df.dtypes[0].type is np.uint8
         df = fp_class.to_dataframe(drop_empty=False)
         resids = set([key for d in fp_class.ifp for key in d.keys()
-                  if key != "Frame"])
+                      if key != "Frame"])
         assert df.shape == (3, len(resids))
 
     def test_to_bv(self, fp, fp_class):
-        with pytest.raises(AttributeError, match="use the run method"):
+        with pytest.raises(AttributeError, match="use the `run` method"):
             fp.to_bitvectors()
         fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
                      residues=None, progress=False)

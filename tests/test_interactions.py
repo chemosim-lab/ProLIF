@@ -2,6 +2,7 @@ import pytest
 from rdkit import RDLogger
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import _INTERACTIONS, Interaction, get_mapindex
+import prolif
 from .test_base import ligand_mol
 from . import mol2factory
 
@@ -9,9 +10,11 @@ from . import mol2factory
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
+
 @pytest.fixture(scope="module")
 def mol1(request):
     return getattr(mol2factory, request.param)()
+
 
 @pytest.fixture(scope="module")
 def mol2(request):
@@ -87,9 +90,14 @@ class TestInteractions:
         with pytest.warns(UserWarning,
                           match="interaction has been superseded"):
             class Hydrophobic(Interaction):
-                pass
+                def detect(self):
+                    pass
         new = id(_INTERACTIONS["Hydrophobic"])
         assert old != new
+        # fix dummy Hydrophobic class being reused in later unrelated tests
+
+        class Hydrophobic(prolif.interactions.Hydrophobic):
+            pass
 
     def test_error_no_detect(self):
         class Dummy(Interaction):
@@ -97,6 +105,8 @@ class TestInteractions:
         with pytest.raises(TypeError,
                            match="Can't instantiate abstract class Dummy"):
             Dummy()
+        # fix Dummy class being reused in later unrelated tests
+        del prolif.interactions._INTERACTIONS["Dummy"]
 
     @pytest.mark.parametrize("index", [
         0, 1, 3, 42, 78

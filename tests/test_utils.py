@@ -16,12 +16,12 @@ from .test_base import ligand_mol, protein_mol
 
 
 def test_centroid():
-    xyz = np.array([(0,0,0),
-                    (0,0,0),
-                    (0,0,0),
-                    (2,2,2),
-                    (2,2,2),
-                    (2,2,2)],
+    xyz = np.array([(0, 0, 0),
+                    (0, 0, 0),
+                    (0, 0, 0),
+                    (2, 2, 2),
+                    (2, 2, 2),
+                    (2, 2, 2)],
                    dtype=np.float32)
     ctd = get_centroid(xyz)
     assert ctd.shape == (3,)
@@ -92,7 +92,7 @@ def test_is_peptide_bond():
 
 
 def test_series_to_bv():
-    v = np.array([0,1,1,0,1])
+    v = np.array([0, 1, 1, 0, 1])
     bv = pandas_series_to_bv(v)
     assert bv.GetNumBits() == len(v)
     assert bv.GetNumOnBits() == 3
@@ -106,11 +106,11 @@ ifp = [{"Frame": 0,
         ("LIG", "ASP3"): np.array([False, True, False])}]
 
 ifp_atoms = [{"Frame": 0,
-              ("LIG", "ALA1"): [[0, 1], [None, None], [None, None]],
-              ("LIG", "GLU2"): [[None, None], [1, 3], [None, None]]},
+              ("LIG", "ALA1"): [[1, 0, 0], [0, None, None], [1, None, None]],
+              ("LIG", "GLU2"): [[0, 1, 0], [None, 1, None], [None, 3, None]]},
              {"Frame": 1,
-              ("LIG", "ALA1"): [[2, 4], [2, 5], [None, None]],
-              ("LIG", "ASP3"): [[None, None], [8, 10], [None, None]]}]
+              ("LIG", "ALA1"): [[1, 1, 0], [2, 2, None], [4, 5, None]],
+              ("LIG", "ASP3"): [[0, 1, 0], [None, 8, None], [None, 10, None]]}]
 
 
 def test_to_df():
@@ -129,7 +129,7 @@ def test_to_df():
 
 
 def test_to_df_atom_pairs():
-    df = to_dataframe(ifp_atoms, ["A", "B", "C"])
+    df = to_dataframe(ifp_atoms, ["A", "B", "C"], return_atoms=True)
     assert df.shape == (2, 4)
     assert df.index.name == "Frame"
     assert ("LIG", "ALA1", "A") in df.columns
@@ -156,6 +156,19 @@ def test_to_df_dtype(dtype):
 def test_to_df_drop_empty():
     df = to_dataframe(ifp, ["A", "B", "C"], drop_empty=False)
     assert df.shape == (2, 9)
+
+
+def test_to_df_raise_dtype_return_atoms():
+    with pytest.raises(
+        ValueError,
+        match="`dtype` cannot be used with `return_atoms=True`"
+    ):
+        to_dataframe(ifp_atoms, ["A", "B", "C"], dtype=int, return_atoms=True)
+
+
+def test_to_df_raise_return_atoms_if_only_bitvector():
+    with pytest.raises(ValueError, match="doesn't contain atom indices"):
+        to_dataframe(ifp, ["A", "B", "C"], return_atoms=True)
 
 
 def test_to_bv():
