@@ -57,6 +57,9 @@ def _return_first_element(f):
         >>> bar.__wrapped__()
         (1, 2, 3)
 
+    .. versionchanged:: 0.3.3
+        The function now must return three values
+
     """
     @wraps(f)
     def wrapper(*args, **kwargs):
