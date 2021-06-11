@@ -13,23 +13,32 @@ from .test_base import protein_mol, ligand_mol, u, ligand_ag, protein_ag
 
 class Dummy(Interaction):
     def detect(self, res1, res2):
-        return 1, 2, 3
+        return True, 4, 2
 
 
-def func_return_single_val():
-    return 0
+def return_value(*args):
+    return args if len(args) > 1 else args[0]
 
 
 def test_wrapper_return():
-    foo = Dummy().detect
-    bar = _return_first_element(foo)
-    assert foo("foo", "bar") == (1, 2, 3)
-    assert bar("foo", "bar") == 1
-    assert bar.__wrapped__("foo", "bar") == (1, 2, 3)
-    baz = _return_first_element(func_return_single_val)
-    assert baz() == 0
-    assert baz.__wrapped__() == 0
+    detect = Dummy().detect
+    mod = _return_first_element(detect)
+    assert detect("foo", "bar") == (True, 4, 2)
+    assert mod("foo", "bar") is True
+    assert mod.__wrapped__("foo", "bar") == (True, 4, 2)
 
+
+@pytest.mark.parametrize("returned", [
+    True,
+    (True,),
+    (True, 4)
+])
+def test_wrapper_incorrect_return(returned):
+    mod = _return_first_element(return_value)
+    assert mod.__wrapped__(returned) == returned
+    with pytest.raises(TypeError,
+                       match="Incorrect function signature"):
+        mod(returned)
 
 class TestFingerprint:
     @pytest.fixture
@@ -60,7 +69,7 @@ class TestFingerprint:
 
     def test_wrapped(self, fp):
         assert fp.dummy("foo", "bar") == 1
-        assert fp.dummy.__wrapped__("foo", "bar") == (1, 2, 3)
+        assert fp.dummy.__wrapped__("foo", "bar") == (True, 4, 2)
 
     def test_bitvector(self, fp):
         bv = fp.bitvector(ligand_mol, protein_mol["ASP129.A"])

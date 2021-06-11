@@ -30,7 +30,12 @@ from .utils import get_residues_near_ligand, to_dataframe, to_bitvectors
 
 def _return_first_element(f):
     """Modifies the return signature of a function by forcing it to return
-    only the first element if multiple values were returned.
+    only the first element when multiple values are returned
+
+    Raises
+    ------
+    TypeError
+        If the function doesn't return three values
 
     Notes
     -----
@@ -57,10 +62,13 @@ def _return_first_element(f):
     def wrapper(*args, **kwargs):
         results = f(*args, **kwargs)
         try:
-            value, *rest = results
-        except TypeError:
-            value = results
-        return value
+            bool_, lig_idx, prot_idx = results
+        except (TypeError, ValueError):
+            raise TypeError(
+                "Incorrect function signature: the interaction class must "
+                "return 3 values (boolean, int, int)"
+            ) from None
+        return bool_
     return wrapper
 
 
@@ -217,6 +225,7 @@ class Fingerprint:
         pro_atoms : list
             A list containing indices for the protein atoms responsible for
             each interaction
+
 
         .. versionchanged:: 0.3.2
             Atom indices are returned as two separate lists instead of a single

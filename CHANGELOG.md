@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Fixed
 
+## [0.3.3] - 2021-06-11
+### Changed
+- Custom interactions must return three values: a boolean for the interaction,
+  and the indices of residue atoms responsible for the interaction
+### Fixed
+- Custom interactions that only returned a single value instead of three would
+  raise an uninformative error message
+
+
 ## [0.3.2] - 2021-06-11
 ### Added
 - LigNetwork: an interaction diagram with atomistic details for the ligand and
