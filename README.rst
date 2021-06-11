@@ -32,6 +32,9 @@ Documentation
 
 The installation instructions, documentation and tutorials can be found online on `ReadTheDocs <https://prolif.readthedocs.io/en/latest/>`_.
 
+| ⚠ Do not ``pip install prolif`` yet ⚠
+| Please refer to the installation instructions instead (and `this comment <https://github.com/chemosim-lab/ProLIF/issues/6#issue-784313798>`__ if you want to know the details)
+
 Issues
 ------
 

@@ -2,6 +2,8 @@
 Plot a Ligand Interaction Network --- :mod:`prolif.plotting.network`
 ====================================================================
 
+.. versionadded:: 0.3.2
+
 .. autoclass:: LigNetwork
    :members:
 
@@ -71,8 +73,6 @@ class LigNetwork:
     You can customize the diagram by tweaking :attr:`LigNetwork.COLORS` and
     :attr:`LigNetwork.RESIDUE_TYPES` by adding or modifying the
     dictionaries inplace.
-
-    .. versionadded:: 0.3.2
     """
     COLORS = {
         "interactions": {

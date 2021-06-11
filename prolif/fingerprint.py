@@ -218,10 +218,10 @@ class Fingerprint:
             A list containing indices for the protein atoms responsible for
             each interaction
 
-
         .. versionchanged:: 0.3.2
-            Returns atom indices as two separate lists instead of a single list
-            of tuples
+            Atom indices are returned as two separate lists instead of a single
+            list of tuples
+
         """
         bitvector = []
         lig_atoms = []
@@ -334,6 +334,7 @@ class Fingerprint:
         .. versionchanged:: 0.3.2
             Moved the ``return_atoms`` parameter from the ``run`` method to the
             dataframe conversion code
+
         """
         iterator = tqdm(traj) if progress else traj
         if residues == "all":
@@ -387,14 +388,15 @@ class Fingerprint:
             >>> fp = plf.Fingerprint()
             >>> fp.run_from_iterable(lig_iter, prot)
 
-        Notes
-        -----
-        See :meth:`~Fingerprint.generate` to generate the fingerprint between
-        two single structures
+        .. seealso::
+
+            :meth:`Fingerprint.generate` to generate the fingerprint between
+            two single structures
 
         .. versionchanged:: 0.3.2
             Moved the ``return_atoms`` parameter from the ``run_from_iterable``
             method to the dataframe conversion code
+
         """
         iterator = tqdm(lig_iterable) if progress else lig_iterable
         if residues == "all":
