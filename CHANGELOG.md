@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+
+## [0.3.2] - 2021-06-11
+### Added
 - LigNetwork: an interaction diagram with atomistic details for the ligand and
   residue-level details for the protein, fully interactive in a browser/notebook, inspired
   from LigPlot (PR #19)
@@ -19,8 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recalculating the IFP if one wants to display it with atomic details (PR #19)
 - Changed the values returned by `fp.bitvector_atoms`: the atom indices have been
   separated in two lists, one for the ligand and one for the protein (PR #19)
-### Deprecated
-### Removed
 ### Fixed
 - Residues with a resnumber of `0` are not converted to `None` anymore (Issue #13)
 
@@ -42,8 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added the `Fingerprint.run_from_iterable` method, which uses the new supplier functions
   to quickly generate a fingerprint.
 - Sorted the output of `Fingerprint.list_available`
-### Deprecated
-### Removed
 ### Fixed
 - `Fingerprint.to_dataframe` is now much faster (Issue #7)
 - `ResidueId.from_string` method now supports 1-letter and 2-letter codes for RNA/DNA
@@ -58,7 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - All the API and the underlying code have been modified
 - Repository has been moved from GitHub user @cbouy to organisation @chemosim-lab
-### Deprecated
 ### Removed
 - Custom MOL2 file reader
 - Command-line interface
