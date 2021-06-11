@@ -11,6 +11,10 @@ If you use ProLIF in your research, please cite the DOI corresponding to the rel
     * - Version
       - Release date
       - DOI
+    * - v0.3.3
+      - 2021-06-11
+      - .. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.4926561.svg
+           :target: https://doi.org/10.5281/zenodo.4926561
     * - v0.3.2
       - 2021-06-11
       - .. image:: https://zenodo.org/badge/DOI/10.5281/zenodo.4926112.svg
