@@ -54,15 +54,27 @@ def get_ring_normal_vector(centroid, coordinates):
 
 
 def angle_between_limits(angle, min_angle, max_angle, ring=False):
-    """Checks if an angle value is between min and max angles in radian.
-    If the angle to check involves a ring, include the angle that would be
-    obtained if we had used the other normal vector (same axis but opposite
-    direction)
+    """Checks if an angle value is between min and max angles in radian
+
+    Parameters
+    ----------
+    angle : float
+        Angle to check, in radians
+    min_angle : float
+        Lower bound angle, in radians
+    max_angle : float
+        Upper bound angle, in radians
+    ring : bool
+        Wether the angle being checked involves a ring or not
+
+    Notes
+    -----
+    When ``ring=True``, the angle is capped between 0 and 90, and so should be
+    the min and max angles. This is useful for angles involving a ring's plane
+    normal vector.
     """
     if ring and (angle > _90_deg_to_rad):
-        mirror_angle = _90_deg_to_rad - (angle % _90_deg_to_rad)
-        return (min_angle <= angle <= max_angle) or (
-                min_angle <= mirror_angle <= max_angle)
+        angle = _90_deg_to_rad - (angle % _90_deg_to_rad)
     return (min_angle <= angle <= max_angle)
 
 
