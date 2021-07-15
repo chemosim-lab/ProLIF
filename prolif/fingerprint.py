@@ -122,7 +122,7 @@ class Fingerprint:
         lig = prolif.Molecule.from_mda(lig)
         ifp = fp.generate(lig, prot)
         ifp["Frame"] = 0
-        plf.to_dataframe([ifp], fp.interactions.keys())
+        prolif.to_dataframe([ifp], fp.interactions.keys())
 
     - On a specific pair of residues for a specific interaction:
 
@@ -284,8 +284,8 @@ class Fingerprint:
         ::
 
             >>> u = mda.Universe("complex.pdb")
-            >>> lig = plf.Molecule.from_mda(u, "resname LIG")
-            >>> prot = plf.Molecule.from_mda(u, "protein")
+            >>> lig = prolif.Molecule.from_mda(u, "resname LIG")
+            >>> prot = prolif.Molecule.from_mda(u, "protein")
             >>> fp = prolif.Fingerprint()
             >>> ifp = fp.generate(lig, prot)
 
@@ -404,9 +404,9 @@ class Fingerprint:
         ::
 
             >>> prot = mda.Universe("protein.pdb")
-            >>> prot = plf.Molecule.from_mda(prot)
-            >>> lig_iter = plf.mol2_supplier("docking_output.mol2")
-            >>> fp = plf.Fingerprint()
+            >>> prot = prolif.Molecule.from_mda(prot)
+            >>> lig_iter = prolif.mol2_supplier("docking_output.mol2")
+            >>> fp = prolif.Fingerprint()
             >>> fp.run_from_iterable(lig_iter, prot)
 
         .. seealso::
