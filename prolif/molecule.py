@@ -279,6 +279,8 @@ def mol2_supplier(path, **kwargs):
     block = []
     with open(path, "r") as f:
         for line in f:
+            if line.startswith("#"):
+                continue
             if block and line.startswith("@<TRIPOS>MOLECULE"):
                 mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
                 yield Molecule.from_rdkit(mol, **kwargs)

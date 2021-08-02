@@ -113,14 +113,16 @@ class Fingerprint:
         fp.run(u.trajectory[:5], lig, prot)
         fp.to_dataframe()
 
-    - On a specific frame and a specific pair of residues:
+    - On two single structures (from RDKit or MDAnalysis):
 
     .. ipython:: python
 
-        u.trajectory[0] # use the first frame
+        u.trajectory[0]  # use coordinates of the first frame
         prot = prolif.Molecule.from_mda(prot)
         lig = prolif.Molecule.from_mda(lig)
-        fp.bitvector(lig, prot["ASP129.A"])
+        ifp = fp.generate(lig, prot)
+        ifp["Frame"] = 0
+        prolif.to_dataframe([ifp], fp.interactions.keys())
 
     - On a specific pair of residues for a specific interaction:
 
@@ -282,8 +284,8 @@ class Fingerprint:
         ::
 
             >>> u = mda.Universe("complex.pdb")
-            >>> lig = plf.Molecule.from_mda(u, "resname LIG")
-            >>> prot = plf.Molecule.from_mda(u, "protein")
+            >>> lig = prolif.Molecule.from_mda(u, "resname LIG")
+            >>> prot = prolif.Molecule.from_mda(u, "protein")
             >>> fp = prolif.Fingerprint()
             >>> ifp = fp.generate(lig, prot)
 
@@ -343,6 +345,13 @@ class Fingerprint:
             >>> prot = u.select_atoms("protein")
             >>> fp = prolif.Fingerprint().run(u.trajectory[:10], lig, prot)
 
+        .. seealso::
+
+            - :meth:`Fingerprint.generate` to generate the fingerprint between
+            two single structures.
+            - :meth:`Fingerprint.run_from_iterable` to generate the fingerprint
+            between a protein and a collection of ligands.
+
         .. versionchanged:: 0.3.2
             Moved the ``return_atoms`` parameter from the ``run`` method to the
             dataframe conversion code
@@ -395,9 +404,9 @@ class Fingerprint:
         ::
 
             >>> prot = mda.Universe("protein.pdb")
-            >>> prot = plf.Molecule.from_mda(prot)
-            >>> lig_iter = plf.mol2_supplier("docking_output.mol2")
-            >>> fp = plf.Fingerprint()
+            >>> prot = prolif.Molecule.from_mda(prot)
+            >>> lig_iter = prolif.mol2_supplier("docking_output.mol2")
+            >>> fp = prolif.Fingerprint()
             >>> fp.run_from_iterable(lig_iter, prot)
 
         .. seealso::

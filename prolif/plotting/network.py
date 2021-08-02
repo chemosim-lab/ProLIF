@@ -586,47 +586,84 @@ class LigNetwork:
         return """
         legend_buttons = %(buttons)s;
         legend = document.getElementById('%(div_id)s');
-        var div1 = document.createElement('div');
-        var div2 = document.createElement('div');
+        var div_residues = document.createElement('div');
+        var div_interactions = document.createElement('div');
+        var disabled = [];
         var legend_callback = function() {
+            this.classList.toggle("disabled");
+            var hide = this.classList.contains("disabled");
+            var show = !hide;
+            var btn_label = this.innerHTML;
+            if (hide) {
+                disabled.push(btn_label);
+            } else {
+                disabled = disabled.filter(x => x !== btn_label);
+            }
             var node_update = [],
                 edge_update = [];
+            // click on residue type
             if (this.classList.contains("residues")) {
                 nodes.forEach((node) => {
-                    if (node.residue_type === this.innerHTML) {
-                        node.hidden = !node.hidden;
-                        node_update.push(node);
+                    // find nodes corresponding to this type
+                    if (node.residue_type === btn_label) {
+                        // if hiding this type and residue isn't already hidden
+                        if (hide && !node.hidden) {
+                            node.hidden = true;
+                            node_update.push(node);
+                        // if showing this type and residue isn't already visible
+                        } else if (show && node.hidden) {
+                            // display if there's at least one of its edge that isn't hidden
+                            num_edges_active = edges.filter(x => x.to === node.id)
+                                                    .map(x => Boolean(x.hidden))
+                                                    .filter(x => !x)
+                                                    .length;
+                            if (num_edges_active > 0) {
+                                node.hidden = false;
+                                node_update.push(node);
+                            }
+                        }
                     }
                 });
                 ifp.body.data.nodes.update(node_update);
+            // click on interaction type
             } else {
                 edges.forEach((edge) => {
-                    if (edge.interaction_type === this.innerHTML) {
+                    // find edges corresponding to this type
+                    if (edge.interaction_type === btn_label) {
                         edge.hidden = !edge.hidden;
                         edge_update.push(edge);
-                        var num_visible = edges.filter(x => x.to === edge.to)
+                        // number of active edges for the corresponding residue
+                        var num_edges_active = edges.filter(x => x.to === edge.to)
                                                .map(x => Boolean(x.hidden))
                                                .filter(x => !x)
                                                .length;
+                        // find corresponding residue
                         var ix = nodes.findIndex(x => x.id === edge.to);
-                        if ((num_visible === 0) || (nodes[ix].hidden)) {
-                            nodes[ix].hidden = !nodes[ix].hidden;
-                            node_update.push(nodes[ix]);
+                        // only change visibility if residue_type not being hidden
+                        if (!(disabled.includes(nodes[ix].residue_type))) {
+                            // hide if no edge being shown for this residue
+                            if (hide && (num_edges_active === 0)) {
+                                nodes[ix].hidden = true;
+                                node_update.push(nodes[ix]);
+                            // show if edges are being shown
+                            } else if (show && (num_edges_active > 0)) {
+                                nodes[ix].hidden = false;
+                                node_update.push(nodes[ix]);
+                            }
                         }
                     }
                 });
                 ifp.body.data.nodes.update(node_update);
                 ifp.body.data.edges.update(edge_update);
             }
-            this.classList.toggle("disabled");
         };
         legend_buttons.forEach(function(v,i) {
             if (v.group === "residues") {
-                var div = div1;
+                var div = div_residues;
                 var border = "none";
                 var color = v.color;
             } else {
-                var div = div2;
+                var div = div_interactions;
                 var border = "3px dashed " + v.color;
                 var color = "white";
             }
@@ -644,8 +681,8 @@ class LigNetwork:
             });
             button.onclick = legend_callback;
         });
-        legend.appendChild(div1);
-        legend.appendChild(div2);
+        legend.appendChild(div_residues);
+        legend.appendChild(div_interactions);
         """ % dict(div_id="networklegend",
                    buttons=json.dumps(buttons))
 

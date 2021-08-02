@@ -87,3 +87,9 @@ class TestSupplier:
         assert all([mi.GetResidueName() == "UNL",
                     mi.GetResidueNumber() == 1,
                     mi.GetChainId() == ""])
+
+    def test_mol2_starting_with_comment(self):
+        path = str(datapath / "mol_comment.mol2")
+        suppl = mol2_supplier(path)
+        mol = next(suppl)
+        assert mol is not None

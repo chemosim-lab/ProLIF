@@ -6,10 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Improved the documentation on how to properly restrict interactions to ignore the
+  protein backbone (Issue #22), how to fix the empty dataframe issue when no bond
+  information is present in the PDB file (Issue #15), how to save the LigNetwork diagram
+  (Issue #21), and some clarifications on using `fp.generate`
 ### Changed
 ### Deprecated
 ### Removed
 ### Fixed
+- Mixing residue type with interaction type in the interactive legend of the LigNetwork
+  would incorrectly display/hide some residues on the canvas (#PR 23)
+- MOL2 files starting with a comment (`#`) would lead to an error
 
 ## [0.3.3] - 2021-06-11
 ### Changed
