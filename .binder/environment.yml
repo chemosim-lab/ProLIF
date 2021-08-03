@@ -16,7 +16,7 @@ dependencies:
   - networkx
   - recommonmark
   - seaborn
-  - sphinx
+  - sphinx==3.2.1
   - tqdm
   - pip:
     - pyvis
