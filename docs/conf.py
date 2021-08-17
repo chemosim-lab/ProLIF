@@ -28,7 +28,7 @@ author = 'Cédric Bouysset'
 # -- General configuration ---------------------------------------------------
 
 github_doc_root = 'https://github.com/chemosim-lab/ProLIF/tree/master/docs/'
-needs_sphinx = '3.0'
+needs_sphinx = '4.1.2'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom

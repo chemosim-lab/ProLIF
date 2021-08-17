@@ -12,11 +12,11 @@ dependencies:
   - python
   - rdkit
   - cython
-  - nbsphinx
+  - nbsphinx==0.8.7
   - networkx
   - recommonmark
-  - seaborn
-  - sphinx==3.2.1
+  - seaborn==0.11.0
+  - sphinx==4.1.2
   - tqdm
   - pip:
     - pyvis
