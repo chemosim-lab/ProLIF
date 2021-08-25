@@ -29,12 +29,16 @@ class TestMolecule(TestBaseRDKitMol):
         rdkit_mol = Molecule(ligand_rdkit)
         newmol = Molecule.from_rdkit(ligand_rdkit)
         assert rdkit_mol[0].resid == newmol[0].resid
+
+    def test_from_rdkit_default_resid(self):
         mol = Chem.MolFromSmiles("CCO")
         newmol = Molecule.from_rdkit(mol)
         assert newmol[0].resid == ResidueId("UNL", 1)
+
+    def test_from_rdkit_resid_args(self):
+        mol = Chem.MolFromSmiles("CCO")
         newmol = Molecule.from_rdkit(mol, "FOO", 42, "A")
         assert newmol[0].resid == ResidueId("FOO", 42, "A")
-
 
     @pytest.mark.parametrize("key", [
         0,

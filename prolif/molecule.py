@@ -12,9 +12,6 @@ from .residue import Residue, ResidueGroup
 from .utils import split_mol_by_residues
 
 
-mda_to_rdkit = mda._CONVERTERS["RDKIT"]().convert
-
-
 class Molecule(BaseRDKitMol):
     """Main molecule class that behaves like an RDKit :class:`~rdkit.Chem.rdchem.Mol`
     with extra attributes (see examples below). The main purpose of this class
@@ -168,7 +165,7 @@ class Molecule(BaseRDKitMol):
         return len(self.residues)
 
 
-def pdbqt_supplier(paths, template):
+def pdbqt_supplier(paths, template, **kwargs):
     """Supplies molecules, given a path to PDBQT files
 
     Parameters
@@ -178,6 +175,8 @@ def pdbqt_supplier(paths, template):
     template : rdkit.Chem.rdchem.Mol
         A template molecule with the correct bond orders and charges. It must
         match exactly the molecule inside the PDBQT file.
+    kwargs : object
+        Keyword arguments passed to the RDKitConverter of MDAnalysis
 
     Returns
     -------
@@ -205,7 +204,8 @@ def pdbqt_supplier(paths, template):
         pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
         pdbqt.atoms.types = pdbqt.atoms.elements
         # convert without infering bond orders and charges
-        mol = mda_to_rdkit(pdbqt.atoms, NoImplicit=False)
+        kwargs.pop("NoImplicit", None)
+        mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False, **kwargs)
         # assign BO from template then add hydrogens
         mol = Chem.RemoveHs(mol, sanitize=False)
         mol = AssignBondOrdersFromTemplate(template, mol)
