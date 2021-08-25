@@ -109,7 +109,10 @@ class Molecule(BaseRDKitMol):
 
         """
         ag = obj.select_atoms(selection) if selection else obj.atoms
-        mol = mda_to_rdkit(ag, **kwargs)
+        if ag.n_atoms == 0:
+            raise mda.SelectionError(
+                f"AtomGroup is empty, please check your selection")
+        mol = ag.convert_to.rdkit(**kwargs)
         return cls(mol)
     
     @classmethod

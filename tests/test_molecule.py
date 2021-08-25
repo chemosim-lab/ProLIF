@@ -1,4 +1,5 @@
 import pytest
+from MDAnalysis import SelectionError
 from rdkit import Chem
 from prolif.molecule import (Molecule,
                              pdbqt_supplier,
@@ -24,6 +25,11 @@ class TestMolecule(TestBaseRDKitMol):
         assert rdkit_mol[0].resid == mda_mol[0].resid
         assert (rdkit_mol.HasSubstructMatch(mda_mol) and
                 mda_mol.HasSubstructMatch(rdkit_mol))
+
+    def test_from_mda_empty_ag(self):
+        ag = u.select_atoms("resname FOO")
+        with pytest.raises(SelectionError, match="AtomGroup is empty"):
+            Molecule.from_mda(ag)
     
     def test_from_rdkit(self):
         rdkit_mol = Molecule(ligand_rdkit)
