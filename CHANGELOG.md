@@ -4,15 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.4] - 2021-09-28
 ### Added
+- Added our J. Cheminformatics article to the citation page of the documentation and the
+  `CITATION.cff` file. 
+### Changed
 - Improved the documentation on how to properly restrict interactions to ignore the
   protein backbone (Issue #22), how to fix the empty dataframe issue when no bond
   information is present in the PDB file (Issue #15), how to save the LigNetwork diagram
   (Issue #21), and some clarifications on using `fp.generate`
-### Changed
-### Deprecated
-### Removed
 ### Fixed
 - Mixing residue type with interaction type in the interactive legend of the LigNetwork
   would incorrectly display/hide some residues on the canvas (#PR 23)

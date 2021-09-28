@@ -21,4 +21,9 @@ preferred-citation:
   title: "ProLIF: a library to encode molecular interactions as fingerprints"
   type: article
   doi: "10.1186/s13321-021-00548-6"
-  date-released: "2021-09-25"
+  issn: "1758-2946"
+  year: 2021
+  date-published: "2021-09-25"
+  volume: 13
+  start: 72
+  journal: "Journal of Cheminformatics"
