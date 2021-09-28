@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the corresponding article (see preferred-citation)."
+authors: 
+  -
+    family-names: Bouysset
+    given-names: "Cédric"
+    orcid: "https://orcid.org/0000-0002-7814-8158"
+repository-code: "https://github.com/chemosim-lab/ProLIF"
+title: "ProLIF"
+license: Apache-2.0
+preferred-citation:
+  authors:
+    -
+      family-names: Bouysset
+      given-names: "Cédric"
+      orcid: "https://orcid.org/0000-0002-7814-8158"
+    -
+      family-names: Fiorucci
+      given-names: "Sébastien"
+      orcid: "https://orcid.org/0000-0003-2245-0478"
+  title: "ProLIF: a library to encode molecular interactions as fingerprints"
+  type: article
+  doi: "10.1186/s13321-021-00548-6"
+  date-released: "2021-09-25"

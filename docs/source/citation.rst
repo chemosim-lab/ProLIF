@@ -1,7 +1,12 @@
 Citation
 --------
 
-If you use ProLIF in your research, please cite the DOI corresponding to the release version you've used:
+If you use ProLIF in your research, please cite the following [paper](https://doi.org/10.1186/s13321-021-00548-6):
+```
+Bouysset, C., Fiorucci, S. ProLIF: a library to encode molecular interactions as fingerprints. J Cheminform 13, 72 (2021). https://doi.org/10.1186/s13321-021-00548-6
+```
+
+You can additionally cite the DOI corresponding to the release version you've used:
 
 .. list-table:: ProLIF releases
     :widths: 10 10 15
