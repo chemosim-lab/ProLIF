@@ -140,9 +140,7 @@ def is_peptide_bond(bond, resids):
     resids : dict
         A dictionnary of ResidueId indexed by atom index
     """
-    if resids[bond.GetBeginAtomIdx()] == resids[bond.GetEndAtomIdx()]:
-        return False
-    return True
+    return resids[bond.GetBeginAtomIdx()] != resids[bond.GetEndAtomIdx()]
 
 
 def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
