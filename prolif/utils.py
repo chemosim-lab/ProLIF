@@ -201,16 +201,17 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
     # residue pairs
     keys = sorted(set([k for d in ifp for k in d.keys() if k != index_col]))
     # check if each interaction value is a list of atom indices or smthg else
-    for k in keys:
-        if k in ifp[0].keys():
-            break
-    is_atompair = isinstance(ifp[0][k][0], Iterable)
-    if return_atoms and not is_atompair:
+    for d in ifp:
+        for key, value in d.items():
+            if key != index_col:
+                has_atom_indices = isinstance(value[0], Iterable)
+                break
+    if return_atoms and not has_atom_indices:
         raise ValueError("The IFP either doesn't contain atom indices or is "
                          "formatted incorrectly")
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
-    if is_atompair and return_atoms:
+    if has_atom_indices and return_atoms:
         empty_arr = [[None, None]] * n_interactions
     else:
         empty_arr = np.array([empty_value] * n_interactions)
@@ -225,16 +226,16 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
             except KeyError:
                 data[key].append(empty_arr)
             else:
-                if is_atompair and return_atoms:
+                if has_atom_indices and return_atoms:
                     arr = list(zip(*arr[1:]))
-                elif is_atompair:
+                elif has_atom_indices:
                     arr = arr[0]
                 data[key].append(arr)
     index = pd.Series(index, name=index_col)
     # create dataframes
     values = np.array([np.hstack([np.ravel(a[i]) for a in data.values()])
                        for i in range(len(index))])
-    if is_atompair and return_atoms:
+    if has_atom_indices and return_atoms:
         columns = pd.MultiIndex.from_tuples(
             [(str(k[0]), str(k[1]), i, a)
              for k in keys
@@ -248,13 +249,13 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
              for i in interactions],
             names=["ligand", "protein", "interaction"])
     df = pd.DataFrame(values, columns=columns, index=index)
-    if is_atompair and return_atoms:
+    if has_atom_indices and return_atoms:
         df = (df.groupby(axis=1, level=["ligand", "protein", "interaction"])
                 .agg(tuple))
     if dtype:
         df = df.astype(dtype)
     if drop_empty:
-        if is_atompair and return_atoms:
+        if has_atom_indices and return_atoms:
             mask = df.apply(lambda s:
                             ~(s.isin([(None, None)]).all()), axis=0)
         else:

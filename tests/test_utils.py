@@ -1,4 +1,5 @@
 from math import radians
+from copy import deepcopy
 import pytest
 from rdkit import Chem
 import numpy as np
@@ -170,6 +171,11 @@ def test_to_df_raise_return_atoms_if_only_bitvector():
     with pytest.raises(ValueError, match="doesn't contain atom indices"):
         to_dataframe(ifp, ["A", "B", "C"], return_atoms=True)
 
+@pytest.mark.parametrize("ifp", [ifp, ifp_atoms])
+def test_to_df_no_interaction_in_first_frame(ifp):
+    fp = deepcopy(ifp)
+    fp[0] = {"Frame": 0}
+    to_dataframe(fp, ["A", "B", "C"])
 
 def test_to_bv():
     df = to_dataframe(ifp, ["A", "B", "C"])
