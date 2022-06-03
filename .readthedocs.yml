@@ -11,5 +11,3 @@ python:
     path: .
 conda:
   environment: .binder/environment.yml
-formats:
-- pdf
