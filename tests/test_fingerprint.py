@@ -172,3 +172,7 @@ class TestFingerprint:
         assert "_BaseHBond" in avail
         assert "_Distance" in avail
         assert "Interaction" in avail
+
+    def test_unknown_interaction(self):
+        with pytest.raises(NameError, match="Unknown interaction"):
+            Fingerprint(["Cationic", "foo"])

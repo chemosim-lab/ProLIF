@@ -1,8 +1,10 @@
 import pytest
 from rdkit import RDLogger
+from MDAnalysis.topology.tables import vdwradii
 from prolif.fingerprint import Fingerprint
-from prolif.interactions import _INTERACTIONS, Interaction, get_mapindex
 import prolif
+from prolif.interactions import (_INTERACTIONS, Interaction, get_mapindex,
+                                 VdWContact)
 from .test_base import ligand_mol
 from . import mol2factory
 
@@ -80,6 +82,8 @@ class TestInteractions:
         ("metalacceptor", "ligand", "metal", True),
         ("metalacceptor", "ligand", "metal_false", False),
         ("metalacceptor", "metal", "ligand", False),
+        ("vdwcontact", "benzene", "etf", True),
+        ("vdwcontact", "xb_acceptor_false_xar", "cation_false", False),
     ], indirect=["mol1", "mol2"])
     def test_interaction(self, fingerprint, func_name, mol1, mol2, expected):
         interaction = getattr(fingerprint, func_name)
@@ -114,3 +118,19 @@ class TestInteractions:
     def test_get_mapindex(self, index):
         parent_index = get_mapindex(ligand_mol[0], index)
         assert parent_index == index
+
+    def test_vdwcontact_tolerance_error(self):
+        with pytest.raises(ValueError,
+                           match="`tolerance` must be 0 or positive"):
+            VdWContact(tolerance=-1)
+
+    @pytest.mark.parametrize("mol1, mol2", [
+        "benzene", "cation"
+    ], indirect=["mol1", "mol2"])
+    def test_vdwcontact_cache(self, mol1, mol2):
+        vdw = VdWContact()
+        assert vdw._vdw_cache == {}
+        vdw.detect(mol1, mol2)
+        for (lig, res), value in vdw._vdw_cache.items():
+            vdw_dist = vdwradii[lig] + vdwradii[res] + vdw.tolerance
+            assert vdw_dist == value

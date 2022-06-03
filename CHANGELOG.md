@@ -5,10 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.0] - ??
+### Added
+- New interaction: van der Waals contact, based on the sum of vdW radii of two atoms.
 ### Fixed
 - If no interaction is detected in the first frame, `to_dataframe` will not complain about
   a `KeyError` anymore (Issue #44).
 - ProLIF can now be installed through pip (Issue #6).
+- When creating a `plf.Fingerprint`, unknown interactions will no longer fail silently.
 
 ## [0.3.4] - 2021-09-28
 ### Added
@@ -50,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   separated in two lists, one for the ligand and one for the protein (PR #19)
 ### Fixed
 - Residues with a resnumber of `0` are not converted to `None` anymore (Issue #13)
+- Fingerprint instantiated with an unknown interaction name will now raise a `NameError`
 
 ## [0.3.1] - 2021-02-02
 ### Added

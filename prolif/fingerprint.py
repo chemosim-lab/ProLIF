@@ -98,6 +98,10 @@ class Fingerprint:
     ifp : list, optionnal
         List of interactions fingerprints for the given trajectory.
 
+    Raises
+    ------
+    NameError : Unknown interaction in the ``interactions`` parameter
+
     Notes
     -----
     You can use the fingerprint generator in multiple ways:
@@ -144,11 +148,15 @@ class Fingerprint:
 
     def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",
                  "PiStacking", "Anionic", "Cationic", "CationPi", "PiCation"]):
-        # read interactions to compute
         self.interactions = {}
         if interactions == "all":
-            interactions = [i for i in _INTERACTIONS.keys()
-                            if not (i.startswith("_") or i == "Interaction")]
+            interactions = self.list_available()
+        # sanity check
+        unsafe = set(interactions)
+        unk = unsafe.symmetric_difference(_INTERACTIONS.keys()) & unsafe
+        if unk:
+            raise NameError(f"Unknown interaction(s): {', '.join(unk)}")
+        # add interaction methods
         for name, interaction_cls in _INTERACTIONS.items():
             if name.startswith("_") or name == "Interaction":
                 continue
