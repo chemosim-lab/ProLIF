@@ -28,10 +28,10 @@ jobs:
           python-version: [3.8, 3.9, "3.10"]
           rdkit-version: ["rdkit>=2020.09.1"]
           include:
-          - name: RDKit min version
+          - name: Min version
             os: ubuntu-latest
             python-version: 3.8
-            rdkit-version: "rdkit==2020.03.1"
+            rdkit-version: "rdkit=2020.03.1 boost-cpp=1.72.0=h359cf19_6"
 
     steps:
     - uses: actions/checkout@v2
