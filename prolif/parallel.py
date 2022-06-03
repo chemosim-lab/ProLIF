@@ -8,7 +8,7 @@ import numpy as np
 u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
 # create selections for the ligand and protein
 lig = u.select_atoms("resname LIG")
-prot = u.select_atoms("protein and byres around 7.0 group lig", lig=lig, updating=True)
+prot = u.select_atoms("protein")
 
 # # serial
 # fp = plf.Fingerprint()
@@ -34,7 +34,7 @@ with mp.Pool(N_WORKERS) as pool:
     for ifp in tqdm(pool.imap_unordered(job, chunks),
                     total=N_WORKERS):
         results.extend(ifp)
-    
+
+results.sort(key=lambda ifp: ifp["Frame"])
 df = plf.to_dataframe(results, plf.Fingerprint().interactions.keys())
-df.sort_index(inplace=True)
 print(df)
