@@ -25,12 +25,12 @@ jobs:
     strategy:
         matrix:
           os: [ubuntu-latest]
-          python-version: [3.6, 3.8, 3.9]
+          python-version: [3.8, 3.9, "3.10"]
           rdkit-version: ["rdkit>=2020.09.1"]
           include:
           - name: RDKit min version
             os: ubuntu-latest
-            python-version: 3.6
+            python-version: 3.8
             rdkit-version: "rdkit==2020.03.1"
 
     steps:
@@ -45,6 +45,7 @@ jobs:
         channels: conda-forge, defaults
         add-pip-as-python-dependency: true
         architecture: x64
+        mamba-version: "*"
 
     - name: Check conda and pip
       run: |
@@ -52,12 +53,12 @@ jobs:
         python --version
         pip --version
         conda --version
+        mamba --version
 
     - name: Install conda dependencies
       run: |
-        conda install mamba
-        mamba install ${{ matrix.rdkit-version }} cython wheel
-        conda list
+        mamba install ${{ matrix.rdkit-version }} wheel
+        mamba list
 
     - name: Install package through pip
       run: |
