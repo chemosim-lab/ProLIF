@@ -83,7 +83,7 @@ class TestInteractions:
         ("metalacceptor", "ligand", "metal_false", False),
         ("metalacceptor", "metal", "ligand", False),
         ("vdwcontact", "benzene", "etf", True),
-        ("vdwcontact", "xb_acceptor_false_xar", "cation_false", False),
+        ("vdwcontact", "hb_acceptor", "metal_false", False),
     ], indirect=["mol1", "mol2"])
     def test_interaction(self, fingerprint, func_name, mol1, mol2, expected):
         interaction = getattr(fingerprint, func_name)
@@ -125,7 +125,7 @@ class TestInteractions:
             VdWContact(tolerance=-1)
 
     @pytest.mark.parametrize("mol1, mol2", [
-        "benzene", "cation"
+        ("benzene", "cation")
     ], indirect=["mol1", "mol2"])
     def test_vdwcontact_cache(self, mol1, mol2):
         vdw = VdWContact()
