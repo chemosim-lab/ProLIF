@@ -32,9 +32,6 @@ Documentation
 
 The installation instructions, documentation and tutorials can be found online on `ReadTheDocs <https://prolif.readthedocs.io/en/latest/>`_.
 
-| ⚠ Do not ``pip install prolif`` yet ⚠
-| Please refer to the installation instructions instead (and `this comment <https://github.com/chemosim-lab/ProLIF/issues/6#issue-784313798>`__ if you want to know the details)
-
 Issues
 ------
 
@@ -55,7 +52,7 @@ License
 
 Unless otherwise noted, all files in this directory and all subdirectories are distributed under the Apache License, Version 2.0 ::
 
-    Copyright 2017-2021 Cédric BOUYSSET
+    Copyright 2017-2022 Cédric BOUYSSET
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
