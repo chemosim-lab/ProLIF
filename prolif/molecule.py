@@ -168,7 +168,7 @@ class Molecule(BaseRDKitMol):
         return len(self.residues)
 
 
-def pdbqt_supplier(paths, template, **kwargs):
+class pdbqt_supplier:
     """Supplies molecules, given a path to PDBQT files
 
     Parameters
@@ -178,8 +178,15 @@ def pdbqt_supplier(paths, template, **kwargs):
     template : rdkit.Chem.rdchem.Mol
         A template molecule with the correct bond orders and charges. It must
         match exactly the molecule inside the PDBQT file.
-    kwargs : object
+    converter_kwargs : dict
         Keyword arguments passed to the RDKitConverter of MDAnalysis
+    resname : str
+        Residue name for every ligand
+    resnumber : int
+        Residue number for every ligand
+    chain : str
+        Chain ID for every ligand
+    
 
     Returns
     -------
@@ -197,26 +204,41 @@ def pdbqt_supplier(paths, template, **kwargs):
         >>> for lig in lig_suppl:
         ...     # do something with each ligand
 
+    .. versionchanged:: 1.0.0
+        Molecule suppliers are now iterators that can be reused and can return
+        their length, instead of single-use generators.
+
     """
-    for pdbqt_path in paths:
-        pdbqt = mda.Universe(pdbqt_path)
-        # set attributes needed by the converter
-        elements = [mda.topology.guessers.guess_atom_element(x)
-                    for x in pdbqt.atoms.names]
-        pdbqt.add_TopologyAttr("elements", elements)
-        pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
-        pdbqt.atoms.types = pdbqt.atoms.elements
-        # convert without infering bond orders and charges
-        kwargs.pop("NoImplicit", None)
-        mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False, **kwargs)
-        # assign BO from template then add hydrogens
-        mol = Chem.RemoveHs(mol, sanitize=False)
-        mol = AssignBondOrdersFromTemplate(template, mol)
-        mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)
-        yield Molecule(mol)
+    def __init__(self, paths, template, converter_kwargs, **kwargs):
+        self.paths = list(paths)
+        self.template = template
+        converter_kwargs.pop("NoImplicit", None)
+        self.converter_kwargs = converter_kwargs
+        self._kwargs = kwargs
+
+    def __iter__(self):
+        for pdbqt_path in self.paths:
+            pdbqt = mda.Universe(pdbqt_path)
+            # set attributes needed by the converter
+            elements = [mda.topology.guessers.guess_atom_element(x)
+                        for x in pdbqt.atoms.names]
+            pdbqt.add_TopologyAttr("elements", elements)
+            pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
+            pdbqt.atoms.types = pdbqt.atoms.elements
+            # convert without infering bond orders and charges
+            mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False,
+                                               **self.converter_kwargs)
+            # assign BO from template then add hydrogens
+            mol = Chem.RemoveHs(mol, sanitize=False)
+            mol = AssignBondOrdersFromTemplate(self.template, mol)
+            mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)
+            yield Molecule.from_rdkit(mol, **self._kwargs)
+
+    def __len__(self):
+        return len(self.paths)
 
 
-def sdf_supplier(path, **kwargs):
+class sdf_supplier:
     """Supplies molecules, given a path to an SDFile
     
     Parameters
@@ -244,13 +266,25 @@ def sdf_supplier(path, **kwargs):
         >>> for lig in lig_suppl:
         ...     # do something with each ligand
 
+    .. versionchanged:: 1.0.0
+        Molecule suppliers are now iterators that can be reused and can return
+        their length, instead of single-use generators.
+
     """
-    suppl = Chem.SDMolSupplier(path, removeHs=False)
-    for mol in suppl:
-        yield Molecule.from_rdkit(mol, **kwargs)
+    def __init__(self, path, **kwargs):
+        self.path = path
+        self._suppl = Chem.SDMolSupplier(path, removeHs=False)
+        self._kwargs = kwargs
+
+    def __iter__(self):
+        for mol in self._suppl:
+            yield Molecule.from_rdkit(mol, **self._kwargs)
+
+    def __len__(self):
+        return len(self._suppl)
 
 
-def mol2_supplier(path, **kwargs):
+class mol2_supplier:
     """Generates prolif.Molecule objects from a MOL2 file
     
     Parameters
@@ -277,18 +311,31 @@ def mol2_supplier(path, **kwargs):
         >>> lig_suppl = mol2_supplier("docking/output.mol2")
         >>> for lig in lig_suppl:
         ...     # do something with each ligand
+    
+    .. versionchanged:: 1.0.0
+        Molecule suppliers are now iterators that can be reused and can return
+        their length, instead of single-use generators.
 
     """
-    block = []
-    with open(path, "r") as f:
-        for line in f:
-            if line.startswith("#"):
-                continue
-            if block and line.startswith("@<TRIPOS>MOLECULE"):
-                mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
-                yield Molecule.from_rdkit(mol, **kwargs)
-                block = []
-            block.append(line)
-        mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
-        yield Molecule.from_rdkit(mol, **kwargs)
-                
+    def __init__(self, path, **kwargs):
+        self.path = path
+        self._kwargs = kwargs
+
+    def __iter__(self):
+        block = []
+        with open(self.path, "r") as f:
+            for line in f:
+                if line.startswith("#"):
+                    continue
+                if block and line.startswith("@<TRIPOS>MOLECULE"):
+                    mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
+                    yield Molecule.from_rdkit(mol, **self._kwargs)
+                    block = []
+                block.append(line)
+            mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
+            yield Molecule.from_rdkit(mol, **self._kwargs)
+
+    def __len__(self):
+        with open(self.path, "r") as f:
+            n_mols = sum(line.startswith("@<TRIPOS>MOLECULE") for line in f)
+        return n_mols
