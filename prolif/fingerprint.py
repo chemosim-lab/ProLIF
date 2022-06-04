@@ -20,11 +20,25 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     TanimotoSimilarity(bv[0], bv[1])
 
 """
+import multiprocessing as mp
+from collections.abc import Iterable
+from copy import deepcopy
 from functools import wraps
+from inspect import isgenerator
+from threading import Thread
 import numpy as np
 from tqdm.auto import tqdm
+from rdkit import Chem
 from .interactions import _INTERACTIONS
 from .molecule import Molecule
+from .parallel import (
+    declare_shared_objs_for_chunk,
+    declare_shared_objs_for_mol,
+    process_chunk,
+    process_mol,
+    Progress,
+    ProgressCounter,
+)
 from .utils import get_residues_near_ligand, to_dataframe, to_bitvectors
 
 
@@ -144,10 +158,17 @@ class Fingerprint:
         fp.bitvector_atoms(lig, prot["ASP129.A"])
         fp.hbdonor.__wrapped__(lig, prot["ASP129.A"])
 
+
+    .. versionchanged:: 1.0.0
+        Added pickle support
     """
 
     def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",
                  "PiStacking", "Anionic", "Cationic", "CationPi", "PiCation"]):
+        self._set_interactions(interactions)
+
+    def _set_interactions(self, interactions):
+        # read interactions to compute
         self.interactions = {}
         if interactions == "all":
             interactions = self.list_available()
@@ -165,6 +186,22 @@ class Fingerprint:
             setattr(self, name.lower(), func)
             if name in interactions:
                 self.interactions[name] = func
+
+    def __getstate__(self):
+        # pickle
+        interactions = list(self.interactions.keys())
+        d = deepcopy(self.__dict__)
+        d["interactions"] = interactions
+        callables = [name for name, attr in d.items() if callable(attr)]
+        for name in callables:
+            d.pop(name)
+        return d
+
+    def __setstate__(self, d):
+        # unpickle
+        self.__dict__ = d
+        interactions = d.pop("interactions")
+        self._set_interactions(interactions)
 
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
@@ -315,7 +352,7 @@ class Fingerprint:
                     ifp[key] = self.bitvector(lres, pres)
         return ifp
 
-    def run(self, traj, lig, prot, residues=None, progress=True):
+    def run(self, traj, lig, prot, residues=None, progress=True, n_jobs=None):
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
         Parameters
@@ -338,6 +375,14 @@ class Fingerprint:
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
+        n_jobs : int or None
+            Number of processes to run in parallel. If ``n_jobs=None``, the
+            analysis will use all available CPU threads, while if ``n_jobs=1``,
+            the analysis will run in serial.
+        
+        Raises
+        ------
+        ValueError : if ``n_jobs <= 0``
 
         Returns
         -------
@@ -364,7 +409,16 @@ class Fingerprint:
             Moved the ``return_atoms`` parameter from the ``run`` method to the
             dataframe conversion code
 
+        .. versionchanged:: 1.0.0
+            Added support for multiprocessing
+
         """
+        if n_jobs is not None and n_jobs < 1:
+            raise ValueError("n_jobs must be > 0 or None")
+        if n_jobs != 1:
+            return self._run_parallel(traj, lig, prot, residues=residues,
+                                      progress=progress, n_jobs=n_jobs)
+
         iterator = tqdm(traj) if progress else traj
         if residues == "all":
             residues = Molecule.from_mda(prot).residues.keys()
@@ -379,8 +433,46 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
+    def _run_parallel(self, traj, lig, prot, residues=None, progress=True,
+                      n_jobs=None):
+        """Parallel implementation of :meth:`~Fingerprint.run`"""
+        n_chunks = n_jobs if n_jobs else mp.cpu_count()
+        try:
+            n_frames = traj.n_frames
+        except AttributeError:
+            # sliced trajectory
+            memo = (traj.start, traj.stop, traj.step)
+            frames = range(*memo)
+            traj = lig.universe.trajectory
+        else:
+            memo = []
+            frames = range(n_frames)
+
+        if residues == "all":
+            residues = Molecule.from_mda(prot).residues.keys()
+        chunks = np.array_split(frames, n_chunks)
+        # setup parallel progress bar
+        pcount = ProgressCounter()
+        if progress:
+            pbar = Progress(pcount, total=len(frames))
+        else:
+            pbar = lambda: None
+        pbar_thread = Thread(target=pbar, daemon=True)
+
+        # run pool of workers
+        with mp.Pool(n_jobs, initializer=declare_shared_objs_for_chunk,
+                     initargs=(self, residues, progress, pcount)) as pool:
+            pbar_thread.start()
+            args = ((traj, lig, prot, chunk) for chunk in chunks)
+            results = []
+            for ifp in pool.imap_unordered(process_chunk, args):
+                results.extend(ifp)
+        results.sort(key=lambda ifp: ifp["Frame"])
+        self.ifp = results
+        return self
+
     def run_from_iterable(self, lig_iterable, prot_mol, residues=None,
-                          progress=True):
+                          progress=True, n_jobs=None):
         """Generates the fingerprint between a list of ligands and a protein
 
         Parameters
@@ -401,6 +493,14 @@ class Fingerprint:
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
+        n_jobs : int or None
+            Number of processes to run in parallel. If ``n_jobs=None``, the
+            analysis will use all available CPU threads, while if ``n_jobs=1``,
+            the analysis will run in serial.
+
+        Raises
+        ------
+        ValueError : if ``n_jobs <= 0``
 
         Returns
         -------
@@ -426,7 +526,17 @@ class Fingerprint:
             Moved the ``return_atoms`` parameter from the ``run_from_iterable``
             method to the dataframe conversion code
 
+        .. versionchanged:: 1.0.0
+            Added support for multiprocessing
+
         """
+        if n_jobs is not None and n_jobs < 1:
+            raise ValueError("n_jobs must be > 0 or None")
+        if n_jobs != 1:
+            return self._run_iter_parallel(
+                lig_iterable=lig_iterable, prot_mol=prot_mol,residues=residues,
+                progress=progress, n_jobs=n_jobs)
+
         iterator = tqdm(lig_iterable) if progress else lig_iterable
         if residues == "all":
             residues = prot_mol.residues.keys()
@@ -437,6 +547,29 @@ class Fingerprint:
             data["Frame"] = i
             ifp.append(data)
         self.ifp = ifp
+        return self
+
+    def _run_iter_parallel(self, lig_iterable, prot_mol, residues=None,
+                           progress=True, n_jobs=None):
+        """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
+        if isinstance(lig_iterable, Chem.SDMolSupplier) or (
+            isinstance(lig_iterable, Iterable) and not isgenerator(lig_iterable)
+            ):
+            total = len(lig_iterable)
+        else:
+            total = None
+        suppl = (x for x in enumerate(lig_iterable))
+        if residues == "all":
+            residues = prot_mol.residues.keys()
+
+        with mp.Pool(n_jobs, initializer=declare_shared_objs_for_mol,
+                     initargs=(self, prot_mol, residues)) as pool:
+            results = []
+            for data in tqdm(pool.imap_unordered(process_mol, suppl),
+                             total=total, disable=not progress):
+                results.append(data)
+        results.sort(key=lambda ifp: ifp["Frame"])
+        self.ifp = results
         return self
 
     def to_dataframe(self, **kwargs):
