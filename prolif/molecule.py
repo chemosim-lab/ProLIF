@@ -209,9 +209,10 @@ class pdbqt_supplier:
         their length, instead of single-use generators.
 
     """
-    def __init__(self, paths, template, converter_kwargs, **kwargs):
+    def __init__(self, paths, template, converter_kwargs=None, **kwargs):
         self.paths = list(paths)
         self.template = template
+        converter_kwargs = converter_kwargs or {}
         converter_kwargs.pop("NoImplicit", None)
         self.converter_kwargs = converter_kwargs
         self._kwargs = kwargs
