@@ -1,40 +1,57 @@
-import MDAnalysis as mda
-import prolif as plf
 import multiprocessing as mp
+from ctypes import c_int32
+from time import sleep
 from tqdm.auto import tqdm
-import numpy as np
+from .molecule import Molecule
 
-# load trajectory
-u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
-# create selections for the ligand and protein
-lig = u.select_atoms("resname LIG")
-prot = u.select_atoms("protein")
 
-# # serial
-# fp = plf.Fingerprint()
-# fp.run(u.trajectory[[0, 10, 20]], lig, prot)
-# df = fp.to_dataframe()
-# print(df)
+def process_chunk(args):
+    """Generates a fingerprint for a chunk of frame indices"""
+    traj, lig, prot, chunk = args
+    ifp = []
+    for ts in traj[chunk]:
+        lig_mol = Molecule.from_mda(lig)
+        prot_mol = Molecule.from_mda(prot)
+        data = fp.generate(lig_mol, prot_mol, residues=residues,
+                           return_atoms=True)
+        data["Frame"] = ts.frame
+        ifp.append(data)
+        if display_progress:
+            with pcount.lock:
+                pcount.counter.value += 1
+    return ifp
 
-# parallel
-N_WORKERS = 6
-frames = range(u.trajectory.n_frames)
-chunks = np.array_split(frames, N_WORKERS)
 
-def job(chunk):
-    univ = u.copy()
-    lig = univ.select_atoms("resname LIG")
-    prot = univ.select_atoms("protein")
-    fp = plf.Fingerprint()
-    fp.run(univ.trajectory[chunk], lig, prot, progress=chunk[0]==0)
-    return fp.ifp
+def declare_shared_objs(fingerprint, resid_list, show_progressbar,
+                        progress_counter):
+    """Declares global objects that are available to the pool of workers"""
+    global fp, residues, display_progress, pcount
+    fp = fingerprint
+    residues = resid_list 
+    display_progress = show_progressbar
+    pcount = progress_counter
 
-with mp.Pool(N_WORKERS) as pool:
-    results = []
-    for ifp in tqdm(pool.imap_unordered(job, chunks),
-                    total=N_WORKERS):
-        results.extend(ifp)
 
-results.sort(key=lambda ifp: ifp["Frame"])
-df = plf.to_dataframe(results, plf.Fingerprint().interactions.keys())
-print(df)
+class ProgressCounter:
+    """Tracks the progress of the fingerprint analysis accross the pool of
+    workers"""
+    def __init__(self):
+        self.lock = mp.Lock()
+        self.counter = mp.Value(c_int32)
+
+
+class Progress:
+    """Handles tracking the progress of the ProgressCounter and updating the
+    tqdm progress bar, from within an independent thread"""
+    def __init__(self, pcount, *args, **kwargs):
+        self.pbar = tqdm(*args, **kwargs)
+        self.pcount = pcount
+    
+    def __call__(self):
+        while self.pbar.n < self.pbar.total:
+            if self.pcount.counter.value != 0:
+                with self.pcount.lock:
+                    n_processed = self.pcount.counter.value
+                    self.pcount.counter.value = 0
+                self.pbar.update(n_processed)
+            sleep(1)
