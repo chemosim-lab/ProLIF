@@ -129,7 +129,7 @@ class Residue(BaseRDKitMol):
     """
     def __init__(self, mol):
         super().__init__(mol)
-        self.resid = ResidueId.from_atom(mol.GetAtomWithIdx(0))
+        self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0))
 
     def __repr__(self): # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
