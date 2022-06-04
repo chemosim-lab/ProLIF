@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - ??
 ### Added
 - New interaction: van der Waals contact, based on the sum of vdW radii of two atoms.
+- Support for multiprocessing, enabled by default. The number of processes can be
+  controlled through `n_jobs` in `fp.run` and `fp.run_from_iterable`.
+### Changed
+- Molecule suppliers can now be reused and can return their length, instead of being
+  single-use generators.
 ### Fixed
+- ProLIF can now be installed through pip (Issue #6).
 - If no interaction is detected in the first frame, `to_dataframe` will not complain about
   a `KeyError` anymore (Issue #44).
-- ProLIF can now be installed through pip (Issue #6).
 - When creating a `plf.Fingerprint`, unknown interactions will no longer fail silently.
 
 ## [0.3.4] - 2021-09-28
