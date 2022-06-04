@@ -22,15 +22,32 @@ def process_chunk(args):
     return ifp
 
 
-def declare_shared_objs(fingerprint, resid_list, show_progressbar,
-                        progress_counter):
-    """Declares global objects that are available to the pool of workers"""
+def declare_shared_objs_for_chunk(fingerprint, resid_list, show_progressbar,
+                                  progress_counter):
+    """Declares global objects that are available to the pool of workers for
+    a trajectory"""
     global fp, residues, display_progress, pcount
     fp = fingerprint
     residues = resid_list 
     display_progress = show_progressbar
     pcount = progress_counter
 
+
+def process_mol(args):
+    """Generates a fingerprint for a single molecule"""
+    index, mol = args
+    data = fp.generate(mol, prot_mol, residues=residues, return_atoms=True)
+    data["Frame"] = index
+    return data
+
+
+def declare_shared_objs_for_mol(fingerprint, pmol, resid_list):
+    """Declares global objects that are available to the pool of workers for
+    an interable of ligands"""
+    global fp, residues, prot_mol
+    fp = fingerprint
+    residues = resid_list
+    prot_mol = pmol
 
 class ProgressCounter:
     """Tracks the progress of the fingerprint analysis accross the pool of
