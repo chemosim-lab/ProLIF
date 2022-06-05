@@ -1,7 +1,9 @@
 import multiprocessing as mp
 from ctypes import c_int32
 from time import sleep
+
 from tqdm.auto import tqdm
+
 from .molecule import Molecule
 
 
@@ -63,7 +65,7 @@ class Progress:
     def __init__(self, pcount, *args, **kwargs):
         self.pbar = tqdm(*args, **kwargs)
         self.pcount = pcount
-    
+
     def __call__(self):
         while self.pbar.n < self.pbar.total:
             if self.pcount.counter.value != 0:

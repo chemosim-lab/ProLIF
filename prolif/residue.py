@@ -3,11 +3,12 @@ Residue-related classes --- :mod:`prolif.residue`
 =================================================
 """
 import re
-from typing import Optional, List
 from collections import UserDict
-import numpy as np
-from .rdkitmol import BaseRDKitMol
+from typing import List, Optional
 
+import numpy as np
+
+from .rdkitmol import BaseRDKitMol
 
 _RE_RESID = re.compile(r'([A-Z]{,3})?(\d*)\.?(\w)?')
 NoneType = type(None)
@@ -15,7 +16,7 @@ NoneType = type(None)
 
 class ResidueId:
     """A unique residue identifier
-    
+
     Parameters
     ----------
     name : str
@@ -47,14 +48,14 @@ class ResidueId:
 
     def __eq__(self, other):
         return hash(self) == hash(other)
-    
+
     def __lt__(self, other):
         return (self.chain, self.number) < (other.chain, other.number)
 
     @classmethod
     def from_atom(cls, atom):
         """Creates a ResidueId from an RDKit atom
-        
+
         Parameters
         ----------
         atom : rdkit.Chem.rdchem.Atom
@@ -71,14 +72,14 @@ class ResidueId:
     @classmethod
     def from_string(cls, resid_str):
         """Creates a ResidueId from a string
-        
+
         Parameters
         ----------
         resid_str : str
             A string in the format ``<3-letter code><residue number>.<chain>``
             All arguments are optionnal, and the dot should be present only if
             the chain identifier is also present
-        
+
         Examples
         --------
 
@@ -121,7 +122,7 @@ class Residue(BaseRDKitMol):
     ----------
     resid : prolif.residue.ResidueId
         The residue identifier
-    
+
     Notes
     -----
     The name of the residue can be converted to a string by using
@@ -141,7 +142,7 @@ class Residue(BaseRDKitMol):
 
 class ResidueGroup(UserDict):
     """A container to store and retrieve Residue instances easily
-    
+
     Parameters
     ----------
     residues : list
@@ -151,7 +152,7 @@ class ResidueGroup(UserDict):
     ----------
     n_residues : int
         Number of residues in the ResidueGroup
-    
+
     Notes
     -----
     Residues in the group can be accessed by :class:`ResidueId`, string, or
@@ -192,7 +193,7 @@ class ResidueGroup(UserDict):
 
     def select(self, mask):
         """Locate a subset of a ResidueGroup based on a boolean mask
-        
+
         Parameters
         ----------
         mask : numpy.ndarray

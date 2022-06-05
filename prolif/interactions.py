@@ -10,7 +10,9 @@ You can declare your own interaction class like this::
         def detect(self, res1, res2, threshold=2.0):
             dist_matrix = distance_matrix(res1.xyz, res2.xyz)
             if (dist_matrix <= threshold).any():
-                return True
+                # return format: bool, ligand atom index, protein atom index
+                return True, None, None
+            return False, None, None
 
 .. warning:: Your custom class must inherit from :class:`prolif.interactions.Interaction`
 
@@ -32,18 +34,17 @@ interactions available to the fingerprint generator::
 
 """
 
-from itertools import product
 import warnings
-from math import radians
 from abc import ABC, ABCMeta, abstractmethod
-from .utils import (
-    angle_between_limits,
-    get_centroid,
-    get_ring_normal_vector)
+from itertools import product
+from math import radians
+
 import numpy as np
-from rdkit.Chem import MolFromSmarts
-from rdkit import Geometry
 from MDAnalysis.topology.tables import vdwradii
+from rdkit import Geometry
+from rdkit.Chem import MolFromSmarts
+
+from .utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 _INTERACTIONS = {}
 

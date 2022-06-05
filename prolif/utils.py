@@ -2,22 +2,21 @@
 Helper functions --- :mod:`prolif.utils`
 ========================================
 """
-from math import pi
 from collections import defaultdict
 from collections.abc import Iterable
 from copy import deepcopy
 from functools import wraps
 from importlib.util import find_spec
+from math import pi
+
 import numpy as np
 import pandas as pd
-from scipy.spatial import cKDTree
-from rdkit.Chem import (SplitMolByPDBResidues,
-                        GetMolFrags,
-                        FragmentOnBonds)
+from rdkit.Chem import FragmentOnBonds, GetMolFrags, SplitMolByPDBResidues
 from rdkit.DataStructs import ExplicitBitVect
 from rdkit.Geometry import Point3D
-from .residue import ResidueId
+from scipy.spatial import cKDTree
 
+from .residue import ResidueId
 
 _90_deg_to_rad = pi/2
 

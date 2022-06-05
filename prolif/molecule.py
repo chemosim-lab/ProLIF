@@ -4,9 +4,11 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 """
 import copy
 from operator import attrgetter
+
 import MDAnalysis as mda
 from rdkit import Chem
 from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
+
 from .rdkitmol import BaseRDKitMol
 from .residue import Residue, ResidueGroup
 from .utils import split_mol_by_residues
@@ -29,7 +31,7 @@ class Molecule(BaseRDKitMol):
         by :class:`~prolif.residue.ResidueId`. The residue list is sorted.
     n_residues : int
         Number of residues
-    
+
     Examples
     --------
 
@@ -42,7 +44,7 @@ class Molecule(BaseRDKitMol):
         mol = u.select_atoms("protein").convert_to("RDKIT")
         mol = prolif.Molecule(mol)
         mol
-    
+
     You can also create a Molecule directly from a
     :class:`~MDAnalysis.core.universe.Universe`:
 
@@ -52,17 +54,17 @@ class Molecule(BaseRDKitMol):
         mol = prolif.Molecule.from_mda(u, "protein")
         mol
 
-    
+
     Notes
     -----
     Residues can be accessed easily in different ways:
-        
+
     .. ipython:: python
 
         mol["TYR38.A"] # by resid string (residue name + number + chain)
         mol[42] # by index (from 0 to n_residues-1)
         mol[prolif.ResidueId("TYR", 38, "A")] # by ResidueId
-    
+
     See :mod:`prolif.residue` for more information on residues
     """
     def __init__(self, mol):
@@ -75,11 +77,11 @@ class Molecule(BaseRDKitMol):
         residues = [Residue(mol) for mol in residues]
         residues.sort(key=attrgetter("resid"))
         self.residues = ResidueGroup(residues)
-    
+
     @classmethod
     def from_mda(cls, obj, selection=None, **kwargs):
         """Creates a Molecule from an MDAnalysis object
-        
+
         Parameters
         ----------
         obj : MDAnalysis.core.universe.Universe or MDAnalysis.core.groups.AtomGroup
@@ -114,15 +116,15 @@ class Molecule(BaseRDKitMol):
                 f"AtomGroup is empty, please check your selection")
         mol = ag.convert_to.rdkit(**kwargs)
         return cls(mol)
-    
+
     @classmethod
     def from_rdkit(cls, mol, resname="UNL", resnumber=1, chain=""):
         """Creates a Molecule from an RDKit molecule
-        
+
         While directly instantiating a molecule with ``prolif.Molecule(mol)``
         would also work, this method insures that every atom is linked to an
         AtomPDBResidueInfo which is required by ProLIF
-        
+
         Parameters
         ----------
         mol : rdkit.Chem.rdchem.Mol
@@ -133,7 +135,7 @@ class Molecule(BaseRDKitMol):
             The default residue number that is used if none was found
         chain : str
             The default chain Id that is used if none was found
-        
+
         Notes
         -----
         This method only checks for an existing AtomPDBResidueInfo in the first
@@ -186,7 +188,7 @@ class pdbqt_supplier:
         Residue number for every ligand
     chain : str
         Chain ID for every ligand
-    
+
 
     Returns
     -------
@@ -241,7 +243,7 @@ class pdbqt_supplier:
 
 class sdf_supplier:
     """Supplies molecules, given a path to an SDFile
-    
+
     Parameters
     ----------
     path : str
@@ -287,7 +289,7 @@ class sdf_supplier:
 
 class mol2_supplier:
     """Generates prolif.Molecule objects from a MOL2 file
-    
+
     Parameters
     ----------
     path : str
@@ -312,7 +314,7 @@ class mol2_supplier:
         >>> lig_suppl = mol2_supplier("docking/output.mol2")
         >>> for lig in lig_suppl:
         ...     # do something with each ligand
-    
+
     .. versionchanged:: 1.0.0
         Molecule suppliers are now iterators that can be reused and can return
         their length, instead of single-use generators.

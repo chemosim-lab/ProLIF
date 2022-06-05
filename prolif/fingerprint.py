@@ -25,20 +25,17 @@ import pickle
 from collections.abc import Iterable
 from inspect import isgenerator
 from threading import Thread
+
 import numpy as np
-from tqdm.auto import tqdm
 from rdkit import Chem
+from tqdm.auto import tqdm
+
 from .interactions import _INTERACTIONS
 from .molecule import Molecule
-from .parallel import (
-    declare_shared_objs_for_chunk,
-    declare_shared_objs_for_mol,
-    process_chunk,
-    process_mol,
-    Progress,
-    ProgressCounter,
-)
-from .utils import get_residues_near_ligand, to_dataframe, to_bitvectors
+from .parallel import (Progress, ProgressCounter,
+                       declare_shared_objs_for_chunk,
+                       declare_shared_objs_for_mol, process_chunk, process_mol)
+from .utils import get_residues_near_ligand, to_bitvectors, to_dataframe
 
 
 class _Docstring:
@@ -404,7 +401,7 @@ class Fingerprint:
             Number of processes to run in parallel. If ``n_jobs=None``, the
             analysis will use all available CPU threads, while if ``n_jobs=1``,
             the analysis will run in serial.
-        
+
         Raises
         ------
         ValueError : if ``n_jobs <= 0``
@@ -413,7 +410,7 @@ class Fingerprint:
         -------
         prolif.fingerprint.Fingerprint
             The Fingerprint instance that generated the fingerprint
-        
+
         Example
         -------
         ::
