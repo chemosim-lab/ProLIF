@@ -21,9 +21,8 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
 
 """
 import multiprocessing as mp
+import pickle
 from collections.abc import Iterable
-from copy import deepcopy
-from functools import wraps
 from inspect import isgenerator
 from threading import Thread
 import numpy as np
@@ -42,14 +41,33 @@ from .parallel import (
 from .utils import get_residues_near_ligand, to_dataframe, to_bitvectors
 
 
-def _return_first_element(f):
-    """Modifies the return signature of a function by forcing it to return
-    only the first element when multiple values are returned
+class _Docstring:
+    """Descriptor that replaces the documentation shown when calling
+    ``fp.hydrophobic?`` and other interaction methods"""
+    def __init__(self):
+        self._docs = {}
+
+    def __set__(self, instance, func):
+        # add function's docstring to memory
+        cls = func.__self__.__class__
+        self._docs[cls.__name__] = cls.__doc__
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        # fetch docstring of last accessed Fingerprint method
+        return self._docs[type(instance)._current_func]
+
+
+class _InteractionWrapper:
+    """Modifies the return signature of an interaction ``detect`` method by
+    forcing it to return only the first element when multiple values are
+    returned.
 
     Raises
     ------
     TypeError
-        If the function doesn't return three values
+        If the ``detect`` method doesn't return three values
 
     Notes
     -----
@@ -60,10 +78,12 @@ def _return_first_element(f):
     -------
     ::
 
-        >>> def foo():
-        ...     return 1, 2, 3
+        >>> class Foo:
+        ...     def detect(self, *args):
+        ...         return 1, 2, 3
         ...
-        >>> bar = _return_first_element(foo)
+        >>> foo = Foo().detect
+        >>> bar = _InteractionWrapper(foo)
         >>> foo()
         (1, 2, 3)
         >>> bar()
@@ -74,10 +94,24 @@ def _return_first_element(f):
     .. versionchanged:: 0.3.3
         The function now must return three values
 
+    .. versionchanged:: 1.0.0
+        Changed from a wrapper function to a class for easier pickling support
+
     """
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        results = f(*args, **kwargs)
+    __doc__ = _Docstring()
+    _current_func = ""
+
+    def __init__(self, func):
+        self.__wrapped__ = func
+        # add docstring to descriptor
+        self.__doc__ = func
+
+    def __repr__(self):  # pragma: no cover
+        cls = self.__wrapped__.__self__.__class__
+        return f"<{cls.__module__}.{cls.__name__} at {id(self):#x}>"
+
+    def __call__(self, *args, **kwargs):
+        results = self.__wrapped__(*args, **kwargs)
         try:
             bool_, lig_idx, prot_idx = results
         except (TypeError, ValueError):
@@ -86,7 +120,6 @@ def _return_first_element(f):
                 "return 3 values (boolean, int, int)"
             ) from None
         return bool_
-    return wrapper
 
 
 class Fingerprint:
@@ -161,6 +194,7 @@ class Fingerprint:
 
     .. versionchanged:: 1.0.0
         Added pickle support
+
     """
 
     def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",
@@ -182,26 +216,17 @@ class Fingerprint:
             if name.startswith("_") or name == "Interaction":
                 continue
             func = interaction_cls().detect
-            func = _return_first_element(func)
+            func = _InteractionWrapper(func)
             setattr(self, name.lower(), func)
             if name in interactions:
                 self.interactions[name] = func
 
-    def __getstate__(self):
-        # pickle
-        interactions = list(self.interactions.keys())
-        d = deepcopy(self.__dict__)
-        d["interactions"] = interactions
-        callables = [name for name, attr in d.items() if callable(attr)]
-        for name in callables:
-            d.pop(name)
-        return d
-
-    def __setstate__(self, d):
-        # unpickle
-        self.__dict__ = d
-        interactions = d.pop("interactions")
-        self._set_interactions(interactions)
+    def __getattribute__(self, name):
+        # trick to get the correct docstring when calling `fp.hydrophobic?`
+        attr = super().__getattribute__(name)
+        if isinstance(attr, _InteractionWrapper):
+            type(attr)._current_func = attr.__wrapped__.__self__.__class__.__name__
+        return attr
 
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
@@ -644,3 +669,17 @@ class Fingerprint:
             df = self.to_dataframe()
             return to_bitvectors(df)
         raise AttributeError("Please use the `run` method before")
+
+    def to_pickle(self, path=None):
+        if path:
+            with open(path, "wb") as f:
+                pickle.dump(self, f)
+        else:
+            return pickle.dumps(self)
+
+    @classmethod
+    def read_pickle(cls, path_or_bytes):
+        if isinstance(path_or_bytes, bytes):
+            return pickle.loads(path_or_bytes)
+        with open(path_or_bytes, "rb") as f:
+            return pickle.load(f)

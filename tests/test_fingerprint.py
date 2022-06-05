@@ -1,9 +1,10 @@
+from tempfile import NamedTemporaryFile
 import pytest
 from pandas import DataFrame
 import numpy as np
 from rdkit.DataStructs import ExplicitBitVect
 from prolif.fingerprint import (Fingerprint,
-                                _return_first_element)
+                                _InteractionWrapper)
 from prolif.interactions import Interaction
 from prolif.residue import ResidueId
 from prolif.datafiles import datapath
@@ -16,13 +17,14 @@ class Dummy(Interaction):
         return True, 4, 2
 
 
-def return_value(*args):
-    return args if len(args) > 1 else args[0]
+class Return:
+    def detect(self, *args):
+        return args if len(args) > 1 else args[0]
 
 
 def test_wrapper_return():
     detect = Dummy().detect
-    mod = _return_first_element(detect)
+    mod = _InteractionWrapper(detect)
     assert detect("foo", "bar") == (True, 4, 2)
     assert mod("foo", "bar") is True
     assert mod.__wrapped__("foo", "bar") == (True, 4, 2)
@@ -34,7 +36,7 @@ def test_wrapper_return():
     (True, 4)
 ])
 def test_wrapper_incorrect_return(returned):
-    mod = _return_first_element(return_value)
+    mod = _InteractionWrapper(Return().detect)
     assert mod.__wrapped__(returned) == returned
     with pytest.raises(TypeError,
                        match="Incorrect function signature"):
@@ -176,3 +178,46 @@ class TestFingerprint:
     def test_unknown_interaction(self):
         with pytest.raises(NameError, match="Unknown interaction"):
             Fingerprint(["Cationic", "foo"])
+
+    @pytest.fixture
+    def fp_unpkl(self, fp):
+        path = str(datapath / "vina" / "vina_output.sdf")
+        lig_suppl = list(sdf_supplier(path))
+        fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
+        pkl = fp.to_pickle()
+        return Fingerprint.read_pickle(pkl)
+
+    @pytest.fixture
+    def fp_unpkl_file(self, fp):
+        path = str(datapath / "vina" / "vina_output.sdf")
+        lig_suppl = list(sdf_supplier(path))
+        fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
+        with NamedTemporaryFile("w+b") as tempf:
+            fp.to_pickle(tempf.name)
+            fp_unpkl = Fingerprint.read_pickle(tempf.name)
+        return fp_unpkl
+
+    @pytest.fixture(params=["fp_unpkl", "fp_unpkl_file"])
+    def fp_pkled(self, request):
+        return request.getfixturevalue(request.param)
+
+    def test_pickle(self, fp, fp_pkled):
+        path = str(datapath / "vina" / "vina_output.sdf")
+        lig_suppl = list(sdf_supplier(path))
+        fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
+        assert fp.interactions.keys() == fp_pkled.interactions.keys()
+        assert len(fp.ifp) == len(fp_pkled.ifp)
+        for d1, d2 in zip(fp.ifp, fp_pkled.ifp):
+            d1.setdefault("Frame", None)
+            assert d1.keys() == d2.keys()
+            d1.pop("Frame", None)
+            d2.pop("Frame")
+            for (fp1, fpal1, fpap1), (fp2, fpal2, fpap2) in zip(d1.values(),
+                                                                d2.values()):
+                assert (fp1 == fp2).all()
+                assert fpal1 == fpal2
+                assert fpap1 == fpap2
+
+    def test_pickle_custom_interaction(self, fp_unpkl):
+        assert hasattr(fp_unpkl, "dummy")
+        assert callable(fp_unpkl.dummy)
