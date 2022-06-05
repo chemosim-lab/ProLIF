@@ -226,11 +226,11 @@ class TestFingerprint:
         fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag,
                n_jobs=1, progress=False)
         serial = fp.to_dataframe()
-        fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag, 
+        fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag,
                n_jobs=None, progress=False)
         multi = fp.to_dataframe()
         assert serial.equals(multi)
-                
+
     def test_run_iter_multiproc_serial_same(self, fp):
         run = fp.run_from_iterable
         path = str(datapath / "vina" / "vina_output.sdf")
@@ -240,4 +240,3 @@ class TestFingerprint:
         run(lig_suppl, protein_mol, n_jobs=None, progress=False)
         multi = fp.to_dataframe()
         assert serial.equals(multi)
-        

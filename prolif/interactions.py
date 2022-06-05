@@ -458,7 +458,7 @@ class MetalAcceptor(_BaseMetallic):
 
 class VdWContact(Interaction):
     """Interaction based on the van der Waals radii of interacting atoms.
-    
+
     Parameters
     ----------
     tolerance : float

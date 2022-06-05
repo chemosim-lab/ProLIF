@@ -463,11 +463,9 @@ class Fingerprint:
             n_frames = traj.n_frames
         except AttributeError:
             # sliced trajectory
-            memo = (traj.start, traj.stop, traj.step)
-            frames = range(*memo)
+            frames = range(traj.start, traj.stop, traj.step)
             traj = lig.universe.trajectory
         else:
-            memo = []
             frames = range(n_frames)
 
         if residues == "all":
@@ -556,8 +554,8 @@ class Fingerprint:
             raise ValueError("n_jobs must be > 0 or None")
         if n_jobs != 1:
             return self._run_iter_parallel(
-                lig_iterable=lig_iterable, prot_mol=prot_mol,residues=residues,
-                progress=progress, n_jobs=n_jobs)
+                lig_iterable=lig_iterable, prot_mol=prot_mol,
+                residues=residues, progress=progress, n_jobs=n_jobs)
 
         iterator = tqdm(lig_iterable) if progress else lig_iterable
         if residues == "all":
@@ -574,9 +572,11 @@ class Fingerprint:
     def _run_iter_parallel(self, lig_iterable, prot_mol, residues=None,
                            progress=True, n_jobs=None):
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
-        if isinstance(lig_iterable, Chem.SDMolSupplier) or (
-            isinstance(lig_iterable, Iterable) and not isgenerator(lig_iterable)
-            ):
+        if (
+            isinstance(lig_iterable, Chem.SDMolSupplier)
+            or (isinstance(lig_iterable, Iterable)
+                and not isgenerator(lig_iterable))
+        ):
             total = len(lig_iterable)
         else:
             total = None

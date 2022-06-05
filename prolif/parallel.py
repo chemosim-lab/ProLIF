@@ -30,7 +30,7 @@ def declare_shared_objs_for_chunk(fingerprint, resid_list, show_progressbar,
     a trajectory"""
     global fp, residues, display_progress, pcount
     fp = fingerprint
-    residues = resid_list 
+    residues = resid_list
     display_progress = show_progressbar
     pcount = progress_counter
 
@@ -50,6 +50,7 @@ def declare_shared_objs_for_mol(fingerprint, pmol, resid_list):
     fp = fingerprint
     residues = resid_list
     prot_mol = pmol
+
 
 class ProgressCounter:
     """Tracks the progress of the fingerprint analysis accross the pool of
