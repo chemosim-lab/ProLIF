@@ -1,8 +1,9 @@
 import pytest
+from numpy.testing import assert_equal
+from prolif.residue import Residue, ResidueGroup, ResidueId
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from numpy.testing import assert_equal
-from prolif.residue import ResidueId, Residue, ResidueGroup
+
 from .test_base import TestBaseRDKitMol, protein_mol
 
 

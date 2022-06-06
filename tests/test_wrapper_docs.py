@@ -1,7 +1,9 @@
-import pytest
-
-from prolif.fingerprint import _Docstring, Fingerprint
 import prolif.interactions
+import pytest
+from prolif.fingerprint import Fingerprint, _Docstring
+
+interaction_list = [i for i in Fingerprint.list_available()
+                    if "Dummy" not in i]
 
 
 class Wrapper:
@@ -36,7 +38,7 @@ def fp():
     return Fingerprint()
 
 
-@pytest.mark.parametrize("int_name", Fingerprint.list_available())
+@pytest.mark.parametrize("int_name", interaction_list)
 def test_fp_docs(fp, int_name):
     meth = getattr(fp, int_name.lower())
     assert type(meth)._current_func == int_name

@@ -1,15 +1,16 @@
 from tempfile import NamedTemporaryFile
+
+import numpy as np
 import pytest
 from pandas import DataFrame
-import numpy as np
-from rdkit.DataStructs import ExplicitBitVect
-from prolif.fingerprint import (Fingerprint,
-                                _InteractionWrapper)
-from prolif.interactions import Interaction
-from prolif.residue import ResidueId
 from prolif.datafiles import datapath
+from prolif.fingerprint import Fingerprint, _InteractionWrapper
+from prolif.interactions import _INTERACTIONS, Interaction
 from prolif.molecule import sdf_supplier
-from .test_base import protein_mol, ligand_mol, u, ligand_ag, protein_ag
+from prolif.residue import ResidueId
+from rdkit.DataStructs import ExplicitBitVect
+
+from .test_base import ligand_ag, ligand_mol, protein_ag, protein_mol, u
 
 
 class Dummy(Interaction):
@@ -32,7 +33,8 @@ def test_wrapper_return():
 
 def test_wrapper_repr():
     mod = _InteractionWrapper(Dummy().detect)
-    assert repr(mod).startswith("<__main__.Dummy at")
+    _repr = repr(mod)
+    assert _repr.startswith("<") and ".Dummy at " in _repr
 
 
 @pytest.mark.parametrize("returned", [
@@ -49,23 +51,25 @@ def test_wrapper_incorrect_return(returned):
 
 
 class TestFingerprint:
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def fp(self):
-        return Fingerprint()
+        yield Fingerprint()
+        _INTERACTIONS.pop("Dummy", None)
 
     @pytest.fixture(scope="class")
-    def fp_class(self):
-        return Fingerprint(["Hydrophobic"])
+    def fp_simple(self):
+        yield Fingerprint(["Hydrophobic"])
+        _INTERACTIONS.pop("Dummy", None)
 
-    def test_init(self, fp):
-        assert "HBDonor" in fp.interactions.keys()
-        assert hasattr(fp, "hbdonor") and callable(fp.hbdonor)
-        assert "Dummy" not in fp.interactions.keys()
-        assert hasattr(fp, "dummy") and callable(fp.dummy)
-        assert "_BaseHBond" not in fp.interactions.keys()
-        assert not hasattr(fp, "_basehbond")
-        assert "Interaction" not in fp.interactions.keys()
-        assert not hasattr(fp, "interaction")
+    def test_init(self, fp_simple):
+        assert "Hydrophobic" in fp_simple.interactions.keys()
+        assert hasattr(fp_simple, "hydrophobic") and callable(fp_simple.hydrophobic)
+        assert "Dummy" not in fp_simple.interactions.keys()
+        assert hasattr(fp_simple, "dummy") and callable(fp_simple.dummy)
+        assert "_BaseHBond" not in fp_simple.interactions.keys()
+        assert not hasattr(fp_simple, "_basehbond")
+        assert "Interaction" not in fp_simple.interactions.keys()
+        assert not hasattr(fp_simple, "interaction")
 
     def test_init_all(self):
         fp = Fingerprint("all")
@@ -75,9 +79,9 @@ class TestFingerprint:
     def test_n_interactions(self, fp):
         assert fp.n_interactions == len(fp.interactions)
 
-    def test_wrapped(self, fp):
-        assert fp.dummy("foo", "bar") == 1
-        assert fp.dummy.__wrapped__("foo", "bar") == (True, 4, 2)
+    def test_wrapped(self, fp_simple):
+        assert fp_simple.dummy("foo", "bar") == 1
+        assert fp_simple.dummy.__wrapped__("foo", "bar") == (True, 4, 2)
 
     def test_bitvector(self, fp):
         bv = fp.bitvector(ligand_mol, protein_mol["ASP129.A"])
@@ -94,78 +98,78 @@ class TestFingerprint:
         ids = np.where(bv == 1)[0]
         assert (lig_ix[ids[0]] is not None and prot_ix[ids[0]] is not None)
 
-    def test_run_residues(self, fp_class):
-        fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
+    def test_run_residues(self, fp_simple):
+        fp_simple.run(u.trajectory[0:1], ligand_ag, protein_ag,
                      residues="all", progress=False)
         lig_id = ResidueId.from_string("LIG1.G")
-        assert hasattr(fp_class, "ifp")
-        assert len(fp_class.ifp) == 1
+        assert hasattr(fp_simple, "ifp")
+        assert len(fp_simple.ifp) == 1
         res = ResidueId.from_string("LYS387.B")
-        assert (lig_id, res) in fp_class.ifp[0].keys()
-        fp_class.run(u.trajectory[1:2], ligand_ag, protein_ag,
+        assert (lig_id, res) in fp_simple.ifp[0].keys()
+        fp_simple.run(u.trajectory[1:2], ligand_ag, protein_ag,
                      residues=["ASP129.A"], progress=False)
-        assert hasattr(fp_class, "ifp")
-        assert len(fp_class.ifp) == 1
+        assert hasattr(fp_simple, "ifp")
+        assert len(fp_simple.ifp) == 1
         res = ResidueId.from_string("ASP129.A")
-        assert (lig_id, res) in fp_class.ifp[0].keys()
-        fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
+        assert (lig_id, res) in fp_simple.ifp[0].keys()
+        fp_simple.run(u.trajectory[:3], ligand_ag, protein_ag,
                      residues=None, progress=False)
-        assert hasattr(fp_class, "ifp")
-        assert len(fp_class.ifp) == 3
-        assert len(fp_class.ifp[0]) > 1
+        assert hasattr(fp_simple, "ifp")
+        assert len(fp_simple.ifp) == 3
+        assert len(fp_simple.ifp[0]) > 1
         res = ResidueId.from_string("VAL201.A")
-        assert (lig_id, res) in fp_class.ifp[0].keys()
+        assert (lig_id, res) in fp_simple.ifp[0].keys()
         u.trajectory[0]
 
-    def test_generate(self, fp_class):
-        ifp = fp_class.generate(ligand_mol, protein_mol)
+    def test_generate(self, fp_simple):
+        ifp = fp_simple.generate(ligand_mol, protein_mol)
         key = (ResidueId("LIG", 1, "G"), ResidueId("THR", 355, "B"))
         bv = ifp[key]
         assert isinstance(bv, np.ndarray)
         assert bv[0] is np.True_
 
-    def test_run(self, fp_class):
-        fp_class.run(u.trajectory[0:1], ligand_ag, protein_ag,
+    def test_run(self, fp_simple):
+        fp_simple.run(u.trajectory[0:1], ligand_ag, protein_ag,
                      residues=None, progress=False)
-        assert hasattr(fp_class, "ifp")
-        ifp = fp_class.ifp[0]
+        assert hasattr(fp_simple, "ifp")
+        ifp = fp_simple.ifp[0]
         ifp.pop("Frame")
         data = list(ifp.values())[0]
         assert isinstance(data[0], np.ndarray)
         assert isinstance(data[1], list)
         assert isinstance(data[2], list)
 
-    def test_run_from_iterable(self, fp):
+    def test_run_from_iterable(self, fp_simple):
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
-        fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
-        assert len(fp.ifp) == 2
+        fp_simple.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
+        assert len(fp_simple.ifp) == 2
 
-    def test_to_df(self, fp, fp_class):
+    def test_to_df(self, fp_simple):
         with pytest.raises(AttributeError, match="use the `run` method"):
-            fp.to_dataframe()
-        fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
+            Fingerprint().to_dataframe()
+        fp_simple.run(u.trajectory[:3], ligand_ag, protein_ag,
                      residues=None, progress=False)
-        df = fp_class.to_dataframe()
+        df = fp_simple.to_dataframe()
         assert isinstance(df, DataFrame)
         assert len(df) == 3
 
-    def test_to_df_kwargs(self, fp_class):
-        fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
+    def test_to_df_kwargs(self, fp_simple):
+        fp_simple.run(u.trajectory[:3], ligand_ag, protein_ag,
                      residues=None, progress=False)
-        df = fp_class.to_dataframe(dtype=np.uint8)
+        df = fp_simple.to_dataframe(dtype=np.uint8)
         assert df.dtypes[0].type is np.uint8
-        df = fp_class.to_dataframe(drop_empty=False)
-        resids = set([key for d in fp_class.ifp for key in d.keys()
+        df = fp_simple.to_dataframe(drop_empty=False)
+        resids = set([key for d in fp_simple.ifp for key in d.keys()
                       if key != "Frame"])
         assert df.shape == (3, len(resids))
 
-    def test_to_bv(self, fp, fp_class):
+    def test_to_bv(self, fp_simple):
         with pytest.raises(AttributeError, match="use the `run` method"):
-            fp.to_bitvectors()
-        fp_class.run(u.trajectory[:3], ligand_ag, protein_ag,
+            Fingerprint().to_bitvectors()
+        fp_simple.run(u.trajectory[:3], ligand_ag, protein_ag,
                      residues=None, progress=False)
-        bvs = fp_class.to_bitvectors()
+        bvs = fp_simple.to_bitvectors()
         assert isinstance(bvs[0], ExplicitBitVect)
         assert len(bvs) == 3
 

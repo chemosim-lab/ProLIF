@@ -1,12 +1,13 @@
+import prolif
 import pytest
-from rdkit import RDLogger
 from MDAnalysis.topology.tables import vdwradii
 from prolif.fingerprint import Fingerprint
-import prolif
-from prolif.interactions import (_INTERACTIONS, Interaction, get_mapindex,
-                                 VdWContact)
-from .test_base import ligand_mol
+from prolif.interactions import (_INTERACTIONS, Interaction, VdWContact,
+                                 get_mapindex)
+from rdkit import RDLogger
+
 from . import mol2factory
+from .test_base import ligand_mol
 
 # disable rdkit warnings
 lg = RDLogger.logger()
@@ -101,16 +102,14 @@ class TestInteractions:
         # fix dummy Hydrophobic class being reused in later unrelated tests
 
         class Hydrophobic(prolif.interactions.Hydrophobic):
-            pass
+            __doc__ = prolif.interactions.Hydrophobic.__doc__
 
     def test_error_no_detect(self):
-        class Dummy(Interaction):
+        class _Dummy(Interaction):
             pass
         with pytest.raises(TypeError,
-                           match="Can't instantiate abstract class Dummy"):
-            Dummy()
-        # fix Dummy class being reused in later unrelated tests
-        del prolif.interactions._INTERACTIONS["Dummy"]
+                           match="Can't instantiate abstract class _Dummy"):
+            _Dummy()
 
     @pytest.mark.parametrize("index", [
         0, 1, 3, 42, 78
