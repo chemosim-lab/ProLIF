@@ -4,16 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2022-06-06
+## [1.0.0] - 2022-06-07
 ### Added
-- Support for multiprocessing, enabled by default (Issue #46). The number of processes can be
-  controlled through `n_jobs` in `fp.run` and `fp.run_from_iterable`.
+- Support for multiprocessing, enabled by default (Issue #46). The number of processes can
+  be controlled through `n_jobs` in `fp.run` and `fp.run_from_iterable`.
 - New interaction: van der Waals contact, based on the sum of vdW radii of two atoms.
 - Saving/loading the fingerprint object as a pickle with `fp.to_pickle` and
   `Fingerprint.read_pickle` (Issue #40).
 ### Changed
-- Molecule suppliers can now be reused and can return their length, instead of being
-  single-use generators.
+- Molecule suppliers can now be indexed, reused and can return their length, instead of
+  being single-use generators.
 ### Fixed
 - ProLIF can now be installed through pip and conda (Issue #6).
 - If no interaction is detected in the first frame, `to_dataframe` will not complain about
