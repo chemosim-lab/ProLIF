@@ -30,6 +30,11 @@ def test_wrapper_return():
     assert mod.__wrapped__("foo", "bar") == (True, 4, 2)
 
 
+def test_wrapper_repr():
+    mod = _InteractionWrapper(Dummy().detect)
+    assert repr(mod).startswith("<__main__.Dummy at")
+
+
 @pytest.mark.parametrize("returned", [
     True,
     (True,),
@@ -41,6 +46,7 @@ def test_wrapper_incorrect_return(returned):
     with pytest.raises(TypeError,
                        match="Incorrect function signature"):
         mod(returned)
+
 
 class TestFingerprint:
     @pytest.fixture
