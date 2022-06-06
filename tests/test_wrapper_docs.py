@@ -35,6 +35,7 @@ def test_getter(wrap):
 def fp():
     return Fingerprint()
 
+
 @pytest.mark.parametrize("int_name", Fingerprint.list_available())
 def test_fp_docs(fp, int_name):
     meth = getattr(fp, int_name.lower())
