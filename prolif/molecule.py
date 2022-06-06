@@ -3,6 +3,7 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
 import copy
+from collections.abc import Sequence
 from operator import attrgetter
 
 import MDAnalysis as mda
@@ -170,7 +171,7 @@ class Molecule(BaseRDKitMol):
         return len(self.residues)
 
 
-class pdbqt_supplier:
+class pdbqt_supplier(Sequence):
     """Supplies molecules, given a path to PDBQT files
 
     Parameters
@@ -192,9 +193,8 @@ class pdbqt_supplier:
 
     Returns
     -------
-    suppl : generator
-        A generator object that will provide the :class:`Molecule` object as
-        you iterate over it.
+    suppl : Sequence
+        A sequence that provides :class:`Molecule` objects
 
     Example
     -------
@@ -207,8 +207,8 @@ class pdbqt_supplier:
         ...     # do something with each ligand
 
     .. versionchanged:: 1.0.0
-        Molecule suppliers are now iterators that can be reused and can return
-        their length, instead of single-use generators.
+        Molecule suppliers are now sequences that can be reused, indexed,
+        and can return their length, instead of single-use generators.
 
     """
     def __init__(self, paths, template, converter_kwargs=None, **kwargs):
@@ -221,27 +221,34 @@ class pdbqt_supplier:
 
     def __iter__(self):
         for pdbqt_path in self.paths:
-            pdbqt = mda.Universe(pdbqt_path)
+            yield self.pdbqt_to_mol(pdbqt_path)
+    
+    def __getitem__(self, index):
+        pdbqt_path = self.paths[index]
+        return self.pdbqt_to_mol(pdbqt_path)
+
+    def pdbqt_to_mol(self, pdbqt_path):
+        pdbqt = mda.Universe(pdbqt_path)
             # set attributes needed by the converter
-            elements = [mda.topology.guessers.guess_atom_element(x)
-                        for x in pdbqt.atoms.names]
-            pdbqt.add_TopologyAttr("elements", elements)
-            pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
-            pdbqt.atoms.types = pdbqt.atoms.elements
+        elements = [mda.topology.guessers.guess_atom_element(x)
+                    for x in pdbqt.atoms.names]
+        pdbqt.add_TopologyAttr("elements", elements)
+        pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
+        pdbqt.atoms.types = pdbqt.atoms.elements
             # convert without infering bond orders and charges
-            mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False,
-                                               **self.converter_kwargs)
+        mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False,
+                                           **self.converter_kwargs)
             # assign BO from template then add hydrogens
-            mol = Chem.RemoveHs(mol, sanitize=False)
-            mol = AssignBondOrdersFromTemplate(self.template, mol)
-            mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)
-            yield Molecule.from_rdkit(mol, **self._kwargs)
+        mol = Chem.RemoveHs(mol, sanitize=False)
+        mol = AssignBondOrdersFromTemplate(self.template, mol)
+        mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)
+        return Molecule.from_rdkit(mol, **self._kwargs)
 
     def __len__(self):
         return len(self.paths)
 
 
-class sdf_supplier:
+class sdf_supplier(Sequence):
     """Supplies molecules, given a path to an SDFile
 
     Parameters
@@ -257,9 +264,8 @@ class sdf_supplier:
 
     Returns
     -------
-    suppl : generator
-        A generator object that will provide the :class:`Molecule` object as
-        you iterate over it.
+    suppl : Sequence
+        A sequence that provides :class:`Molecule` objects. Can be indexed
 
     Example
     -------
@@ -270,8 +276,8 @@ class sdf_supplier:
         ...     # do something with each ligand
 
     .. versionchanged:: 1.0.0
-        Molecule suppliers are now iterators that can be reused and can return
-        their length, instead of single-use generators.
+        Molecule suppliers are now sequences that can be reused, indexed,
+        and can return their length, instead of single-use generators.
 
     """
     def __init__(self, path, **kwargs):
@@ -283,12 +289,16 @@ class sdf_supplier:
         for mol in self._suppl:
             yield Molecule.from_rdkit(mol, **self._kwargs)
 
+    def __getitem__(self, index):
+        mol = self._suppl[index]
+        return Molecule.from_rdkit(mol, **self._kwargs)
+
     def __len__(self):
         return len(self._suppl)
 
 
-class mol2_supplier:
-    """Generates prolif.Molecule objects from a MOL2 file
+class mol2_supplier(Sequence):
+    """Supplies molecules, given a path to a MOL2 file
 
     Parameters
     ----------
@@ -303,9 +313,8 @@ class mol2_supplier:
 
     Returns
     -------
-    suppl : generator
-        A generator object that will provide the :class:`Molecule` object as
-        you iterate over it.
+    suppl : Sequence
+        A sequence that provides :class:`Molecule` objects
 
     Example
     -------
@@ -316,8 +325,8 @@ class mol2_supplier:
         ...     # do something with each ligand
 
     .. versionchanged:: 1.0.0
-        Molecule suppliers are now iterators that can be reused and can return
-        their length, instead of single-use generators.
+        Molecule suppliers are now sequences that can be reused, indexed,
+        and can return their length, instead of single-use generators.
 
     """
     def __init__(self, path, **kwargs):
@@ -331,12 +340,32 @@ class mol2_supplier:
                 if line.startswith("#"):
                     continue
                 if block and line.startswith("@<TRIPOS>MOLECULE"):
-                    mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
-                    yield Molecule.from_rdkit(mol, **self._kwargs)
+                    yield self.block_to_mol(block)
                     block = []
                 block.append(line)
-            mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
-            yield Molecule.from_rdkit(mol, **self._kwargs)
+            yield self.block_to_mol(block)
+
+    def block_to_mol(self, block):
+        mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
+        return Molecule.from_rdkit(mol, **self._kwargs)
+
+    def __getitem__(self, index):
+        if index < 0:
+            index %= len(self)
+        mol_index = -1
+        block = []
+        with open(self.path, "r") as f:
+            for line in f:
+                if line.startswith("@<TRIPOS>MOLECULE"):
+                    mol_index += 1
+                    if index == mol_index and not block:
+                        block.append(line)
+                    elif mol_index > index:
+                        return self.block_to_mol(block)
+                elif block:
+                    block.append(line)
+            else:
+                return self.block_to_mol(block)
 
     def __len__(self):
         with open(self.path, "r") as f:

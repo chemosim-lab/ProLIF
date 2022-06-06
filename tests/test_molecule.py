@@ -1,5 +1,6 @@
 import pytest
 from MDAnalysis import SelectionError
+from numpy.testing import assert_array_equal
 from rdkit import Chem
 from prolif.molecule import (Molecule,
                              pdbqt_supplier,
@@ -67,8 +68,10 @@ class TestMolecule(TestBaseRDKitMol):
 class SupplierBase:
     resid = ResidueId("UNL", 1, "")
 
-    def test_base(self, suppl):
+    def test_len(self, suppl):
         assert len(suppl) == 9
+
+    def test_returns_mol(self, suppl):
         mol = next(iter(suppl))
         assert isinstance(mol, Molecule)
 
@@ -76,6 +79,15 @@ class SupplierBase:
         mol = next(iter(suppl))
         resid = ResidueId.from_atom(mol.GetAtomWithIdx(0))
         assert resid == self.resid
+
+    @pytest.mark.parametrize("index", [0, 2, 8, -1])
+    def test_index(self, suppl, index):
+        index %= 9
+        mol_i = suppl[index]
+        for i, mol in enumerate(suppl):
+            if i == index:
+                break
+        assert_array_equal(mol.xyz, mol_i.xyz)
 
 
 class TestPDBQTSupplier(SupplierBase):
