@@ -106,5 +106,7 @@ venv.bak/
 .coveragerc
 .vscode
 *.npz
+*.lock
 docs/notebooks/debug.log
 docs/notebooks/*.html
+*.pkl

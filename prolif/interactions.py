@@ -10,7 +10,9 @@ You can declare your own interaction class like this::
         def detect(self, res1, res2, threshold=2.0):
             dist_matrix = distance_matrix(res1.xyz, res2.xyz)
             if (dist_matrix <= threshold).any():
-                return True
+                # return format: bool, ligand atom index, protein atom index
+                return True, None, None
+            return False, None, None
 
 .. warning:: Your custom class must inherit from :class:`prolif.interactions.Interaction`
 
@@ -32,17 +34,17 @@ interactions available to the fingerprint generator::
 
 """
 
-from itertools import product
 import warnings
-from math import radians
 from abc import ABC, ABCMeta, abstractmethod
-from .utils import (
-    angle_between_limits,
-    get_centroid,
-    get_ring_normal_vector)
+from itertools import product
+from math import radians
+
 import numpy as np
-from rdkit.Chem import MolFromSmarts
+from MDAnalysis.topology.tables import vdwradii
 from rdkit import Geometry
+from rdkit.Chem import MolFromSmarts
+
+from .utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 _INTERACTIONS = {}
 
@@ -452,3 +454,42 @@ class MetalAcceptor(_BaseMetallic):
     def detect(self, ligand, residue):
         bit, ires, ilig = super().detect(residue, ligand)
         return bit, ilig, ires
+
+
+class VdWContact(Interaction):
+    """Interaction based on the van der Waals radii of interacting atoms.
+
+    Parameters
+    ----------
+    tolerance : float
+        Tolerance added to the sum of vdW radii of atoms before comparing to
+        the interatomic distance. If ``distance <= sum_vdw + tolerance`` the
+        atoms are identified as a contact
+
+    Raises
+    ------
+    ValueError : ``tolerance`` parameter cannot be negative
+    """
+    def __init__(self, tolerance=.5):
+        if tolerance >= 0:
+            self.tolerance = tolerance
+        else:
+            raise ValueError("`tolerance` must be 0 or positive")
+        self._vdw_cache = {}
+
+    def detect(self, ligand, residue):
+        lxyz = ligand.GetConformer()
+        rxyz = residue.GetConformer()
+        for la, ra in product(ligand.GetAtoms(), residue.GetAtoms()):
+            lig = la.GetSymbol().upper()
+            res = ra.GetSymbol().upper()
+            try:
+                vdw = self._vdw_cache[(lig, res)]
+            except KeyError:
+                vdw = vdwradii[lig] + vdwradii[res] + self.tolerance
+                self._vdw_cache[(lig, res)] = vdw
+            dist = (lxyz.GetAtomPosition(la.GetIdx())
+                        .Distance(rxyz.GetAtomPosition(ra.GetIdx())))
+            if dist <= vdw:
+                return True, la.GetIdx(), ra.GetIdx()
+        return False, None, None

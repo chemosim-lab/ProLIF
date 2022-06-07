@@ -1,18 +1,16 @@
-from math import radians
 from copy import deepcopy
-import pytest
-from rdkit import Chem
+from math import radians
+
 import numpy as np
+import pytest
 from numpy.testing import assert_equal
-from prolif.residue import ResidueId, Residue, ResidueGroup
-from prolif.utils import (get_centroid,
-                          angle_between_limits,
-                          get_residues_near_ligand,
-                          split_mol_by_residues,
-                          is_peptide_bond,
-                          pandas_series_to_bv,
-                          to_dataframe,
-                          to_bitvectors)
+from prolif.residue import Residue, ResidueGroup, ResidueId
+from prolif.utils import (angle_between_limits, get_centroid,
+                          get_residues_near_ligand, is_peptide_bond,
+                          pandas_series_to_bv, split_mol_by_residues,
+                          to_bitvectors, to_dataframe)
+from rdkit import Chem
+
 from .test_base import ligand_mol, protein_mol
 
 

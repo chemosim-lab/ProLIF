@@ -1,8 +1,9 @@
 import numpy as np
 from MDAnalysis import Universe
 from MDAnalysis.topology.guessers import guess_atom_element
-from prolif.molecule import Molecule
 from prolif.datafiles import datapath
+from prolif.molecule import Molecule
+
 
 def from_mol2(f):
     path = str(datapath / f)

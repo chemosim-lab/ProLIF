@@ -1,12 +1,11 @@
 import pytest
 from MDAnalysis import Universe
+from numpy.testing import assert_array_almost_equal
+from prolif.datafiles import TOP, TRAJ
+from prolif.molecule import Molecule
+from prolif.rdkitmol import BaseRDKitMol
 from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
-from numpy.testing import assert_array_almost_equal
-from prolif.molecule import Molecule
-from prolif.datafiles import TOP, TRAJ
-from prolif.rdkitmol import BaseRDKitMol
-
 
 u = Universe(TOP, TRAJ)
 rdkit_mol = Chem.MolFromPDBFile(TOP, removeHs=False)
