@@ -3,7 +3,7 @@ import versioneer
 import re
 import os
 
-GITHUB_ACTIONS = os.environ.get("GITHUB_ACTION", False)
+GITHUB_ACTIONS = os.environ.get("GITHUB_ACTIONS", False)
 
 # manually check RDKit version
 try:
