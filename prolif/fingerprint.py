@@ -674,7 +674,7 @@ class Fingerprint:
 
     def to_pickle(self, path=None):
         """Dumps the fingerprint object as a pickle.
-        
+
         Parameters
         ----------
         path : str, pathlib.Path or None
@@ -685,7 +685,7 @@ class Fingerprint:
         obj : None or bytes
             ``None`` if ``path`` is set, else the bytes corresponding to the
             pickle
-        
+
         Example
         -------
         ::
@@ -711,7 +711,7 @@ class Fingerprint:
     @classmethod
     def from_pickle(cls, path_or_bytes):
         """Creates a fingerprint object from a pickle dump.
-        
+
         Parameters
         ----------
         path_or_bytes : str, pathlib.Path or bytes

@@ -222,23 +222,23 @@ class pdbqt_supplier(Sequence):
     def __iter__(self):
         for pdbqt_path in self.paths:
             yield self.pdbqt_to_mol(pdbqt_path)
-    
+
     def __getitem__(self, index):
         pdbqt_path = self.paths[index]
         return self.pdbqt_to_mol(pdbqt_path)
 
     def pdbqt_to_mol(self, pdbqt_path):
         pdbqt = mda.Universe(pdbqt_path)
-            # set attributes needed by the converter
+        # set attributes needed by the converter
         elements = [mda.topology.guessers.guess_atom_element(x)
                     for x in pdbqt.atoms.names]
         pdbqt.add_TopologyAttr("elements", elements)
         pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
         pdbqt.atoms.types = pdbqt.atoms.elements
-            # convert without infering bond orders and charges
+        # convert without infering bond orders and charges
         mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False,
                                            **self.converter_kwargs)
-            # assign BO from template then add hydrogens
+        # assign BO from template then add hydrogens
         mol = Chem.RemoveHs(mol, sanitize=False)
         mol = AssignBondOrdersFromTemplate(self.template, mol)
         mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)

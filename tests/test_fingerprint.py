@@ -63,7 +63,8 @@ class TestFingerprint:
 
     def test_init(self, fp_simple):
         assert "Hydrophobic" in fp_simple.interactions.keys()
-        assert hasattr(fp_simple, "hydrophobic") and callable(fp_simple.hydrophobic)
+        assert (hasattr(fp_simple, "hydrophobic")
+                and callable(fp_simple.hydrophobic))
         assert "Dummy" not in fp_simple.interactions.keys()
         assert hasattr(fp_simple, "dummy") and callable(fp_simple.dummy)
         assert "_BaseHBond" not in fp_simple.interactions.keys()
