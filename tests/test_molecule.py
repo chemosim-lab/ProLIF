@@ -1,13 +1,13 @@
 import pytest
 from MDAnalysis import SelectionError
-from rdkit import Chem
-from prolif.molecule import (Molecule,
-                             pdbqt_supplier,
-                             mol2_supplier,
+from numpy.testing import assert_array_equal
+from prolif.datafiles import datapath
+from prolif.molecule import (Molecule, mol2_supplier, pdbqt_supplier,
                              sdf_supplier)
 from prolif.residue import ResidueId
-from prolif.datafiles import datapath
-from .test_base import TestBaseRDKitMol, rdkit_mol, ligand_rdkit, u
+from rdkit import Chem
+
+from .test_base import TestBaseRDKitMol, ligand_rdkit, rdkit_mol, u
 
 
 class TestMolecule(TestBaseRDKitMol):
@@ -64,42 +64,59 @@ class TestMolecule(TestBaseRDKitMol):
         assert mol.n_residues == mol.residues.n_residues
 
 
-class TestSupplier:
-    def test_pdbqt(self):
+class SupplierBase:
+    resid = ResidueId("UNL", 1, "")
+
+    def test_len(self, suppl):
+        assert len(suppl) == 9
+
+    def test_returns_mol(self, suppl):
+        mol = next(iter(suppl))
+        assert isinstance(mol, Molecule)
+
+    def test_monomer_info(self, suppl):
+        mol = next(iter(suppl))
+        resid = ResidueId.from_atom(mol.GetAtomWithIdx(0))
+        assert resid == self.resid
+
+    @pytest.mark.parametrize("index", [0, 2, 8, -1])
+    def test_index(self, suppl, index):
+        index %= 9
+        mol_i = suppl[index]
+        for i, mol in enumerate(suppl):
+            if i == index:
+                break
+        assert_array_equal(mol.xyz, mol_i.xyz)
+
+
+class TestPDBQTSupplier(SupplierBase):
+    resid = ResidueId("LIG", 1, "G")
+
+    @pytest.fixture
+    def suppl(self):
         path = datapath / "vina"
         pdbqts = sorted(path.glob("*.pdbqt"))
         template = Chem.MolFromSmiles("C[NH+]1CC(C(=O)NC2(C)OC3(O)C4CCCN4C(=O)"
                                       "C(Cc4ccccc4)N3C2=O)C=C2c3cccc4[nH]cc"
                                       "(c34)CC21")
-        suppl = pdbqt_supplier(pdbqts, template)
-        mols = list(suppl)
-        assert isinstance(mols[0], Molecule)
-        assert len(mols) == len(pdbqts)
+        return pdbqt_supplier(pdbqts, template)
 
-    def test_sdf(self):
+
+class TestSDFSupplier(SupplierBase):
+    @pytest.fixture
+    def suppl(self):
         path = str(datapath / "vina" / "vina_output.sdf")
-        suppl = sdf_supplier(path)
-        mols = list(suppl)
-        assert isinstance(mols[0], Molecule)
-        assert len(mols) == 9
-        mi = mols[0].GetAtomWithIdx(0).GetMonomerInfo()
-        assert all([mi.GetResidueName() == "UNL",
-                    mi.GetResidueNumber() == 1,
-                    mi.GetChainId() == ""])
+        return sdf_supplier(path)
 
-    def test_mol2(self):
+
+class TestMOL2Supplier(SupplierBase):
+    @pytest.fixture
+    def suppl(self):
         path = str(datapath / "vina" / "vina_output.mol2")
-        suppl = mol2_supplier(path)
-        mols = list(suppl)
-        assert isinstance(mols[0], Molecule)
-        assert len(mols) == 9
-        mi = mols[0].GetAtomWithIdx(0).GetMonomerInfo()
-        assert all([mi.GetResidueName() == "UNL",
-                    mi.GetResidueNumber() == 1,
-                    mi.GetChainId() == ""])
+        return mol2_supplier(path)
 
     def test_mol2_starting_with_comment(self):
         path = str(datapath / "mol_comment.mol2")
         suppl = mol2_supplier(path)
-        mol = next(suppl)
+        mol = next(iter(suppl))
         assert mol is not None

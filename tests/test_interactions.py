@@ -1,10 +1,13 @@
-import pytest
-from rdkit import RDLogger
-from prolif.fingerprint import Fingerprint
-from prolif.interactions import _INTERACTIONS, Interaction, get_mapindex
 import prolif
-from .test_base import ligand_mol
+import pytest
+from MDAnalysis.topology.tables import vdwradii
+from prolif.fingerprint import Fingerprint
+from prolif.interactions import (_INTERACTIONS, Interaction, VdWContact,
+                                 get_mapindex)
+from rdkit import RDLogger
+
 from . import mol2factory
+from .test_base import ligand_mol
 
 # disable rdkit warnings
 lg = RDLogger.logger()
@@ -80,6 +83,8 @@ class TestInteractions:
         ("metalacceptor", "ligand", "metal", True),
         ("metalacceptor", "ligand", "metal_false", False),
         ("metalacceptor", "metal", "ligand", False),
+        ("vdwcontact", "benzene", "etf", True),
+        ("vdwcontact", "hb_acceptor", "metal_false", False),
     ], indirect=["mol1", "mol2"])
     def test_interaction(self, fingerprint, func_name, mol1, mol2, expected):
         interaction = getattr(fingerprint, func_name)
@@ -97,16 +102,14 @@ class TestInteractions:
         # fix dummy Hydrophobic class being reused in later unrelated tests
 
         class Hydrophobic(prolif.interactions.Hydrophobic):
-            pass
+            __doc__ = prolif.interactions.Hydrophobic.__doc__
 
     def test_error_no_detect(self):
-        class Dummy(Interaction):
+        class _Dummy(Interaction):
             pass
         with pytest.raises(TypeError,
-                           match="Can't instantiate abstract class Dummy"):
-            Dummy()
-        # fix Dummy class being reused in later unrelated tests
-        del prolif.interactions._INTERACTIONS["Dummy"]
+                           match="Can't instantiate abstract class _Dummy"):
+            _Dummy()
 
     @pytest.mark.parametrize("index", [
         0, 1, 3, 42, 78
@@ -114,3 +117,19 @@ class TestInteractions:
     def test_get_mapindex(self, index):
         parent_index = get_mapindex(ligand_mol[0], index)
         assert parent_index == index
+
+    def test_vdwcontact_tolerance_error(self):
+        with pytest.raises(ValueError,
+                           match="`tolerance` must be 0 or positive"):
+            VdWContact(tolerance=-1)
+
+    @pytest.mark.parametrize("mol1, mol2", [
+        ("benzene", "cation")
+    ], indirect=["mol1", "mol2"])
+    def test_vdwcontact_cache(self, mol1, mol2):
+        vdw = VdWContact()
+        assert vdw._vdw_cache == {}
+        vdw.detect(mol1, mol2)
+        for (lig, res), value in vdw._vdw_cache.items():
+            vdw_dist = vdwradii[lig] + vdwradii[res] + vdw.tolerance
+            assert vdw_dist == value

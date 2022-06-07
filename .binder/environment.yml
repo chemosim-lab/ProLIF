@@ -9,15 +9,15 @@ dependencies:
   - ipywidgets
   - pandoc
   - pip
-  - python
+  - python==3.9.*
   - rdkit
-  - cython
   - nbsphinx==0.8.7
   - networkx
   - recommonmark
   - seaborn==0.11.0
   - sphinx==4.1.2
   - tqdm
+  - mdanalysis==2.2.*
   - pip:
     - pyvis
     - py3Dmol

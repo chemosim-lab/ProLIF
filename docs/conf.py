@@ -46,15 +46,6 @@ mathjax_path = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?
 autosectionlabel_prefix_document = True
 napoleon_google_docstring = False
 
-# find the kernel name
-kernel_names = list(kernelspec.find_kernel_specs().keys())
-for name in kernel_names:
-    if "prolif" in name:
-        nbsphinx_kernel_name = name
-        break
-else:
-    nbsphinx_kernel_name = kernel_names[0]
-
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 

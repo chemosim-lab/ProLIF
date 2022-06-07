@@ -3,10 +3,13 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
 import copy
+from collections.abc import Sequence
 from operator import attrgetter
+
 import MDAnalysis as mda
 from rdkit import Chem
 from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
+
 from .rdkitmol import BaseRDKitMol
 from .residue import Residue, ResidueGroup
 from .utils import split_mol_by_residues
@@ -29,7 +32,7 @@ class Molecule(BaseRDKitMol):
         by :class:`~prolif.residue.ResidueId`. The residue list is sorted.
     n_residues : int
         Number of residues
-    
+
     Examples
     --------
 
@@ -42,7 +45,7 @@ class Molecule(BaseRDKitMol):
         mol = u.select_atoms("protein").convert_to("RDKIT")
         mol = prolif.Molecule(mol)
         mol
-    
+
     You can also create a Molecule directly from a
     :class:`~MDAnalysis.core.universe.Universe`:
 
@@ -52,17 +55,17 @@ class Molecule(BaseRDKitMol):
         mol = prolif.Molecule.from_mda(u, "protein")
         mol
 
-    
+
     Notes
     -----
     Residues can be accessed easily in different ways:
-        
+
     .. ipython:: python
 
         mol["TYR38.A"] # by resid string (residue name + number + chain)
         mol[42] # by index (from 0 to n_residues-1)
         mol[prolif.ResidueId("TYR", 38, "A")] # by ResidueId
-    
+
     See :mod:`prolif.residue` for more information on residues
     """
     def __init__(self, mol):
@@ -75,11 +78,11 @@ class Molecule(BaseRDKitMol):
         residues = [Residue(mol) for mol in residues]
         residues.sort(key=attrgetter("resid"))
         self.residues = ResidueGroup(residues)
-    
+
     @classmethod
     def from_mda(cls, obj, selection=None, **kwargs):
         """Creates a Molecule from an MDAnalysis object
-        
+
         Parameters
         ----------
         obj : MDAnalysis.core.universe.Universe or MDAnalysis.core.groups.AtomGroup
@@ -114,15 +117,15 @@ class Molecule(BaseRDKitMol):
                 f"AtomGroup is empty, please check your selection")
         mol = ag.convert_to.rdkit(**kwargs)
         return cls(mol)
-    
+
     @classmethod
     def from_rdkit(cls, mol, resname="UNL", resnumber=1, chain=""):
         """Creates a Molecule from an RDKit molecule
-        
+
         While directly instantiating a molecule with ``prolif.Molecule(mol)``
         would also work, this method insures that every atom is linked to an
         AtomPDBResidueInfo which is required by ProLIF
-        
+
         Parameters
         ----------
         mol : rdkit.Chem.rdchem.Mol
@@ -133,7 +136,7 @@ class Molecule(BaseRDKitMol):
             The default residue number that is used if none was found
         chain : str
             The default chain Id that is used if none was found
-        
+
         Notes
         -----
         This method only checks for an existing AtomPDBResidueInfo in the first
@@ -168,7 +171,7 @@ class Molecule(BaseRDKitMol):
         return len(self.residues)
 
 
-def pdbqt_supplier(paths, template, **kwargs):
+class pdbqt_supplier(Sequence):
     """Supplies molecules, given a path to PDBQT files
 
     Parameters
@@ -178,14 +181,20 @@ def pdbqt_supplier(paths, template, **kwargs):
     template : rdkit.Chem.rdchem.Mol
         A template molecule with the correct bond orders and charges. It must
         match exactly the molecule inside the PDBQT file.
-    kwargs : object
+    converter_kwargs : dict
         Keyword arguments passed to the RDKitConverter of MDAnalysis
+    resname : str
+        Residue name for every ligand
+    resnumber : int
+        Residue number for every ligand
+    chain : str
+        Chain ID for every ligand
+
 
     Returns
     -------
-    suppl : generator
-        A generator object that will provide the :class:`Molecule` object as
-        you iterate over it.
+    suppl : Sequence
+        A sequence that provides :class:`Molecule` objects
 
     Example
     -------
@@ -197,8 +206,28 @@ def pdbqt_supplier(paths, template, **kwargs):
         >>> for lig in lig_suppl:
         ...     # do something with each ligand
 
+    .. versionchanged:: 1.0.0
+        Molecule suppliers are now sequences that can be reused, indexed,
+        and can return their length, instead of single-use generators.
+
     """
-    for pdbqt_path in paths:
+    def __init__(self, paths, template, converter_kwargs=None, **kwargs):
+        self.paths = list(paths)
+        self.template = template
+        converter_kwargs = converter_kwargs or {}
+        converter_kwargs.pop("NoImplicit", None)
+        self.converter_kwargs = converter_kwargs
+        self._kwargs = kwargs
+
+    def __iter__(self):
+        for pdbqt_path in self.paths:
+            yield self.pdbqt_to_mol(pdbqt_path)
+
+    def __getitem__(self, index):
+        pdbqt_path = self.paths[index]
+        return self.pdbqt_to_mol(pdbqt_path)
+
+    def pdbqt_to_mol(self, pdbqt_path):
         pdbqt = mda.Universe(pdbqt_path)
         # set attributes needed by the converter
         elements = [mda.topology.guessers.guess_atom_element(x)
@@ -207,18 +236,21 @@ def pdbqt_supplier(paths, template, **kwargs):
         pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
         pdbqt.atoms.types = pdbqt.atoms.elements
         # convert without infering bond orders and charges
-        kwargs.pop("NoImplicit", None)
-        mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False, **kwargs)
+        mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False,
+                                           **self.converter_kwargs)
         # assign BO from template then add hydrogens
         mol = Chem.RemoveHs(mol, sanitize=False)
-        mol = AssignBondOrdersFromTemplate(template, mol)
+        mol = AssignBondOrdersFromTemplate(self.template, mol)
         mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)
-        yield Molecule(mol)
+        return Molecule.from_rdkit(mol, **self._kwargs)
+
+    def __len__(self):
+        return len(self.paths)
 
 
-def sdf_supplier(path, **kwargs):
+class sdf_supplier(Sequence):
     """Supplies molecules, given a path to an SDFile
-    
+
     Parameters
     ----------
     path : str
@@ -232,9 +264,8 @@ def sdf_supplier(path, **kwargs):
 
     Returns
     -------
-    suppl : generator
-        A generator object that will provide the :class:`Molecule` object as
-        you iterate over it.
+    suppl : Sequence
+        A sequence that provides :class:`Molecule` objects. Can be indexed
 
     Example
     -------
@@ -244,15 +275,31 @@ def sdf_supplier(path, **kwargs):
         >>> for lig in lig_suppl:
         ...     # do something with each ligand
 
+    .. versionchanged:: 1.0.0
+        Molecule suppliers are now sequences that can be reused, indexed,
+        and can return their length, instead of single-use generators.
+
     """
-    suppl = Chem.SDMolSupplier(path, removeHs=False)
-    for mol in suppl:
-        yield Molecule.from_rdkit(mol, **kwargs)
+    def __init__(self, path, **kwargs):
+        self.path = path
+        self._suppl = Chem.SDMolSupplier(path, removeHs=False)
+        self._kwargs = kwargs
+
+    def __iter__(self):
+        for mol in self._suppl:
+            yield Molecule.from_rdkit(mol, **self._kwargs)
+
+    def __getitem__(self, index):
+        mol = self._suppl[index]
+        return Molecule.from_rdkit(mol, **self._kwargs)
+
+    def __len__(self):
+        return len(self._suppl)
 
 
-def mol2_supplier(path, **kwargs):
-    """Generates prolif.Molecule objects from a MOL2 file
-    
+class mol2_supplier(Sequence):
+    """Supplies molecules, given a path to a MOL2 file
+
     Parameters
     ----------
     path : str
@@ -266,9 +313,8 @@ def mol2_supplier(path, **kwargs):
 
     Returns
     -------
-    suppl : generator
-        A generator object that will provide the :class:`Molecule` object as
-        you iterate over it.
+    suppl : Sequence
+        A sequence that provides :class:`Molecule` objects
 
     Example
     -------
@@ -278,17 +324,50 @@ def mol2_supplier(path, **kwargs):
         >>> for lig in lig_suppl:
         ...     # do something with each ligand
 
+    .. versionchanged:: 1.0.0
+        Molecule suppliers are now sequences that can be reused, indexed,
+        and can return their length, instead of single-use generators.
+
     """
-    block = []
-    with open(path, "r") as f:
-        for line in f:
-            if line.startswith("#"):
-                continue
-            if block and line.startswith("@<TRIPOS>MOLECULE"):
-                mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
-                yield Molecule.from_rdkit(mol, **kwargs)
-                block = []
-            block.append(line)
+    def __init__(self, path, **kwargs):
+        self.path = path
+        self._kwargs = kwargs
+
+    def __iter__(self):
+        block = []
+        with open(self.path, "r") as f:
+            for line in f:
+                if line.startswith("#"):
+                    continue
+                if block and line.startswith("@<TRIPOS>MOLECULE"):
+                    yield self.block_to_mol(block)
+                    block = []
+                block.append(line)
+            yield self.block_to_mol(block)
+
+    def block_to_mol(self, block):
         mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
-        yield Molecule.from_rdkit(mol, **kwargs)
-                
+        return Molecule.from_rdkit(mol, **self._kwargs)
+
+    def __getitem__(self, index):
+        if index < 0:
+            index %= len(self)
+        mol_index = -1
+        block = []
+        with open(self.path, "r") as f:
+            for line in f:
+                if line.startswith("@<TRIPOS>MOLECULE"):
+                    mol_index += 1
+                    if index == mol_index and not block:
+                        block.append(line)
+                    elif mol_index > index:
+                        return self.block_to_mol(block)
+                elif block:
+                    block.append(line)
+            else:
+                return self.block_to_mol(block)
+
+    def __len__(self):
+        with open(self.path, "r") as f:
+            n_mols = sum(line.startswith("@<TRIPOS>MOLECULE") for line in f)
+        return n_mols

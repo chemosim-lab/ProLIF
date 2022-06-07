@@ -18,24 +18,58 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     df
     bv = fp.to_bitvectors()
     TanimotoSimilarity(bv[0], bv[1])
+    # save results
+    fp.to_pickle("fingerprint.pkl")
+    # load
+    fp = prolif.Fingerprint.from_pickle("fingerprint.pkl")
+    df.equals(fp.to_dataframe())
 
 """
-from functools import wraps
+import multiprocessing as mp
+import pickle
+from collections.abc import Iterable
+from inspect import isgenerator
+from threading import Thread
+
 import numpy as np
+from rdkit import Chem
 from tqdm.auto import tqdm
+
 from .interactions import _INTERACTIONS
 from .molecule import Molecule
-from .utils import get_residues_near_ligand, to_dataframe, to_bitvectors
+from .parallel import (Progress, ProgressCounter,
+                       declare_shared_objs_for_chunk,
+                       declare_shared_objs_for_mol, process_chunk, process_mol)
+from .utils import get_residues_near_ligand, to_bitvectors, to_dataframe
 
 
-def _return_first_element(f):
-    """Modifies the return signature of a function by forcing it to return
-    only the first element when multiple values are returned
+class _Docstring:
+    """Descriptor that replaces the documentation shown when calling
+    ``fp.hydrophobic?`` and other interaction methods"""
+    def __init__(self):
+        self._docs = {}
+
+    def __set__(self, instance, func):
+        # add function's docstring to memory
+        cls = func.__self__.__class__
+        self._docs[cls.__name__] = cls.__doc__
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        # fetch docstring of last accessed Fingerprint method
+        return self._docs[type(instance)._current_func]
+
+
+class _InteractionWrapper:
+    """Modifies the return signature of an interaction ``detect`` method by
+    forcing it to return only the first element when multiple values are
+    returned.
 
     Raises
     ------
     TypeError
-        If the function doesn't return three values
+        If the ``detect`` method doesn't return three values
 
     Notes
     -----
@@ -46,10 +80,12 @@ def _return_first_element(f):
     -------
     ::
 
-        >>> def foo():
-        ...     return 1, 2, 3
+        >>> class Foo:
+        ...     def detect(self, *args):
+        ...         return 1, 2, 3
         ...
-        >>> bar = _return_first_element(foo)
+        >>> foo = Foo().detect
+        >>> bar = _InteractionWrapper(foo)
         >>> foo()
         (1, 2, 3)
         >>> bar()
@@ -60,10 +96,24 @@ def _return_first_element(f):
     .. versionchanged:: 0.3.3
         The function now must return three values
 
+    .. versionchanged:: 1.0.0
+        Changed from a wrapper function to a class for easier pickling support
+
     """
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        results = f(*args, **kwargs)
+    __doc__ = _Docstring()
+    _current_func = ""
+
+    def __init__(self, func):
+        self.__wrapped__ = func
+        # add docstring to descriptor
+        self.__doc__ = func
+
+    def __repr__(self):  # pragma: no cover
+        cls = self.__wrapped__.__self__.__class__
+        return f"<{cls.__module__}.{cls.__name__} at {id(self):#x}>"
+
+    def __call__(self, *args, **kwargs):
+        results = self.__wrapped__(*args, **kwargs)
         try:
             bool_, lig_idx, prot_idx = results
         except (TypeError, ValueError):
@@ -72,7 +122,6 @@ def _return_first_element(f):
                 "return 3 values (boolean, int, int)"
             ) from None
         return bool_
-    return wrapper
 
 
 class Fingerprint:
@@ -97,6 +146,10 @@ class Fingerprint:
         Number of interaction functions registered by the fingerprint
     ifp : list, optionnal
         List of interactions fingerprints for the given trajectory.
+
+    Raises
+    ------
+    NameError : Unknown interaction in the ``interactions`` parameter
 
     Notes
     -----
@@ -140,23 +193,42 @@ class Fingerprint:
         fp.bitvector_atoms(lig, prot["ASP129.A"])
         fp.hbdonor.__wrapped__(lig, prot["ASP129.A"])
 
+
+    .. versionchanged:: 1.0.0
+        Added pickle support
+
     """
 
     def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",
                  "PiStacking", "Anionic", "Cationic", "CationPi", "PiCation"]):
+        self._set_interactions(interactions)
+
+    def _set_interactions(self, interactions):
         # read interactions to compute
         self.interactions = {}
         if interactions == "all":
-            interactions = [i for i in _INTERACTIONS.keys()
-                            if not (i.startswith("_") or i == "Interaction")]
+            interactions = self.list_available()
+        # sanity check
+        unsafe = set(interactions)
+        unk = unsafe.symmetric_difference(_INTERACTIONS.keys()) & unsafe
+        if unk:
+            raise NameError(f"Unknown interaction(s): {', '.join(unk)}")
+        # add interaction methods
         for name, interaction_cls in _INTERACTIONS.items():
             if name.startswith("_") or name == "Interaction":
                 continue
             func = interaction_cls().detect
-            func = _return_first_element(func)
+            func = _InteractionWrapper(func)
             setattr(self, name.lower(), func)
             if name in interactions:
                 self.interactions[name] = func
+
+    def __getattribute__(self, name):
+        # trick to get the correct docstring when calling `fp.hydrophobic?`
+        attr = super().__getattribute__(name)
+        if isinstance(attr, _InteractionWrapper):
+            type(attr)._current_func = attr.__wrapped__.__self__.__class__.__name__
+        return attr
 
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
@@ -307,7 +379,7 @@ class Fingerprint:
                     ifp[key] = self.bitvector(lres, pres)
         return ifp
 
-    def run(self, traj, lig, prot, residues=None, progress=True):
+    def run(self, traj, lig, prot, residues=None, progress=True, n_jobs=None):
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
         Parameters
@@ -330,12 +402,20 @@ class Fingerprint:
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
+        n_jobs : int or None
+            Number of processes to run in parallel. If ``n_jobs=None``, the
+            analysis will use all available CPU threads, while if ``n_jobs=1``,
+            the analysis will run in serial.
+
+        Raises
+        ------
+        ValueError : if ``n_jobs <= 0``
 
         Returns
         -------
         prolif.fingerprint.Fingerprint
             The Fingerprint instance that generated the fingerprint
-        
+
         Example
         -------
         ::
@@ -348,15 +428,24 @@ class Fingerprint:
         .. seealso::
 
             - :meth:`Fingerprint.generate` to generate the fingerprint between
-            two single structures.
+              two single structures.
             - :meth:`Fingerprint.run_from_iterable` to generate the fingerprint
-            between a protein and a collection of ligands.
+              between a protein and a collection of ligands.
 
         .. versionchanged:: 0.3.2
             Moved the ``return_atoms`` parameter from the ``run`` method to the
             dataframe conversion code
 
+        .. versionchanged:: 1.0.0
+            Added support for multiprocessing
+
         """
+        if n_jobs is not None and n_jobs < 1:
+            raise ValueError("n_jobs must be > 0 or None")
+        if n_jobs != 1:
+            return self._run_parallel(traj, lig, prot, residues=residues,
+                                      progress=progress, n_jobs=n_jobs)
+
         iterator = tqdm(traj) if progress else traj
         if residues == "all":
             residues = Molecule.from_mda(prot).residues.keys()
@@ -371,8 +460,44 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
+    def _run_parallel(self, traj, lig, prot, residues=None, progress=True,
+                      n_jobs=None):
+        """Parallel implementation of :meth:`~Fingerprint.run`"""
+        n_chunks = n_jobs if n_jobs else mp.cpu_count()
+        try:
+            n_frames = traj.n_frames
+        except AttributeError:
+            # sliced trajectory
+            frames = range(traj.start, traj.stop, traj.step)
+            traj = lig.universe.trajectory
+        else:
+            frames = range(n_frames)
+
+        if residues == "all":
+            residues = Molecule.from_mda(prot).residues.keys()
+        chunks = np.array_split(frames, n_chunks)
+        # setup parallel progress bar
+        pcount = ProgressCounter()
+        if progress:
+            pbar = Progress(pcount, total=len(frames))
+        else:
+            pbar = lambda: None
+        pbar_thread = Thread(target=pbar, daemon=True)
+
+        # run pool of workers
+        with mp.Pool(n_jobs, initializer=declare_shared_objs_for_chunk,
+                     initargs=(self, residues, progress, pcount)) as pool:
+            pbar_thread.start()
+            args = ((traj, lig, prot, chunk) for chunk in chunks)
+            results = []
+            for ifp in pool.imap_unordered(process_chunk, args):
+                results.extend(ifp)
+        results.sort(key=lambda ifp: ifp["Frame"])
+        self.ifp = results
+        return self
+
     def run_from_iterable(self, lig_iterable, prot_mol, residues=None,
-                          progress=True):
+                          progress=True, n_jobs=None):
         """Generates the fingerprint between a list of ligands and a protein
 
         Parameters
@@ -393,6 +518,14 @@ class Fingerprint:
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
+        n_jobs : int or None
+            Number of processes to run in parallel. If ``n_jobs=None``, the
+            analysis will use all available CPU threads, while if ``n_jobs=1``,
+            the analysis will run in serial.
+
+        Raises
+        ------
+        ValueError : if ``n_jobs <= 0``
 
         Returns
         -------
@@ -418,7 +551,17 @@ class Fingerprint:
             Moved the ``return_atoms`` parameter from the ``run_from_iterable``
             method to the dataframe conversion code
 
+        .. versionchanged:: 1.0.0
+            Added support for multiprocessing
+
         """
+        if n_jobs is not None and n_jobs < 1:
+            raise ValueError("n_jobs must be > 0 or None")
+        if n_jobs != 1:
+            return self._run_iter_parallel(
+                lig_iterable=lig_iterable, prot_mol=prot_mol,
+                residues=residues, progress=progress, n_jobs=n_jobs)
+
         iterator = tqdm(lig_iterable) if progress else lig_iterable
         if residues == "all":
             residues = prot_mol.residues.keys()
@@ -429,6 +572,31 @@ class Fingerprint:
             data["Frame"] = i
             ifp.append(data)
         self.ifp = ifp
+        return self
+
+    def _run_iter_parallel(self, lig_iterable, prot_mol, residues=None,
+                           progress=True, n_jobs=None):
+        """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
+        if (
+            isinstance(lig_iterable, Chem.SDMolSupplier)
+            or (isinstance(lig_iterable, Iterable)
+                and not isgenerator(lig_iterable))
+        ):
+            total = len(lig_iterable)
+        else:
+            total = None
+        suppl = (x for x in enumerate(lig_iterable))
+        if residues == "all":
+            residues = prot_mol.residues.keys()
+
+        with mp.Pool(n_jobs, initializer=declare_shared_objs_for_mol,
+                     initargs=(self, prot_mol, residues)) as pool:
+            results = []
+            for data in tqdm(pool.imap_unordered(process_mol, suppl),
+                             total=total, disable=not progress):
+                results.append(data)
+        results.sort(key=lambda ifp: ifp["Frame"])
+        self.ifp = results
         return self
 
     def to_dataframe(self, **kwargs):
@@ -503,3 +671,61 @@ class Fingerprint:
             df = self.to_dataframe()
             return to_bitvectors(df)
         raise AttributeError("Please use the `run` method before")
+
+    def to_pickle(self, path=None):
+        """Dumps the fingerprint object as a pickle.
+
+        Parameters
+        ----------
+        path : str, pathlib.Path or None
+            Output path. If ``None``, the method returns the pickle as bytes.
+
+        Returns
+        -------
+        obj : None or bytes
+            ``None`` if ``path`` is set, else the bytes corresponding to the
+            pickle
+
+        Example
+        -------
+        ::
+
+            >>> dump = fp.to_pickle()
+            >>> saved_fp = Fingerprint.from_pickle(dump)
+            >>> fp.to_pickle("data/fp.pkl")
+            >>> saved_fp = Fingerprint.from_pickle("data/fp.pkl")
+
+        .. seealso::
+
+            :meth:`~Fingerprint.from_pickle` for loading the pickle dump.
+
+        .. versionadded:: 1.0.0
+
+        """
+        if path:
+            with open(path, "wb") as f:
+                pickle.dump(self, f)
+        else:
+            return pickle.dumps(self)
+
+    @classmethod
+    def from_pickle(cls, path_or_bytes):
+        """Creates a fingerprint object from a pickle dump.
+
+        Parameters
+        ----------
+        path_or_bytes : str, pathlib.Path or bytes
+            The path to the pickle file, or bytes corresponding to a pickle
+            dump
+
+        .. seealso::
+
+            :meth:`~Fingerprint.to_pickle` for creating the pickle dump.
+
+        .. versionadded:: 1.0.0
+
+        """
+        if isinstance(path_or_bytes, bytes):
+            return pickle.loads(path_or_bytes)
+        with open(path_or_bytes, "rb") as f:
+            return pickle.load(f)
