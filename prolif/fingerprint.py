@@ -423,9 +423,9 @@ class Fingerprint:
         .. seealso::
 
             - :meth:`Fingerprint.generate` to generate the fingerprint between
-            two single structures.
+              two single structures.
             - :meth:`Fingerprint.run_from_iterable` to generate the fingerprint
-            between a protein and a collection of ligands.
+              between a protein and a collection of ligands.
 
         .. versionchanged:: 0.3.2
             Moved the ``return_atoms`` parameter from the ``run`` method to the
