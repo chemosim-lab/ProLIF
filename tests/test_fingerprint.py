@@ -195,7 +195,7 @@ class TestFingerprint:
         lig_suppl = list(sdf_supplier(path))
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
         pkl = fp.to_pickle()
-        return Fingerprint.read_pickle(pkl)
+        return Fingerprint.from_pickle(pkl)
 
     @pytest.fixture
     def fp_unpkl_file(self, fp):
@@ -204,7 +204,7 @@ class TestFingerprint:
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
         with NamedTemporaryFile("w+b") as tempf:
             fp.to_pickle(tempf.name)
-            fp_unpkl = Fingerprint.read_pickle(tempf.name)
+            fp_unpkl = Fingerprint.from_pickle(tempf.name)
         return fp_unpkl
 
     @pytest.fixture(params=["fp_unpkl", "fp_unpkl_file"])

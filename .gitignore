@@ -109,3 +109,4 @@ venv.bak/
 *.lock
 docs/notebooks/debug.log
 docs/notebooks/*.html
+*.pkl

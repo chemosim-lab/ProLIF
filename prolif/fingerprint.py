@@ -18,6 +18,11 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     df
     bv = fp.to_bitvectors()
     TanimotoSimilarity(bv[0], bv[1])
+    # save results
+    fp.to_pickle("fingerprint.pkl")
+    # load
+    fp = prolif.Fingerprint.from_pickle("fingerprint.pkl")
+    df.equals(fp.to_dataframe())
 
 """
 import multiprocessing as mp
@@ -668,6 +673,35 @@ class Fingerprint:
         raise AttributeError("Please use the `run` method before")
 
     def to_pickle(self, path=None):
+        """Dumps the fingerprint object as a pickle.
+        
+        Parameters
+        ----------
+        path : str, pathlib.Path or None
+            Output path. If ``None``, the method returns the pickle as bytes.
+
+        Returns
+        -------
+        obj : None or bytes
+            ``None`` if ``path`` is set, else the bytes corresponding to the
+            pickle
+        
+        Example
+        -------
+        ::
+
+            >>> dump = fp.to_pickle()
+            >>> saved_fp = Fingerprint.from_pickle(dump)
+            >>> fp.to_pickle("data/fp.pkl")
+            >>> saved_fp = Fingerprint.from_pickle("data/fp.pkl")
+
+        .. seealso::
+
+            :meth:`~Fingerprint.from_pickle` for loading the pickle dump.
+
+        .. versionadded:: 1.0.0
+
+        """
         if path:
             with open(path, "wb") as f:
                 pickle.dump(self, f)
@@ -675,7 +709,22 @@ class Fingerprint:
             return pickle.dumps(self)
 
     @classmethod
-    def read_pickle(cls, path_or_bytes):
+    def from_pickle(cls, path_or_bytes):
+        """Creates a fingerprint object from a pickle dump.
+        
+        Parameters
+        ----------
+        path_or_bytes : str, pathlib.Path or bytes
+            The path to the pickle file, or bytes corresponding to a pickle
+            dump
+
+        .. seealso::
+
+            :meth:`~Fingerprint.to_pickle` for creating the pickle dump.
+
+        .. versionadded:: 1.0.0
+
+        """
         if isinstance(path_or_bytes, bytes):
             return pickle.loads(path_or_bytes)
         with open(path_or_bytes, "rb") as f:
