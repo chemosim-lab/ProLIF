@@ -10,8 +10,8 @@ ProLIF
       - |binder|
     * - **CI**
       - |tests| |codecov| |lgtm|
-    * - **PyPI**
-      - |pypi-version| |build|
+    * - **Builds**
+      - |conda-version| |pypi-version| |build|
     * - **Dependencies**
       - |mdanalysis| |rdkit|
     * - **License**
@@ -70,6 +70,10 @@ Unless otherwise noted, all files in this directory and all subdirectories are d
 .. |pypi-version| image:: https://img.shields.io/pypi/v/prolif.svg
    :target: https://pypi.python.org/pypi/prolif
    :alt: Pypi Version
+
+.. |conda-version| image:: https://img.shields.io/conda/vn/conda-forge/prolif.svg
+    :target: https://anaconda.org/conda-forge/prolif
+    :alt: Conda-forge version
 
 .. |build| image:: https://github.com/chemosim-lab/ProLIF/workflows/build/badge.svg
     :target: https://github.com/chemosim-lab/ProLIF/actions?query=workflow%3Abuild
