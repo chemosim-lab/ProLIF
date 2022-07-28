@@ -150,7 +150,7 @@ class _BaseHBond(Interaction):
     """
     def __init__(self,
                  donor="[#7,#8,#16][H]",
-                 acceptor="[N,O,F,-{1-};!+{1-}]",
+                 acceptor="[#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),$([O])&!$([OX2](C)C=O)&!$(*(~a)~a),-{1-};!+{1-}]",
                  distance=3.5,
                  angles=(130, 180)):
         self.donor = MolFromSmarts(donor)
@@ -438,7 +438,7 @@ class _BaseMetallic(_Distance):
     """
     def __init__(self,
                  metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
-                 ligand="[O,N,-{1-};!+{1-}]",
+                 ligand="[O,#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),-{1-};!+{1-}]",
                  distance=2.8):
         super().__init__(metal, ligand, distance)
 
