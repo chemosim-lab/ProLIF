@@ -35,7 +35,7 @@ import numpy as np
 from rdkit import Chem
 from tqdm.auto import tqdm
 
-from .interactions import _INTERACTIONS
+from prolif.interactions import _INTERACTIONS
 from .molecule import Molecule
 from .parallel import (Progress, ProgressCounter,
                        declare_shared_objs_for_chunk,
@@ -312,13 +312,15 @@ class Fingerprint:
         bitvector = []
         lig_atoms = []
         prot_atoms = []
+        measurements=[]
         for func in self.interactions.values():
-            bit, la, pa = func.__wrapped__(res1, res2)
+            bit, la, pa, m = func.__wrapped__(res1, res2)
             bitvector.append(bit)
             lig_atoms.append(la)
             prot_atoms.append(pa)
+            measurements.append(m)
         bitvector = np.array(bitvector)
-        return bitvector, lig_atoms, prot_atoms
+        return bitvector, lig_atoms, prot_atoms, measurements
 
     def generate(self, lig, prot, residues=None, return_atoms=False):
         """Generates the interaction fingerprint between 2 molecules

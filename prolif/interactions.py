@@ -44,10 +44,11 @@ from MDAnalysis.topology.tables import vdwradii
 from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
 
-from .utils import angle_between_limits, get_centroid, get_ring_normal_vector
+from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
+from math import pi as PI # to prevent interference with pi (-cation)
 
 _INTERACTIONS = {}
-
+MEASUREMENT_DECIMAL_PLACES=3
 
 class _InteractionMeta(ABCMeta):
     """Metaclass to register interactions automatically"""
@@ -113,9 +114,10 @@ class _Distance(Interaction):
                                                            prot_matches):
                 alig = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
                 aprot = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
-                if alig.Distance(aprot) <= self.distance:
-                    return True, lig_match[0], prot_match[0]
-        return False, None, None
+                dist = alig.Distance(aprot) 
+                if dist <= self.distance:
+                    return True, lig_match[0], prot_match[0] , {'distance':round(dist,MEASUREMENT_DECIMAL_PLACES)}
+        return False, None, None, None
 
 
 class Hydrophobic(_Distance):
@@ -168,21 +170,23 @@ class _BaseHBond(Interaction):
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 h = Geometry.Point3D(*donor.xyz[donor_match[1]])
                 a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
-                if d.Distance(a) <= self.distance:
+                dist =  d.Distance(a) 
+                if dist <= self.distance:
                     hd = h.DirectionVector(d)
                     ha = h.DirectionVector(a)
                     # get DHA angle
                     angle = hd.AngleTo(ha)
                     if angle_between_limits(angle, *self.angles):
-                        return True, acceptor_match[0], donor_match[1]
-        return False, None, None
+                        return True, acceptor_match[0], donor_match[1],\
+                            {'distance':round(dist, MEASUREMENT_DECIMAL_PLACES),
+                             'angle':round(angle*180/PI, MEASUREMENT_DECIMAL_PLACES)}
+        return False, None, None, None
 
 
 class HBDonor(_BaseHBond):
     """Hbond interaction between a ligand (donor) and a residue (acceptor)"""
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
+        return super().detect(residue, ligand)
 
 
 class HBAcceptor(_BaseHBond):
@@ -233,20 +237,24 @@ class _BaseXBond(Interaction):
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 x = Geometry.Point3D(*donor.xyz[donor_match[1]])
                 a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
-                if x.Distance(a) <= self.distance:
+                dist = x.Distance(a)
+                if dist <= self.distance:
                     # D-X ... A angle
                     xd = x.DirectionVector(d)
                     xa = x.DirectionVector(a)
-                    angle = xd.AngleTo(xa)
-                    if angle_between_limits(angle, *self.axd_angles):
+                    axd_angle = xd.AngleTo(xa)
+                    if angle_between_limits(axd_angle, *self.axd_angles):
                         # X ... A-R angle
                         r = Geometry.Point3D(*acceptor.xyz[acceptor_match[1]])
                         ax = a.DirectionVector(x)
                         ar = a.DirectionVector(r)
-                        angle = ax.AngleTo(ar)
-                        if angle_between_limits(angle, *self.xar_angles):
-                            return True, acceptor_match[0], donor_match[1]
-        return False, None, None
+                        xar_angle = ax.AngleTo(ar)
+                        if angle_between_limits(xar_angle, *self.xar_angles):
+                            return True, acceptor_match[0], donor_match[1], \
+                                    {"distance":round(dist, MEASUREMENT_DECIMAL_PLACES),
+                                        "axd_angle":round(axd_angle*180/PI,MEASUREMENT_DECIMAL_PLACES),
+                                        "xar_angle":round(xar_angle*180/PI,MEASUREMENT_DECIMAL_PLACES)}
+        return False, None, None, None
 
 
 class XBAcceptor(_BaseXBond):
@@ -258,8 +266,7 @@ class XBAcceptor(_BaseXBond):
 class XBDonor(_BaseXBond):
     """Halogen bonding between a ligand (donor) and a residue (acceptor)"""
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
+        return super().detect(residue, ligand)
 
 
 class _BaseIonic(_Distance):
@@ -280,8 +287,7 @@ class Cationic(_BaseIonic):
 class Anionic(_BaseIonic):
     """Ionic interaction between a ligand (anion) and a residue (cation)"""
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
+        return super().detect(residue, ligand)
 
 
 class _BaseCationPi(Interaction):
@@ -322,7 +328,8 @@ class _BaseCationPi(Interaction):
                 # centroid of pi-system as 3d point
                 centroid = Geometry.Point3D(*get_centroid(pi_coords))
                 # distance between cation and centroid
-                if cat.Distance(centroid) > self.distance:
+                dist=cat.Distance(centroid) 
+                if dist > self.distance:
                     continue
                 # vector normal to ring plane
                 normal = get_ring_normal_vector(centroid, pi_coords)
@@ -332,16 +339,16 @@ class _BaseCationPi(Interaction):
                 # centroid-cation
                 angle = normal.AngleTo(centroid_cation)
                 if angle_between_limits(angle, *self.angles, ring=True):
-                    return True, cation_match[0], pi_match[0]
-        return False, None, None
-
+                    return True, cation_match[0], pi_match[0],\
+                            {'distance':round(dist,MEASUREMENT_DECIMAL_PLACES),
+                            'angle':round(angle*180/PI, MEASUREMENT_DECIMAL_PLACES)}
+        return False, None, None, None
 
 class PiCation(_BaseCationPi):
     """Cation-Pi interaction between a ligand (aromatic ring) and a residue
     (cation)"""
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
+        return super().detect(residue, ligand)
 
 
 class CationPi(_BaseCationPi):
@@ -406,8 +413,11 @@ class PiStacking(Interaction):
                 plane_angle = lig_normal.AngleTo(res_normal)
                 if angle_between_limits(plane_angle, *self.plane_angles,
                                         ring=True):
-                    return True, lig_match[0], res_match[0]
-        return False, None, None
+                    return True, lig_match[0], res_match[0], \
+                        {'centroid_distance':round(cdist,MEASUREMENT_DECIMAL_PLACES), 
+                         'shortest_distance':round(shortest_dist, MEASUREMENT_DECIMAL_PLACES),
+                         'plane_angle':round(plane_angle*180/PI, MEASUREMENT_DECIMAL_PLACES)}
+        return False, None, None, None
 
 
 class FaceToFace(PiStacking):
@@ -452,8 +462,7 @@ class MetalDonor(_BaseMetallic):
 class MetalAcceptor(_BaseMetallic):
     """Metallic interaction between a ligand (chelated) and a metal residue"""
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
+        return super().detect(residue, ligand)
 
 
 class VdWContact(Interaction):
@@ -491,5 +500,6 @@ class VdWContact(Interaction):
             dist = (lxyz.GetAtomPosition(la.GetIdx())
                         .Distance(rxyz.GetAtomPosition(ra.GetIdx())))
             if dist <= vdw:
-                return True, la.GetIdx(), ra.GetIdx()
-        return False, None, None
+                return True, la.GetIdx(), ra.GetIdx(),\
+                    {'distance':round(dist, MEASUREMENT_DECIMAL_PLACES)}
+        return False, None, None, None

@@ -209,14 +209,17 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
     if has_atom_indices and return_atoms:
-        empty_arr = [[None, None]] * n_interactions
+        empty_arr = [[None, None, None]] * n_interactions
     else:
         empty_arr = np.array([empty_value] * n_interactions)
     # sparse to dense
+    # key: interaction, value: ordered list of lists. sublist for each ligand (or MD frame) containing either: [None,None, None] or [ligand_atom, protein_atom, measurements_dict) 
     data = defaultdict(list)
     index = []
+    # loop through each ligand or MD frame
     for d in ifp:
         index.append(d.pop(index_col))
+        # loop through each interaction "key"
         for key in keys:
             try:
                 arr = d[key]
@@ -224,11 +227,12 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
                 data[key].append(empty_arr)
             else:
                 if has_atom_indices and return_atoms:
+                    # grab everything after 0-th index
                     arr = list(zip(*arr[1:]))
                 elif has_atom_indices:
-                    arr = arr[0]
+                    arr = arr[0] # grabs just boolean
                 data[key].append(arr)
-    index = pd.Series(index, name=index_col)
+    index = pd.Series(index, name=index_col) # matches number of ligands (or md frames)
     # create dataframes
     values = np.array([np.hstack([np.ravel(a[i]) for a in data.values()])
                        for i in range(len(index))])
@@ -237,8 +241,9 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
             [(str(k[0]), str(k[1]), i, a)
              for k in keys
              for i in interactions
-             for a in ["ligand", "protein"]],
-            names=["ligand", "protein", "interaction", "atom"])
+             for a in ["ligand", "protein","measurement"]
+             ],
+            names=["ligand", "protein", "interaction", "atom",])
     else:
         columns = pd.MultiIndex.from_tuples(
             [(str(k[0]), str(k[1]), i)
@@ -247,6 +252,7 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
             names=["ligand", "protein", "interaction"])
     df = pd.DataFrame(values, columns=columns, index=index)
     if has_atom_indices and return_atoms:
+        # presents tuple of ligand atom idx, protein atom idx, and measurements_dict
         df = (df.groupby(axis=1, level=["ligand", "protein", "interaction"])
                 .agg(tuple))
     if dtype:
@@ -254,7 +260,7 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
     if drop_empty:
         if has_atom_indices and return_atoms:
             mask = df.apply(lambda s:
-                            ~(s.isin([(None, None)]).all()), axis=0)
+                            ~(s.isin([(None, None, None)]).all()), axis=0)
         else:
             mask = (df != empty_value).any(axis=0)
         df = df.loc[:, mask]
