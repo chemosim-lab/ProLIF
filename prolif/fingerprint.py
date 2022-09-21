@@ -400,8 +400,8 @@ class Fingerprint:
             automatically use protein residues that are distant of 6.0 Å or
             less from each ligand residue.
         converter_kwargs : list or None
-            List of kwargs passed to the underlying RDKitConverter from MDAnalysis: the
-            first for the ligand, and the second for the protein
+            List of kwargs passed to the underlying :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
+            from MDAnalysis: the first for the ligand, and the second for the protein
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
