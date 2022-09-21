@@ -443,7 +443,8 @@ class Fingerprint:
             Added support for multiprocessing
         
         .. versionadded:: 1.0.1
-            Added support for passing kwargs to the RDKitConverter
+            Added support for passing kwargs to the RDKitConverter through
+            the ``converter_kwargs`` parameter
 
         """
         if n_jobs is not None and n_jobs < 1:
