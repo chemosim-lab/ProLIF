@@ -4,7 +4,7 @@ from MDAnalysis.topology.tables import vdwradii
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import (_INTERACTIONS, Interaction, VdWContact,
                                  get_mapindex)
-from rdkit import RDLogger
+from rdkit import Chem, RDLogger
 
 from . import mol2factory
 from .test_base import ligand_mol
@@ -14,14 +14,26 @@ lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
 
+interaction_instances = {
+    name: cls() for name, cls in _INTERACTIONS.items()
+    if name not in ["Interaction", "_Distance"]
+}
+
+
 @pytest.fixture(scope="module")
-def mol1(request):
+def lig_mol(request):
     return getattr(mol2factory, request.param)()
 
 
 @pytest.fixture(scope="module")
-def mol2(request):
+def prot_mol(request):
     return getattr(mol2factory, request.param)()
+
+
+@pytest.fixture(scope="module")
+def interaction_qmol(request):
+    int_name, parameter = request.param.split(".")
+    return getattr(interaction_instances[int_name], parameter)
 
 
 class TestInteractions:
@@ -29,7 +41,7 @@ class TestInteractions:
     def fingerprint(self):
         return Fingerprint()
 
-    @pytest.mark.parametrize("func_name, mol1, mol2, expected", [
+    @pytest.mark.parametrize("func_name, lig_mol, prot_mol, expected", [
         ("cationic", "cation", "anion", True),
         ("cationic", "anion", "cation", False),
         ("cationic", "cation", "benzene", False),
@@ -85,10 +97,10 @@ class TestInteractions:
         ("metalacceptor", "metal", "ligand", False),
         ("vdwcontact", "benzene", "etf", True),
         ("vdwcontact", "hb_acceptor", "metal_false", False),
-    ], indirect=["mol1", "mol2"])
-    def test_interaction(self, fingerprint, func_name, mol1, mol2, expected):
+    ], indirect=["lig_mol", "prot_mol"])
+    def test_interaction(self, fingerprint, func_name, lig_mol, prot_mol, expected):
         interaction = getattr(fingerprint, func_name)
-        assert interaction(mol1, mol2) is expected
+        assert interaction(lig_mol, prot_mol) is expected
 
     def test_warning_supersede(self):
         old = id(_INTERACTIONS["Hydrophobic"])
@@ -123,13 +135,30 @@ class TestInteractions:
                            match="`tolerance` must be 0 or positive"):
             VdWContact(tolerance=-1)
 
-    @pytest.mark.parametrize("mol1, mol2", [
+    @pytest.mark.parametrize("lig_mol, prot_mol", [
         ("benzene", "cation")
-    ], indirect=["mol1", "mol2"])
-    def test_vdwcontact_cache(self, mol1, mol2):
+    ], indirect=["lig_mol", "prot_mol"])
+    def test_vdwcontact_cache(self, lig_mol, prot_mol):
         vdw = VdWContact()
         assert vdw._vdw_cache == {}
-        vdw.detect(mol1, mol2)
+        vdw.detect(lig_mol, prot_mol)
         for (lig, res), value in vdw._vdw_cache.items():
             vdw_dist = vdwradii[lig] + vdwradii[res] + vdw.tolerance
             assert vdw_dist == value
+
+    @pytest.mark.parametrize(["interaction_qmol", "smiles", "expected"], [
+        ("Hydrophobic.lig_pattern", "C", True),
+        ("Hydrophobic.lig_pattern", "O", False),
+        ("_BaseHBond.donor", "O", True),
+        ("_BaseHBond.donor", "O=C=O", False),
+        ("_BaseHBond.acceptor", "O", True),
+        ("_BaseHBond.acceptor", "N", True),
+        ("_BaseHBond.acceptor", "[NH+]", False),
+        ("_BaseHBond.acceptor", "N-C=[SH2]", False),
+        ("_BaseHBond.acceptor", "[nH+]1ccccc1", False),
+        ("_BaseHBond.acceptor", "o1cccc1", False),
+    ], indirect=["interaction_qmol"])
+    def test_smarts_matches(self, interaction_qmol, smiles, expected):
+        mol = Chem.MolFromSmiles(smiles)
+        mol = Chem.AddHs(mol)
+        assert mol.HasSubstructMatch(interaction_qmol) is expected
