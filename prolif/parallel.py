@@ -10,10 +10,11 @@ from .molecule import Molecule
 def process_chunk(args):
     """Generates a fingerprint for a chunk of frame indices"""
     traj, lig, prot, chunk = args
+    lig_kwargs, prot_kwargs = converter_kwargs
     ifp = []
     for ts in traj[chunk]:
-        lig_mol = Molecule.from_mda(lig)
-        prot_mol = Molecule.from_mda(prot)
+        lig_mol = Molecule.from_mda(lig, **lig_kwargs)
+        prot_mol = Molecule.from_mda(prot, **prot_kwargs)
         data = fp.generate(lig_mol, prot_mol, residues=residues,
                            return_atoms=True)
         data["Frame"] = ts.frame
@@ -25,14 +26,15 @@ def process_chunk(args):
 
 
 def declare_shared_objs_for_chunk(fingerprint, resid_list, show_progressbar,
-                                  progress_counter):
+                                  progress_counter, rdkitconverter_kwargs):
     """Declares global objects that are available to the pool of workers for
     a trajectory"""
-    global fp, residues, display_progress, pcount
+    global fp, residues, display_progress, pcount, converter_kwargs
     fp = fingerprint
     residues = resid_list
     display_progress = show_progressbar
     pcount = progress_counter
+    converter_kwargs = rdkitconverter_kwargs
 
 
 def process_mol(args):
