@@ -597,7 +597,7 @@ class Fingerprint:
             total = len(lig_iterable)
         else:
             total = None
-        suppl = (x for x in enumerate(lig_iterable))
+        suppl = enumerate(lig_iterable)
         if residues == "all":
             residues = prot_mol.residues.keys()
 
