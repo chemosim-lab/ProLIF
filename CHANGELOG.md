@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
 
+### Added
+- `Fingerprint.run` now has a `converter_kwargs` parameter that can pass kwargs to the
+  underlying RDKitConverter from MDAnalysis (Issue #57).
+
 ## [1.0.0] - 2022-06-07
 ### Added
 - Support for multiprocessing, enabled by default (Issue #46). The number of processes can
