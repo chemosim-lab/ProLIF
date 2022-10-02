@@ -147,18 +147,54 @@ class TestInteractions:
             assert vdw_dist == value
 
     @pytest.mark.parametrize(["interaction_qmol", "smiles", "expected"], [
-        ("Hydrophobic.lig_pattern", "C", True),
-        ("Hydrophobic.lig_pattern", "O", False),
-        ("_BaseHBond.donor", "O", True),
-        ("_BaseHBond.donor", "O=C=O", False),
-        ("_BaseHBond.acceptor", "O", True),
-        ("_BaseHBond.acceptor", "N", True),
-        ("_BaseHBond.acceptor", "[NH+]", False),
-        ("_BaseHBond.acceptor", "N-C=[SH2]", False),
-        ("_BaseHBond.acceptor", "[nH+]1ccccc1", False),
-        ("_BaseHBond.acceptor", "o1cccc1", False),
+        ("Hydrophobic.lig_pattern", "C", 1),
+        ("Hydrophobic.lig_pattern", "O", 0),
+        ("_BaseHBond.donor", "[OH2]", 2),
+        ("_BaseHBond.donor", "[NH3]", 3),
+        ("_BaseHBond.donor", "[SH2]", 2),
+        ("_BaseHBond.donor", "O=C=O", 0),
+        ("_BaseHBond.donor", "c1c[nH+]ccc1", 1),
+        ("_BaseHBond.donor", "c1c[sH]ccc1", 1),
+        ("_BaseHBond.acceptor", "O", 1),
+        ("_BaseHBond.acceptor", "N", 1),
+        ("_BaseHBond.acceptor", "[NH+]", 0),
+        ("_BaseHBond.acceptor", "N-C=[SH2]", 0),
+        ("_BaseHBond.acceptor", "[nH+]1ccccc1", 0),
+        ("_BaseHBond.acceptor", "Nc1ccccc1", 0),
+        ("_BaseHBond.acceptor", "o1cccc1", 0),
+        ("_BaseHBond.acceptor", "COC=O", 1),
+        ("_BaseXBond.donor", "CCl", 1),
+        ("_BaseXBond.donor", "c1ccccc1Cl", 1),
+        ("_BaseXBond.donor", "NCl", 1),
+        ("_BaseXBond.donor", "c1cccc[n+]1Cl", 1),
+        ("_BaseXBond.acceptor", "[NH3]", 3),
+        ("_BaseXBond.acceptor", "[NH+]C", 0),
+        ("_BaseXBond.acceptor", "c1ccccc1", 12),
+        ("Cationic.lig_pattern", "[NH4+]", 1),
+        ("Cationic.lig_pattern", "[Ca+2]", 1),
+        ("Cationic.prot_pattern", "[Cl-]", 1),
+        ("Cationic.prot_pattern", "C(=O)[O-]", 1),
+        ("_BaseCationPi.cation", "[NH4+]", 1),
+        ("_BaseCationPi.pi_ring", "c1ccccc1", 1),
+        ("_BaseCationPi.pi_ring", "c1cocc1", 1),
+        ("PiStacking.pi_ring", "c1ccccc1", 1),
+        ("PiStacking.pi_ring", "c1cocc1", 1),
+        ("_BaseMetallic.lig_pattern", "[Mg]", 1),
+        ("_BaseMetallic.prot_pattern", "O", 1),
+        ("_BaseMetallic.prot_pattern", "N", 1),
+        ("_BaseMetallic.prot_pattern", "[NH+]", 0),
+        ("_BaseMetallic.prot_pattern", "N-C=[SH2]", 0),
+        ("_BaseMetallic.prot_pattern", "[nH+]1ccccc1", 0),
+        ("_BaseMetallic.prot_pattern", "Nc1ccccc1", 0),
+        ("_BaseMetallic.prot_pattern", "o1cccc1", 0),
+        ("_BaseMetallic.prot_pattern", "COC=O", 2),
     ], indirect=["interaction_qmol"])
     def test_smarts_matches(self, interaction_qmol, smiles, expected):
         mol = Chem.MolFromSmiles(smiles)
         mol = Chem.AddHs(mol)
-        assert mol.HasSubstructMatch(interaction_qmol) is expected
+        if isinstance(interaction_qmol, list):
+            n_matches = sum(len(mol.GetSubstructMatches(qmol))
+                            for qmol in interaction_qmol)
+        else:
+            n_matches = len(mol.GetSubstructMatches(interaction_qmol))
+        assert n_matches == expected
