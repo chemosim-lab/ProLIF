@@ -384,12 +384,12 @@ class Fingerprint:
 
         Parameters
         ----------
-        traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced
+        traj : mda.coordinates.base.ProtoReader or mda.coordinates.base.FrameIteratorSliced
             Iterate over this Universe trajectory or sliced trajectory object
             to extract the frames used for the fingerprint extraction
-        lig : MDAnalysis.core.groups.AtomGroup
+        lig : mda.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the ligand
-        prot : MDAnalysis.core.groups.AtomGroup
+        prot : mda.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the protein (with multiple residues)
         residues : list or "all" or None
             A list of protein residues (:class:`str`, :class:`int` or
@@ -400,7 +400,7 @@ class Fingerprint:
             automatically use protein residues that are distant of 6.0 Å or
             less from each ligand residue.
         converter_kwargs : list or None
-            List of kwargs passed to the underlying :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
+            List of kwargs passed to the underlying :class:`~mda.converters.RDKit.RDKitConverter`
             from MDAnalysis: the first for the ligand, and the second for the protein
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a

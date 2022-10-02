@@ -47,7 +47,7 @@ class Molecule(BaseRDKitMol):
         mol
 
     You can also create a Molecule directly from a
-    :class:`~MDAnalysis.core.universe.Universe`:
+    :class:`~mda.core.universe.Universe`:
 
     .. ipython:: python
         :okwarning:
@@ -85,13 +85,14 @@ class Molecule(BaseRDKitMol):
 
         Parameters
         ----------
-        obj : MDAnalysis.core.universe.Universe or MDAnalysis.core.groups.AtomGroup
+        obj : mda.core.universe.Universe or mda.core.groups.AtomGroup
             The MDAnalysis object to convert
         selection : None or str
             Apply a selection to `obj` to create an AtomGroup. Uses all atoms
             in `obj` if ``selection=None``
         **kwargs : object
-            Other arguments passed to the RDKitConverter of MDAnalysis
+            Other arguments passed to the :class:`~mda.converters.RDKit.RDKitConverter`
+            of MDAnalysis
 
         Example
         -------
