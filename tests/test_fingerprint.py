@@ -1,5 +1,6 @@
 from tempfile import NamedTemporaryFile
 
+import MDAnalysis as mda
 import numpy as np
 import pytest
 from pandas import DataFrame
@@ -251,3 +252,23 @@ class TestFingerprint:
         run(lig_suppl, protein_mol, n_jobs=None, progress=False)
         multi = fp.to_dataframe()
         assert serial.equals(multi)
+
+    def test_converter_kwargs_raises_error(self, fp: Fingerprint):
+        with pytest.raises(
+            ValueError,
+            match="converter_kwargs must be a list of 2 dicts"
+        ):
+            fp.run(
+                u.trajectory[0:5], ligand_ag, protein_ag, n_jobs=1, progress=False,
+                converter_kwargs=[dict(force=True)]
+            )
+    
+    @pytest.mark.parametrize("n_jobs", [1, 2])
+    def test_converter_kwargs(self, fp: Fingerprint, n_jobs: int):
+        u = mda.Universe.from_smiles("O=C=O.O=C=O")
+        lig, prot = u.atoms.fragments
+        fp.run(
+            u.trajectory, lig, prot, n_jobs=n_jobs, 
+            converter_kwargs=[dict(force=True), dict(force=True)]
+        )
+        assert fp.ifp

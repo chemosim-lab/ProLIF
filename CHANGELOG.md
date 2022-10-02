@@ -5,8 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `Fingerprint.run` now has a `converter_kwargs` parameter that can pass kwargs to the
+  underlying RDKitConverter from MDAnalysis (Issue #57).
+
 ### Changed
 - HBond acceptor and Metal ligand SMARTS have been updated to a more accurate definition.
+
+### Fixed
+- Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
 
 ## [1.0.0] - 2022-06-07
 ### Added

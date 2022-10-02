@@ -71,7 +71,7 @@ html_static_path = [] # ['_static']
 
 intersphinx_mapping = {'https://docs.python.org/3/': None,
                        'https://numpy.org/doc/stable/': None,
-                       'https://docs.mdanalysis.org/2.0.0-dev0/': None,
+                       'https://docs.mdanalysis.org/stable/': None,
                        'https://www.rdkit.org/docs/': None,
                        'https://pandas.pydata.org/docs/': None,
                        }

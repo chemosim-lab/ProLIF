@@ -379,7 +379,7 @@ class Fingerprint:
                     ifp[key] = self.bitvector(lres, pres)
         return ifp
 
-    def run(self, traj, lig, prot, residues=None, progress=True, n_jobs=None):
+    def run(self, traj, lig, prot, residues=None, converter_kwargs=None, progress=True, n_jobs=None):
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
         Parameters
@@ -399,6 +399,9 @@ class Fingerprint:
             :func:`~prolif.utils.get_residues_near_ligand` function is used to
             automatically use protein residues that are distant of 6.0 Å or
             less from each ligand residue.
+        converter_kwargs : list or None
+            List of kwargs passed to the underlying :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
+            from MDAnalysis: the first for the ligand, and the second for the protein
         progress : bool
             Use the `tqdm <https://tqdm.github.io/>`_ package to display a
             progressbar while running the calculation
@@ -438,21 +441,29 @@ class Fingerprint:
 
         .. versionchanged:: 1.0.0
             Added support for multiprocessing
+        
+        .. versionadded:: 1.0.1
+            Added support for passing kwargs to the RDKitConverter through
+            the ``converter_kwargs`` parameter
 
         """
         if n_jobs is not None and n_jobs < 1:
             raise ValueError("n_jobs must be > 0 or None")
+        if converter_kwargs is not None and len(converter_kwargs) != 2:
+            raise ValueError("converter_kwargs must be a list of 2 dicts")
         if n_jobs != 1:
             return self._run_parallel(traj, lig, prot, residues=residues,
+                                      converter_kwargs=converter_kwargs,
                                       progress=progress, n_jobs=n_jobs)
+        lig_kwargs, prot_kwargs = converter_kwargs or ({}, {})
 
         iterator = tqdm(traj) if progress else traj
         if residues == "all":
-            residues = Molecule.from_mda(prot).residues.keys()
+            residues = Molecule.from_mda(prot, **prot_kwargs).residues.keys()
         ifp = []
         for ts in iterator:
-            prot_mol = Molecule.from_mda(prot)
-            lig_mol = Molecule.from_mda(lig)
+            prot_mol = Molecule.from_mda(prot, **prot_kwargs)
+            lig_mol = Molecule.from_mda(lig, **lig_kwargs)
             data = self.generate(lig_mol, prot_mol, residues=residues,
                                  return_atoms=True)
             data["Frame"] = ts.frame
@@ -460,8 +471,8 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
-    def _run_parallel(self, traj, lig, prot, residues=None, progress=True,
-                      n_jobs=None):
+    def _run_parallel(self, traj, lig, prot, residues=None, converter_kwargs=None,
+                      progress=True, n_jobs=None):
         """Parallel implementation of :meth:`~Fingerprint.run`"""
         n_chunks = n_jobs if n_jobs else mp.cpu_count()
         try:
@@ -472,9 +483,10 @@ class Fingerprint:
             traj = lig.universe.trajectory
         else:
             frames = range(n_frames)
+        lig_kwargs, prot_kwargs = converter_kwargs or ({}, {})
 
         if residues == "all":
-            residues = Molecule.from_mda(prot).residues.keys()
+            residues = Molecule.from_mda(prot, **prot_kwargs).residues.keys()
         chunks = np.array_split(frames, n_chunks)
         # setup parallel progress bar
         pcount = ProgressCounter()
@@ -486,7 +498,7 @@ class Fingerprint:
 
         # run pool of workers
         with mp.Pool(n_jobs, initializer=declare_shared_objs_for_chunk,
-                     initargs=(self, residues, progress, pcount)) as pool:
+                     initargs=(self, residues, progress, pcount, (lig_kwargs, prot_kwargs))) as pool:
             pbar_thread.start()
             args = ((traj, lig, prot, chunk) for chunk in chunks)
             results = []
@@ -585,7 +597,7 @@ class Fingerprint:
             total = len(lig_iterable)
         else:
             total = None
-        suppl = (x for x in enumerate(lig_iterable))
+        suppl = enumerate(lig_iterable)
         if residues == "all":
             residues = prot_mol.residues.keys()
 

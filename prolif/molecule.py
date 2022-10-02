@@ -91,7 +91,8 @@ class Molecule(BaseRDKitMol):
             Apply a selection to `obj` to create an AtomGroup. Uses all atoms
             in `obj` if ``selection=None``
         **kwargs : object
-            Other arguments passed to the RDKitConverter of MDAnalysis
+            Other arguments passed to the :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
+            of MDAnalysis
 
         Example
         -------
