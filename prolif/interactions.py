@@ -149,8 +149,8 @@ class _BaseHBond(Interaction):
         Min and max values for the ``[Donor]-[Hydrogen]...[Acceptor]`` angle
     """
     def __init__(self,
-                 donor="[#7,#8,#16][H]",
-                 acceptor="[#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),$([O])&!$([OX2](C)C=O)&!$(*(~a)~a),-{1-};!+{1-}]",
+                 donor="[#7,O,#16][H]",
+                 acceptor="[#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),O&!$([OX2](C)C=O),-{1-};!+{1-}]",
                  distance=3.5,
                  angles=(130, 180)):
         self.donor = MolFromSmarts(donor)
