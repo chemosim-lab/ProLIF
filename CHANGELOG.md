@@ -10,7 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   underlying RDKitConverter from MDAnalysis (Issue #57).
 
 ### Changed
-- HBond acceptor and Metal ligand SMARTS have been updated to a more accurate definition.
+- The SMARTS for the following groups have been updated to a more accurate definition
+  (PR #73, @DrrDom):
+  - HBond acceptor: exclude amides and some amines, exclude biaryl ethers and alkoxy
+    oxygen from esters, include aromatic nitrogens,
+  - Anion: include resonance forms of carboxylic, sulfonic and phosphorus acids,
+  - Cation: include amidine and guanidine,
+  - Metal ligand: exclude amides and some amines.
 
 ### Fixed
 - Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
