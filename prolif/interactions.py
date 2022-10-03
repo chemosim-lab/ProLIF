@@ -129,7 +129,7 @@ class Hydrophobic(_Distance):
         Cutoff distance for the interaction
     """
     def __init__(self,
-                 hydrophobic="[#6,#16,F,Cl,Br,I,At;+0]",
+                 hydrophobic="[c,s,S&H0&v2,Br,I,$([D3,D4;#6;+0])&!$([#6]~[#7,#8,#9])]",
                  distance=4.5):
         super().__init__(hydrophobic, hydrophobic, distance)
 

@@ -148,7 +148,13 @@ class TestInteractions:
 
     @pytest.mark.parametrize(["interaction_qmol", "smiles", "expected"], [
         ("Hydrophobic.lig_pattern", "C", 1),
-        ("Hydrophobic.lig_pattern", "O", 0),
+        ("Hydrophobic.lig_pattern", "C=[SH2]", 1),
+        ("Hydrophobic.lig_pattern", "c1cscc1", 5),
+        ("Hydrophobic.lig_pattern", "CSC", 3),
+        ("Hydrophobic.lig_pattern", "BrI", 2),
+        ("Hydrophobic.lig_pattern", "C=O", 0),
+        ("Hydrophobic.lig_pattern", "C=N", 0),
+        ("Hydrophobic.lig_pattern", "CF", 0),
         ("_BaseHBond.donor", "[OH2]", 2),
         ("_BaseHBond.donor", "[NH3]", 3),
         ("_BaseHBond.donor", "[SH2]", 2),
