@@ -265,8 +265,8 @@ class XBDonor(_BaseXBond):
 class _BaseIonic(_Distance):
     """Base class for ionic interactions"""
     def __init__(self,
-                 cation="[+{1-}]",
-                 anion="[-{1-}]",
+                 cation="[+{1-},$([NX3&!$([NX3]-O)]-[*]=[NX3+])]",
+                 anion="[-{1-},$(O=[C,S,P]-[O-])]",
                  distance=4.5):
         super().__init__(cation, anion, distance)
 
