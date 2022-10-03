@@ -147,10 +147,18 @@ class _BaseHBond(Interaction):
         Cutoff distance between the donor and acceptor atoms
     angles : tuple
         Min and max values for the ``[Donor]-[Hydrogen]...[Acceptor]`` angle
+
+    Notes
+    -----
+    The SMARTS pattern are inspired from `Pharmit`_ and `RDKit`_.
+
+    .. _Pharmit: https://sourceforge.net/p/pharmit/code/ci/master/tree/src/pharmarec.cpp
+    .. _RDKit: https://github.com/rdkit/rdkit/blob/master/Data/BaseFeatures.fdef
+
     """
     def __init__(self,
-                 donor="[#7,O,#16][H]",
-                 acceptor="[#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),O&!$([OX2](C)C=O)&!$(O(~a)~a),-{1-};!+{1-}]",
+                 donor="[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
+                 acceptor="[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([NX4]),O&!$([OX2](C)C=O)&!$(O(~a)~a)]",
                  distance=3.5,
                  angles=(130, 180)):
         self.donor = MolFromSmarts(donor)
@@ -301,7 +309,7 @@ class _BaseCationPi(Interaction):
     """
     def __init__(self,
                  cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
-                 pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1"),
+                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1"),
                  distance=4.5,
                  angles=(0, 30)):
         self.cation = MolFromSmarts(cation)
@@ -369,7 +377,7 @@ class PiStacking(Interaction):
                  centroid_distance=6.0,
                  shortest_distance=3.8,
                  plane_angles=(0, 90),
-                 pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1")):
+                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.centroid_distance = centroid_distance
         self.shortest_distance = shortest_distance**2
