@@ -11,12 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - The SMARTS for the following groups have been updated to a more accurate definition
-  (PR #73, @DrrDom):
+  (PR #73 @DrrDom, and PR ??):
+  - Hydrophobic: excluded F, Cl, tetracoordinated C and S, C connected to N, O or F.
+  - HBond donor: exclude charged O, S and charged aromatic N, only accept nitrogen
+    that is in valence 3 or ammonium
   - HBond acceptor: exclude amides and some amines, exclude biaryl ethers and alkoxy
-    oxygen from esters, include aromatic nitrogens,
+    oxygen from esters, include some aromatic oxygen and nitrogen,
   - Anion: include resonance forms of carboxylic, sulfonic and phosphorus acids,
   - Cation: include amidine and guanidine,
-  - Metal ligand: exclude amides and some amines.
+  - Metal ligand: exclude amides and some amines,
+  
 
 ### Fixed
 - Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).

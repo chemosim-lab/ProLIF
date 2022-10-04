@@ -32,6 +32,12 @@ interactions available to the fingerprint generator::
     >>> fp.closecontact(lmol, pmol["ASP129.A"])
     True
 
+Note that some of the SMARTS patterns used in the interaction classes are inspired from
+`Pharmit`_ and `RDKit`_.
+
+.. _Pharmit: https://sourceforge.net/p/pharmit/code/ci/master/tree/src/pharmarec.cpp
+.. _RDKit: https://github.com/rdkit/rdkit/blob/master/Data/BaseFeatures.fdef
+
 """
 
 import warnings
@@ -127,6 +133,10 @@ class Hydrophobic(_Distance):
         SMARTS query for hydrophobic atoms
     distance : float
         Cutoff distance for the interaction
+
+    .. versionchanged:: 1.1.0
+        The initial SMARTS pattern was too broad.
+
     """
     def __init__(
         self,
@@ -153,19 +163,19 @@ class _BaseHBond(Interaction):
     angles : tuple
         Min and max values for the ``[Donor]-[Hydrogen]...[Acceptor]`` angle
 
-    Notes
-    -----
-    The SMARTS pattern are inspired from `Pharmit`_ and `RDKit`_.
-
-    .. _Pharmit: https://sourceforge.net/p/pharmit/code/ci/master/tree/src/pharmarec.cpp
-    .. _RDKit: https://github.com/rdkit/rdkit/blob/master/Data/BaseFeatures.fdef
+    .. versionchanged:: 1.1.0
+        The initial SMARTS pattern was too broad.
 
     """
-    def __init__(self,
+    def __init__(
+        self,         
                  donor="[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
-                 acceptor="[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([NX4]),O&!$([OX2](C)C=O)&!$(O(~a)~a)]",
+        acceptor=(
+            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
+        ),
                  distance=3.5,
-                 angles=(130, 180)):
+        angles=(130, 180)
+    ):
         self.donor = MolFromSmarts(donor)
         self.acceptor = MolFromSmarts(acceptor)
         self.distance = distance
@@ -276,7 +286,12 @@ class XBDonor(_BaseXBond):
 
 
 class _BaseIonic(_Distance):
-    """Base class for ionic interactions"""
+    """Base class for ionic interactions
+
+    .. versionchanged:: 1.1.0
+        Handles resonance forms for common acids, amidine and guanidine.
+
+"""
     def __init__(self,
                  cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
                  anion="[-{1-},$(O=[C,S,P]-[O-])]",
@@ -311,6 +326,10 @@ class _BaseCationPi(Interaction):
     angles : tuple
         Min and max values for the angle between the vector normal to the ring
         plane and the vector going from the centroid to the cation
+
+    .. versionchanged:: 1.1.0
+        Handles resonance forms for amidine and guanidine as cations.
+
     """
     def __init__(self,
                  cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
@@ -448,6 +467,10 @@ class _BaseMetallic(_Distance):
         SMARTS for a ligand
     distance : float
         Cutoff distance
+
+    .. versionchanged:: 1.1.0
+        The initial SMARTS pattern was too broad.
+
     """
     def __init__(self,
                  metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
