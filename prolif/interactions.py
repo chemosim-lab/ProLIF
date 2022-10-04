@@ -169,11 +169,13 @@ class _BaseHBond(Interaction):
     """
     def __init__(
         self,         
-                 donor="[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
+        donor="[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
         acceptor=(
             "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
+            "O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,"
+            "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
         ),
-                 distance=3.5,
+        distance=3.5,
         angles=(130, 180)
     ):
         self.donor = MolFromSmarts(donor)
