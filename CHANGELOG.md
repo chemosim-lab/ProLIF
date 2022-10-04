@@ -5,13 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.1.0] - 2022-10-XX
 ### Added
 - `Fingerprint.run` now has a `converter_kwargs` parameter that can pass kwargs to the
   underlying RDKitConverter from MDAnalysis (Issue #57).
 
 ### Changed
 - The SMARTS for the following groups have been updated to a more accurate definition
-  (PR #73 @DrrDom, and PR ??):
+  (Issue #68, PR #73 by @DrrDom, and PR #84):
   - Hydrophobic: excluded F, Cl, tetracoordinated C and S, C connected to N, O or F.
   - HBond donor: exclude charged O, S and charged aromatic N, only accept nitrogen
     that is in valence 3 or ammonium
@@ -21,7 +23,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Cation: include amidine and guanidine,
   - Metal ligand: exclude amides and some amines,
   
-
 ### Fixed
 - Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
 
