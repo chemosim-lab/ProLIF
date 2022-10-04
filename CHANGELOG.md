@@ -5,12 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Fixed
-- Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
-
 ### Added
 - `Fingerprint.run` now has a `converter_kwargs` parameter that can pass kwargs to the
   underlying RDKitConverter from MDAnalysis (Issue #57).
+
+### Changed
+- The SMARTS for the following groups have been updated to a more accurate definition
+  (PR #73, @DrrDom):
+  - HBond acceptor: exclude amides and some amines, exclude biaryl ethers and alkoxy
+    oxygen from esters, include aromatic nitrogens,
+  - Anion: include resonance forms of carboxylic, sulfonic and phosphorus acids,
+  - Cation: include amidine and guanidine,
+  - Metal ligand: exclude amides and some amines.
+
+### Fixed
+- Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
 
 ## [1.0.0] - 2022-06-07
 ### Added

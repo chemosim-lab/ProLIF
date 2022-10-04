@@ -4,7 +4,7 @@ from MDAnalysis.topology.tables import vdwradii
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import (_INTERACTIONS, Interaction, VdWContact,
                                  get_mapindex)
-from rdkit import RDLogger
+from rdkit import Chem, RDLogger
 
 from . import mol2factory
 from .test_base import ligand_mol
@@ -14,14 +14,26 @@ lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
 
+interaction_instances = {
+    name: cls() for name, cls in _INTERACTIONS.items()
+    if name not in ["Interaction", "_Distance"]
+}
+
+
 @pytest.fixture(scope="module")
-def mol1(request):
+def lig_mol(request):
     return getattr(mol2factory, request.param)()
 
 
 @pytest.fixture(scope="module")
-def mol2(request):
+def prot_mol(request):
     return getattr(mol2factory, request.param)()
+
+
+@pytest.fixture(scope="module")
+def interaction_qmol(request):
+    int_name, parameter = request.param.split(".")
+    return getattr(interaction_instances[int_name], parameter)
 
 
 class TestInteractions:
@@ -29,7 +41,7 @@ class TestInteractions:
     def fingerprint(self):
         return Fingerprint()
 
-    @pytest.mark.parametrize("func_name, mol1, mol2, expected", [
+    @pytest.mark.parametrize("func_name, lig_mol, prot_mol, expected", [
         ("cationic", "cation", "anion", True),
         ("cationic", "anion", "cation", False),
         ("cationic", "cation", "benzene", False),
@@ -85,10 +97,10 @@ class TestInteractions:
         ("metalacceptor", "metal", "ligand", False),
         ("vdwcontact", "benzene", "etf", True),
         ("vdwcontact", "hb_acceptor", "metal_false", False),
-    ], indirect=["mol1", "mol2"])
-    def test_interaction(self, fingerprint, func_name, mol1, mol2, expected):
+    ], indirect=["lig_mol", "prot_mol"])
+    def test_interaction(self, fingerprint, func_name, lig_mol, prot_mol, expected):
         interaction = getattr(fingerprint, func_name)
-        assert interaction(mol1, mol2) is expected
+        assert interaction(lig_mol, prot_mol) is expected
 
     def test_warning_supersede(self):
         old = id(_INTERACTIONS["Hydrophobic"])
@@ -123,13 +135,75 @@ class TestInteractions:
                            match="`tolerance` must be 0 or positive"):
             VdWContact(tolerance=-1)
 
-    @pytest.mark.parametrize("mol1, mol2", [
+    @pytest.mark.parametrize("lig_mol, prot_mol", [
         ("benzene", "cation")
-    ], indirect=["mol1", "mol2"])
-    def test_vdwcontact_cache(self, mol1, mol2):
+    ], indirect=["lig_mol", "prot_mol"])
+    def test_vdwcontact_cache(self, lig_mol, prot_mol):
         vdw = VdWContact()
         assert vdw._vdw_cache == {}
-        vdw.detect(mol1, mol2)
+        vdw.detect(lig_mol, prot_mol)
         for (lig, res), value in vdw._vdw_cache.items():
             vdw_dist = vdwradii[lig] + vdwradii[res] + vdw.tolerance
             assert vdw_dist == value
+
+    @pytest.mark.parametrize(["interaction_qmol", "smiles", "expected"], [
+        ("Hydrophobic.lig_pattern", "C", 1),
+        ("Hydrophobic.lig_pattern", "O", 0),
+        ("_BaseHBond.donor", "[OH2]", 2),
+        ("_BaseHBond.donor", "[NH3]", 3),
+        ("_BaseHBond.donor", "[SH2]", 2),
+        ("_BaseHBond.donor", "O=C=O", 0),
+        ("_BaseHBond.donor", "c1c[nH+]ccc1", 1),
+        ("_BaseHBond.acceptor", "O", 1),
+        ("_BaseHBond.acceptor", "N", 1),
+        ("_BaseHBond.acceptor", "[NH+]", 0),
+        ("_BaseHBond.acceptor", "N-C=O", 1),
+        ("_BaseHBond.acceptor", "N-C=[SH2]", 0),
+        ("_BaseHBond.acceptor", "[nH+]1ccccc1", 0),
+        ("_BaseHBond.acceptor", "n1ccccc1", 1),
+        ("_BaseHBond.acceptor", "Nc1ccccc1", 0),
+        ("_BaseHBond.acceptor", "o1cccc1", 0),
+        ("_BaseHBond.acceptor", "COC=O", 1),
+        ("_BaseHBond.acceptor", "c1ccccc1Oc1ccccc1", 0),
+        ("_BaseXBond.donor", "CCl", 1),
+        ("_BaseXBond.donor", "c1ccccc1Cl", 1),
+        ("_BaseXBond.donor", "NCl", 1),
+        ("_BaseXBond.donor", "c1cccc[n+]1Cl", 1),
+        ("_BaseXBond.acceptor", "[NH3]", 3),
+        ("_BaseXBond.acceptor", "[NH+]C", 0),
+        ("_BaseXBond.acceptor", "c1ccccc1", 12),
+        ("Cationic.lig_pattern", "[NH4+]", 1),
+        ("Cationic.lig_pattern", "[Ca+2]", 1),
+        ("Cationic.lig_pattern", "CC(=[NH2+])N", 2),
+        ("Cationic.lig_pattern", "NC(=[NH2+])N", 3),
+        ("Cationic.prot_pattern", "[Cl-]", 1),
+        ("Cationic.prot_pattern", "CC(=O)[O-]", 2),
+        ("Cationic.prot_pattern", "CS(=O)[O-]", 2),
+        ("Cationic.prot_pattern", "CP(=O)[O-]", 2),
+        ("_BaseCationPi.cation", "[NH4+]", 1),
+        ("_BaseCationPi.cation", "[Ca+2]", 1),
+        ("_BaseCationPi.cation", "CC(=[NH2+])N", 2),
+        ("_BaseCationPi.cation", "NC(=[NH2+])N", 3),
+        ("_BaseCationPi.pi_ring", "c1ccccc1", 1),
+        ("_BaseCationPi.pi_ring", "c1cocc1", 1),
+        ("PiStacking.pi_ring", "c1ccccc1", 1),
+        ("PiStacking.pi_ring", "c1cocc1", 1),
+        ("_BaseMetallic.lig_pattern", "[Mg]", 1),
+        ("_BaseMetallic.prot_pattern", "O", 1),
+        ("_BaseMetallic.prot_pattern", "N", 1),
+        ("_BaseMetallic.prot_pattern", "[NH+]", 0),
+        ("_BaseMetallic.prot_pattern", "N-C=[SH2]", 0),
+        ("_BaseMetallic.prot_pattern", "[nH+]1ccccc1", 0),
+        ("_BaseMetallic.prot_pattern", "Nc1ccccc1", 0),
+        ("_BaseMetallic.prot_pattern", "o1cccc1", 0),
+        ("_BaseMetallic.prot_pattern", "COC=O", 2),
+    ], indirect=["interaction_qmol"])
+    def test_smarts_matches(self, interaction_qmol, smiles, expected):
+        mol = Chem.MolFromSmiles(smiles)
+        mol = Chem.AddHs(mol)
+        if isinstance(interaction_qmol, list):
+            n_matches = sum(len(mol.GetSubstructMatches(qmol))
+                            for qmol in interaction_qmol)
+        else:
+            n_matches = len(mol.GetSubstructMatches(interaction_qmol))
+        assert n_matches == expected

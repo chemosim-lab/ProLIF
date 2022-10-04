@@ -149,8 +149,8 @@ class _BaseHBond(Interaction):
         Min and max values for the ``[Donor]-[Hydrogen]...[Acceptor]`` angle
     """
     def __init__(self,
-                 donor="[#7,#8,#16][H]",
-                 acceptor="[N,O,F,-{1-};!+{1-}]",
+                 donor="[#7,O,#16][H]",
+                 acceptor="[#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),O&!$([OX2](C)C=O)&!$(O(~a)~a),-{1-};!+{1-}]",
                  distance=3.5,
                  angles=(130, 180)):
         self.donor = MolFromSmarts(donor)
@@ -265,8 +265,8 @@ class XBDonor(_BaseXBond):
 class _BaseIonic(_Distance):
     """Base class for ionic interactions"""
     def __init__(self,
-                 cation="[+{1-}]",
-                 anion="[-{1-}]",
+                 cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
+                 anion="[-{1-},$(O=[C,S,P]-[O-])]",
                  distance=4.5):
         super().__init__(cation, anion, distance)
 
@@ -300,7 +300,7 @@ class _BaseCationPi(Interaction):
         plane and the vector going from the centroid to the cation
     """
     def __init__(self,
-                 cation="[+{1-}]",
+                 cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
                  pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1"),
                  distance=4.5,
                  angles=(0, 30)):
@@ -438,7 +438,7 @@ class _BaseMetallic(_Distance):
     """
     def __init__(self,
                  metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
-                 ligand="[O,N,-{1-};!+{1-}]",
+                 ligand="[O,#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),-{1-};!+{1-}]",
                  distance=2.8):
         super().__init__(metal, ligand, distance)
 
