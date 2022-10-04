@@ -265,7 +265,7 @@ class XBDonor(_BaseXBond):
 class _BaseIonic(_Distance):
     """Base class for ionic interactions"""
     def __init__(self,
-                 cation="[+{1-},$([NX3&!$([NX3]-O)]-[*]=[NX3+])]",
+                 cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
                  anion="[-{1-},$(O=[C,S,P]-[O-])]",
                  distance=4.5):
         super().__init__(cation, anion, distance)
@@ -300,7 +300,7 @@ class _BaseCationPi(Interaction):
         plane and the vector going from the centroid to the cation
     """
     def __init__(self,
-                 cation="[+{1-}]",
+                 cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
                  pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1"),
                  distance=4.5,
                  angles=(0, 30)):
