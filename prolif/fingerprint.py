@@ -442,7 +442,7 @@ class Fingerprint:
         .. versionchanged:: 1.0.0
             Added support for multiprocessing
         
-        .. versionadded:: 1.0.1
+        .. versionadded:: 1.1.0
             Added support for passing kwargs to the RDKitConverter through
             the ``converter_kwargs`` parameter
 
