@@ -125,7 +125,7 @@ class TestFingerprint:
 
     def test_generate(self, fp_simple):
         ifp = fp_simple.generate(ligand_mol, protein_mol)
-        key = (ResidueId("LIG", 1, "G"), ResidueId("THR", 355, "B"))
+        key = (ResidueId("LIG", 1, "G"), ResidueId("VAL", 201, "A"))
         bv = ifp[key]
         assert isinstance(bv, np.ndarray)
         assert bv[0] is np.True_

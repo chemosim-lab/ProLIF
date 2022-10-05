@@ -7,6 +7,7 @@ from collections import UserDict
 from typing import List, Optional
 
 import numpy as np
+from rdkit.Chem.rdmolops import FastFindRings
 
 from .rdkitmol import BaseRDKitMol
 
@@ -130,6 +131,7 @@ class Residue(BaseRDKitMol):
     """
     def __init__(self, mol):
         super().__init__(mol)
+        FastFindRings(self)
         self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0))
 
     def __repr__(self): # pragma: no cover
