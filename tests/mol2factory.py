@@ -34,6 +34,9 @@ def etf():
 def chlorine():
     return from_mol2("chlorine.mol2")
 
+def bromine():
+    return from_mol2("bromine.mol2")
+
 def hb_donor():
     return from_mol2("donor.mol2")
 
