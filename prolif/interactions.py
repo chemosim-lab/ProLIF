@@ -32,6 +32,12 @@ interactions available to the fingerprint generator::
     >>> fp.closecontact(lmol, pmol["ASP129.A"])
     True
 
+Note that some of the SMARTS patterns used in the interaction classes are inspired from
+`Pharmit`_ and `RDKit`_.
+
+.. _Pharmit: https://sourceforge.net/p/pharmit/code/ci/master/tree/src/pharmarec.cpp
+.. _RDKit: https://github.com/rdkit/rdkit/blob/master/Data/BaseFeatures.fdef
+
 """
 
 import warnings
@@ -127,10 +133,19 @@ class Hydrophobic(_Distance):
         SMARTS query for hydrophobic atoms
     distance : float
         Cutoff distance for the interaction
+
+    .. versionchanged:: 1.1.0
+        The initial SMARTS pattern was too broad.
+
     """
-    def __init__(self,
-                 hydrophobic="[#6,#16,F,Cl,Br,I,At;+0]",
-                 distance=4.5):
+    def __init__(
+        self,
+        hydrophobic=(
+            "[c,s,Br,I,S&H0&v2,"
+            "$([D3,D4;#6])&!$([#6]~[#7,#8,#9])&!$([#6X4H0]);+0]"
+        ),
+        distance=4.5
+    ):
         super().__init__(hydrophobic, hydrophobic, distance)
 
 
@@ -147,12 +162,22 @@ class _BaseHBond(Interaction):
         Cutoff distance between the donor and acceptor atoms
     angles : tuple
         Min and max values for the ``[Donor]-[Hydrogen]...[Acceptor]`` angle
+
+    .. versionchanged:: 1.1.0
+        The initial SMARTS pattern was too broad.
+
     """
-    def __init__(self,
-                 donor="[#7,O,#16][H]",
-                 acceptor="[#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),O&!$([OX2](C)C=O)&!$(O(~a)~a),-{1-};!+{1-}]",
-                 distance=3.5,
-                 angles=(130, 180)):
+    def __init__(
+        self,         
+        donor="[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
+        acceptor=(
+            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
+            "O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,"
+            "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
+        ),
+        distance=3.5,
+        angles=(130, 180)
+    ):
         self.donor = MolFromSmarts(donor)
         self.acceptor = MolFromSmarts(acceptor)
         self.distance = distance
@@ -263,7 +288,12 @@ class XBDonor(_BaseXBond):
 
 
 class _BaseIonic(_Distance):
-    """Base class for ionic interactions"""
+    """Base class for ionic interactions
+
+    .. versionchanged:: 1.1.0
+        Handles resonance forms for common acids, amidine and guanidine.
+
+"""
     def __init__(self,
                  cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
                  anion="[-{1-},$(O=[C,S,P]-[O-])]",
@@ -298,10 +328,14 @@ class _BaseCationPi(Interaction):
     angles : tuple
         Min and max values for the angle between the vector normal to the ring
         plane and the vector going from the centroid to the cation
+
+    .. versionchanged:: 1.1.0
+        Handles resonance forms for amidine and guanidine as cations.
+
     """
     def __init__(self,
                  cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
-                 pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1"),
+                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1"),
                  distance=4.5,
                  angles=(0, 30)):
         self.cation = MolFromSmarts(cation)
@@ -369,7 +403,7 @@ class PiStacking(Interaction):
                  centroid_distance=6.0,
                  shortest_distance=3.8,
                  plane_angles=(0, 90),
-                 pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1")):
+                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.centroid_distance = centroid_distance
         self.shortest_distance = shortest_distance**2
@@ -435,6 +469,10 @@ class _BaseMetallic(_Distance):
         SMARTS for a ligand
     distance : float
         Cutoff distance
+
+    .. versionchanged:: 1.1.0
+        The initial SMARTS pattern was too broad.
+
     """
     def __init__(self,
                  metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
