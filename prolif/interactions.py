@@ -385,36 +385,30 @@ class CationPi(_BaseCationPi):
         return super().detect(ligand, residue)
 
 
-class PiStacking(Interaction):
-    """Pi-Stacking interaction between a ligand and a residue
-
+class _BasePiStacking(Interaction):
+    """Base class for Pi-Stacking interactions
+    
     Parameters
     ----------
     centroid_distance : float
         Cutoff distance between each rings centroid
     plane_angles : tuple
         Min and max values for the angle between the ring planes
-    angle_normal_centroid : float
-        Max allowed angle between the vector normal to a ring's plane, and the
-        vector between this ring's and the other's centroid. In other terms,
-        the other ring's centroid can be in a cone starting from the centroid
-        and expanding perpendicular to the ring plane.
+    normal_centroids_angles : tuple
+        Min and max angles allowed between the vector normal to a ring's plane,
+        and the vector between the centroid of both rings.
     pi_ring : list
         List of SMARTS for aromatic rings
-
-    .. versionchanged:: 0.3.4
-        `shortest_distance` has been replaced by `angle_normal_centroid`
-
     """
     def __init__(self,
-                 centroid_distance=7.0,
-                 plane_angles=(0, 90),
-                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1"),
-                 angle_normal_centroid=40):
+                 centroid_distance=5.5,
+                 plane_angle=(0, 35),
+                 normal_to_centroid_angle=(0, 30),
+                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.centroid_distance = centroid_distance
-        self.plane_angles = tuple(radians(i) for i in plane_angles)
-        self.angle_normal_centroid = radians(angle_normal_centroid)
+        self.plane_angle = tuple(radians(i) for i in plane_angle) 
+        self.normal_to_centroid_angle = tuple(radians(i) for i in normal_to_centroid_angle)
 
     def detect(self, ligand, residue):
         for pi_rings in product(self.pi_ring, repeat=2):
@@ -436,39 +430,75 @@ class PiStacking(Interaction):
                 # residue
                 res_normal = get_ring_normal_vector(res_centroid,
                                                     res_pi_coords)
-                # angle between planes
                 plane_angle = lig_normal.AngleTo(res_normal)
-                if not angle_between_limits(plane_angle, *self.plane_angles,
-                                            ring=True):
+                if not angle_between_limits(
+                    plane_angle, *self.plane_angle, ring=True
+                ):
                     continue
                 c1c2 = lig_centroid.DirectionVector(res_centroid)
                 c2c1 = res_centroid.DirectionVector(lig_centroid)
                 n1c1c2 = lig_normal.AngleTo(c1c2)
                 n2c2c1 = res_normal.AngleTo(c2c1)
-                opposite_to_plane = (
-                    angle_between_limits(n1c1c2, 0, self.angle_normal_centroid,
-                                         ring=True)
+                if not (
+                    angle_between_limits(n1c1c2, *self.normal_to_centroid_angle, ring=True)
                     or
-                    angle_between_limits(n2c2c1, 0, self.angle_normal_centroid,
-                                         ring=True)
-                )
-                if opposite_to_plane:
-                    return True, lig_match[0], res_match[0]
+                    angle_between_limits(n2c2c1, *self.normal_to_centroid_angle, ring=True)
+                ):
+                    continue
+                return True, lig_match[0], res_match[0]
         return False, None, None
 
 
-class FaceToFace(PiStacking):
+class FaceToFace(_BasePiStacking):
     """Face-to-face Pi-Stacking interaction between a ligand and a residue"""
-    def __init__(self, centroid_distance=5.0, plane_angles=(0, 40), **kwargs):
-        super().__init__(centroid_distance=centroid_distance,
-                         plane_angles=plane_angles, **kwargs)
+    def __init__(self,
+                 centroid_distance=5.5,
+                 plane_angle=(0, 35),
+                 normal_to_centroid_angle=(0, 30),
+                 pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1")):
+        super().__init__(
+            centroid_distance=centroid_distance,
+            plane_angle=plane_angle,
+            normal_to_centroid_angle=normal_to_centroid_angle,
+            pi_ring=pi_ring
+        )
 
 
-class EdgeToFace(PiStacking):
+class EdgeToFace(_BasePiStacking):
     """Edge-to-face Pi-Stacking interaction between a ligand and a residue"""
-    def __init__(self, centroid_distance=7.0, plane_angles=(50, 90), **kwargs):
-        super().__init__(centroid_distance=centroid_distance,
-                         plane_angles=plane_angles, **kwargs)
+    def __init__(self,
+                 centroid_distance=6.0,
+                 plane_angle=(50, 90),
+                 normal_to_centroid_angle=(0, 20),
+                 pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1")):
+        super().__init__(
+            centroid_distance=centroid_distance,
+            plane_angle=plane_angle,
+            normal_to_centroid_angle=normal_to_centroid_angle,
+            pi_ring=pi_ring
+        )
+
+
+class PiStacking(Interaction):
+    """Pi-Stacking interaction between a ligand and a residue
+
+    Parameters
+    ----------
+    ftf_kwargs : dict
+        Parameters to pass to the underlying FaceToFace class
+    etf_kwargs : dict
+        Parameters to pass to the underlying EdgeToFace class
+
+    .. versionchanged:: 0.3.4
+        `shortest_distance` has been replaced by `angle_normal_centroid`
+
+    """
+    def __init__(self, ftf_kwargs=None, etf_kwargs=None):
+        self.ftf = FaceToFace(**ftf_kwargs or {})
+        self.etf = EdgeToFace(**etf_kwargs or {})
+
+    def detect(self, ligand, residue):
+        return self.ftf.detect(ligand, residue) or self.etf.detect(ligand, residue)
 
 
 class _BaseMetallic(_Distance):
