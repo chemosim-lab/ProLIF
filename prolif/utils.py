@@ -73,8 +73,11 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
     the min and max angles. This is useful for angles involving a ring's plane
     normal vector.
     """
-    if ring and (angle > _90_deg_to_rad):
-        angle = _90_deg_to_rad - (angle % _90_deg_to_rad)
+    if ring:
+        if angle >= pi:
+            angle %= _90_deg_to_rad
+        elif angle > _90_deg_to_rad:
+            angle = _90_deg_to_rad - (angle % _90_deg_to_rad)
     return (min_angle <= angle <= max_angle)
 
 
