@@ -409,6 +409,8 @@ class _BasePiStacking(Interaction):
         self.centroid_distance = centroid_distance
         self.plane_angle = tuple(radians(i) for i in plane_angle) 
         self.normal_to_centroid_angle = tuple(radians(i) for i in normal_to_centroid_angle)
+        self.edge = False
+        self.edge_padding = 0
 
     def detect(self, ligand, residue):
         for pi_rings in product(self.pi_ring, repeat=2):
@@ -439,12 +441,34 @@ class _BasePiStacking(Interaction):
                 c2c1 = res_centroid.DirectionVector(lig_centroid)
                 n1c1c2 = lig_normal.AngleTo(c1c2)
                 n2c2c1 = res_normal.AngleTo(c2c1)
-                if not (
-                    angle_between_limits(n1c1c2, *self.normal_to_centroid_angle, ring=True)
-                    or
-                    angle_between_limits(n2c2c1, *self.normal_to_centroid_angle, ring=True)
-                ):
+                if angle_between_limits(n1c1c2, *self.normal_to_centroid_angle, ring=True):
+                    tilted_plane_coords = res_pi_coords
+                    tilted_normal = res_normal
+                    plane_coords = lig_pi_coords
+                    plane_normal = lig_normal
+                    plane_centroid = lig_centroid
+                elif angle_between_limits(n2c2c1, *self.normal_to_centroid_angle, ring=True):
+                    tilted_plane_coords = lig_pi_coords
+                    tilted_normal = lig_normal
+                    plane_coords = res_pi_coords
+                    plane_normal = res_normal
+                    plane_centroid = res_centroid
+                else:
                     continue
+                if self.edge:
+                    # look for point of intersection between both ring planes
+                    intersect_direction = plane_normal.CrossProduct(tilted_normal)
+                    A = np.array([list(plane_normal), list(tilted_normal), list(intersect_direction)])
+                    if np.linalg.det(A) == 0:
+                        continue
+                    tilted_offset = tilted_normal.DotProduct(Geometry.Point3D(*tilted_plane_coords[0]))
+                    plane_point = Geometry.Point3D(*plane_coords[0])
+                    plane_offset = plane_normal.DotProduct(plane_point)
+                    d = np.array([[plane_offset], [tilted_offset], [0.]])
+                    intersect = np.linalg.solve(A, d).T
+                    ring_radius = plane_centroid.Distance(plane_point)
+                    if plane_centroid.Distance(Geometry.Point3D(*intersect[0])) > ring_radius + self.edge_padding:
+                        continue
                 return True, lig_match[0], res_match[0]
         return False, None, None
 
@@ -470,6 +494,7 @@ class EdgeToFace(_BasePiStacking):
                  centroid_distance=6.0,
                  plane_angle=(50, 90),
                  normal_to_centroid_angle=(0, 20),
+                 edge_padding=0.3,
                  pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1")):
         super().__init__(
             centroid_distance=centroid_distance,
@@ -477,6 +502,8 @@ class EdgeToFace(_BasePiStacking):
             normal_to_centroid_angle=normal_to_centroid_angle,
             pi_ring=pi_ring
         )
+        self.edge = True
+        self.edge_padding = edge_padding
 
 
 class PiStacking(Interaction):
