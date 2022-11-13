@@ -1,3 +1,9 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 93%
+
 ignore:
   - versioneer.py
   - prolif/_version.py
