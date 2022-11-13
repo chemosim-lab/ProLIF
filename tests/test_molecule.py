@@ -1,3 +1,4 @@
+from collections import defaultdict
 import pytest
 from MDAnalysis import SelectionError
 from numpy.testing import assert_array_equal
@@ -6,6 +7,7 @@ from prolif.molecule import (Molecule, mol2_supplier, pdbqt_supplier,
                              sdf_supplier)
 from prolif.residue import ResidueId
 from rdkit import Chem
+from rdkit.Chem import AllChem
 
 from .test_base import TestBaseRDKitMol, ligand_rdkit, rdkit_mol, u
 
@@ -120,3 +122,42 @@ class TestMOL2Supplier(SupplierBase):
         suppl = mol2_supplier(path)
         mol = next(iter(suppl))
         assert mol is not None
+
+
+def test_pdbqt():
+    smiles_params = Chem.SmilesParserParams()
+    smiles_params.sanitize = False
+    smiles_params.removeHs = False
+    pdb_mol = Chem.MolFromSmiles(
+        "[C@@]1(C)(N(C(O)[C@H]2C[N@](C)([H])[C@@H]3CC4CN([H])C5[C@@H]4[C@H]([C@@H]3C2)CCC5)[H])[C@H](O)N2[C@@H](CC3CCCCC3)[C@@H](O)N3CCC[C@H]3[C@]2(O[H])O1",
+        smiles_params
+    )
+    for atom in pdb_mol.GetAtoms():
+        atom.SetUnsignedProp("pdbindex", atom.GetIdx())
+    # remove Hs to match with template
+    pdb_noh = Chem.RemoveAllHs(pdb_mol, sanitize=False)
+    template = Chem.MolFromSmiles("C[NH+]1CC(C(=O)NC2(C)OC3(O)C4CCCN4C(=O)C(Cc4ccccc4)N3C2=O)C=C2c3cccc4[nH]cc(c34)CC21")
+    mol = AllChem.AssignBondOrdersFromTemplate(template, pdb_noh)
+    mol = Chem.RWMol(mol)
+    # mapping between pdbindex of atom bearing H --> H atom(s)
+    atoms_with_hydrogens = defaultdict(list)
+    for atom in pdb_mol.GetAtoms():
+        if atom.GetAtomicNum() == 1:
+            atoms_with_hydrogens[atom.GetNeighbors()[0].GetProp("pdbindex")].append(atom)
+    # mapping between atom that should be bearing a H in RWMol and corresponding H(s)
+    reverse_mapping = {
+        atom.GetIdx(): atoms_with_hydrogens[idx]
+        for atom in mol.GetAtoms()
+        if (idx := atom.GetProp("pdbindex")) in atoms_with_hydrogens
+    }
+    # add missing Hs
+    mol.BeginBatchEdit()
+    for atom_idx, hydrogens in reverse_mapping.items():
+        for hydrogen in hydrogens:
+            h_idx = mol.AddAtom(hydrogen)
+            mol.AddBond(atom_idx, h_idx, Chem.BondType.SINGLE)
+        mol.GetAtomWithIdx(atom_idx).SetNoImplicit(True)
+    mol.CommitBatchEdit()
+    mol.UpdatePropertyCache(strict=False)
+    # sanitize fails with Explicit valence for atom # 7 N, 4, is greater than permitted
+    Chem.SanitizeMol(mol)

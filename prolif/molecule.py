@@ -3,6 +3,7 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
 import copy
+import warnings
 from collections.abc import Sequence
 from operator import attrgetter
 
@@ -237,11 +238,35 @@ class pdbqt_supplier(Sequence):
         pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
         pdbqt.atoms.types = pdbqt.atoms.elements
         # convert without infering bond orders and charges
-        mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False,
-                                           **self.converter_kwargs)
-        # assign BO from template then add hydrogens
-        mol = Chem.RemoveHs(mol, sanitize=False)
-        mol = AssignBondOrdersFromTemplate(self.template, mol)
+        pdbqt_mol = pdbqt.atoms.convert_to.rdkit(
+            NoImplicit=False, **self.converter_kwargs
+        )
+        # remove explicit hydrogens and assign BO from template
+        pdbqt_noH = Chem.RemoveAllHs(pdbqt_mol, sanitize=False)
+        pdbqt_noH.UpdatePropertyCache(strict=False)
+        mol = AssignBondOrdersFromTemplate(self.template, pdbqt_noH)
+        mol = Chem.RWMol(mol)
+        # mapping between identifier of atom bearing H and H atom
+        hydrogens = {
+            atom.GetNeighbors()[0].GetProp("_MDAnalysis_index"): atom
+            for atom in pdbqt_mol.GetAtoms()
+            if atom.GetAtomicNum() == 1
+        }
+        # mapping between atom that should be bearing a H in RWMol and corresponding H
+        hydrogen_mapping = {
+            atom.GetIdx(): hydrogens[idx]
+            for atom in mol.GetAtoms()
+            if (idx := atom.GetProp("_MDAnalysis_index")) in hydrogens
+        }
+        # add removed Hs
+        mol.BeginBatchEdit()
+        for atom_idx, hydrogen in hydrogen_mapping.items():
+            h_idx = mol.AddAtom(hydrogen)
+            mol.AddBond(atom_idx, h_idx, Chem.BondType.SINGLE)
+            mol.GetAtomWithIdx(atom_idx).SetNoImplicit(True)
+        mol.CommitBatchEdit()
+        mol.UpdatePropertyCache(strict=False)
+        Chem.SanitizeMol(mol)
         mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)
         return Molecule.from_rdkit(mol, **self._kwargs)
 
