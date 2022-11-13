@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Anion: include resonance forms of carboxylic, sulfonic and phosphorus acids,
   - Cation: include amidine and guanidine,
   - Metal ligand: exclude amides and some amines.
-- The Pi stacking interactions have been changed for a more accurate implementation.
+- The Pi stacking interactions have been changed for a more accurate implementation
+  (PR #97).
   
 ### Fixed
 - Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
