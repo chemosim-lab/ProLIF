@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.0] - 2022-10-XX
+## [1.1.0] - 2022-11-XX
 ### Added
 - `Fingerprint.run` now has a `converter_kwargs` parameter that can pass kwargs to the
   underlying RDKitConverter from MDAnalysis (Issue #57).
@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     oxygen from esters, include some aromatic oxygen and nitrogen,
   - Anion: include resonance forms of carboxylic, sulfonic and phosphorus acids,
   - Cation: include amidine and guanidine,
-  - Metal ligand: exclude amides and some amines,
+  - Metal ligand: exclude amides and some amines.
+- The Pi stacking interactions have been changed for a more accurate implementation.
   
 ### Fixed
 - Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).

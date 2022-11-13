@@ -1,6 +1,10 @@
 import prolif
 import pytest
+import numpy as np
+import MDAnalysis as mda
 from MDAnalysis.topology.tables import vdwradii
+from MDAnalysis.transformations import translate, rotateby
+from rdkit import RDLogger
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import (_INTERACTIONS, Interaction, VdWContact,
                                  get_mapindex)
@@ -13,6 +17,11 @@ from .test_base import ligand_mol
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
+benzene = mda.Universe(prolif.datafiles.datapath / "benzene.mol2")
+elements = mda.topology.guessers.guess_types(benzene.atoms.names)
+benzene.add_TopologyAttr("elements", elements)
+benzene.segments.segids = np.array(["U1"], dtype=object)
+benzene.transfer_to_memory()
 
 interaction_instances = {
     name: cls() for name, cls in _INTERACTIONS.items()
@@ -200,8 +209,10 @@ class TestInteractions:
         ("_BaseCationPi.cation", "NC(=[NH2+])N", 3),
         ("_BaseCationPi.pi_ring", "c1ccccc1", 1),
         ("_BaseCationPi.pi_ring", "c1cocc1", 1),
-        ("PiStacking.pi_ring", "c1ccccc1", 1),
-        ("PiStacking.pi_ring", "c1cocc1", 1),
+        ("EdgeToFace.pi_ring", "c1ccccc1", 1),
+        ("EdgeToFace.pi_ring", "c1cocc1", 1),
+        ("FaceToFace.pi_ring", "c1ccccc1", 1),
+        ("FaceToFace.pi_ring", "c1cocc1", 1),
         ("_BaseMetallic.lig_pattern", "[Mg]", 1),
         ("_BaseMetallic.prot_pattern", "O", 1),
         ("_BaseMetallic.prot_pattern", "N", 1),
@@ -221,3 +232,38 @@ class TestInteractions:
         else:
             n_matches = len(mol.GetSubstructMatches(interaction_qmol))
         assert n_matches == expected
+
+    @pytest.mark.parametrize(["xyz", "rotation", "pi_type", "expected"], [
+        ([0, 2.5, 4.5], [0, 0, 0], "facetoface", True),
+        ([0, 3, 4.5], [0, 0, 0], "facetoface", False),
+        ([0, 2, 4.5], [30, 0, 0], "facetoface", True),
+        ([0, 2, 4.5], [150, 0, 0], "facetoface", True),
+        ([0, 2, -4.5], [30, 0, 0], "facetoface", True),
+        ([0, 2, -4.5], [150, 0, 0], "facetoface", True),
+        ([1, 1.5, 3.5], [30, 15, 80], "facetoface", True),
+        ([0, 1.5, 4.5], [55, 0, 0], "edgetoface", True),
+        ([0, 1.5, 4.5], [90, 0, 0], "edgetoface", True),
+        ([0, 1.5, -4.5], [90, 0, 0], "edgetoface", True),
+        ([0, 6, -.5], [110, 0, 0], "edgetoface", True),
+        ([0, 4.5, -.5], [105, 0, 0], "edgetoface", True),
+        ([0, 1.5, 4.5], [115, 0, 0], "edgetoface", False),
+        ([0, 1.5, -4.5], [55, 0, 0], "edgetoface", False),
+    ])
+    def test_pi_stacking(self, xyz, rotation, pi_type, expected, fingerprint):
+        r1, r2 = self.create_rings(xyz, rotation)
+        assert getattr(fingerprint, pi_type)(r1, r2) is expected
+        if expected is True:
+            other = "edgetoface" if pi_type == "facetoface" else "facetoface"
+            assert getattr(fingerprint, other)(r1, r2) is not expected
+            assert getattr(fingerprint, "pistacking")(r1, r2) is expected
+
+    @staticmethod
+    def create_rings(xyz, rotation):
+        r2 = benzene.copy()
+        r2.segments.segids = np.array(["U2"], dtype=object)
+        tr = translate(xyz)
+        rotx = rotateby(rotation[0], [1,0,0], ag=r2.atoms)
+        roty = rotateby(rotation[1], [0,1,0], ag=r2.atoms)
+        rotz = rotateby(rotation[2], [0,0,1], ag=r2.atoms)
+        r2.trajectory.add_transformations(tr, rotx, roty, rotz)
+        return prolif.Molecule.from_mda(benzene), prolif.Molecule.from_mda(r2)

@@ -134,6 +134,7 @@ class Hydrophobic(_Distance):
     distance : float
         Cutoff distance for the interaction
 
+
     .. versionchanged:: 1.1.0
         The initial SMARTS pattern was too broad.
 
@@ -162,6 +163,7 @@ class _BaseHBond(Interaction):
         Cutoff distance between the donor and acceptor atoms
     angles : tuple
         Min and max values for the ``[Donor]-[Hydrogen]...[Acceptor]`` angle
+
 
     .. versionchanged:: 1.1.0
         The initial SMARTS pattern was too broad.
@@ -293,7 +295,7 @@ class _BaseIonic(_Distance):
     .. versionchanged:: 1.1.0
         Handles resonance forms for common acids, amidine and guanidine.
 
-"""
+    """
     def __init__(self,
                  cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
                  anion="[-{1-},$(O=[C,S,P]-[O-])]",
@@ -328,6 +330,7 @@ class _BaseCationPi(Interaction):
     angles : tuple
         Min and max values for the angle between the vector normal to the ring
         plane and the vector going from the centroid to the cation
+
 
     .. versionchanged:: 1.1.0
         Handles resonance forms for amidine and guanidine as cations.
@@ -385,29 +388,39 @@ class CationPi(_BaseCationPi):
         return super().detect(ligand, residue)
 
 
-class PiStacking(Interaction):
-    """Pi-Stacking interaction between a ligand and a residue
-
+class _BasePiStacking(Interaction):
+    """Base class for Pi-Stacking interactions
+    
     Parameters
     ----------
     centroid_distance : float
         Cutoff distance between each rings centroid
-    shortest_distance : float
-        Shortest distance allowed between the closest atoms of both rings
     plane_angles : tuple
         Min and max values for the angle between the ring planes
+    normal_centroids_angles : tuple
+        Min and max angles allowed between the vector normal to a ring's plane,
+        and the vector between the centroid of both rings.
     pi_ring : list
         List of SMARTS for aromatic rings
+
+
+    .. versionchanged:: 1.1.0
+        The implementation now relies on the angle between the vector normal to a ring's
+        plane and the vector between centroids (``normal_centroids_angles``) instead of
+        the ``shortest_distance`` parameter.
+
     """
     def __init__(self,
-                 centroid_distance=6.0,
-                 shortest_distance=3.8,
-                 plane_angles=(0, 90),
+                 centroid_distance=5.5,
+                 plane_angle=(0, 35),
+                 normal_to_centroid_angle=(0, 30),
                  pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.centroid_distance = centroid_distance
-        self.shortest_distance = shortest_distance**2
-        self.plane_angles = tuple(radians(i) for i in plane_angles)
+        self.plane_angle = tuple(radians(i) for i in plane_angle) 
+        self.normal_to_centroid_angle = tuple(radians(i) for i in normal_to_centroid_angle)
+        self.edge = False
+        self.edge_padding = 0
 
     def detect(self, ligand, residue):
         for pi_rings in product(self.pi_ring, repeat=2):
@@ -423,39 +436,124 @@ class PiStacking(Interaction):
                 cdist = lig_centroid.Distance(res_centroid)
                 if cdist > self.centroid_distance:
                     continue
-                squared_dist_matrix = np.add.outer(
-                    (lig_pi_coords**2).sum(axis=-1),
-                    (res_pi_coords**2).sum(axis=-1)
-                ) - 2*np.dot(lig_pi_coords, res_pi_coords.T)
-                shortest_dist = squared_dist_matrix.min().min()
-                if shortest_dist > self.shortest_distance:
-                    continue
                 # ligand
                 lig_normal = get_ring_normal_vector(lig_centroid,
                                                     lig_pi_coords)
                 # residue
                 res_normal = get_ring_normal_vector(res_centroid,
                                                     res_pi_coords)
-                # angle between planes
                 plane_angle = lig_normal.AngleTo(res_normal)
-                if angle_between_limits(plane_angle, *self.plane_angles,
-                                        ring=True):
-                    return True, lig_match[0], res_match[0]
+                if not angle_between_limits(
+                    plane_angle, *self.plane_angle, ring=True
+                ):
+                    continue
+                c1c2 = lig_centroid.DirectionVector(res_centroid)
+                c2c1 = res_centroid.DirectionVector(lig_centroid)
+                n1c1c2 = lig_normal.AngleTo(c1c2)
+                n2c2c1 = res_normal.AngleTo(c2c1)
+                if angle_between_limits(n1c1c2, *self.normal_to_centroid_angle, ring=True):
+                    tilted_plane_coords = res_pi_coords
+                    tilted_normal = res_normal
+                    plane_coords = lig_pi_coords
+                    plane_normal = lig_normal
+                    plane_centroid = lig_centroid
+                elif angle_between_limits(n2c2c1, *self.normal_to_centroid_angle, ring=True):
+                    tilted_plane_coords = lig_pi_coords
+                    tilted_normal = lig_normal
+                    plane_coords = res_pi_coords
+                    plane_normal = res_normal
+                    plane_centroid = res_centroid
+                else:
+                    continue
+                if self.edge:
+                    # look for point of intersection between both ring planes
+                    intersect_direction = plane_normal.CrossProduct(tilted_normal)
+                    A = np.array([list(plane_normal), list(tilted_normal), list(intersect_direction)])
+                    if np.linalg.det(A) == 0:
+                        continue
+                    tilted_offset = tilted_normal.DotProduct(Geometry.Point3D(*tilted_plane_coords[0]))
+                    plane_point = Geometry.Point3D(*plane_coords[0])
+                    plane_offset = plane_normal.DotProduct(plane_point)
+                    d = np.array([[plane_offset], [tilted_offset], [0.]])
+                    intersect = np.linalg.solve(A, d).T
+                    ring_radius = plane_centroid.Distance(plane_point)
+                    if plane_centroid.Distance(Geometry.Point3D(*intersect[0])) > ring_radius + self.edge_padding:
+                        continue
+                return True, lig_match[0], res_match[0]
         return False, None, None
 
 
-class FaceToFace(PiStacking):
+class FaceToFace(_BasePiStacking):
     """Face-to-face Pi-Stacking interaction between a ligand and a residue"""
-    def __init__(self, centroid_distance=4.5, plane_angles=(0, 40), **kwargs):
-        super().__init__(centroid_distance=centroid_distance,
-                         plane_angles=plane_angles, **kwargs)
+    def __init__(self,
+                 centroid_distance=5.5,
+                 plane_angle=(0, 35),
+                 normal_to_centroid_angle=(0, 30),
+                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
+        super().__init__(
+            centroid_distance=centroid_distance,
+            plane_angle=plane_angle,
+            normal_to_centroid_angle=normal_to_centroid_angle,
+            pi_ring=pi_ring
+        )
 
 
-class EdgeToFace(PiStacking):
-    """Edge-to-face Pi-Stacking interaction between a ligand and a residue"""
-    def __init__(self, centroid_distance=6.0, plane_angles=(50, 90), **kwargs):
-        super().__init__(centroid_distance=centroid_distance,
-                         plane_angles=plane_angles, **kwargs)
+class EdgeToFace(_BasePiStacking):
+    """Edge-to-face Pi-Stacking interaction between a ligand and a residue
+    
+    .. versionchanged:: 1.1.0
+        In addition to the changes made to the base pi-stacking interaction, this
+        implementation makes sure that the intersection between the perpendicular ring's
+        plane and the other's plane falls inside the ring.
+
+    """
+    def __init__(self,
+                 centroid_distance=6.5,
+                 plane_angle=(50, 90),
+                 normal_to_centroid_angle=(0, 25),
+                 edge_padding=0.3,
+                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
+        super().__init__(
+            centroid_distance=centroid_distance,
+            plane_angle=plane_angle,
+            normal_to_centroid_angle=normal_to_centroid_angle,
+            pi_ring=pi_ring
+        )
+        self.edge = True
+        self.edge_padding = edge_padding
+    
+    def detect(self, ligand, residue):
+        return super().detect(ligand, residue)
+
+
+class PiStacking(Interaction):
+    """Pi-Stacking interaction between a ligand and a residue
+
+    Parameters
+    ----------
+    ftf_kwargs : dict
+        Parameters to pass to the underlying FaceToFace class
+    etf_kwargs : dict
+        Parameters to pass to the underlying EdgeToFace class
+
+
+    .. versionchanged:: 0.3.4
+        `shortest_distance` has been replaced by `angle_normal_centroid`
+    
+    .. versionchanged:: 1.1.0
+        The implementation now directly calls :class:`EdgeToFace` and :class:`FaceToFace`
+        instead of overwriting the default parameters with more generic ones.
+
+    """
+    def __init__(self, ftf_kwargs=None, etf_kwargs=None):
+        self.ftf = FaceToFace(**ftf_kwargs or {})
+        self.etf = EdgeToFace(**etf_kwargs or {})
+
+    def detect(self, ligand, residue):
+        ftf = self.ftf.detect(ligand, residue)
+        if ftf[0] is True:
+            return ftf
+        return self.etf.detect(ligand, residue)
 
 
 class _BaseMetallic(_Distance):
@@ -469,6 +567,7 @@ class _BaseMetallic(_Distance):
         SMARTS for a ligand
     distance : float
         Cutoff distance
+
 
     .. versionchanged:: 1.1.0
         The initial SMARTS pattern was too broad.
