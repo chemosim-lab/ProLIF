@@ -134,6 +134,7 @@ class Hydrophobic(_Distance):
     distance : float
         Cutoff distance for the interaction
 
+
     .. versionchanged:: 1.1.0
         The initial SMARTS pattern was too broad.
 
@@ -162,6 +163,7 @@ class _BaseHBond(Interaction):
         Cutoff distance between the donor and acceptor atoms
     angles : tuple
         Min and max values for the ``[Donor]-[Hydrogen]...[Acceptor]`` angle
+
 
     .. versionchanged:: 1.1.0
         The initial SMARTS pattern was too broad.
@@ -293,7 +295,7 @@ class _BaseIonic(_Distance):
     .. versionchanged:: 1.1.0
         Handles resonance forms for common acids, amidine and guanidine.
 
-"""
+    """
     def __init__(self,
                  cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
                  anion="[-{1-},$(O=[C,S,P]-[O-])]",
@@ -328,6 +330,7 @@ class _BaseCationPi(Interaction):
     angles : tuple
         Min and max values for the angle between the vector normal to the ring
         plane and the vector going from the centroid to the cation
+
 
     .. versionchanged:: 1.1.0
         Handles resonance forms for amidine and guanidine as cations.
@@ -399,6 +402,13 @@ class _BasePiStacking(Interaction):
         and the vector between the centroid of both rings.
     pi_ring : list
         List of SMARTS for aromatic rings
+
+
+    .. versionchanged:: 1.1.0
+        The implementation now relies on the angle between the vector normal to a ring's
+        plane and the vector between centroids (``normal_centroids_angles``) instead of
+        the ``shortest_distance`` parameter.
+
     """
     def __init__(self,
                  centroid_distance=5.5,
@@ -489,7 +499,14 @@ class FaceToFace(_BasePiStacking):
 
 
 class EdgeToFace(_BasePiStacking):
-    """Edge-to-face Pi-Stacking interaction between a ligand and a residue"""
+    """Edge-to-face Pi-Stacking interaction between a ligand and a residue
+    
+    .. versionchanged:: 1.1.0
+        In addition to the changes made to the base pi-stacking interaction, this
+        implementation makes sure that the intersection between the perpendicular ring's
+        plane and the other's plane falls inside the ring.
+
+    """
     def __init__(self,
                  centroid_distance=6.5,
                  plane_angle=(50, 90),
@@ -519,8 +536,13 @@ class PiStacking(Interaction):
     etf_kwargs : dict
         Parameters to pass to the underlying EdgeToFace class
 
+
     .. versionchanged:: 0.3.4
         `shortest_distance` has been replaced by `angle_normal_centroid`
+    
+    .. versionchanged:: 1.1.0
+        The implementation now directly calls :class:`EdgeToFace` and :class:`FaceToFace`
+        instead of overwriting the default parameters with more generic ones.
 
     """
     def __init__(self, ftf_kwargs=None, etf_kwargs=None):
@@ -545,6 +567,7 @@ class _BaseMetallic(_Distance):
         SMARTS for a ligand
     distance : float
         Cutoff distance
+
 
     .. versionchanged:: 1.1.0
         The initial SMARTS pattern was too broad.
