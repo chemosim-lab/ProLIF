@@ -240,9 +240,9 @@ class TestInteractions:
         ([0, 2, -4.5], [150, 0, 0], "facetoface", True),
         ([1, 1.5, 3.5], [30, 15, 80], "facetoface", True),
         ([0, 1.5, 4.5], [55, 0, 0], "edgetoface", True),
-        ([0, 1.5, 4.5], [105, 0, 0], "edgetoface", True),
-        ([0, 1.5, -4.5], [105, 0, 0], "edgetoface", True),
-        ([0, 4, -.5], [115, 0, 0], "edgetoface", True),
+        ([0, 1.5, 4.5], [90, 0, 0], "edgetoface", True),
+        ([0, 1.5, -4.5], [90, 0, 0], "edgetoface", True),
+        ([0, 6, -.5], [110, 0, 0], "edgetoface", True),
         ([0, 4.5, -.5], [105, 0, 0], "edgetoface", True),
         ([0, 1.5, 4.5], [115, 0, 0], "edgetoface", False),
         ([0, 1.5, -4.5], [55, 0, 0], "edgetoface", False),
@@ -253,6 +253,7 @@ class TestInteractions:
         if expected is True:
             other = "edgetoface" if pi_type == "facetoface" else "facetoface"
             assert getattr(fingerprint, other)(r1, r2) is not expected
+            assert getattr(fingerprint, "pistacking")(r1, r2) is expected
 
     @staticmethod
     def create_rings(xyz, rotation):

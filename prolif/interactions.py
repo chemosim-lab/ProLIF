@@ -491,9 +491,9 @@ class FaceToFace(_BasePiStacking):
 class EdgeToFace(_BasePiStacking):
     """Edge-to-face Pi-Stacking interaction between a ligand and a residue"""
     def __init__(self,
-                 centroid_distance=6.0,
+                 centroid_distance=6.5,
                  plane_angle=(50, 90),
-                 normal_to_centroid_angle=(0, 20),
+                 normal_to_centroid_angle=(0, 25),
                  edge_padding=0.3,
                  pi_ring=("a1:a:a:a:a:a:1", "a1:a:a:a:a:1")):
         super().__init__(
@@ -504,6 +504,9 @@ class EdgeToFace(_BasePiStacking):
         )
         self.edge = True
         self.edge_padding = edge_padding
+    
+    def detect(self, ligand, residue):
+        return super().detect(ligand, residue)
 
 
 class PiStacking(Interaction):
@@ -525,7 +528,10 @@ class PiStacking(Interaction):
         self.etf = EdgeToFace(**etf_kwargs or {})
 
     def detect(self, ligand, residue):
-        return self.ftf.detect(ligand, residue) or self.etf.detect(ligand, residue)
+        ftf = self.ftf.detect(ligand, residue)
+        if ftf[0] is True:
+            return ftf
+        return self.etf.detect(ligand, residue)
 
 
 class _BaseMetallic(_Distance):
