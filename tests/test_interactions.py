@@ -11,7 +11,7 @@ from prolif.interactions import (_INTERACTIONS, Interaction, VdWContact,
 from rdkit import Chem, RDLogger
 
 from . import mol2factory
-from .test_base import ligand_mol
+from .test_base import ligand_mol, protein_mol
 
 # disable rdkit warnings
 lg = RDLogger.logger()
@@ -267,3 +267,9 @@ class TestInteractions:
         rotz = rotateby(rotation[2], [0,0,1], ag=r2.atoms)
         r2.trajectory.add_transformations(tr, rotx, roty, rotz)
         return prolif.Molecule.from_mda(benzene), prolif.Molecule.from_mda(r2)
+
+    def test_edgetoface_phe331(self):
+        fp = Fingerprint()
+        lig, phe331 = ligand_mol[0], protein_mol["PHE331.B"]
+        assert fp.edgetoface(lig, phe331) is True
+        assert fp.pistacking(lig, phe331) is True
