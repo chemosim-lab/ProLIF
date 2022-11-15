@@ -70,9 +70,9 @@ jobs:
         pytest --color=yes --disable-pytest-warnings --cov=prolif --cov-report=xml tests/
 
     - name: Measure tests coverage
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       with:
-        file: coverage.xml
+        files: ./coverage.xml
         fail_ci_if_error: True
         verbose: True
 
