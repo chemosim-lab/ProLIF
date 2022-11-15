@@ -508,7 +508,7 @@ class FaceToFace(_BasePiStacking):
     def __init__(self,
                  centroid_distance=5.5,
                  plane_angle=(0, 35),
-                 normal_to_centroid_angle=(0, 30),
+                 normal_to_centroid_angle=(0, 33),
                  pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
         super().__init__(
             centroid_distance=centroid_distance,
@@ -531,7 +531,7 @@ class EdgeToFace(_BasePiStacking):
                  centroid_distance=6.5,
                  plane_angle=(50, 90),
                  normal_to_centroid_angle=(0, 30),
-                 ring_radius=1.7,
+                 ring_radius=1.5,
                  pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
         super().__init__(
             centroid_distance=centroid_distance,
