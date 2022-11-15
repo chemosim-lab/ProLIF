@@ -234,20 +234,22 @@ class TestInteractions:
         assert n_matches == expected
 
     @pytest.mark.parametrize(["xyz", "rotation", "pi_type", "expected"], [
-        ([0, 2.5, 4.5], [0, 0, 0], "facetoface", True),
+        ([0, 2.5, 4.0], [0, 0, 0], "facetoface", True),
         ([0, 3, 4.5], [0, 0, 0], "facetoface", False),
         ([0, 2, 4.5], [30, 0, 0], "facetoface", True),
         ([0, 2, 4.5], [150, 0, 0], "facetoface", True),
         ([0, 2, -4.5], [30, 0, 0], "facetoface", True),
         ([0, 2, -4.5], [150, 0, 0], "facetoface", True),
         ([1, 1.5, 3.5], [30, 15, 80], "facetoface", True),
-        ([0, 1.5, 4.5], [55, 0, 0], "edgetoface", True),
+        ([1, 2.5, 4.5], [30, 15, 65], "facetoface", True),
+        ([0, 1.5, 4.5], [60, 0, 0], "edgetoface", True),
+        ([0, 2, 5], [60, 0, 0], "edgetoface", True),
         ([0, 1.5, 4.5], [90, 0, 0], "edgetoface", True),
         ([0, 1.5, -4.5], [90, 0, 0], "edgetoface", True),
         ([0, 6, -.5], [110, 0, 0], "edgetoface", True),
         ([0, 4.5, -.5], [105, 0, 0], "edgetoface", True),
-        ([0, 1.5, 4.5], [115, 0, 0], "edgetoface", False),
-        ([0, 1.5, -4.5], [55, 0, 0], "edgetoface", False),
+        ([0, 1.5, 4.5], [105, 0, 0], "edgetoface", False),
+        ([0, 1.5, -4.5], [75, 0, 0], "edgetoface", False),
     ])
     def test_pi_stacking(self, xyz, rotation, pi_type, expected, fingerprint):
         r1, r2 = self.create_rings(xyz, rotation)
