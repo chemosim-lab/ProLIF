@@ -25,13 +25,13 @@ jobs:
     strategy:
         matrix:
           os: [ubuntu-latest]
-          python-version: [3.8, 3.9, "3.10"]
-          rdkit-version: ["rdkit>=2020.09.1"]
+          python-version: [3.9, "3.10"]
+          rdkit-version: ["rdkit>2021.03.1"]
           include:
           - name: Min version
             os: ubuntu-latest
             python-version: 3.8
-            rdkit-version: "rdkit=2020.03.1 boost-cpp=1.72.0=h359cf19_6"
+            rdkit-version: "rdkit=2021.03.1"
 
     steps:
     - uses: actions/checkout@v2

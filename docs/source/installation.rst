@@ -4,7 +4,7 @@ Installation
 Requirements:
 
 * Python 3.8+
-* `RDKit <https://www.rdkit.org/docs/>`_ (2020.03+)
+* `RDKit <https://www.rdkit.org/docs/>`_ (2021.03+)
 * `MDAnalysis <https://www.mdanalysis.org/>`_ (2.2+)
 * `Pandas <https://pandas.pydata.org/>`_ (1.0+)
 * `NumPy <https://numpy.org/>`_

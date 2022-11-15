@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Metal ligand: exclude amides and some amines.
 - The Pi stacking interactions have been changed for a more accurate implementation
   (PR #97).
+- Updated the minimal RDKit version to `2021.03.1` 
   
 ### Fixed
 - Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
