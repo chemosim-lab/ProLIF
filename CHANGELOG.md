@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   
 ### Fixed
 - Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
+- The `pdbqt_supplier` now correctly preserves hydrogens from the input PDBQT file.
 
 ## [1.0.0] - 2022-06-07
 ### Added
