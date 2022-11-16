@@ -266,8 +266,9 @@ class pdbqt_supplier(Sequence):
     def _adjust_hydrogens(template, pdbqt_mol):
         # remove explicit hydrogens and assign BO from template
         pdbqt_noH = Chem.RemoveAllHs(pdbqt_mol, sanitize=False)
-        with rdBase.BlockLogs():
-            mol = AssignBondOrdersFromTemplate(template, pdbqt_noH)
+        block = rdBase.BlockLogs()
+        mol = AssignBondOrdersFromTemplate(template, pdbqt_noH)
+        del block
         # mapping between pdbindex of atom bearing H --> H atom(s)
         atoms_with_hydrogens = defaultdict(list)
         for atom in pdbqt_mol.GetAtoms():
