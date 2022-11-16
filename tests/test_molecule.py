@@ -1,4 +1,5 @@
 import pytest
+from copy import deepcopy
 from MDAnalysis import SelectionError
 from numpy.testing import assert_array_equal
 from prolif.datafiles import datapath
@@ -79,14 +80,11 @@ class SupplierBase:
         resid = ResidueId.from_atom(mol.GetAtomWithIdx(0))
         assert resid == self.resid
 
-    @pytest.mark.parametrize("index", [0, 2, 8, -1])
-    def test_index(self, suppl, index):
-        index %= 9
-        mol_i = suppl[index]
-        for i, mol in enumerate(suppl):
-            if i == index:
-                break
-        assert_array_equal(mol.xyz, mol_i.xyz)
+    def test_index(self, suppl):
+        mols = list(suppl)
+        for index in [0, 2, 8, -1]:
+            mol_i = suppl[index]
+            assert_array_equal(mols[index].xyz, mol_i.xyz)
 
 
 class TestPDBQTSupplier(SupplierBase):
@@ -100,6 +98,32 @@ class TestPDBQTSupplier(SupplierBase):
                                       "C(Cc4ccccc4)N3C2=O)C=C2c3cccc4[nH]cc"
                                       "(c34)CC21")
         return pdbqt_supplier(pdbqts, template)
+
+    def test_pdbqt_hydrogens_stay_in_mol(self):
+        template = Chem.RemoveHs(ligand_rdkit)
+        indices = []
+        rwmol = Chem.RWMol(ligand_rdkit)
+        rwmol.BeginBatchEdit()
+        for atom in rwmol.GetAtoms():
+            idx = atom.GetIdx()
+            atom.SetIntProp("_MDAnalysis_index", idx)
+            if atom.GetAtomicNum() == 1:
+                if idx % 2:
+                    indices.append(idx)
+                else:
+                    neighbor = atom.GetNeighbors()[0]
+                    rwmol.RemoveBond(idx, neighbor.GetIdx())
+                    rwmol.RemoveAtom(idx)
+                    neighbor.SetNumExplicitHs(1)
+        rwmol.CommitBatchEdit()
+        pdbqt_mol = rwmol.GetMol()
+        mol = pdbqt_supplier._adjust_hydrogens(template, pdbqt_mol)
+        hydrogens = [
+            idx for atom in mol.GetAtoms()
+            if atom.HasProp("_MDAnalysis_index")
+            and (idx := atom.GetIntProp("_MDAnalysis_index")) in indices
+        ]
+        assert hydrogens == indices
 
 
 class TestSDFSupplier(SupplierBase):
@@ -120,30 +144,3 @@ class TestMOL2Supplier(SupplierBase):
         suppl = mol2_supplier(path)
         mol = next(iter(suppl))
         assert mol is not None
-
-
-def test_pdbqt_hydrogens_stay_in_mol():
-    smiles_params = Chem.SmilesParserParams()
-    smiles_params.sanitize = False
-    smiles_params.removeHs = False
-    pdb_mol = Chem.MolFromSmiles(
-        "[C@@]1(C)(N(C(O)[C@H]2C[N@](C)([H])[C@@H]3CC4CN([H])C5[C@@H]4[C@H]([C@@H]3C2)CCC5)[H])[C@H](O)N2[C@@H](CC3CCCCC3)[C@@H](O)N3CCC[C@H]3[C@]2(O[H])O1",
-        smiles_params
-    )
-    h_indices = set()
-    for atom in pdb_mol.GetAtoms():
-        atom.SetIntProp("_MDAnalysis_index", atom.GetIdx())
-        if atom.GetAtomicNum() == 1:
-            h_indices.add(atom.GetIdx())
-            atom.SetBoolProp("flagged", True)
-        else:
-            atom.SetBoolProp("flagged", False)
-    template = Chem.MolFromSmiles("C[NH+]1CC(C(=O)NC2(C)OC3(O)C4CCCN4C(=O)C(Cc4ccccc4)N3C2=O)C=C2c3cccc4[nH]cc(c34)CC21")
-    mol = pdbqt_supplier._adjust_hydrogens(template, pdb_mol)
-    hydrogens = [
-        atom for atom in mol.GetAtoms()
-        if atom.HasProp("_MDAnalysis_index")
-        and atom.GetIntProp("_MDAnalysis_index") in h_indices
-    ]
-    assert all(atom.GetBoolProp("flagged") for atom in hydrogens)
-    
