@@ -3,12 +3,13 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
 import copy
+import warnings
 from collections import defaultdict
 from collections.abc import Sequence
 from operator import attrgetter
 
 import MDAnalysis as mda
-from rdkit import Chem
+from rdkit import Chem, rdBase
 from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
 
 from .rdkitmol import BaseRDKitMol
@@ -219,6 +220,7 @@ class pdbqt_supplier(Sequence):
         uses the hydrogen atoms present in the file and won't add explicit
         ones anymore, to prevent the fingerprint from detecting hydrogen bonds
         with "random" hydrogen atoms.
+        A lot of irrelevant warnings and logs have been disabled as well.
 
     """
     def __init__(self, paths, template, converter_kwargs=None, **kwargs):
@@ -238,7 +240,11 @@ class pdbqt_supplier(Sequence):
         return self.pdbqt_to_mol(pdbqt_path)
 
     def pdbqt_to_mol(self, pdbqt_path):
-        pdbqt = mda.Universe(pdbqt_path)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", message=r"^Failed to guess the mass"
+            )
+            pdbqt = mda.Universe(pdbqt_path)
         # set attributes needed by the converter
         elements = [mda.topology.guessers.guess_atom_element(x)
                     for x in pdbqt.atoms.names]
@@ -246,9 +252,13 @@ class pdbqt_supplier(Sequence):
         pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
         pdbqt.atoms.types = pdbqt.atoms.elements
         # convert without infering bond orders and charges
-        pdbqt_mol = pdbqt.atoms.convert_to.rdkit(
-            NoImplicit=False, **self.converter_kwargs
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", message=r"^Could not sanitize molecule"
+            )
+            pdbqt_mol = pdbqt.atoms.convert_to.rdkit(
+                NoImplicit=False, **self.converter_kwargs
+            )
         mol = self._adjust_hydrogens(self.template, pdbqt_mol)
         return Molecule.from_rdkit(mol, **self._kwargs)
 
@@ -256,7 +266,8 @@ class pdbqt_supplier(Sequence):
     def _adjust_hydrogens(template, pdbqt_mol):
         # remove explicit hydrogens and assign BO from template
         pdbqt_noH = Chem.RemoveAllHs(pdbqt_mol, sanitize=False)
-        mol = AssignBondOrdersFromTemplate(template, pdbqt_noH)
+        with rdBase.BlockLogs():
+            mol = AssignBondOrdersFromTemplate(template, pdbqt_noH)
         # mapping between pdbindex of atom bearing H --> H atom(s)
         atoms_with_hydrogens = defaultdict(list)
         for atom in pdbqt_mol.GetAtoms():
