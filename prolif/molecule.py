@@ -272,19 +272,19 @@ class pdbqt_supplier(Sequence):
                 atom.SetNumExplicitHs(0)
         # add missing Hs
         pdb_conf = pdbqt_mol.GetConformer()
-        mol_conf = mol.GetConformer()
-        with Chem.RWMol(mol) as rwmol:
-            for atom_idx, hydrogens in reverse_mapping.items():
-                for hydrogen in hydrogens:
-                    h_idx = rwmol.AddAtom(hydrogen)
-                    xyz = pdb_conf.GetAtomPosition(hydrogen.GetIdx())
-                    mol_conf.SetAtomPosition(h_idx, xyz)
-                    rwmol.AddBond(atom_idx, h_idx, Chem.BondType.SINGLE)
-            mol = rwmol.GetMol()
+        rwmol = Chem.RWMol(mol)
+        mol_conf = rwmol.GetConformer()
+        for atom_idx, hydrogens in reverse_mapping.items():
+            for hydrogen in hydrogens:
+                h_idx = rwmol.AddAtom(hydrogen)
+                xyz = pdb_conf.GetAtomPosition(hydrogen.GetIdx())
+                mol_conf.SetAtomPosition(h_idx, xyz)
+                rwmol.AddBond(atom_idx, h_idx, Chem.BondType.SINGLE)
+        mol = rwmol.GetMol()
         # sanitize
-        rwmol.UpdatePropertyCache()
-        Chem.SanitizeMol(rwmol)
-        # mol = Chem.AddHs(rwmol, addCoords=True, addResidueInfo=True)
+        mol.UpdatePropertyCache()
+        Chem.SanitizeMol(mol)
+        # mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=False)
         return mol
 
     def __len__(self):
