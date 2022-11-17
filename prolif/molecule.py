@@ -3,18 +3,17 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
 import copy
-import warnings
 from collections import defaultdict
 from collections.abc import Sequence
 from operator import attrgetter
 
 import MDAnalysis as mda
-from rdkit import Chem, rdBase
+from rdkit import Chem
 from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
 
 from .rdkitmol import BaseRDKitMol
 from .residue import Residue, ResidueGroup
-from .utils import split_mol_by_residues
+from .utils import catch_rdkit_logs, catch_warning, split_mol_by_residues
 
 
 class Molecule(BaseRDKitMol):
@@ -240,10 +239,7 @@ class pdbqt_supplier(Sequence):
         return self.pdbqt_to_mol(pdbqt_path)
 
     def pdbqt_to_mol(self, pdbqt_path):
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore", message=r"^Failed to guess the mass"
-            )
+        with catch_warning(message=r"^Failed to guess the mass"):
             pdbqt = mda.Universe(pdbqt_path)
         # set attributes needed by the converter
         elements = [mda.topology.guessers.guess_atom_element(x)
@@ -252,10 +248,10 @@ class pdbqt_supplier(Sequence):
         pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
         pdbqt.atoms.types = pdbqt.atoms.elements
         # convert without infering bond orders and charges
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore", message=r"^Could not sanitize molecule"
-            )
+        with catch_rdkit_logs(), catch_warning(
+            message=r"^(Could not sanitize molecule)|"
+            r"(No `bonds` attribute in this AtomGroup)"
+        ):
             pdbqt_mol = pdbqt.atoms.convert_to.rdkit(
                 NoImplicit=False, **self.converter_kwargs
             )
@@ -266,9 +262,8 @@ class pdbqt_supplier(Sequence):
     def _adjust_hydrogens(template, pdbqt_mol):
         # remove explicit hydrogens and assign BO from template
         pdbqt_noH = Chem.RemoveAllHs(pdbqt_mol, sanitize=False)
-        block = rdBase.BlockLogs()
-        mol = AssignBondOrdersFromTemplate(template, pdbqt_noH)
-        del block
+        with catch_rdkit_logs():
+            mol = AssignBondOrdersFromTemplate(template, pdbqt_noH)
         # mapping between pdbindex of atom bearing H --> H atom(s)
         atoms_with_hydrogens = defaultdict(list)
         for atom in pdbqt_mol.GetAtoms():

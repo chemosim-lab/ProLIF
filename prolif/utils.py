@@ -2,8 +2,10 @@
 Helper functions --- :mod:`prolif.utils`
 ========================================
 """
+import warnings
 from collections import defaultdict
 from collections.abc import Iterable
+from contextlib import contextmanager
 from copy import deepcopy
 from functools import wraps
 from importlib.util import find_spec
@@ -11,6 +13,7 @@ from math import pi
 
 import numpy as np
 import pandas as pd
+from rdkit import rdBase
 from rdkit.Chem import FragmentOnBonds, GetMolFrags, SplitMolByPDBResidues
 from rdkit.DataStructs import ExplicitBitVect
 from rdkit.Geometry import Point3D
@@ -32,6 +35,27 @@ def requires(module):  # pragma: no cover
                 "but it is not installed!")
         return wrapper
     return inner
+
+
+@contextmanager
+def catch_rdkit_logs():
+    log_status = rdBase.LogStatus()
+    rdBase.DisableLog("rdApp.*")
+    yield
+    log_status = {st.split(":")[0]: st.split(":")[1] for st in log_status.split("\n")}
+    log_status = {k: True if v == "enabled" else False for k, v in log_status.items()}
+    for k, v in log_status.items():
+        if v is True:
+            rdBase.EnableLog(k)
+        else:
+            rdBase.DisableLog(k)
+
+
+@contextmanager
+def catch_warning(**kwargs):
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", **kwargs)
+        yield
 
 
 def get_centroid(coordinates):
