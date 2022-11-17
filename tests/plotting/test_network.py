@@ -9,7 +9,7 @@ import pytest
 
 
 @contextmanager
-def TempFilename(mode='w'):
+def TempFilename(mode="w"):
     f = NamedTemporaryFile(delete=False, mode=mode)
     try:
         f.close()
@@ -50,8 +50,9 @@ class TestLigNetwork:
 
     def test_kwargs(self, lignetwork_data):
         lig, df = lignetwork_data
-        net = LigNetwork.from_ifp(df, lig, kekulize=True, match3D=False,
-                                  rotation=42, carbon=0)
+        net = LigNetwork.from_ifp(
+            df, lig, kekulize=True, match3D=False, rotation=42, carbon=0
+        )
         with StringIO() as buffer:
             net.save(buffer)
             buffer.seek(0)

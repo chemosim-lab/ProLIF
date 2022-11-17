@@ -3,8 +3,7 @@ from copy import deepcopy
 from MDAnalysis import SelectionError
 from numpy.testing import assert_array_equal
 from prolif.datafiles import datapath
-from prolif.molecule import (Molecule, mol2_supplier, pdbqt_supplier,
-                             sdf_supplier)
+from prolif.molecule import Molecule, mol2_supplier, pdbqt_supplier, sdf_supplier
 from prolif.residue import ResidueId
 from rdkit import Chem
 
@@ -24,14 +23,15 @@ class TestMolecule(TestBaseRDKitMol):
         rdkit_mol = Molecule(ligand_rdkit)
         mda_mol = Molecule.from_mda(u, "resname LIG")
         assert rdkit_mol[0].resid == mda_mol[0].resid
-        assert (rdkit_mol.HasSubstructMatch(mda_mol) and
-                mda_mol.HasSubstructMatch(rdkit_mol))
+        assert rdkit_mol.HasSubstructMatch(mda_mol) and mda_mol.HasSubstructMatch(
+            rdkit_mol
+        )
 
     def test_from_mda_empty_ag(self):
         ag = u.select_atoms("resname FOO")
         with pytest.raises(SelectionError, match="AtomGroup is empty"):
             Molecule.from_mda(ag)
-    
+
     def test_from_rdkit(self):
         rdkit_mol = Molecule(ligand_rdkit)
         newmol = Molecule.from_rdkit(ligand_rdkit)
@@ -47,13 +47,7 @@ class TestMolecule(TestBaseRDKitMol):
         newmol = Molecule.from_rdkit(mol, "FOO", 42, "A")
         assert newmol[0].resid == ResidueId("FOO", 42, "A")
 
-    @pytest.mark.parametrize("key", [
-        0,
-        42,
-        -1,
-        "LYS49.A",
-        ResidueId("LYS", 49, "A")
-    ])
+    @pytest.mark.parametrize("key", [0, 42, -1, "LYS49.A", ResidueId("LYS", 49, "A")])
     def test_getitem(self, mol, key):
         assert mol[key].resid is mol.residues[key].resid
 
@@ -94,9 +88,11 @@ class TestPDBQTSupplier(SupplierBase):
     def suppl(self):
         path = datapath / "vina"
         pdbqts = sorted(path.glob("*.pdbqt"))
-        template = Chem.MolFromSmiles("C[NH+]1CC(C(=O)NC2(C)OC3(O)C4CCCN4C(=O)"
-                                      "C(Cc4ccccc4)N3C2=O)C=C2c3cccc4[nH]cc"
-                                      "(c34)CC21")
+        template = Chem.MolFromSmiles(
+            "C[NH+]1CC(C(=O)NC2(C)OC3(O)C4CCCN4C(=O)"
+            "C(Cc4ccccc4)N3C2=O)C=C2c3cccc4[nH]cc"
+            "(c34)CC21"
+        )
         return pdbqt_supplier(pdbqts, template)
 
     def test_pdbqt_hydrogens_stay_in_mol(self):
@@ -119,7 +115,8 @@ class TestPDBQTSupplier(SupplierBase):
         pdbqt_mol = rwmol.GetMol()
         mol = pdbqt_supplier._adjust_hydrogens(template, pdbqt_mol)
         hydrogens = [
-            idx for atom in mol.GetAtoms()
+            idx
+            for atom in mol.GetAtoms()
             if atom.HasProp("_MDAnalysis_index")
             and (idx := atom.GetIntProp("_MDAnalysis_index")) in indices
         ]

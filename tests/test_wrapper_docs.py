@@ -2,8 +2,7 @@ import prolif.interactions
 import pytest
 from prolif.fingerprint import Fingerprint, _Docstring
 
-interaction_list = [i for i in Fingerprint.list_available()
-                    if "Dummy" not in i]
+interaction_list = [i for i in Fingerprint.list_available() if "Dummy" not in i]
 
 
 class Wrapper:
@@ -13,6 +12,7 @@ class Wrapper:
 
 class Dummy:
     """Dummy class docs"""
+
     def do_something(self):
         """Method docstring"""
         return 1

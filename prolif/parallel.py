@@ -15,8 +15,7 @@ def process_chunk(args):
     for ts in traj[chunk]:
         lig_mol = Molecule.from_mda(lig, **lig_kwargs)
         prot_mol = Molecule.from_mda(prot, **prot_kwargs)
-        data = fp.generate(lig_mol, prot_mol, residues=residues,
-                           return_atoms=True)
+        data = fp.generate(lig_mol, prot_mol, residues=residues, return_atoms=True)
         data["Frame"] = ts.frame
         ifp.append(data)
         if display_progress:
@@ -25,8 +24,9 @@ def process_chunk(args):
     return ifp
 
 
-def declare_shared_objs_for_chunk(fingerprint, resid_list, show_progressbar,
-                                  progress_counter, rdkitconverter_kwargs):
+def declare_shared_objs_for_chunk(
+    fingerprint, resid_list, show_progressbar, progress_counter, rdkitconverter_kwargs
+):
     """Declares global objects that are available to the pool of workers for
     a trajectory"""
     global fp, residues, display_progress, pcount, converter_kwargs
@@ -57,6 +57,7 @@ def declare_shared_objs_for_mol(fingerprint, pmol, resid_list):
 class ProgressCounter:
     """Tracks the progress of the fingerprint analysis accross the pool of
     workers"""
+
     def __init__(self):
         self.lock = mp.Lock()
         self.counter = mp.Value(c_int32)
@@ -65,6 +66,7 @@ class ProgressCounter:
 class Progress:
     """Handles tracking the progress of the ProgressCounter and updating the
     tqdm progress bar, from within an independent thread"""
+
     def __init__(self, pcount, *args, **kwargs):
         self.pbar = tqdm(*args, **kwargs)
         self.pcount = pcount

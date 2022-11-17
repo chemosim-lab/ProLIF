@@ -38,16 +38,11 @@ def test_wrapper_repr():
     assert _repr.startswith("<") and ".Dummy at " in _repr
 
 
-@pytest.mark.parametrize("returned", [
-    True,
-    (True,),
-    (True, 4)
-])
+@pytest.mark.parametrize("returned", [True, (True,), (True, 4)])
 def test_wrapper_incorrect_return(returned):
     mod = _InteractionWrapper(Return().detect)
     assert mod.__wrapped__(returned) == returned
-    with pytest.raises(TypeError,
-                       match="Incorrect function signature"):
+    with pytest.raises(TypeError, match="Incorrect function signature"):
         mod(returned)
 
 
@@ -64,8 +59,7 @@ class TestFingerprint:
 
     def test_init(self, fp_simple):
         assert "Hydrophobic" in fp_simple.interactions.keys()
-        assert (hasattr(fp_simple, "hydrophobic")
-                and callable(fp_simple.hydrophobic))
+        assert hasattr(fp_simple, "hydrophobic") and callable(fp_simple.hydrophobic)
         assert "Dummy" not in fp_simple.interactions.keys()
         assert hasattr(fp_simple, "dummy") and callable(fp_simple.dummy)
         assert "_BaseHBond" not in fp_simple.interactions.keys()
@@ -91,31 +85,37 @@ class TestFingerprint:
         assert bv.sum() > 0
 
     def test_bitvector_atoms(self, fp):
-        bv, lig_ix, prot_ix = fp.bitvector_atoms(ligand_mol,
-                                                 protein_mol["ASP129.A"])
+        bv, lig_ix, prot_ix = fp.bitvector_atoms(ligand_mol, protein_mol["ASP129.A"])
         assert len(bv) == fp.n_interactions
         assert len(lig_ix) == fp.n_interactions
         assert len(prot_ix) == fp.n_interactions
         assert bv.sum() > 0
         ids = np.where(bv == 1)[0]
-        assert (lig_ix[ids[0]] is not None and prot_ix[ids[0]] is not None)
+        assert lig_ix[ids[0]] is not None and prot_ix[ids[0]] is not None
 
     def test_run_residues(self, fp_simple):
-        fp_simple.run(u.trajectory[0:1], ligand_ag, protein_ag,
-                     residues="all", progress=False)
+        fp_simple.run(
+            u.trajectory[0:1], ligand_ag, protein_ag, residues="all", progress=False
+        )
         lig_id = ResidueId.from_string("LIG1.G")
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
         res = ResidueId.from_string("LYS387.B")
         assert (lig_id, res) in fp_simple.ifp[0].keys()
-        fp_simple.run(u.trajectory[1:2], ligand_ag, protein_ag,
-                     residues=["ASP129.A"], progress=False)
+        fp_simple.run(
+            u.trajectory[1:2],
+            ligand_ag,
+            protein_ag,
+            residues=["ASP129.A"],
+            progress=False,
+        )
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
         res = ResidueId.from_string("ASP129.A")
         assert (lig_id, res) in fp_simple.ifp[0].keys()
-        fp_simple.run(u.trajectory[:3], ligand_ag, protein_ag,
-                     residues=None, progress=False)
+        fp_simple.run(
+            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+        )
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 3
         assert len(fp_simple.ifp[0]) > 1
@@ -131,8 +131,9 @@ class TestFingerprint:
         assert bv[0] is np.True_
 
     def test_run(self, fp_simple):
-        fp_simple.run(u.trajectory[0:1], ligand_ag, protein_ag,
-                     residues=None, progress=False)
+        fp_simple.run(
+            u.trajectory[0:1], ligand_ag, protein_ag, residues=None, progress=False
+        )
         assert hasattr(fp_simple, "ifp")
         ifp = fp_simple.ifp[0]
         ifp.pop("Frame")
@@ -150,27 +151,29 @@ class TestFingerprint:
     def test_to_df(self, fp_simple):
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_dataframe()
-        fp_simple.run(u.trajectory[:3], ligand_ag, protein_ag,
-                     residues=None, progress=False)
+        fp_simple.run(
+            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+        )
         df = fp_simple.to_dataframe()
         assert isinstance(df, DataFrame)
         assert len(df) == 3
 
     def test_to_df_kwargs(self, fp_simple):
-        fp_simple.run(u.trajectory[:3], ligand_ag, protein_ag,
-                     residues=None, progress=False)
+        fp_simple.run(
+            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+        )
         df = fp_simple.to_dataframe(dtype=np.uint8)
         assert df.dtypes[0].type is np.uint8
         df = fp_simple.to_dataframe(drop_empty=False)
-        resids = set([key for d in fp_simple.ifp for key in d.keys()
-                      if key != "Frame"])
+        resids = set([key for d in fp_simple.ifp for key in d.keys() if key != "Frame"])
         assert df.shape == (3, len(resids))
 
     def test_to_bv(self, fp_simple):
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_bitvectors()
-        fp_simple.run(u.trajectory[:3], ligand_ag, protein_ag,
-                     residues=None, progress=False)
+        fp_simple.run(
+            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+        )
         bvs = fp_simple.to_bitvectors()
         assert isinstance(bvs[0], ExplicitBitVect)
         assert len(bvs) == 3
@@ -224,8 +227,9 @@ class TestFingerprint:
             assert d1.keys() == d2.keys()
             d1.pop("Frame", None)
             d2.pop("Frame")
-            for (fp1, fpal1, fpap1), (fp2, fpal2, fpap2) in zip(d1.values(),
-                                                                d2.values()):
+            for (fp1, fpal1, fpap1), (fp2, fpal2, fpap2) in zip(
+                d1.values(), d2.values()
+            ):
                 assert (fp1 == fp2).all()
                 assert fpal1 == fpal2
                 assert fpap1 == fpap2
@@ -235,11 +239,11 @@ class TestFingerprint:
         assert callable(fp_unpkl.dummy)
 
     def test_run_multiproc_serial_same(self, fp):
-        fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag,
-               n_jobs=1, progress=False)
+        fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag, n_jobs=1, progress=False)
         serial = fp.to_dataframe()
-        fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag,
-               n_jobs=None, progress=False)
+        fp.run(
+            u.trajectory[0:100:10], ligand_ag, protein_ag, n_jobs=None, progress=False
+        )
         multi = fp.to_dataframe()
         assert serial.equals(multi)
 
@@ -255,20 +259,26 @@ class TestFingerprint:
 
     def test_converter_kwargs_raises_error(self, fp: Fingerprint):
         with pytest.raises(
-            ValueError,
-            match="converter_kwargs must be a list of 2 dicts"
+            ValueError, match="converter_kwargs must be a list of 2 dicts"
         ):
             fp.run(
-                u.trajectory[0:5], ligand_ag, protein_ag, n_jobs=1, progress=False,
-                converter_kwargs=[dict(force=True)]
+                u.trajectory[0:5],
+                ligand_ag,
+                protein_ag,
+                n_jobs=1,
+                progress=False,
+                converter_kwargs=[dict(force=True)],
             )
-    
+
     @pytest.mark.parametrize("n_jobs", [1, 2])
     def test_converter_kwargs(self, fp: Fingerprint, n_jobs: int):
         u = mda.Universe.from_smiles("O=C=O.O=C=O")
         lig, prot = u.atoms.fragments
         fp.run(
-            u.trajectory, lig, prot, n_jobs=n_jobs, 
-            converter_kwargs=[dict(force=True), dict(force=True)]
+            u.trajectory,
+            lig,
+            prot,
+            n_jobs=n_jobs,
+            converter_kwargs=[dict(force=True), dict(force=True)],
         )
         assert fp.ifp
