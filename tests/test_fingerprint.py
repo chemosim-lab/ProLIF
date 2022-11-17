@@ -11,8 +11,6 @@ from prolif.molecule import sdf_supplier
 from prolif.residue import ResidueId
 from rdkit.DataStructs import ExplicitBitVect
 
-from .test_base import ligand_ag, ligand_mol, protein_ag, protein_mol, u
-
 
 class Dummy(Interaction):
     def detect(self, res1, res2):
@@ -79,12 +77,12 @@ class TestFingerprint:
         assert fp_simple.dummy("foo", "bar") == 1
         assert fp_simple.dummy.__wrapped__("foo", "bar") == (True, 4, 2)
 
-    def test_bitvector(self, fp):
+    def test_bitvector(self, fp, ligand_mol, protein_mol):
         bv = fp.bitvector(ligand_mol, protein_mol["ASP129.A"])
         assert len(bv) == fp.n_interactions
         assert bv.sum() > 0
 
-    def test_bitvector_atoms(self, fp):
+    def test_bitvector_atoms(self, fp, ligand_mol, protein_mol):
         bv, lig_ix, prot_ix = fp.bitvector_atoms(ligand_mol, protein_mol["ASP129.A"])
         assert len(bv) == fp.n_interactions
         assert len(lig_ix) == fp.n_interactions
@@ -93,7 +91,7 @@ class TestFingerprint:
         ids = np.where(bv == 1)[0]
         assert lig_ix[ids[0]] is not None and prot_ix[ids[0]] is not None
 
-    def test_run_residues(self, fp_simple):
+    def test_run_residues(self, fp_simple, u, ligand_ag, protein_ag):
         fp_simple.run(
             u.trajectory[0:1], ligand_ag, protein_ag, residues="all", progress=False
         )
@@ -123,14 +121,14 @@ class TestFingerprint:
         assert (lig_id, res) in fp_simple.ifp[0].keys()
         u.trajectory[0]
 
-    def test_generate(self, fp_simple):
+    def test_generate(self, fp_simple, ligand_mol, protein_mol):
         ifp = fp_simple.generate(ligand_mol, protein_mol)
         key = (ResidueId("LIG", 1, "G"), ResidueId("VAL", 201, "A"))
         bv = ifp[key]
         assert isinstance(bv, np.ndarray)
         assert bv[0] is np.True_
 
-    def test_run(self, fp_simple):
+    def test_run(self, fp_simple, u, ligand_ag, protein_ag):
         fp_simple.run(
             u.trajectory[0:1], ligand_ag, protein_ag, residues=None, progress=False
         )
@@ -142,13 +140,13 @@ class TestFingerprint:
         assert isinstance(data[1], list)
         assert isinstance(data[2], list)
 
-    def test_run_from_iterable(self, fp_simple):
+    def test_run_from_iterable(self, fp_simple, protein_mol):
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
         fp_simple.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
         assert len(fp_simple.ifp) == 2
 
-    def test_to_df(self, fp_simple):
+    def test_to_df(self, fp_simple, u, ligand_ag, protein_ag):
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_dataframe()
         fp_simple.run(
@@ -158,7 +156,7 @@ class TestFingerprint:
         assert isinstance(df, DataFrame)
         assert len(df) == 3
 
-    def test_to_df_kwargs(self, fp_simple):
+    def test_to_df_kwargs(self, fp_simple, u, ligand_ag, protein_ag):
         fp_simple.run(
             u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
         )
@@ -168,7 +166,7 @@ class TestFingerprint:
         resids = set([key for d in fp_simple.ifp for key in d.keys() if key != "Frame"])
         assert df.shape == (3, len(resids))
 
-    def test_to_bv(self, fp_simple):
+    def test_to_bv(self, fp_simple, u, ligand_ag, protein_ag):
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_bitvectors()
         fp_simple.run(
@@ -195,7 +193,7 @@ class TestFingerprint:
             Fingerprint(["Cationic", "foo"])
 
     @pytest.fixture
-    def fp_unpkl(self, fp):
+    def fp_unpkl(self, fp, protein_mol):
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
@@ -203,7 +201,7 @@ class TestFingerprint:
         return Fingerprint.from_pickle(pkl)
 
     @pytest.fixture
-    def fp_unpkl_file(self, fp):
+    def fp_unpkl_file(self, fp, protein_mol):
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
@@ -216,7 +214,7 @@ class TestFingerprint:
     def fp_pkled(self, request):
         return request.getfixturevalue(request.param)
 
-    def test_pickle(self, fp, fp_pkled):
+    def test_pickle(self, fp, fp_pkled, protein_mol):
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
@@ -238,7 +236,7 @@ class TestFingerprint:
         assert hasattr(fp_unpkl, "dummy")
         assert callable(fp_unpkl.dummy)
 
-    def test_run_multiproc_serial_same(self, fp):
+    def test_run_multiproc_serial_same(self, fp, u, ligand_ag, protein_ag):
         fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag, n_jobs=1, progress=False)
         serial = fp.to_dataframe()
         fp.run(
@@ -247,7 +245,7 @@ class TestFingerprint:
         multi = fp.to_dataframe()
         assert serial.equals(multi)
 
-    def test_run_iter_multiproc_serial_same(self, fp):
+    def test_run_iter_multiproc_serial_same(self, fp, protein_mol):
         run = fp.run_from_iterable
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = sdf_supplier(path)
@@ -257,7 +255,7 @@ class TestFingerprint:
         multi = fp.to_dataframe()
         assert serial.equals(multi)
 
-    def test_converter_kwargs_raises_error(self, fp: Fingerprint):
+    def test_converter_kwargs_raises_error(self, fp, u, ligand_ag, protein_ag):
         with pytest.raises(
             ValueError, match="converter_kwargs must be a list of 2 dicts"
         ):
@@ -271,7 +269,7 @@ class TestFingerprint:
             )
 
     @pytest.mark.parametrize("n_jobs", [1, 2])
-    def test_converter_kwargs(self, fp: Fingerprint, n_jobs: int):
+    def test_converter_kwargs(self, fp, n_jobs):
         u = mda.Universe.from_smiles("O=C=O.O=C=O")
         lig, prot = u.atoms.fragments
         fp.run(

@@ -4,7 +4,7 @@ from prolif.residue import Residue, ResidueGroup, ResidueId
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-from .test_base import TestBaseRDKitMol, protein_mol
+from .test_base import TestBaseRDKitMol
 
 
 class TestResidueId:
@@ -201,7 +201,7 @@ class TestResidueGroup:
         with pytest.raises(KeyError, match="Expected a ResidueId, int, or str"):
             rg[1.5]
 
-    def test_select(self):
+    def test_select(self, protein_mol):
         rg = protein_mol.residues
         assert rg.select(rg.name == "LYS").n_residues == 16
         assert rg.select(rg.number == 300).n_residues == 1
@@ -216,7 +216,7 @@ class TestResidueGroup:
         # not
         assert rg.select(~(rg.chain == "B")).n_residues == 212
 
-    def test_select_sameas_getitem(self):
+    def test_select_sameas_getitem(self, protein_mol):
         rg = protein_mol.residues
         sel = rg.select((rg.name == "LYS") & (rg.number == 49))[0]
         assert sel.resid is rg["LYS49.A"].resid

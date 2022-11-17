@@ -17,8 +17,6 @@ from prolif.utils import (
 )
 from rdkit import Chem
 
-from .test_base import ligand_mol, protein_mol
-
 
 def test_centroid():
     xyz = np.array(
@@ -50,7 +48,7 @@ def test_angle_limits(angle, mina, maxa, ring, expected):
     assert angle_between_limits(angle, mina, maxa, ring) is expected
 
 
-def test_pocket_residues():
+def test_pocket_residues(ligand_mol, protein_mol):
     resids = get_residues_near_ligand(ligand_mol, protein_mol)
     residues = [
         "TYR38.A",

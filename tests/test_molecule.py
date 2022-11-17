@@ -7,19 +7,19 @@ from prolif.molecule import Molecule, mol2_supplier, pdbqt_supplier, sdf_supplie
 from prolif.residue import ResidueId
 from rdkit import Chem
 
-from .test_base import TestBaseRDKitMol, ligand_rdkit, rdkit_mol, u
+from .test_base import TestBaseRDKitMol
 
 
 class TestMolecule(TestBaseRDKitMol):
     @pytest.fixture(scope="class")
-    def mol(self):
+    def mol(self, rdkit_mol):
         return Molecule(rdkit_mol)
 
     def test_mapindex(self, mol):
         for atom in mol.GetAtoms():
             assert atom.GetUnsignedProp("mapindex") == atom.GetIdx()
 
-    def test_from_mda(self):
+    def test_from_mda(self, u, ligand_rdkit):
         rdkit_mol = Molecule(ligand_rdkit)
         mda_mol = Molecule.from_mda(u, "resname LIG")
         assert rdkit_mol[0].resid == mda_mol[0].resid
@@ -27,12 +27,12 @@ class TestMolecule(TestBaseRDKitMol):
             rdkit_mol
         )
 
-    def test_from_mda_empty_ag(self):
+    def test_from_mda_empty_ag(self, u):
         ag = u.select_atoms("resname FOO")
         with pytest.raises(SelectionError, match="AtomGroup is empty"):
             Molecule.from_mda(ag)
 
-    def test_from_rdkit(self):
+    def test_from_rdkit(self, ligand_rdkit):
         rdkit_mol = Molecule(ligand_rdkit)
         newmol = Molecule.from_rdkit(ligand_rdkit)
         assert rdkit_mol[0].resid == newmol[0].resid
@@ -95,7 +95,7 @@ class TestPDBQTSupplier(SupplierBase):
         )
         return pdbqt_supplier(pdbqts, template)
 
-    def test_pdbqt_hydrogens_stay_in_mol(self):
+    def test_pdbqt_hydrogens_stay_in_mol(self, ligand_rdkit):
         template = Chem.RemoveHs(ligand_rdkit)
         indices = []
         rwmol = Chem.RWMol(ligand_rdkit)

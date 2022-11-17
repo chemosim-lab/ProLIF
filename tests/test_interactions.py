@@ -10,7 +10,6 @@ from prolif.interactions import _INTERACTIONS, Interaction, VdWContact, get_mapi
 from rdkit import Chem, RDLogger
 
 from . import mol2factory
-from .test_base import ligand_mol, protein_mol
 
 # disable rdkit warnings
 lg = RDLogger.logger()
@@ -139,7 +138,7 @@ class TestInteractions:
             _Dummy()
 
     @pytest.mark.parametrize("index", [0, 1, 3, 42, 78])
-    def test_get_mapindex(self, index):
+    def test_get_mapindex(self, index, ligand_mol):
         parent_index = get_mapindex(ligand_mol[0], index)
         assert parent_index == index
 
@@ -280,7 +279,7 @@ class TestInteractions:
         r2.trajectory.add_transformations(tr, rotx, roty, rotz)
         return prolif.Molecule.from_mda(benzene), prolif.Molecule.from_mda(r2)
 
-    def test_edgetoface_phe331(self):
+    def test_edgetoface_phe331(self, ligand_mol, protein_mol):
         fp = Fingerprint()
         lig, phe331 = ligand_mol[0], protein_mol["PHE331.B"]
         assert fp.edgetoface(lig, phe331) is True
