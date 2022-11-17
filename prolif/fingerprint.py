@@ -217,6 +217,7 @@ class Fingerprint:
             "Cationic",
             "CationPi",
             "PiCation",
+            "VdWContact",
         ],
     ):
         self._set_interactions(interactions)

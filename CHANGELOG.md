@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Metal ligand: exclude amides and some amines.
 - The Pi stacking interactions have been changed for a more accurate implementation
   (PR #97, PR #98).
+- The Van der Waals contact has been added to the default interactions, and the `tolerance`
+  parameter has been set to 0. 
 - The `pdbqt_supplier` will not add explicit hydrogen atoms anymore, to avoid detecting
   hydrogen bonds with "random" hydrogens that weren't in the PDBQT file (PR #99).
 - When using the `pdbqt_supplier`, irrelevant warnings and logs have been disabled (PR #99).

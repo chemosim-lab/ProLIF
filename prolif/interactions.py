@@ -675,7 +675,7 @@ class VdWContact(Interaction):
     ValueError : ``tolerance`` parameter cannot be negative
     """
 
-    def __init__(self, tolerance=0.5):
+    def __init__(self, tolerance=0.0):
         if tolerance >= 0:
             self.tolerance = tolerance
         else:
@@ -689,10 +689,10 @@ class VdWContact(Interaction):
             lig = la.GetSymbol().upper()
             res = ra.GetSymbol().upper()
             try:
-                vdw = self._vdw_cache[(lig, res)]
+                vdw = self._vdw_cache[frozenset((lig, res))]
             except KeyError:
                 vdw = vdwradii[lig] + vdwradii[res] + self.tolerance
-                self._vdw_cache[(lig, res)] = vdw
+                self._vdw_cache[frozenset((lig, res))] = vdw
             dist = lxyz.GetAtomPosition(la.GetIdx()).Distance(
                 rxyz.GetAtomPosition(ra.GetIdx())
             )
