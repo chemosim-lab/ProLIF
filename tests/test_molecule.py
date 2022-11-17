@@ -1,4 +1,5 @@
 import pytest
+from copy import deepcopy
 from MDAnalysis import SelectionError
 from numpy.testing import assert_array_equal
 from prolif.datafiles import datapath
@@ -79,14 +80,11 @@ class SupplierBase:
         resid = ResidueId.from_atom(mol.GetAtomWithIdx(0))
         assert resid == self.resid
 
-    @pytest.mark.parametrize("index", [0, 2, 8, -1])
-    def test_index(self, suppl, index):
-        index %= 9
-        mol_i = suppl[index]
-        for i, mol in enumerate(suppl):
-            if i == index:
-                break
-        assert_array_equal(mol.xyz, mol_i.xyz)
+    def test_index(self, suppl):
+        mols = list(suppl)
+        for index in [0, 2, 8, -1]:
+            mol_i = suppl[index]
+            assert_array_equal(mols[index].xyz, mol_i.xyz)
 
 
 class TestPDBQTSupplier(SupplierBase):
@@ -100,6 +98,32 @@ class TestPDBQTSupplier(SupplierBase):
                                       "C(Cc4ccccc4)N3C2=O)C=C2c3cccc4[nH]cc"
                                       "(c34)CC21")
         return pdbqt_supplier(pdbqts, template)
+
+    def test_pdbqt_hydrogens_stay_in_mol(self):
+        template = Chem.RemoveHs(ligand_rdkit)
+        indices = []
+        rwmol = Chem.RWMol(ligand_rdkit)
+        rwmol.BeginBatchEdit()
+        for atom in rwmol.GetAtoms():
+            idx = atom.GetIdx()
+            atom.SetIntProp("_MDAnalysis_index", idx)
+            if atom.GetAtomicNum() == 1:
+                if idx % 2:
+                    indices.append(idx)
+                else:
+                    neighbor = atom.GetNeighbors()[0]
+                    rwmol.RemoveBond(idx, neighbor.GetIdx())
+                    rwmol.RemoveAtom(idx)
+                    neighbor.SetNumExplicitHs(1)
+        rwmol.CommitBatchEdit()
+        pdbqt_mol = rwmol.GetMol()
+        mol = pdbqt_supplier._adjust_hydrogens(template, pdbqt_mol)
+        hydrogens = [
+            idx for atom in mol.GetAtoms()
+            if atom.HasProp("_MDAnalysis_index")
+            and (idx := atom.GetIntProp("_MDAnalysis_index")) in indices
+        ]
+        assert hydrogens == indices
 
 
 class TestSDFSupplier(SupplierBase):

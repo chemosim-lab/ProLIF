@@ -3,6 +3,7 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
 import copy
+from collections import defaultdict
 from collections.abc import Sequence
 from operator import attrgetter
 
@@ -12,7 +13,7 @@ from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
 
 from .rdkitmol import BaseRDKitMol
 from .residue import Residue, ResidueGroup
-from .utils import split_mol_by_residues
+from .utils import catch_rdkit_logs, catch_warning, split_mol_by_residues
 
 
 class Molecule(BaseRDKitMol):
@@ -173,7 +174,7 @@ class Molecule(BaseRDKitMol):
 
 
 class pdbqt_supplier(Sequence):
-    """Supplies molecules, given a path to PDBQT files
+    """Supplies molecules, given paths to PDBQT files
 
     Parameters
     ----------
@@ -210,6 +211,15 @@ class pdbqt_supplier(Sequence):
     .. versionchanged:: 1.0.0
         Molecule suppliers are now sequences that can be reused, indexed,
         and can return their length, instead of single-use generators.
+    
+    .. versionchanged:: 1.1.0
+        Because the PDBQT supplier needs to strip hydrogen atoms before
+        assigning bond orders from the template, it used to replace them
+        entirely with hydrogens containing new coordinates. It now directly
+        uses the hydrogen atoms present in the file and won't add explicit
+        ones anymore, to prevent the fingerprint from detecting hydrogen bonds
+        with "random" hydrogen atoms.
+        A lot of irrelevant warnings and logs have been disabled as well.
 
     """
     def __init__(self, paths, template, converter_kwargs=None, **kwargs):
@@ -229,7 +239,8 @@ class pdbqt_supplier(Sequence):
         return self.pdbqt_to_mol(pdbqt_path)
 
     def pdbqt_to_mol(self, pdbqt_path):
-        pdbqt = mda.Universe(pdbqt_path)
+        with catch_warning(message=r"^Failed to guess the mass"):
+            pdbqt = mda.Universe(pdbqt_path)
         # set attributes needed by the converter
         elements = [mda.topology.guessers.guess_atom_element(x)
                     for x in pdbqt.atoms.names]
@@ -237,13 +248,51 @@ class pdbqt_supplier(Sequence):
         pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
         pdbqt.atoms.types = pdbqt.atoms.elements
         # convert without infering bond orders and charges
-        mol = pdbqt.atoms.convert_to.rdkit(NoImplicit=False,
-                                           **self.converter_kwargs)
-        # assign BO from template then add hydrogens
-        mol = Chem.RemoveHs(mol, sanitize=False)
-        mol = AssignBondOrdersFromTemplate(self.template, mol)
-        mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=True)
+        with catch_rdkit_logs(), catch_warning(
+            message=r"^(Could not sanitize molecule)|"
+            r"(No `bonds` attribute in this AtomGroup)"
+        ):
+            pdbqt_mol = pdbqt.atoms.convert_to.rdkit(
+                NoImplicit=False, **self.converter_kwargs
+            )
+        mol = self._adjust_hydrogens(self.template, pdbqt_mol)
         return Molecule.from_rdkit(mol, **self._kwargs)
+
+    @staticmethod
+    def _adjust_hydrogens(template, pdbqt_mol):
+        # remove explicit hydrogens and assign BO from template
+        pdbqt_noH = Chem.RemoveAllHs(pdbqt_mol, sanitize=False)
+        with catch_rdkit_logs():
+            mol = AssignBondOrdersFromTemplate(template, pdbqt_noH)
+        # mapping between pdbindex of atom bearing H --> H atom(s)
+        atoms_with_hydrogens = defaultdict(list)
+        for atom in pdbqt_mol.GetAtoms():
+            if atom.GetAtomicNum() == 1:
+                atoms_with_hydrogens[
+                    atom.GetNeighbors()[0].GetIntProp("_MDAnalysis_index")
+                ].append(atom)
+        # mapping between atom that should be bearing a H in RWMol and corresponding H(s)
+        reverse_mapping = {}
+        for atom in mol.GetAtoms():
+            if (idx := atom.GetIntProp("_MDAnalysis_index")) in atoms_with_hydrogens:
+                reverse_mapping[atom.GetIdx()] = atoms_with_hydrogens[idx]
+                atom.SetNumExplicitHs(0)
+        # add missing Hs
+        pdb_conf = pdbqt_mol.GetConformer()
+        rwmol = Chem.RWMol(mol)
+        mol_conf = rwmol.GetConformer()
+        for atom_idx, hydrogens in reverse_mapping.items():
+            for hydrogen in hydrogens:
+                h_idx = rwmol.AddAtom(hydrogen)
+                xyz = pdb_conf.GetAtomPosition(hydrogen.GetIdx())
+                mol_conf.SetAtomPosition(h_idx, xyz)
+                rwmol.AddBond(atom_idx, h_idx, Chem.BondType.SINGLE)
+        mol = rwmol.GetMol()
+        # sanitize
+        mol.UpdatePropertyCache()
+        Chem.SanitizeMol(mol)
+        # mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=False)
+        return mol
 
     def __len__(self):
         return len(self.paths)
