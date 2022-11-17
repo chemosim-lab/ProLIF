@@ -5,6 +5,7 @@ Reading RDKit molecules --- :mod:`prolif.rdkitmol`
 from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
 
+
 class BaseRDKitMol(Chem.Mol):
     """Base molecular class that behaves like an RDKit :class:`~rdkit.Chem.rdchem.Mol`
     with extra attributes (see below).
@@ -24,6 +25,7 @@ class BaseRDKitMol(Chem.Mol):
     xyz : numpy.ndarray
         XYZ coordinates of all atoms in the molecule
     """
+
     @property
     def centroid(self):
         return ComputeCentroid(self.GetConformer())

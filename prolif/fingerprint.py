@@ -37,28 +37,15 @@ from tqdm.auto import tqdm
 
 from .interactions import _INTERACTIONS
 from .molecule import Molecule
-from .parallel import (Progress, ProgressCounter,
-                       declare_shared_objs_for_chunk,
-                       declare_shared_objs_for_mol, process_chunk, process_mol)
+from .parallel import (
+    Progress,
+    ProgressCounter,
+    declare_shared_objs_for_chunk,
+    declare_shared_objs_for_mol,
+    process_chunk,
+    process_mol,
+)
 from .utils import get_residues_near_ligand, to_bitvectors, to_dataframe
-
-
-class _Docstring:
-    """Descriptor that replaces the documentation shown when calling
-    ``fp.hydrophobic?`` and other interaction methods"""
-    def __init__(self):
-        self._docs = {}
-
-    def __set__(self, instance, func):
-        # add function's docstring to memory
-        cls = func.__self__.__class__
-        self._docs[cls.__name__] = cls.__doc__
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        # fetch docstring of last accessed Fingerprint method
-        return self._docs[type(instance)._current_func]
 
 
 class _InteractionWrapper:
@@ -100,8 +87,6 @@ class _InteractionWrapper:
         Changed from a wrapper function to a class for easier pickling support
 
     """
-    __doc__ = _Docstring()
-    _current_func = ""
 
     def __init__(self, func):
         self.__wrapped__ = func
@@ -199,8 +184,20 @@ class Fingerprint:
 
     """
 
-    def __init__(self, interactions=["Hydrophobic", "HBDonor", "HBAcceptor",
-                 "PiStacking", "Anionic", "Cationic", "CationPi", "PiCation"]):
+    def __init__(
+        self,
+        interactions=[
+            "Hydrophobic",
+            "HBDonor",
+            "HBAcceptor",
+            "PiStacking",
+            "Anionic",
+            "Cationic",
+            "CationPi",
+            "PiCation",
+            "VdWContact",
+        ],
+    ):
         self._set_interactions(interactions)
 
     def _set_interactions(self, interactions):
@@ -223,13 +220,6 @@ class Fingerprint:
             if name in interactions:
                 self.interactions[name] = func
 
-    def __getattribute__(self, name):
-        # trick to get the correct docstring when calling `fp.hydrophobic?`
-        attr = super().__getattribute__(name)
-        if isinstance(attr, _InteractionWrapper):
-            type(attr)._current_func = attr.__wrapped__.__self__.__class__.__name__
-        return attr
-
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
@@ -248,9 +238,11 @@ class Fingerprint:
         if show_hidden:
             interactions = [name for name in _INTERACTIONS.keys()]
         else:
-            interactions = [name for name in _INTERACTIONS.keys()
-                            if not (name.startswith("_")
-                                    or name == "Interaction")]
+            interactions = [
+                name
+                for name in _INTERACTIONS.keys()
+                if not (name.startswith("_") or name == "Interaction")
+            ]
         return sorted(interactions)
 
     @property
@@ -379,7 +371,16 @@ class Fingerprint:
                     ifp[key] = self.bitvector(lres, pres)
         return ifp
 
-    def run(self, traj, lig, prot, residues=None, converter_kwargs=None, progress=True, n_jobs=None):
+    def run(
+        self,
+        traj,
+        lig,
+        prot,
+        residues=None,
+        converter_kwargs=None,
+        progress=True,
+        n_jobs=None,
+    ):
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
         Parameters
@@ -441,7 +442,7 @@ class Fingerprint:
 
         .. versionchanged:: 1.0.0
             Added support for multiprocessing
-        
+
         .. versionchanged:: 1.1.0
             Added support for passing kwargs to the RDKitConverter through
             the ``converter_kwargs`` parameter
@@ -452,9 +453,15 @@ class Fingerprint:
         if converter_kwargs is not None and len(converter_kwargs) != 2:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
         if n_jobs != 1:
-            return self._run_parallel(traj, lig, prot, residues=residues,
-                                      converter_kwargs=converter_kwargs,
-                                      progress=progress, n_jobs=n_jobs)
+            return self._run_parallel(
+                traj,
+                lig,
+                prot,
+                residues=residues,
+                converter_kwargs=converter_kwargs,
+                progress=progress,
+                n_jobs=n_jobs,
+            )
         lig_kwargs, prot_kwargs = converter_kwargs or ({}, {})
 
         iterator = tqdm(traj) if progress else traj
@@ -464,15 +471,24 @@ class Fingerprint:
         for ts in iterator:
             prot_mol = Molecule.from_mda(prot, **prot_kwargs)
             lig_mol = Molecule.from_mda(lig, **lig_kwargs)
-            data = self.generate(lig_mol, prot_mol, residues=residues,
-                                 return_atoms=True)
+            data = self.generate(
+                lig_mol, prot_mol, residues=residues, return_atoms=True
+            )
             data["Frame"] = ts.frame
             ifp.append(data)
         self.ifp = ifp
         return self
 
-    def _run_parallel(self, traj, lig, prot, residues=None, converter_kwargs=None,
-                      progress=True, n_jobs=None):
+    def _run_parallel(
+        self,
+        traj,
+        lig,
+        prot,
+        residues=None,
+        converter_kwargs=None,
+        progress=True,
+        n_jobs=None,
+    ):
         """Parallel implementation of :meth:`~Fingerprint.run`"""
         n_chunks = n_jobs if n_jobs else mp.cpu_count()
         try:
@@ -497,8 +513,11 @@ class Fingerprint:
         pbar_thread = Thread(target=pbar, daemon=True)
 
         # run pool of workers
-        with mp.Pool(n_jobs, initializer=declare_shared_objs_for_chunk,
-                     initargs=(self, residues, progress, pcount, (lig_kwargs, prot_kwargs))) as pool:
+        with mp.Pool(
+            n_jobs,
+            initializer=declare_shared_objs_for_chunk,
+            initargs=(self, residues, progress, pcount, (lig_kwargs, prot_kwargs)),
+        ) as pool:
             pbar_thread.start()
             args = ((traj, lig, prot, chunk) for chunk in chunks)
             results = []
@@ -508,8 +527,9 @@ class Fingerprint:
         self.ifp = results
         return self
 
-    def run_from_iterable(self, lig_iterable, prot_mol, residues=None,
-                          progress=True, n_jobs=None):
+    def run_from_iterable(
+        self, lig_iterable, prot_mol, residues=None, progress=True, n_jobs=None
+    ):
         """Generates the fingerprint between a list of ligands and a protein
 
         Parameters
@@ -571,28 +591,32 @@ class Fingerprint:
             raise ValueError("n_jobs must be > 0 or None")
         if n_jobs != 1:
             return self._run_iter_parallel(
-                lig_iterable=lig_iterable, prot_mol=prot_mol,
-                residues=residues, progress=progress, n_jobs=n_jobs)
+                lig_iterable=lig_iterable,
+                prot_mol=prot_mol,
+                residues=residues,
+                progress=progress,
+                n_jobs=n_jobs,
+            )
 
         iterator = tqdm(lig_iterable) if progress else lig_iterable
         if residues == "all":
             residues = prot_mol.residues.keys()
         ifp = []
         for i, lig_mol in enumerate(iterator):
-            data = self.generate(lig_mol, prot_mol, residues=residues,
-                                 return_atoms=True)
+            data = self.generate(
+                lig_mol, prot_mol, residues=residues, return_atoms=True
+            )
             data["Frame"] = i
             ifp.append(data)
         self.ifp = ifp
         return self
 
-    def _run_iter_parallel(self, lig_iterable, prot_mol, residues=None,
-                           progress=True, n_jobs=None):
+    def _run_iter_parallel(
+        self, lig_iterable, prot_mol, residues=None, progress=True, n_jobs=None
+    ):
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
-        if (
-            isinstance(lig_iterable, Chem.SDMolSupplier)
-            or (isinstance(lig_iterable, Iterable)
-                and not isgenerator(lig_iterable))
+        if isinstance(lig_iterable, Chem.SDMolSupplier) or (
+            isinstance(lig_iterable, Iterable) and not isgenerator(lig_iterable)
         ):
             total = len(lig_iterable)
         else:
@@ -601,11 +625,17 @@ class Fingerprint:
         if residues == "all":
             residues = prot_mol.residues.keys()
 
-        with mp.Pool(n_jobs, initializer=declare_shared_objs_for_mol,
-                     initargs=(self, prot_mol, residues)) as pool:
+        with mp.Pool(
+            n_jobs,
+            initializer=declare_shared_objs_for_mol,
+            initargs=(self, prot_mol, residues),
+        ) as pool:
             results = []
-            for data in tqdm(pool.imap_unordered(process_mol, suppl),
-                             total=total, disable=not progress):
+            for data in tqdm(
+                pool.imap_unordered(process_mol, suppl),
+                total=total,
+                disable=not progress,
+            ):
                 results.append(data)
         results.sort(key=lambda ifp: ifp["Frame"])
         self.ifp = results

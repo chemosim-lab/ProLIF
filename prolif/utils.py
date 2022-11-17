@@ -21,7 +21,7 @@ from scipy.spatial import cKDTree
 
 from .residue import ResidueId
 
-_90_deg_to_rad = pi/2
+_90_deg_to_rad = pi / 2
 
 
 def requires(module):  # pragma: no cover
@@ -32,8 +32,11 @@ def requires(module):  # pragma: no cover
                 return func(*args, **kwargs)
             raise ModuleNotFoundError(
                 f"The module {module!r} is required to use {func.__name__!r} "
-                "but it is not installed!")
+                "but it is not installed!"
+            )
+
         return wrapper
+
     return inner
 
 
@@ -102,7 +105,7 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
             angle %= _90_deg_to_rad
         elif angle > _90_deg_to_rad:
             angle = _90_deg_to_rad - (angle % _90_deg_to_rad)
-    return (min_angle <= angle <= max_angle)
+    return min_angle <= angle <= max_angle
 
 
 def get_residues_near_ligand(lig, prot, cutoff=6.0):
@@ -152,12 +155,12 @@ def split_mol_by_residues(mol):
     for res in SplitMolByPDBResidues(mol).values():
         for frag in GetMolFrags(res, asMols=True, sanitizeFrags=False):
             # count number of unique residues in the fragment
-            resids = {a.GetIdx(): ResidueId.from_atom(a)
-                      for a in frag.GetAtoms()}
+            resids = {a.GetIdx(): ResidueId.from_atom(a) for a in frag.GetAtoms()}
             if len(set(resids.values())) > 1:
                 # split on peptide bonds
-                bonds = [b.GetIdx() for b in frag.GetBonds()
-                         if is_peptide_bond(b, resids)]
+                bonds = [
+                    b.GetIdx() for b in frag.GetBonds() if is_peptide_bond(b, resids)
+                ]
                 mols = FragmentOnBonds(frag, bonds, addDummies=False)
                 mols = GetMolFrags(mols, asMols=True, sanitizeFrags=False)
                 residues.extend(mols)
@@ -181,8 +184,14 @@ def is_peptide_bond(bond, resids):
     return resids[bond.GetBeginAtomIdx()] != resids[bond.GetEndAtomIdx()]
 
 
-def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
-                 drop_empty=True, return_atoms=False):
+def to_dataframe(
+    ifp,
+    interactions,
+    index_col="Frame",
+    dtype=None,
+    drop_empty=True,
+    return_atoms=False,
+):
     """Converts IFPs to a pandas DataFrame
 
     Parameters
@@ -237,14 +246,16 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
     # residue pairs
     keys = sorted(set([k for d in ifp for k in d.keys() if k != index_col]))
     # check if each interaction value is a list of atom indices or smthg else
+    has_atom_indices = False
     for d in ifp:
         for key, value in d.items():
             if key != index_col:
                 has_atom_indices = isinstance(value[0], Iterable)
                 break
     if return_atoms and not has_atom_indices:
-        raise ValueError("The IFP either doesn't contain atom indices or is "
-                         "formatted incorrectly")
+        raise ValueError(
+            "The IFP either doesn't contain atom indices or is formatted incorrectly"
+        )
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
     if has_atom_indices and return_atoms:
@@ -269,31 +280,35 @@ def to_dataframe(ifp, interactions, index_col="Frame", dtype=None,
                 data[key].append(arr)
     index = pd.Series(index, name=index_col)
     # create dataframes
-    values = np.array([np.hstack([np.ravel(a[i]) for a in data.values()])
-                       for i in range(len(index))])
+    if not data:
+        warnings.warn("No interaction detected")
+        return pd.DataFrame([], index=index)
+    values = np.array(
+        [np.hstack([np.ravel(a[i]) for a in data.values()]) for i in range(len(index))]
+    )
     if has_atom_indices and return_atoms:
         columns = pd.MultiIndex.from_tuples(
-            [(str(k[0]), str(k[1]), i, a)
-             for k in keys
-             for i in interactions
-             for a in ["ligand", "protein"]],
-            names=["ligand", "protein", "interaction", "atom"])
+            [
+                (str(k[0]), str(k[1]), i, a)
+                for k in keys
+                for i in interactions
+                for a in ["ligand", "protein"]
+            ],
+            names=["ligand", "protein", "interaction", "atom"],
+        )
     else:
         columns = pd.MultiIndex.from_tuples(
-            [(str(k[0]), str(k[1]), i)
-             for k in keys
-             for i in interactions],
-            names=["ligand", "protein", "interaction"])
+            [(str(k[0]), str(k[1]), i) for k in keys for i in interactions],
+            names=["ligand", "protein", "interaction"],
+        )
     df = pd.DataFrame(values, columns=columns, index=index)
     if has_atom_indices and return_atoms:
-        df = (df.groupby(axis=1, level=["ligand", "protein", "interaction"])
-                .agg(tuple))
+        df = df.groupby(axis=1, level=["ligand", "protein", "interaction"]).agg(tuple)
     if dtype:
         df = df.astype(dtype)
     if drop_empty:
         if has_atom_indices and return_atoms:
-            mask = df.apply(lambda s:
-                            ~(s.isin([(None, None)]).all()), axis=0)
+            mask = df.apply(lambda s: ~(s.isin([(None, None)]).all()), axis=0)
         else:
             mask = (df != empty_value).any(axis=0)
         df = df.loc[:, mask]

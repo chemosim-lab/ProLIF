@@ -1,0 +1,11 @@
+[tool.black]
+line-length = 88
+extend-exclude = '''
+(
+  ^/versioneer.py
+  | ^/docs/conf.py
+)
+'''
+
+[tool.isort]
+profile = "black"

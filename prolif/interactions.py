@@ -57,11 +57,14 @@ _INTERACTIONS = {}
 
 class _InteractionMeta(ABCMeta):
     """Metaclass to register interactions automatically"""
+
     def __init__(cls, name, bases, classdict):
         type.__init__(cls, name, bases, classdict)
         if name in _INTERACTIONS.keys():
-            warnings.warn(f"The {name!r} interaction has been superseded by a "
-                          f"new class with id {id(cls):#x}")
+            warnings.warn(
+                f"The {name!r} interaction has been superseded by a "
+                f"new class with id {id(cls):#x}"
+            )
         _INTERACTIONS[name] = cls
 
 
@@ -71,6 +74,7 @@ class Interaction(ABC, metaclass=_InteractionMeta):
     All interaction classes must inherit this class and define a
     :meth:`~detect` method
     """
+
     @abstractmethod
     def detect(self, **kwargs):
         pass
@@ -106,6 +110,7 @@ class _Distance(Interaction):
     distance : float
         Cutoff distance, measured between the first atom of each pattern
     """
+
     def __init__(self, lig_pattern, prot_pattern, distance):
         self.lig_pattern = MolFromSmarts(lig_pattern)
         self.prot_pattern = MolFromSmarts(prot_pattern)
@@ -115,8 +120,7 @@ class _Distance(Interaction):
         lig_matches = lig_res.GetSubstructMatches(self.lig_pattern)
         prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
         if lig_matches and prot_matches:
-            for lig_match, prot_match in product(lig_matches,
-                                                           prot_matches):
+            for lig_match, prot_match in product(lig_matches, prot_matches):
                 alig = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
                 aprot = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
                 if alig.Distance(aprot) <= self.distance:
@@ -139,13 +143,13 @@ class Hydrophobic(_Distance):
         The initial SMARTS pattern was too broad.
 
     """
+
     def __init__(
         self,
         hydrophobic=(
-            "[c,s,Br,I,S&H0&v2,"
-            "$([D3,D4;#6])&!$([#6]~[#7,#8,#9])&!$([#6X4H0]);+0]"
+            "[c,s,Br,I,S&H0&v2," "$([D3,D4;#6])&!$([#6]~[#7,#8,#9])&!$([#6X4H0]);+0]"
         ),
-        distance=4.5
+        distance=4.5,
     ):
         super().__init__(hydrophobic, hydrophobic, distance)
 
@@ -169,8 +173,9 @@ class _BaseHBond(Interaction):
         The initial SMARTS pattern was too broad.
 
     """
+
     def __init__(
-        self,         
+        self,
         donor="[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
         acceptor=(
             "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
@@ -178,7 +183,7 @@ class _BaseHBond(Interaction):
             "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
         ),
         distance=3.5,
-        angles=(130, 180)
+        angles=(130, 180),
     ):
         self.donor = MolFromSmarts(donor)
         self.acceptor = MolFromSmarts(acceptor)
@@ -189,8 +194,7 @@ class _BaseHBond(Interaction):
         acceptor_matches = acceptor.GetSubstructMatches(self.acceptor)
         donor_matches = donor.GetSubstructMatches(self.donor)
         if acceptor_matches and donor_matches:
-            for donor_match, acceptor_match in product(donor_matches,
-                                                       acceptor_matches):
+            for donor_match, acceptor_match in product(donor_matches, acceptor_matches):
                 # D-H ... A
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 h = Geometry.Point3D(*donor.xyz[donor_match[1]])
@@ -207,6 +211,7 @@ class _BaseHBond(Interaction):
 
 class HBDonor(_BaseHBond):
     """Hbond interaction between a ligand (donor) and a residue (acceptor)"""
+
     def detect(self, ligand, residue):
         bit, ires, ilig = super().detect(residue, ligand)
         return bit, ilig, ires
@@ -214,6 +219,7 @@ class HBDonor(_BaseHBond):
 
 class HBAcceptor(_BaseHBond):
     """Hbond interaction between a ligand (acceptor) and a residue (donor)"""
+
     def detect(self, ligand, residue):
         return super().detect(ligand, residue)
 
@@ -238,12 +244,15 @@ class _BaseXBond(Interaction):
     -----
     Distance and angle adapted from Auffinger et al. PNAS 2004
     """
-    def __init__(self,
-                 donor="[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
-                 acceptor="[#7,#8,P,S,Se,Te,a;!+{1-}][*]",
-                 distance=3.5,
-                 axd_angles=(130, 180),
-                 xar_angles=(80, 140)):
+
+    def __init__(
+        self,
+        donor="[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
+        acceptor="[#7,#8,P,S,Se,Te,a;!+{1-}][*]",
+        distance=3.5,
+        axd_angles=(130, 180),
+        xar_angles=(80, 140),
+    ):
         self.donor = MolFromSmarts(donor)
         self.acceptor = MolFromSmarts(acceptor)
         self.distance = distance
@@ -254,8 +263,7 @@ class _BaseXBond(Interaction):
         acceptor_matches = acceptor.GetSubstructMatches(self.acceptor)
         donor_matches = donor.GetSubstructMatches(self.donor)
         if acceptor_matches and donor_matches:
-            for donor_match, acceptor_match in product(donor_matches,
-                                                       acceptor_matches):
+            for donor_match, acceptor_match in product(donor_matches, acceptor_matches):
                 # D-X ... A distance
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 x = Geometry.Point3D(*donor.xyz[donor_match[1]])
@@ -278,12 +286,14 @@ class _BaseXBond(Interaction):
 
 class XBAcceptor(_BaseXBond):
     """Halogen bonding between a ligand (acceptor) and a residue (donor)"""
+
     def detect(self, ligand, residue):
         return super().detect(ligand, residue)
 
 
 class XBDonor(_BaseXBond):
     """Halogen bonding between a ligand (donor) and a residue (acceptor)"""
+
     def detect(self, ligand, residue):
         bit, ires, ilig = super().detect(residue, ligand)
         return bit, ilig, ires
@@ -296,21 +306,26 @@ class _BaseIonic(_Distance):
         Handles resonance forms for common acids, amidine and guanidine.
 
     """
-    def __init__(self,
-                 cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
-                 anion="[-{1-},$(O=[C,S,P]-[O-])]",
-                 distance=4.5):
+
+    def __init__(
+        self,
+        cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
+        anion="[-{1-},$(O=[C,S,P]-[O-])]",
+        distance=4.5,
+    ):
         super().__init__(cation, anion, distance)
 
 
 class Cationic(_BaseIonic):
     """Ionic interaction between a ligand (cation) and a residue (anion)"""
+
     def detect(self, ligand, residue):
         return super().detect(ligand, residue)
 
 
 class Anionic(_BaseIonic):
     """Ionic interaction between a ligand (anion) and a residue (cation)"""
+
     def detect(self, ligand, residue):
         bit, ires, ilig = super().detect(residue, ligand)
         return bit, ilig, ires
@@ -336,11 +351,17 @@ class _BaseCationPi(Interaction):
         Handles resonance forms for amidine and guanidine as cations.
 
     """
-    def __init__(self,
-                 cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
-                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1"),
-                 distance=4.5,
-                 angles=(0, 30)):
+
+    def __init__(
+        self,
+        cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
+        pi_ring=(
+            "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
+            "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
+        ),
+        distance=4.5,
+        angles=(0, 30),
+    ):
         self.cation = MolFromSmarts(cation)
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.distance = distance
@@ -376,6 +397,7 @@ class _BaseCationPi(Interaction):
 class PiCation(_BaseCationPi):
     """Cation-Pi interaction between a ligand (aromatic ring) and a residue
     (cation)"""
+
     def detect(self, ligand, residue):
         bit, ires, ilig = super().detect(residue, ligand)
         return bit, ilig, ires
@@ -384,13 +406,14 @@ class PiCation(_BaseCationPi):
 class CationPi(_BaseCationPi):
     """Cation-Pi interaction between a ligand (cation) and a residue
     (aromatic ring)"""
+
     def detect(self, ligand, residue):
         return super().detect(ligand, residue)
 
 
 class _BasePiStacking(Interaction):
     """Base class for Pi-Stacking interactions
-    
+
     Parameters
     ----------
     centroid_distance : float
@@ -410,15 +433,23 @@ class _BasePiStacking(Interaction):
         the ``shortest_distance`` parameter.
 
     """
-    def __init__(self,
-                 centroid_distance=5.5,
-                 plane_angle=(0, 35),
-                 normal_to_centroid_angle=(0, 30),
-                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
+
+    def __init__(
+        self,
+        centroid_distance=5.5,
+        plane_angle=(0, 35),
+        normal_to_centroid_angle=(0, 30),
+        pi_ring=(
+            "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
+            "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
+        ),
+    ):
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.centroid_distance = centroid_distance
-        self.plane_angle = tuple(radians(i) for i in plane_angle) 
-        self.normal_to_centroid_angle = tuple(radians(i) for i in normal_to_centroid_angle)
+        self.plane_angle = tuple(radians(i) for i in plane_angle)
+        self.normal_to_centroid_angle = tuple(
+            radians(i) for i in normal_to_centroid_angle
+        )
         self.edge = False
         self.ring_radius = 1.7
 
@@ -437,15 +468,11 @@ class _BasePiStacking(Interaction):
                 if cdist > self.centroid_distance:
                     continue
                 # ligand
-                lig_normal = get_ring_normal_vector(lig_centroid,
-                                                    lig_pi_coords)
+                lig_normal = get_ring_normal_vector(lig_centroid, lig_pi_coords)
                 # residue
-                res_normal = get_ring_normal_vector(res_centroid,
-                                                    res_pi_coords)
+                res_normal = get_ring_normal_vector(res_centroid, res_pi_coords)
                 plane_angle = lig_normal.AngleTo(res_normal)
-                if not angle_between_limits(
-                    plane_angle, *self.plane_angle, ring=True
-                ):
+                if not angle_between_limits(plane_angle, *self.plane_angle, ring=True):
                     continue
                 c1c2 = lig_centroid.DirectionVector(res_centroid)
                 c2c1 = res_centroid.DirectionVector(lig_centroid)
@@ -454,7 +481,8 @@ class _BasePiStacking(Interaction):
                 if not (
                     angle_between_limits(
                         n1c1c2, *self.normal_to_centroid_angle, ring=True
-                    ) or angle_between_limits(
+                    )
+                    or angle_between_limits(
                         n2c2c1, *self.normal_to_centroid_angle, ring=True
                     )
                 ):
@@ -469,7 +497,7 @@ class _BasePiStacking(Interaction):
                     # check if intersection point falls ~within plane ring
                     intersect_dist = min(
                         lig_centroid.Distance(intersect),
-                        res_centroid.Distance(intersect)
+                        res_centroid.Distance(intersect),
                     )
                     if intersect_dist > self.ring_radius:
                         continue
@@ -478,21 +506,22 @@ class _BasePiStacking(Interaction):
 
     @staticmethod
     def _get_intersect_point(
-        plane_normal, plane_centroid, tilted_normal, tilted_centroid,
+        plane_normal,
+        plane_centroid,
+        tilted_normal,
+        tilted_centroid,
     ):
-        # intersect line is orthogonal to both planes normal vectors 
+        # intersect line is orthogonal to both planes normal vectors
         intersect_direction = plane_normal.CrossProduct(tilted_normal)
         # setup system of linear equations to solve
-        A = np.array([list(plane_normal), list(tilted_normal), list(intersect_direction)])
+        A = np.array(
+            [list(plane_normal), list(tilted_normal), list(intersect_direction)]
+        )
         if np.linalg.det(A) == 0:
             return None
-        tilted_offset = tilted_normal.DotProduct(
-            Geometry.Point3D(*tilted_centroid)
-        )
-        plane_offset = plane_normal.DotProduct(
-            Geometry.Point3D(*plane_centroid)
-        )
-        d = np.array([[plane_offset], [tilted_offset], [0.]])
+        tilted_offset = tilted_normal.DotProduct(Geometry.Point3D(*tilted_centroid))
+        plane_offset = plane_normal.DotProduct(Geometry.Point3D(*plane_centroid))
+        d = np.array([[plane_offset], [tilted_offset], [0.0]])
         # point on intersect line
         point = np.linalg.solve(A, d).T[0]
         point = Geometry.Point3D(*point)
@@ -505,43 +534,55 @@ class _BasePiStacking(Interaction):
 
 class FaceToFace(_BasePiStacking):
     """Face-to-face Pi-Stacking interaction between a ligand and a residue"""
-    def __init__(self,
-                 centroid_distance=5.5,
-                 plane_angle=(0, 35),
-                 normal_to_centroid_angle=(0, 33),
-                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
+
+    def __init__(
+        self,
+        centroid_distance=5.5,
+        plane_angle=(0, 35),
+        normal_to_centroid_angle=(0, 33),
+        pi_ring=(
+            "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
+            "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
+        ),
+    ):
         super().__init__(
             centroid_distance=centroid_distance,
             plane_angle=plane_angle,
             normal_to_centroid_angle=normal_to_centroid_angle,
-            pi_ring=pi_ring
+            pi_ring=pi_ring,
         )
 
 
 class EdgeToFace(_BasePiStacking):
     """Edge-to-face Pi-Stacking interaction between a ligand and a residue
-    
+
     .. versionchanged:: 1.1.0
         In addition to the changes made to the base pi-stacking interaction, this
         implementation makes sure that the intersection between the perpendicular ring's
         plane and the other's plane falls inside the ring.
 
     """
-    def __init__(self,
-                 centroid_distance=6.5,
-                 plane_angle=(50, 90),
-                 normal_to_centroid_angle=(0, 30),
-                 ring_radius=1.5,
-                 pi_ring=("[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1", "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1")):
+
+    def __init__(
+        self,
+        centroid_distance=6.5,
+        plane_angle=(50, 90),
+        normal_to_centroid_angle=(0, 30),
+        ring_radius=1.5,
+        pi_ring=(
+            "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
+            "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
+        ),
+    ):
         super().__init__(
             centroid_distance=centroid_distance,
             plane_angle=plane_angle,
             normal_to_centroid_angle=normal_to_centroid_angle,
-            pi_ring=pi_ring
+            pi_ring=pi_ring,
         )
         self.edge = True
         self.ring_radius = ring_radius
-    
+
     def detect(self, ligand, residue):
         return super().detect(ligand, residue)
 
@@ -559,12 +600,13 @@ class PiStacking(Interaction):
 
     .. versionchanged:: 0.3.4
         `shortest_distance` has been replaced by `angle_normal_centroid`
-    
+
     .. versionchanged:: 1.1.0
         The implementation now directly calls :class:`EdgeToFace` and :class:`FaceToFace`
         instead of overwriting the default parameters with more generic ones.
 
     """
+
     def __init__(self, ftf_kwargs=None, etf_kwargs=None):
         self.ftf = FaceToFace(**ftf_kwargs or {})
         self.etf = EdgeToFace(**etf_kwargs or {})
@@ -593,21 +635,26 @@ class _BaseMetallic(_Distance):
         The initial SMARTS pattern was too broad.
 
     """
-    def __init__(self,
-                 metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
-                 ligand="[O,#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),-{1-};!+{1-}]",
-                 distance=2.8):
+
+    def __init__(
+        self,
+        metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
+        ligand="[O,#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),-{1-};!+{1-}]",
+        distance=2.8,
+    ):
         super().__init__(metal, ligand, distance)
 
 
 class MetalDonor(_BaseMetallic):
     """Metallic interaction between a metal and a residue (chelated)"""
+
     def detect(self, ligand, residue):
         return super().detect(ligand, residue)
 
 
 class MetalAcceptor(_BaseMetallic):
     """Metallic interaction between a ligand (chelated) and a metal residue"""
+
     def detect(self, ligand, residue):
         bit, ires, ilig = super().detect(residue, ligand)
         return bit, ilig, ires
@@ -627,7 +674,8 @@ class VdWContact(Interaction):
     ------
     ValueError : ``tolerance`` parameter cannot be negative
     """
-    def __init__(self, tolerance=.5):
+
+    def __init__(self, tolerance=0.0):
         if tolerance >= 0:
             self.tolerance = tolerance
         else:
@@ -641,12 +689,13 @@ class VdWContact(Interaction):
             lig = la.GetSymbol().upper()
             res = ra.GetSymbol().upper()
             try:
-                vdw = self._vdw_cache[(lig, res)]
+                vdw = self._vdw_cache[frozenset((lig, res))]
             except KeyError:
                 vdw = vdwradii[lig] + vdwradii[res] + self.tolerance
-                self._vdw_cache[(lig, res)] = vdw
-            dist = (lxyz.GetAtomPosition(la.GetIdx())
-                        .Distance(rxyz.GetAtomPosition(ra.GetIdx())))
+                self._vdw_cache[frozenset((lig, res))] = vdw
+            dist = lxyz.GetAtomPosition(la.GetIdx()).Distance(
+                rxyz.GetAtomPosition(ra.GetIdx())
+            )
             if dist <= vdw:
                 return True, la.GetIdx(), ra.GetIdx()
         return False, None, None

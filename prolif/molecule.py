@@ -69,6 +69,7 @@ class Molecule(BaseRDKitMol):
 
     See :mod:`prolif.residue` for more information on residues
     """
+
     def __init__(self, mol):
         super().__init__(mol)
         # set mapping of atoms
@@ -115,8 +116,7 @@ class Molecule(BaseRDKitMol):
         """
         ag = obj.select_atoms(selection) if selection else obj.atoms
         if ag.n_atoms == 0:
-            raise mda.SelectionError(
-                f"AtomGroup is empty, please check your selection")
+            raise mda.SelectionError(f"AtomGroup is empty, please check your selection")
         mol = ag.convert_to.rdkit(**kwargs)
         return cls(mol)
 
@@ -149,10 +149,12 @@ class Molecule(BaseRDKitMol):
             return cls(mol)
         mol = copy.deepcopy(mol)
         for atom in mol.GetAtoms():
-            mi = Chem.AtomPDBResidueInfo(f" {atom.GetSymbol():<3.3}",
-                                         residueName=resname,
-                                         residueNumber=resnumber,
-                                         chainId=chain)
+            mi = Chem.AtomPDBResidueInfo(
+                f" {atom.GetSymbol():<3.3}",
+                residueName=resname,
+                residueNumber=resnumber,
+                chainId=chain,
+            )
             atom.SetMonomerInfo(mi)
         return cls(mol)
 
@@ -163,7 +165,7 @@ class Molecule(BaseRDKitMol):
     def __getitem__(self, key):
         return self.residues[key]
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         params = f"{self.n_residues} residues and {self.GetNumAtoms()} atoms"
         return f"<{name} with {params} at {id(self):#x}>"
@@ -211,7 +213,7 @@ class pdbqt_supplier(Sequence):
     .. versionchanged:: 1.0.0
         Molecule suppliers are now sequences that can be reused, indexed,
         and can return their length, instead of single-use generators.
-    
+
     .. versionchanged:: 1.1.0
         Because the PDBQT supplier needs to strip hydrogen atoms before
         assigning bond orders from the template, it used to replace them
@@ -222,6 +224,7 @@ class pdbqt_supplier(Sequence):
         A lot of irrelevant warnings and logs have been disabled as well.
 
     """
+
     def __init__(self, paths, template, converter_kwargs=None, **kwargs):
         self.paths = list(paths)
         self.template = template
@@ -242,8 +245,9 @@ class pdbqt_supplier(Sequence):
         with catch_warning(message=r"^Failed to guess the mass"):
             pdbqt = mda.Universe(pdbqt_path)
         # set attributes needed by the converter
-        elements = [mda.topology.guessers.guess_atom_element(x)
-                    for x in pdbqt.atoms.names]
+        elements = [
+            mda.topology.guessers.guess_atom_element(x) for x in pdbqt.atoms.names
+        ]
         pdbqt.add_TopologyAttr("elements", elements)
         pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
         pdbqt.atoms.types = pdbqt.atoms.elements
@@ -330,6 +334,7 @@ class sdf_supplier(Sequence):
         and can return their length, instead of single-use generators.
 
     """
+
     def __init__(self, path, **kwargs):
         self.path = path
         self._suppl = Chem.SDMolSupplier(path, removeHs=False)
@@ -379,6 +384,7 @@ class mol2_supplier(Sequence):
         and can return their length, instead of single-use generators.
 
     """
+
     def __init__(self, path, **kwargs):
         self.path = path
         self._kwargs = kwargs

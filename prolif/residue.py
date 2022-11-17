@@ -11,7 +11,7 @@ from rdkit.Chem.rdmolops import FastFindRings
 
 from .rdkitmol import BaseRDKitMol
 
-_RE_RESID = re.compile(r'([A-Z]{,3})?(\d*)\.?(\w)?')
+_RE_RESID = re.compile(r"([A-Z]{,3})?(\d*)\.?(\w)?")
 NoneType = type(None)
 
 
@@ -27,10 +27,8 @@ class ResidueId:
     chain : str or None, optionnal
         1-letter protein chain
     """
-    def __init__(self,
-                 name: str = "UNK",
-                 number: int = 0,
-                 chain: Optional[str] = None):
+
+    def __init__(self, name: str = "UNK", number: int = 0, chain: Optional[str] = None):
         self.name = name or "UNK"
         self.number = number or 0
         self.chain = chain or None
@@ -129,12 +127,13 @@ class Residue(BaseRDKitMol):
     The name of the residue can be converted to a string by using
     ``str(Residue)``
     """
+
     def __init__(self, mol):
         super().__init__(mol)
         FastFindRings(self)
         self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0))
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         return f"<{name} {self.resid} at {id(self):#x}>"
 
@@ -162,10 +161,12 @@ class ResidueGroup(UserDict):
     You can also use the :meth:`~prolif.residue.ResidueGroup.select` method to
     access a subset of a ResidueGroup.
     """
+
     def __init__(self, residues: List[Residue]):
         self._residues = np.asarray(residues, dtype=object)
-        resinfo = [(r.resid.name, r.resid.number, r.resid.chain)
-                   for r in self._residues]
+        resinfo = [
+            (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
+        ]
         try:
             name, number, chain = zip(*resinfo)
         except ValueError:
@@ -181,8 +182,10 @@ class ResidueGroup(UserDict):
     def __getitem__(self, key):
         # bool is a subclass of int but shouldn't be used here
         if isinstance(key, bool):
-            raise KeyError("Expected a ResidueId, int, or str, "
-                           f"got {type(key).__name__!r} instead")
+            raise KeyError(
+                "Expected a ResidueId, int, or str, "
+                f"got {type(key).__name__!r} instead"
+            )
         if isinstance(key, int):
             return self._residues[key]
         elif isinstance(key, str):
@@ -190,8 +193,9 @@ class ResidueGroup(UserDict):
             return self.data[key]
         elif isinstance(key, ResidueId):
             return self.data[key]
-        raise KeyError("Expected a ResidueId, int, or str, "
-                       f"got {type(key).__name__!r} instead")
+        raise KeyError(
+            "Expected a ResidueId, int, or str, " f"got {type(key).__name__!r} instead"
+        )
 
     def select(self, mask):
         """Locate a subset of a ResidueGroup based on a boolean mask
@@ -235,7 +239,7 @@ class ResidueGroup(UserDict):
         """
         return ResidueGroup(self._residues[mask])
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         return f"<{name} with {self.n_residues} residues at {id(self):#x}>"
 
