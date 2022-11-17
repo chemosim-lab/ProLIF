@@ -48,25 +48,6 @@ from .parallel import (
 from .utils import get_residues_near_ligand, to_bitvectors, to_dataframe
 
 
-class _Docstring:
-    """Descriptor that replaces the documentation shown when calling
-    ``fp.hydrophobic?`` and other interaction methods"""
-
-    def __init__(self):
-        self._docs = {}
-
-    def __set__(self, instance, func):
-        # add function's docstring to memory
-        cls = func.__self__.__class__
-        self._docs[cls.__name__] = cls.__doc__
-
-    def __get__(self, instance, owner):
-        if instance is None:
-            return self
-        # fetch docstring of last accessed Fingerprint method
-        return self._docs[type(instance)._current_func]
-
-
 class _InteractionWrapper:
     """Modifies the return signature of an interaction ``detect`` method by
     forcing it to return only the first element when multiple values are
@@ -106,9 +87,6 @@ class _InteractionWrapper:
         Changed from a wrapper function to a class for easier pickling support
 
     """
-
-    __doc__ = _Docstring()
-    _current_func = ""
 
     def __init__(self, func):
         self.__wrapped__ = func
@@ -241,13 +219,6 @@ class Fingerprint:
             setattr(self, name.lower(), func)
             if name in interactions:
                 self.interactions[name] = func
-
-    def __getattribute__(self, name):
-        # trick to get the correct docstring when calling `fp.hydrophobic?`
-        attr = super().__getattribute__(name)
-        if isinstance(attr, _InteractionWrapper):
-            type(attr)._current_func = attr.__wrapped__.__self__.__class__.__name__
-        return attr
 
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
