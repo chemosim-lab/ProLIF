@@ -1,13 +1,13 @@
-import prolif
-import pytest
-import numpy as np
 import MDAnalysis as mda
+import numpy as np
+import pytest
 from MDAnalysis.topology.tables import vdwradii
-from MDAnalysis.transformations import translate, rotateby
-from rdkit import RDLogger
+from MDAnalysis.transformations import rotateby, translate
+from rdkit import Chem, RDLogger
+
+import prolif
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import _INTERACTIONS, Interaction, VdWContact, get_mapindex
-from rdkit import Chem, RDLogger
 
 from . import mol2factory
 

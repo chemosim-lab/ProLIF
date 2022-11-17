@@ -1,8 +1,9 @@
 import pytest
 from numpy.testing import assert_array_almost_equal
-from prolif.rdkitmol import BaseRDKitMol
 from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
+
+from prolif.rdkitmol import BaseRDKitMol
 
 
 class TestBaseRDKitMol:

@@ -4,6 +4,8 @@ from math import radians
 import numpy as np
 import pytest
 from numpy.testing import assert_equal
+from rdkit import Chem
+
 from prolif.residue import Residue, ResidueGroup, ResidueId
 from prolif.utils import (
     angle_between_limits,
@@ -15,7 +17,6 @@ from prolif.utils import (
     to_bitvectors,
     to_dataframe,
 )
-from rdkit import Chem
 
 
 def test_centroid():

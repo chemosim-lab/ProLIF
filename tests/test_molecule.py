@@ -1,11 +1,13 @@
-import pytest
 from copy import deepcopy
+
+import pytest
 from MDAnalysis import SelectionError
 from numpy.testing import assert_array_equal
+from rdkit import Chem
+
 from prolif.datafiles import datapath
 from prolif.molecule import Molecule, mol2_supplier, pdbqt_supplier, sdf_supplier
 from prolif.residue import ResidueId
-from rdkit import Chem
 
 from .test_base import TestBaseRDKitMol
 

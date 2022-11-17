@@ -4,12 +4,13 @@ import MDAnalysis as mda
 import numpy as np
 import pytest
 from pandas import DataFrame
+from rdkit.DataStructs import ExplicitBitVect
+
 from prolif.datafiles import datapath
 from prolif.fingerprint import Fingerprint, _InteractionWrapper
 from prolif.interactions import _INTERACTIONS, Interaction
 from prolif.molecule import sdf_supplier
 from prolif.residue import ResidueId
-from rdkit.DataStructs import ExplicitBitVect
 
 
 class Dummy(Interaction):

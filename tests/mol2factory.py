@@ -1,6 +1,7 @@
 import numpy as np
 from MDAnalysis import Universe
 from MDAnalysis.topology.guessers import guess_atom_element
+
 from prolif.datafiles import datapath
 from prolif.molecule import Molecule
 

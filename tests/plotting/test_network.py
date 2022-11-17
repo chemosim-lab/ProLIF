@@ -1,11 +1,13 @@
-from io import StringIO
-from tempfile import NamedTemporaryFile
 import os
 from contextlib import contextmanager
+from io import StringIO
+from tempfile import NamedTemporaryFile
+
 import MDAnalysis as mda
+import pytest
+
 import prolif as plf
 from prolif.plotting.network import LigNetwork
-import pytest
 
 
 @contextmanager

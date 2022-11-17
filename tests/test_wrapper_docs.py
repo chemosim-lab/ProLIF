@@ -1,5 +1,6 @@
-import prolif.interactions
 import pytest
+
+import prolif.interactions
 from prolif.fingerprint import Fingerprint, _Docstring
 
 interaction_list = [i for i in Fingerprint.list_available() if "Dummy" not in i]

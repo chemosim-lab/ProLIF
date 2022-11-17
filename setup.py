@@ -1,7 +1,9 @@
-from setuptools import setup
-import versioneer
-import re
 import os
+import re
+
+from setuptools import setup
+
+import versioneer
 
 GITHUB_ACTIONS = os.environ.get("GITHUB_ACTIONS", False)
 

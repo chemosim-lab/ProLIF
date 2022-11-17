@@ -8,16 +8,18 @@ Plot a Ligand Interaction Network --- :mod:`prolif.plotting.network`
    :members:
 
 """
-from copy import deepcopy
-from collections import defaultdict
-import warnings
 import json
 import re
+import warnings
+from collections import defaultdict
+from copy import deepcopy
 from html import escape
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import rdDepictor
+
 from ..residue import ResidueId
 from ..utils import requires
 
