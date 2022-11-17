@@ -243,6 +243,12 @@ def test_to_df_no_interaction_in_first_frame(ifp):
     to_dataframe(fp, ["A", "B", "C"])
 
 
+def test_to_df_empty_ifp():
+    ifp = [{"Frame": 0}, {"Frame": 1}]
+    df = to_dataframe(ifp, ["A"])
+    assert df.to_numpy().shape == (2, 0)
+
+
 def test_to_bv():
     df = to_dataframe(ifp, ["A", "B", "C"])
     bvs = to_bitvectors(df)

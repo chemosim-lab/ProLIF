@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Dead link in the quickstart notebook for the MDAnalysis quickstart (PR #75, @radifar).
 - The `pdbqt_supplier` now correctly preserves hydrogens from the input PDBQT file (PR #99).
+- If no interaction was detected, `to_dataframe` would error without giving a helpful message. It
+  now returns a dataframe with the correct number of frames in the index and no column.
 
 
 ## [1.0.0] - 2022-06-07

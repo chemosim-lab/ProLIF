@@ -246,6 +246,7 @@ def to_dataframe(
     # residue pairs
     keys = sorted(set([k for d in ifp for k in d.keys() if k != index_col]))
     # check if each interaction value is a list of atom indices or smthg else
+    has_atom_indices = False
     for d in ifp:
         for key, value in d.items():
             if key != index_col:
@@ -253,7 +254,7 @@ def to_dataframe(
                 break
     if return_atoms and not has_atom_indices:
         raise ValueError(
-            "The IFP either doesn't contain atom indices or is " "formatted incorrectly"
+            "The IFP either doesn't contain atom indices or is formatted incorrectly"
         )
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
@@ -279,6 +280,9 @@ def to_dataframe(
                 data[key].append(arr)
     index = pd.Series(index, name=index_col)
     # create dataframes
+    if not data:
+        warnings.warn("No interaction detected")
+        return pd.DataFrame([], index=index)
     values = np.array(
         [np.hstack([np.ravel(a[i]) for a in data.values()]) for i in range(len(index))]
     )
