@@ -91,6 +91,7 @@ class LigNetwork:
             "PiStacking": "#b559e3",
             "EdgeToFace": "#b559e3",
             "FaceToFace": "#b559e3",
+            "VdWContact": "#59e3ad",
         },
         "atoms": {
             "C": "black",
@@ -243,10 +244,16 @@ class LigNetwork:
         # regroup interactions of the same color
         temp = defaultdict(list)
         interactions = set(df.index.get_level_values("interaction").unique())
-        for interaction, color in self.COLORS["interactions"].items():
-            if interaction in interactions:
-                temp[color].append(interaction)
-        self._interaction_types = {i: "/".join(t) for c, t in temp.items() for i in t}
+        for interaction in interactions:
+            color = self.COLORS["interactions"].get(
+                interaction, self._default_interaction_color
+            )
+            temp[color].append(interaction)
+        self._interaction_types = {
+            interaction: "/".join(interaction_group)
+            for interaction_group in temp.values()
+            for interaction in interaction_group
+        }
 
     @classmethod
     def from_ifp(cls, ifp, lig, kind="aggregate", frame=0, threshold=0.3, **kwargs):
@@ -484,7 +491,9 @@ class LigNetwork:
                 "from": origin,
                 "to": prot_res,
                 "title": interaction,
-                "interaction_type": self._interaction_types[interaction],
+                "interaction_type": self._interaction_types.get(
+                    interaction, interaction
+                ),
                 "color": self.COLORS["interactions"].get(
                     interaction, self._default_interaction_color
                 ),
@@ -578,7 +587,7 @@ class LigNetwork:
         buttons = []
         map_color_restype = {c: t for t, c in self.COLORS["residues"].items()}
         map_color_interactions = {
-            self.COLORS["interactions"][i]: t
+            self.COLORS["interactions"].get(i, self._default_interaction_color): t
             for i, t in self._interaction_types.items()
         }
         # residues
@@ -598,7 +607,7 @@ class LigNetwork:
         for edge in self.edges:
             if edge.get("group", "") == "interaction":
                 color = edge["color"]
-                available[color] = map_color_interactions.get(color, "Unknown")
+                available[color] = map_color_interactions[color]
         available = {
             k: v for k, v in sorted(available.items(), key=lambda item: item[1])
         }
