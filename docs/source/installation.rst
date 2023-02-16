@@ -26,7 +26,7 @@ Then simply run the following command to install the library::
 
 Alternatively, you can install ProLIF with pip instead of conda::
 
-    pip install rdkit-pypi prolif
+    pip install rdkit prolif
 
 
 .. _conda: https://docs.conda.io/projects/conda/en/latest/user-guide/index.html
