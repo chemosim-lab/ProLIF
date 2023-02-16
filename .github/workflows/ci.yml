@@ -45,7 +45,8 @@ jobs:
         channels: conda-forge, defaults
         add-pip-as-python-dependency: true
         architecture: x64
-        mamba-version: "*"
+        use-mamba: true
+        miniforge-variant: Mambaforge
 
     - name: Check conda and pip
       run: |
