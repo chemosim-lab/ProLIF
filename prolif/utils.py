@@ -303,6 +303,7 @@ def to_dataframe(
         )
     df = pd.DataFrame(values, columns=columns, index=index)
     if has_atom_indices and return_atoms:
+        ## remove empty columns before grouping
         
         # check which cols only contain None
         isColNotAllNone = ~df.applymap(lambda x: x is None).all()
