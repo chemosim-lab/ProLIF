@@ -303,6 +303,18 @@ def to_dataframe(
         )
     df = pd.DataFrame(values, columns=columns, index=index)
     if has_atom_indices and return_atoms:
+        
+        # check which cols only contain None
+        isColNotAllNone = ~df.applymap(lambda x: x is None).all()
+        
+        # ensure the cols left are still always in pairs of two on the last column level axis
+        assert df[df.columns[isColNotAllNone]].groupby(axis=1, \
+                                             level=["ligand", "protein", "interaction"])\
+                                            .apply(lambda g: len(g.columns))\
+                                            .eq(2)\
+                                            .all()
+        # remove the empty columns before grouping
+        df = df[df.columns[isColNotAllNone]]
         df = df.groupby(axis=1, level=["ligand", "protein", "interaction"]).agg(tuple)
     if dtype:
         df = df.astype(dtype)
