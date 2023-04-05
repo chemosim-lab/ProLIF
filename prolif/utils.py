@@ -303,15 +303,25 @@ def to_dataframe(
         )
     df = pd.DataFrame(values, columns=columns, index=index)
     if has_atom_indices and return_atoms:
+        if drop_empty:
+            # remove empty columns before grouping
+            df = df[df.columns[~df.applymap(lambda x: x is None).all()]]
+            # ensure columns are still in pairs of two after groupby
+            assert (
+                df.groupby(axis=1, level=["ligand", "protein", "interaction"])
+                .apply(lambda g: len(g.columns))
+                .eq(2)
+                .all()
+            )
+        # aggregate each interaction for a pair of residues as a tuple of ligand and
+        # protein atom indices
         df = df.groupby(axis=1, level=["ligand", "protein", "interaction"]).agg(tuple)
-    if dtype:
-        df = df.astype(dtype)
-    if drop_empty:
-        if has_atom_indices and return_atoms:
-            mask = df.apply(lambda s: ~(s.isin([(None, None)]).all()), axis=0)
-        else:
+    else:
+        if dtype:
+            df = df.astype(dtype)
+        if drop_empty:
             mask = (df != empty_value).any(axis=0)
-        df = df.loc[:, mask]
+            df = df.loc[:, mask]
     return df
 
 

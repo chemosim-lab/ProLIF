@@ -6,7 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.0] - 2022-11-XX
+### Changed
+- Converting the IFP to a dataframe with atom indices has been optimized and now runs
+  about 5 times faster (Issue #112, PR #113 by @ReneHamburger1993).
+
+
+## [1.1.0] - 2022-11-18
 
 ### Added
 - `Fingerprint.run` now has a `converter_kwargs` parameter that can pass kwargs to the
