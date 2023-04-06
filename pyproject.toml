@@ -2,8 +2,7 @@
 line-length = 88
 extend-exclude = '''
 (
-  ^/versioneer.py
-  | ^/docs/conf.py
+  ^/docs/conf.py
 )
 '''
 

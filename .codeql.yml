@@ -3,4 +3,3 @@ queries:
 
 paths-ignore:
   - prolif/_version.py
-  - versioneer.py

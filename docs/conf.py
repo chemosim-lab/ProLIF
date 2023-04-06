@@ -24,7 +24,7 @@ from recommonmark.transform import AutoStructify
 # -- Project information -----------------------------------------------------
 
 project = "ProLIF"
-copyright = f"2020-{datetime.now().year}, Cédric Bouysset"
+copyright = f"2017-{datetime.now().year}, Cédric Bouysset"
 author = "Cédric Bouysset"
 
 
