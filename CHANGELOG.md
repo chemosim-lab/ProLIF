@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Converting the IFP to a dataframe with atom indices has been optimized and now runs
   about 5 times faster (Issue #112, PR #113 by @ReneHamburger1993).
+- Various changes related to packaging, code formatting, linting and CI pipelines
+  (PR #114).
 
 
 ## [1.1.0] - 2022-11-18
