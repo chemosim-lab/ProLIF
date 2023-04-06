@@ -1,20 +1,20 @@
-from pathlib import Path
-
 import pytest
 from MDAnalysis import Universe
 from rdkit import Chem
 
-from prolif.datafiles import TOP, TRAJ
+from prolif.datafiles import TOP, TRAJ, datapath
 from prolif.molecule import Molecule
 
 
 def pytest_sessionstart(session):
-    example_file = Path(TOP)
-    if example_file.exists():
-        print(f"Example data files found in {example_file!s}, proceeding with tests")
-    else:
+    if not datapath.exists():
         pytest.exit(
-            f"Example data files are not accessible: {example_file!s} does not exist"
+            f"Example data files are not accessible: {datapath!s} does not exist"
+        )
+    vina_path = datapath / "vina"
+    if not vina_path.exists():
+        pytest.exit(
+            f"Example Vina data files are not accessible: {vina_path!s} does not exist"
         )
 
 
