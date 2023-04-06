@@ -76,7 +76,7 @@ class Interaction(ABC, metaclass=_InteractionMeta):
     """
 
     @abstractmethod
-    def detect(self, **kwargs):
+    def detect(self, lig_res, prot_res):
         pass
 
 
