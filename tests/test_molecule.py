@@ -9,7 +9,7 @@ from prolif.datafiles import datapath
 from prolif.molecule import Molecule, mol2_supplier, pdbqt_supplier, sdf_supplier
 from prolif.residue import ResidueId
 
-from .test_base import TestBaseRDKitMol
+from test_base import TestBaseRDKitMol
 
 
 class TestMolecule(TestBaseRDKitMol):

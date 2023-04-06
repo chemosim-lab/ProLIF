@@ -5,7 +5,7 @@ from rdkit.Chem import AllChem
 
 from prolif.residue import Residue, ResidueGroup, ResidueId
 
-from .test_base import TestBaseRDKitMol
+from test_base import TestBaseRDKitMol
 
 
 class TestResidueId:

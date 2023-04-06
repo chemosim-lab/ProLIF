@@ -63,7 +63,7 @@ jobs:
 
     - name: Install package through pip
       run: |
-        pip install .[tests]
+        pip install .[dev]
         pip list
 
     - name: Run tests
@@ -80,7 +80,7 @@ jobs:
 
     - name: Build
       run: |
-        python setup.py sdist bdist_wheel
+        python -m build
     
     - name: Remove previous ProLIF install
       run: |

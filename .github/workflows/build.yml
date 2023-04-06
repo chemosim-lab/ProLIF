@@ -23,7 +23,7 @@ jobs:
     
     - name: Install dependencies for packaging
       run: |
-        pip install setuptools wheel
+        pip install build
     
     - name: Check python installation
       run: |
@@ -34,7 +34,7 @@ jobs:
 
     - name: Build package
       run: |
-        python setup.py sdist bdist_wheel
+        python -m build
     
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@master

@@ -64,8 +64,8 @@ zip-safe = false
 include-package-data = false
 
 [tool.setuptools.packages.find]
+where = ["."]
 include = ["prolif*"]
-exclude = ["tests*", "docs*"]
 
 [tool.setuptools.package-data]
 "prolif.data" = ["*"]
