@@ -85,6 +85,7 @@ intersphinx_mapping = {
     "https://pandas.pydata.org/docs/": None,
 }
 
+
 # app setup hook
 def setup(app):
     app.add_config_value(

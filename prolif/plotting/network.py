@@ -474,7 +474,7 @@ class LigNetwork:
                 "residue_type": restype,
             }
             self.nodes[prot_res] = node
-        for ((lig_res, prot_res, interaction, lig_id), (weight,)) in self.df.iterrows():
+        for (lig_res, prot_res, interaction, lig_id), (weight,) in self.df.iterrows():
             if interaction in self._LIG_PI_INTERACTIONS:
                 centroid = self._get_ring_centroid(lig_id)
                 origin = str((lig_res, prot_res, interaction))
