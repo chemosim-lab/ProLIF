@@ -34,7 +34,7 @@ jobs:
             rdkit-version: "rdkit=2021.03.1"
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Setup Conda
       uses: conda-incubator/setup-miniconda@v2
@@ -58,7 +58,7 @@ jobs:
 
     - name: Install conda dependencies
       run: |
-        mamba install ${{ matrix.rdkit-version }} wheel
+        mamba install ${{ matrix.rdkit-version }}
         mamba list
 
     - name: Install package through pip
@@ -81,7 +81,7 @@ jobs:
     - name: Build
       run: |
         python -m build
-    
+
     - name: Remove previous ProLIF install
       run: |
         pip uninstall -y prolif
@@ -89,7 +89,7 @@ jobs:
     - name: Install from tar.gz
       run: |
         pip install dist/prolif-*.tar.gz
-    
+
     - name: Test tar.gz install
       run: |
         python <<EOF
@@ -107,7 +107,7 @@ jobs:
     - name: Install from wheel
       run: |
         pip install dist/prolif-*.whl
-    
+
     - name: Test wheel install
       run: |
         python <<EOF

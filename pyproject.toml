@@ -64,7 +64,6 @@ zip-safe = false
 include-package-data = false
 
 [tool.setuptools.packages.find]
-where = ["."]
 include = ["prolif*"]
 
 [tool.setuptools.package-data]
@@ -75,11 +74,6 @@ version = { attr = "prolif._version.__version__" }
 
 [tool.black]
 line-length = 88
-extend-exclude = '''
-(
-  ^/docs/conf.py
-)
-'''
 
 [tool.isort]
 profile = "black"
