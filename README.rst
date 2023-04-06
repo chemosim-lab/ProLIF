@@ -9,7 +9,7 @@ ProLIF
     * - **Tutorials**
       - |binder|
     * - **CI**
-      - |tests| |codecov| |lgtm|
+      - |tests| |codecov| |codeql|
     * - **Builds**
       - |conda-version| |pypi-version| |build|
     * - **Dependencies**
@@ -76,11 +76,11 @@ Unless otherwise noted, all files in this directory and all subdirectories are d
     :alt: Conda-forge version
 
 .. |build| image:: https://github.com/chemosim-lab/ProLIF/workflows/build/badge.svg
-    :target: https://github.com/chemosim-lab/ProLIF/actions?query=workflow%3Abuild
+    :target: https://github.com/chemosim-lab/ProLIF/actions/workflows/build.yml
     :alt: Build status
 
 .. |tests| image:: https://github.com/chemosim-lab/ProLIF/workflows/tests/badge.svg?branch=master
-    :target: https://github.com/chemosim-lab/ProLIF/actions?query=workflow%3Atests
+    :target: https://github.com/chemosim-lab/ProLIF/actions/workflows/ci.yml
     :alt: Tests status
 
 .. |codecov| image:: https://codecov.io/gh/chemosim-lab/ProLIF/branch/master/graph/badge.svg?token=2FCHV08G8A
@@ -90,8 +90,8 @@ Unless otherwise noted, all files in this directory and all subdirectories are d
     :target: https://prolif.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
-.. |lgtm| image:: https://img.shields.io/lgtm/grade/python/g/chemosim-lab/ProLIF.svg?logo=lgtm&logoWidth=18
-    :target: https://lgtm.com/projects/g/chemosim-lab/ProLIF/context:python
+.. |codeql| image:: https://github.com/chemosim-lab/ProLIF/workflows/CodeQL/badge.svg?branch=master
+    :target: https://github.com/chemosim-lab/ProLIF/actions/workflows/codeql.yml
     :alt: Code quality
 
 .. |license| image:: https://img.shields.io/pypi/l/prolif
