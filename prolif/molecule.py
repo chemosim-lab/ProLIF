@@ -295,7 +295,6 @@ class pdbqt_supplier(Sequence):
         # sanitize
         mol.UpdatePropertyCache()
         Chem.SanitizeMol(mol)
-        # mol = Chem.AddHs(mol, addCoords=True, addResidueInfo=False)
         return mol
 
     def __len__(self):
@@ -409,19 +408,21 @@ class mol2_supplier(Sequence):
         if index < 0:
             index %= len(self)
         mol_index = -1
+        molblock_started = False
         block = []
         with open(self.path, "r") as f:
             for line in f:
                 if line.startswith("@<TRIPOS>MOLECULE"):
                     mol_index += 1
-                    if index == mol_index and not block:
-                        block.append(line)
-                    elif mol_index > index:
+                    if mol_index > index:
                         return self.block_to_mol(block)
-                elif block:
+                    if mol_index == index:
+                        molblock_started = True
+                if molblock_started:
                     block.append(line)
-            else:
-                return self.block_to_mol(block)
+        if block:
+            return self.block_to_mol(block)
+        raise ValueError(f"Could not parse molecule with index {index}")
 
     def __len__(self):
         with open(self.path, "r") as f:

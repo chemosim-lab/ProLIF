@@ -9,7 +9,7 @@ import prolif
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import _INTERACTIONS, Interaction, VdWContact, get_mapindex
 
-from . import mol2factory
+import mol2factory
 
 # disable rdkit warnings
 lg = RDLogger.logger()

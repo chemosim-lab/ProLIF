@@ -18,23 +18,31 @@ concurrency:
 
 jobs:
   tests:
-    name: CI - ${{ matrix.os }} / Py${{ matrix.python-version }} / ${{ matrix.rdkit-version }}
+    name: ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     # only run once if internal PR
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
         matrix:
-          os: [ubuntu-latest]
-          python-version: [3.9, "3.10"]
-          rdkit-version: ["rdkit>2021.03.1"]
           include:
-          - name: Min version
+          - label: earliest
             os: ubuntu-latest
             python-version: 3.8
             rdkit-version: "rdkit=2021.03.1"
+            coverage: false
+          - label: baseline
+            os: ubuntu-latest
+            python-version: 3.9
+            rdkit-version: "rdkit~=2022.09"
+            coverage: true
+          - label: latest
+            os: ubuntu-latest
+            python-version: "3.10"
+            rdkit-version: "rdkit"
+            coverage: false
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Setup Conda
       uses: conda-incubator/setup-miniconda@v2
@@ -58,12 +66,12 @@ jobs:
 
     - name: Install conda dependencies
       run: |
-        mamba install ${{ matrix.rdkit-version }} wheel
+        mamba install ${{ matrix.rdkit-version }}
         mamba list
 
     - name: Install package through pip
       run: |
-        pip install .[tests]
+        pip install .[dev]
         pip list
 
     - name: Run tests
@@ -71,16 +79,18 @@ jobs:
         pytest --color=yes --disable-pytest-warnings --cov=prolif --cov-report=xml tests/
 
     - name: Measure tests coverage
+      if: matrix.coverage
       uses: codecov/codecov-action@v3
       with:
         files: ./coverage.xml
-        fail_ci_if_error: True
-        verbose: True
+        fail_ci_if_error: true
+        verbose: true
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Build
       run: |
-        python setup.py sdist bdist_wheel
-    
+        python -m build
+
     - name: Remove previous ProLIF install
       run: |
         pip uninstall -y prolif
@@ -88,7 +98,7 @@ jobs:
     - name: Install from tar.gz
       run: |
         pip install dist/prolif-*.tar.gz
-    
+
     - name: Test tar.gz install
       run: |
         python <<EOF
@@ -106,7 +116,7 @@ jobs:
     - name: Install from wheel
       run: |
         pip install dist/prolif-*.whl
-    
+
     - name: Test wheel install
       run: |
         python <<EOF

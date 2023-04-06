@@ -747,8 +747,8 @@ class Fingerprint:
         if path:
             with open(path, "wb") as f:
                 pickle.dump(self, f)
-        else:
-            return pickle.dumps(self)
+            return None
+        return pickle.dumps(self)
 
     @classmethod
     def from_pickle(cls, path_or_bytes):

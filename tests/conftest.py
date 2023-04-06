@@ -2,8 +2,20 @@ import pytest
 from MDAnalysis import Universe
 from rdkit import Chem
 
-from prolif.datafiles import TOP, TRAJ
+from prolif.datafiles import TOP, TRAJ, datapath
 from prolif.molecule import Molecule
+
+
+def pytest_sessionstart(session):
+    if not datapath.exists():
+        pytest.exit(
+            f"Example data files are not accessible: {datapath!s} does not exist"
+        )
+    vina_path = datapath / "vina"
+    if not vina_path.exists():
+        pytest.exit(
+            f"Example Vina data files are not accessible: {vina_path!s} does not exist"
+        )
 
 
 @pytest.fixture(scope="session")
