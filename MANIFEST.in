@@ -1,3 +1,0 @@
-include README.rst LICENSE CHANGELOG.md
-recursive-include prolif/data *
-include prolif/_version.py

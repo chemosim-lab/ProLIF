@@ -1,3 +1,78 @@
+[project]
+name = "prolif"
+description = "Interaction Fingerprints for protein-ligand complexes and more"
+authors = [
+  { name = "Cédric Bouysset", email = "cedric@bouysset.net" },
+]
+readme = "README.rst"
+requires-python = ">=3.8"
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+keywords = [
+    "science",
+    "chemistry",
+    "drug-design",
+    "cheminformatics",
+    "chemoinformatics",
+    "molecular-dynamics",
+    "interaction-fingerprint",
+]
+dependencies = [
+    "pandas>=1.0.0",
+    "numpy>=1.13.3",
+    "scipy>=1.3.0",
+    "mdanalysis>=2.2.0",
+    "tqdm",
+]
+
+[project.license]
+file = "LICENSE"
+
+[project.optional-dependencies]
+build = [
+    "build",
+]
+tests = [
+    "pytest>=6.1.2",
+    "pytest-cov",
+    "codecov",
+]
+dev = [
+    "prolif[build,tests]",
+]
+
+[project.urls]
+Homepage = "https://github.com/chemosim-lab/ProLIF"
+Documentation = "https://prolif.readthedocs.io/en/stable/"
+Discussions = "https://github.com/chemosim-lab/ProLIF/discussions"
+Issues = "https://github.com/chemosim-lab/ProLIF/issues"
+Changelog = "https://github.com/chemosim-lab/ProLIF/blob/master/CHANGELOG.md"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["prolif*"]
+exclude = ["tests*", "docs*"]
+
+[tool.setuptools.package-data]
+"prolif.data" = ["*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "prolif._version.__version__" }
+
 [tool.black]
 line-length = 88
 extend-exclude = '''
@@ -8,3 +83,7 @@ extend-exclude = '''
 
 [tool.isort]
 profile = "black"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
