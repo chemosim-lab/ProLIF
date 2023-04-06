@@ -1,0 +1,6 @@
+queries:
+  - uses: security-and-quality
+
+paths-ignore:
+  - prolif/_version.py
+  - versioneer.py
