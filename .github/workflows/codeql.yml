@@ -16,9 +16,7 @@ jobs:
       security-events: write
 
     strategy:
-      fail-fast: false
-      matrix:
-        language: [ python ]
+      fail-fast: true
 
     steps:
       - name: Checkout
@@ -27,14 +25,8 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
-          languages: ${{ matrix.language }}
-          config-file: ./.github/codeql.yml
-          queries: +security-and-quality
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v2
+          languages: python
+          config-file: ./.codeql.yml
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
-        with:
-          category: "/language:${{ matrix.language }}"
