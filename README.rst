@@ -52,7 +52,7 @@ License
 
 Unless otherwise noted, all files in this directory and all subdirectories are distributed under the Apache License, Version 2.0 ::
 
-    Copyright 2017-2022 Cédric BOUYSSET
+    Copyright 2017-2023 Cédric BOUYSSET
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
