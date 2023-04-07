@@ -2,10 +2,9 @@ import pytest
 from numpy.testing import assert_equal
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from test_base import TestBaseRDKitMol
 
 from prolif.residue import Residue, ResidueGroup, ResidueId
-
-from test_base import TestBaseRDKitMol
 
 
 class TestResidueId:
@@ -74,8 +73,8 @@ class TestResidueId:
     def test_from_atom_no_mi(self):
         atom = Chem.Atom(1)
         resid = ResidueId.from_atom(atom)
-        assert resid.name is "UNK"
-        assert resid.number is 0
+        assert resid.name == "UNK"
+        assert resid.number == 0
         assert resid.chain is None
 
     @pytest.mark.parametrize(
