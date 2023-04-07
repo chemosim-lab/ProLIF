@@ -2,9 +2,10 @@ import pytest
 from numpy.testing import assert_equal
 from rdkit import Chem
 from rdkit.Chem import AllChem
-from test_base import TestBaseRDKitMol
 
 from prolif.residue import Residue, ResidueGroup, ResidueId
+
+from .test_base import TestBaseRDKitMol
 
 
 class TestResidueId:
