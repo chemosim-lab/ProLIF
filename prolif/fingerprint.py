@@ -48,67 +48,6 @@ from .parallel import (
 from .utils import get_residues_near_ligand, to_bitvectors, to_dataframe
 
 
-class _InteractionWrapper:
-    """Modifies the return signature of an interaction ``detect`` method by
-    forcing it to return only the first element when multiple values are
-    returned.
-
-    Raises
-    ------
-    TypeError
-        If the ``detect`` method doesn't return three values
-
-    Notes
-    -----
-    The original return signature of the decorated function is still accessible
-    by calling ``function.__wrapped__(*args, **kwargs)``.
-
-    Example
-    -------
-    ::
-
-        >>> class Foo:
-        ...     def detect(self, *args):
-        ...         return 1, 2, 3
-        ...
-        >>> foo = Foo().detect
-        >>> bar = _InteractionWrapper(foo)
-        >>> foo()
-        (1, 2, 3)
-        >>> bar()
-        1
-        >>> bar.__wrapped__()
-        (1, 2, 3)
-
-    .. versionchanged:: 0.3.3
-        The function now must return three values
-
-    .. versionchanged:: 1.0.0
-        Changed from a wrapper function to a class for easier pickling support
-
-    """
-
-    def __init__(self, func):
-        self.__wrapped__ = func
-        # add docstring to descriptor
-        self.__doc__ = func
-
-    def __repr__(self):  # pragma: no cover
-        cls = self.__wrapped__.__self__.__class__
-        return f"<{cls.__module__}.{cls.__name__} at {id(self):#x}>"
-
-    def __call__(self, *args, **kwargs):
-        results = self.__wrapped__(*args, **kwargs)
-        try:
-            bool_, lig_idx, prot_idx = results
-        except (TypeError, ValueError):
-            raise TypeError(
-                "Incorrect function signature: the interaction class must "
-                "return 3 values (boolean, int, int)"
-            ) from None
-        return bool_
-
-
 class Fingerprint:
     """Class that generates an interaction fingerprint between two molecules
 
@@ -214,11 +153,10 @@ class Fingerprint:
         for name, interaction_cls in _INTERACTIONS.items():
             if name.startswith("_") or name == "Interaction":
                 continue
-            func = interaction_cls().detect
-            func = _InteractionWrapper(func)
-            setattr(self, name.lower(), func)
+            interaction = interaction_cls()
+            setattr(self, name.lower(), interaction)
             if name in interactions:
-                self.interactions[name] = func
+                self.interactions[name] = interaction
 
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])

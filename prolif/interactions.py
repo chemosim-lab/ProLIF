@@ -68,18 +68,6 @@ class _InteractionMeta(ABCMeta):
         _INTERACTIONS[name] = cls
 
 
-class Interaction(ABC, metaclass=_InteractionMeta):
-    """Abstract class for interactions
-
-    All interaction classes must inherit this class and define a
-    :meth:`~detect` method
-    """
-
-    @abstractmethod
-    def detect(self, lig_res, prot_res):
-        pass
-
-
 def get_mapindex(res, index):
     """Get the index of the atom in the original molecule
 
@@ -98,6 +86,26 @@ def get_mapindex(res, index):
     return res.GetAtomWithIdx(index).GetUnsignedProp("mapindex")
 
 
+class Interaction(ABC, metaclass=_InteractionMeta):
+    """Base class for interactions
+
+    All interaction classes must inherit this class and define a
+    :meth:`~detect` method.
+
+    .. versionchanged:: 2.0.0
+        Changed the return type of interactions
+    """
+
+    @abstractmethod
+    def detect(self, lig_res, prot_res):
+        pass
+
+    def __call__(self, lig_res, prot_res):
+        return self.detect(lig_res, prot_res)
+
+    def __repr__(self):  # pragma: no cover
+        cls = self.__class__
+        return f"<{cls.__module__}.{cls.__name__} at {id(self):#x}>"
 class _Distance(Interaction):
     """Generic class for distance-based interactions
 
