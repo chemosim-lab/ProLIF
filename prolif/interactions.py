@@ -6,13 +6,31 @@ You can declare your own interaction class like this::
 
     from scipy.spatial import distance_matrix
 
-    class CloseContact(prolif.Interaction):
-        def detect(self, res1, res2, threshold=2.0):
-            dist_matrix = distance_matrix(res1.xyz, res2.xyz)
-            if (dist_matrix <= threshold).any():
-                # return format: bool, ligand atom index, protein atom index
-                return True, None, None
-            return False, None, None
+    class CloseContact(prolif.interactions.Interaction):
+        def __init__(self, contact_threshold=2.0):
+            self.contact_threshold = contact_threshold
+
+        def detect(self, ligand_residue, protein_residue):
+            # distance matrix between atoms of both residues
+            dist_matrix = distance_matrix(ligand_residue.xyz, protein_residue.xyz)
+            if (dist_matrix <= self.contact_threshold).any():
+                # indices of atoms with the shortest distance
+                ligand_index, protein_index = divmod(
+                    dist_matrix.argmin(), dist_matrix.shape[1]
+                )
+                # shortest distance value
+                min_dist = dist_matrix[ligand_index, protein_index]
+                # return dict with metadata on the interaction
+                # required arguments: input residues, and tuple of indices of atoms
+                #                     responsible for the interaction
+                # optional arguments: any additional `key=value` pair (e.g. distance)
+                return self.metadata(
+                    lig_res=ligand_residue,
+                    prot_res=protein_residue,
+                    lig_indices=(ligand_index,),
+                    prot_indices=(protein_index,),
+                    distance=min_dist,
+                )
 
 .. warning:: Your custom class must inherit from :class:`prolif.interactions.Interaction`
 
@@ -22,15 +40,19 @@ interactions available to the fingerprint generator::
     >>> u = mda.Universe(prolif.datafiles.TOP, prolif.datafiles.TRAJ)
     >>> prot = u.select_atoms("protein")
     >>> lig = u.select_atoms("resname LIG")
-    >>> fp = prolif.Fingerprint(interactions="all")
-    >>> df = fp.run(u.trajectory[0:1], lig, prot).to_dataframe()
+    >>> fp = prolif.Fingerprint(interactions=["CloseContact"])
+    >>> fp.run(u.trajectory[0:1], lig, prot)
+    >>> df = fp.to_dataframe()
     >>> df.xs("CloseContact", level=1, axis=1)
-       ASP129.A  VAL201.A
-    0         1         1
+    ligand            LIG1.G             
+    protein         ASP129.A     VAL201.A
+    interaction CloseContact CloseContact
+    Frame                                
+    0                   True         True
     >>> lmol = prolif.Molecule.from_mda(lig)
     >>> pmol = prolif.Molecule.from_mda(prot)
     >>> fp.closecontact(lmol, pmol["ASP129.A"])
-    True
+    {'indices': {'ligand': (52,), 'protein': (8,)}, 'parent_indices': {'ligand': (52,), 'protein': (1489,)}, 'distance': 1.7540241205623204}
 
 Note that some of the SMARTS patterns used in the interaction classes are inspired from
 `Pharmit`_ and `RDKit`_.
@@ -100,12 +122,53 @@ class Interaction(ABC, metaclass=_InteractionMeta):
     def detect(self, lig_res, prot_res):
         pass
 
-    def __call__(self, lig_res, prot_res):
-        return self.detect(lig_res, prot_res)
+    def __call__(self, lig_res, prot_res, metadata=False):
+        int_data = self.detect(lig_res, prot_res)
+        return int_data if metadata else (int_data is not None)
 
     def __repr__(self):  # pragma: no cover
         cls = self.__class__
         return f"<{cls.__module__}.{cls.__name__} at {id(self):#x}>"
+
+    @staticmethod
+    def metadata(lig_res, prot_res, lig_indices, prot_indices, **data):
+        """Returns a dict containing the indices of atoms responsible for the
+        interaction, alongside any other metrics (e.g. distance, angle...etc.)."""
+        return {
+            "indices": {
+                "ligand": lig_indices,
+                "protein": prot_indices,
+            },
+            "parent_indices": {
+                "ligand": tuple(
+                    [get_mapindex(lig_res, index) for index in lig_indices]
+                ),
+                "protein": tuple(
+                    [get_mapindex(prot_res, index) for index in prot_indices]
+                ),
+            },
+            **data,
+        }
+
+    @staticmethod
+    def invert_role(metadata):
+        """Invert the role of the ligand and protein components in the dict returned
+        by :meth:`~Interaction.metadata`."""
+        if metadata is not None:
+            metadata["indices"]["protein"], metadata["indices"]["ligand"] = (
+                metadata["indices"]["ligand"],
+                metadata["indices"]["protein"],
+            )
+            (
+                metadata["parent_indices"]["protein"],
+                metadata["parent_indices"]["ligand"],
+            ) = (
+                metadata["parent_indices"]["ligand"],
+                metadata["parent_indices"]["protein"],
+            )
+        return metadata
+
+
 class _Distance(Interaction):
     """Generic class for distance-based interactions
 
@@ -131,9 +194,11 @@ class _Distance(Interaction):
             for lig_match, prot_match in product(lig_matches, prot_matches):
                 alig = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
                 aprot = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
-                if alig.Distance(aprot) <= self.distance:
-                    return True, lig_match[0], prot_match[0]
-        return False, None, None
+                dist = alig.Distance(aprot)
+                if dist <= self.distance:
+                    return self.metadata(
+                        lig_res, prot_res, lig_match, prot_match, distance=dist
+                    )
 
 
 class Hydrophobic(_Distance):
@@ -207,29 +272,33 @@ class _BaseHBond(Interaction):
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 h = Geometry.Point3D(*donor.xyz[donor_match[1]])
                 a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
-                if d.Distance(a) <= self.distance:
+                dist = d.Distance(a)
+                if dist <= self.distance:
                     hd = h.DirectionVector(d)
                     ha = h.DirectionVector(a)
                     # get DHA angle
                     angle = hd.AngleTo(ha)
                     if angle_between_limits(angle, *self.angles):
-                        return True, acceptor_match[0], donor_match[1]
-        return False, None, None
+                        return self.metadata(
+                            acceptor,
+                            donor,
+                            acceptor_match,
+                            donor_match,
+                            distance=dist,
+                            angle=np.degrees(angle),
+                        )
+
+
+class HBAcceptor(_BaseHBond):
+    """Hbond interaction between a ligand (acceptor) and a residue (donor)"""
 
 
 class HBDonor(_BaseHBond):
     """Hbond interaction between a ligand (donor) and a residue (acceptor)"""
 
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
-
-
-class HBAcceptor(_BaseHBond):
-    """Hbond interaction between a ligand (acceptor) and a residue (donor)"""
-
-    def detect(self, ligand, residue):
-        return super().detect(ligand, residue)
+        metadata = super().detect(residue, ligand)
+        return self.invert_role(metadata)
 
 
 class _BaseXBond(Interaction):
@@ -276,35 +345,40 @@ class _BaseXBond(Interaction):
                 d = Geometry.Point3D(*donor.xyz[donor_match[0]])
                 x = Geometry.Point3D(*donor.xyz[donor_match[1]])
                 a = Geometry.Point3D(*acceptor.xyz[acceptor_match[0]])
-                if x.Distance(a) <= self.distance:
+                dist = x.Distance(a)
+                if dist <= self.distance:
                     # D-X ... A angle
                     xd = x.DirectionVector(d)
                     xa = x.DirectionVector(a)
-                    angle = xd.AngleTo(xa)
-                    if angle_between_limits(angle, *self.axd_angles):
+                    axd = xd.AngleTo(xa)
+                    if angle_between_limits(axd, *self.axd_angles):
                         # X ... A-R angle
                         r = Geometry.Point3D(*acceptor.xyz[acceptor_match[1]])
                         ax = a.DirectionVector(x)
                         ar = a.DirectionVector(r)
-                        angle = ax.AngleTo(ar)
-                        if angle_between_limits(angle, *self.xar_angles):
-                            return True, acceptor_match[0], donor_match[1]
-        return False, None, None
+                        xar = ax.AngleTo(ar)
+                        if angle_between_limits(xar, *self.xar_angles):
+                            return self.metadata(
+                                acceptor,
+                                donor,
+                                acceptor_match,
+                                donor_match,
+                                distance=dist,
+                                AXD_angle=np.degrees(axd),
+                                XAR_angle=np.degrees(xar),
+                            )
 
 
 class XBAcceptor(_BaseXBond):
     """Halogen bonding between a ligand (acceptor) and a residue (donor)"""
-
-    def detect(self, ligand, residue):
-        return super().detect(ligand, residue)
 
 
 class XBDonor(_BaseXBond):
     """Halogen bonding between a ligand (donor) and a residue (acceptor)"""
 
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
+        metadata = super().detect(residue, ligand)
+        return self.invert_role(metadata)
 
 
 class _BaseIonic(_Distance):
@@ -327,16 +401,13 @@ class _BaseIonic(_Distance):
 class Cationic(_BaseIonic):
     """Ionic interaction between a ligand (cation) and a residue (anion)"""
 
-    def detect(self, ligand, residue):
-        return super().detect(ligand, residue)
-
 
 class Anionic(_BaseIonic):
     """Ionic interaction between a ligand (anion) and a residue (cation)"""
 
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
+        metadata = super().detect(residue, ligand)
+        return self.invert_role(metadata)
 
 
 class _BaseCationPi(Interaction):
@@ -388,7 +459,8 @@ class _BaseCationPi(Interaction):
                 # centroid of pi-system as 3d point
                 centroid = Geometry.Point3D(*get_centroid(pi_coords))
                 # distance between cation and centroid
-                if cat.Distance(centroid) > self.distance:
+                dist = cat.Distance(centroid)
+                if dist > self.distance:
                     continue
                 # vector normal to ring plane
                 normal = get_ring_normal_vector(centroid, pi_coords)
@@ -398,8 +470,14 @@ class _BaseCationPi(Interaction):
                 # centroid-cation
                 angle = normal.AngleTo(centroid_cation)
                 if angle_between_limits(angle, *self.angles, ring=True):
-                    return True, cation_match[0], pi_match[0]
-        return False, None, None
+                    return self.metadata(
+                        cation,
+                        pi,
+                        cation_match,
+                        pi_match,
+                        distance=dist,
+                        angle=np.degrees(angle),
+                    )
 
 
 class PiCation(_BaseCationPi):
@@ -407,16 +485,12 @@ class PiCation(_BaseCationPi):
     (cation)"""
 
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
+        metadata = super().detect(residue, ligand)
+        return self.invert_role(metadata)
 
 
 class CationPi(_BaseCationPi):
-    """Cation-Pi interaction between a ligand (cation) and a residue
-    (aromatic ring)"""
-
-    def detect(self, ligand, residue):
-        return super().detect(ligand, residue)
+    """Cation-Pi interaction between a ligand (cation) and a residue (aromatic ring)"""
 
 
 class _BasePiStacking(Interaction):
@@ -509,8 +583,14 @@ class _BasePiStacking(Interaction):
                     )
                     if intersect_dist > self.ring_radius:
                         continue
-                return True, lig_match[0], res_match[0]
-        return False, None, None
+                return self.metadata(
+                    ligand,
+                    residue,
+                    lig_match,
+                    res_match,
+                    distance=cdist,
+                    angle=np.degrees(plane_angle),
+                )
 
     @staticmethod
     def _get_intersect_point(
@@ -591,9 +671,6 @@ class EdgeToFace(_BasePiStacking):
         self.edge = True
         self.ring_radius = ring_radius
 
-    def detect(self, ligand, residue):
-        return super().detect(ligand, residue)
-
 
 class PiStacking(Interaction):
     """Pi-Stacking interaction between a ligand and a residue
@@ -620,10 +697,7 @@ class PiStacking(Interaction):
         self.etf = EdgeToFace(**etf_kwargs or {})
 
     def detect(self, ligand, residue):
-        ftf = self.ftf.detect(ligand, residue)
-        if ftf[0] is True:
-            return ftf
-        return self.etf.detect(ligand, residue)
+        return self.ftf.detect(ligand, residue) or self.etf.detect(ligand, residue)
 
 
 class _BaseMetallic(_Distance):
@@ -656,16 +730,13 @@ class _BaseMetallic(_Distance):
 class MetalDonor(_BaseMetallic):
     """Metallic interaction between a metal and a residue (chelated)"""
 
-    def detect(self, ligand, residue):
-        return super().detect(ligand, residue)
-
 
 class MetalAcceptor(_BaseMetallic):
     """Metallic interaction between a ligand (chelated) and a metal residue"""
 
     def detect(self, ligand, residue):
-        bit, ires, ilig = super().detect(residue, ligand)
-        return bit, ilig, ires
+        metadata = super().detect(residue, ligand)
+        return self.invert_role(metadata)
 
 
 class VdWContact(Interaction):
@@ -705,5 +776,6 @@ class VdWContact(Interaction):
                 rxyz.GetAtomPosition(ra.GetIdx())
             )
             if dist <= vdw:
-                return True, la.GetIdx(), ra.GetIdx()
-        return False, None, None
+                return self.metadata(
+                    ligand, residue, (la.GetIdx(),), (ra.GetIdx(),), distance=dist
+                )

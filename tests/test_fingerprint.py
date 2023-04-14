@@ -7,7 +7,7 @@ from pandas import DataFrame
 from rdkit.DataStructs import ExplicitBitVect
 
 from prolif.datafiles import datapath
-from prolif.fingerprint import Fingerprint, _InteractionWrapper
+from prolif.fingerprint import Fingerprint
 from prolif.interactions import _INTERACTIONS, Interaction
 from prolif.molecule import sdf_supplier
 from prolif.residue import ResidueId
@@ -15,34 +15,14 @@ from prolif.residue import ResidueId
 
 class Dummy(Interaction):
     def detect(self, res1, res2):
-        return True, 4, 2
+        return self.metadata(res1, res2, (2,), (4,), distance=4.2)
 
 
-class Return:
-    def detect(self, *args):
-        return args if len(args) > 1 else args[0]
-
-
-def test_wrapper_return():
-    detect = Dummy().detect
-    mod = _InteractionWrapper(detect)
-    assert detect("foo", "bar") == (True, 4, 2)
-    assert mod("foo", "bar") is True
-    assert mod.__wrapped__("foo", "bar") == (True, 4, 2)
-
-
-def test_wrapper_repr():
-    mod = _InteractionWrapper(Dummy().detect)
-    _repr = repr(mod)
+def test_interaction_base():
+    interaction = Dummy()
+    _repr = repr(interaction)
     assert _repr.startswith("<") and ".Dummy at " in _repr
-
-
-@pytest.mark.parametrize("returned", [True, (True,), (True, 4)])
-def test_wrapper_incorrect_return(returned):
-    mod = _InteractionWrapper(Return().detect)
-    assert mod.__wrapped__(returned) == returned
-    with pytest.raises(TypeError, match="Incorrect function signature"):
-        mod(returned)
+    assert callable(interaction)
 
 
 class TestFingerprint:
@@ -74,10 +54,6 @@ class TestFingerprint:
     def test_n_interactions(self, fp):
         assert fp.n_interactions == len(fp.interactions)
 
-    def test_wrapped(self, fp_simple):
-        assert fp_simple.dummy("foo", "bar") == 1
-        assert fp_simple.dummy.__wrapped__("foo", "bar") == (True, 4, 2)
-
     def test_bitvector(self, fp, ligand_mol, protein_mol):
         bv = fp.bitvector(ligand_mol, protein_mol["ASP129.A"])
         assert len(bv) == fp.n_interactions
@@ -94,23 +70,27 @@ class TestFingerprint:
 
     def test_run_residues(self, fp_simple, u, ligand_ag, protein_ag):
         fp_simple.run(
-            u.trajectory[0:1], ligand_ag, protein_ag, residues="all", progress=False
+            u.trajectory[0:1],
+            ligand_ag,
+            protein_ag,
+            residues=["TYR109.A"],
+            progress=False,
         )
         lig_id = ResidueId.from_string("LIG1.G")
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
-        res = ResidueId.from_string("LYS387.B")
+        res = ResidueId.from_string("TYR109.A")
         assert (lig_id, res) in fp_simple.ifp[0].keys()
         fp_simple.run(
             u.trajectory[1:2],
             ligand_ag,
             protein_ag,
-            residues=["ASP129.A"],
+            residues="all",
             progress=False,
         )
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
-        res = ResidueId.from_string("ASP129.A")
+        res = ResidueId.from_string("TRP125.A")
         assert (lig_id, res) in fp_simple.ifp[0].keys()
         fp_simple.run(
             u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
@@ -118,7 +98,7 @@ class TestFingerprint:
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 3
         assert len(fp_simple.ifp[0]) > 1
-        res = ResidueId.from_string("VAL201.A")
+        res = ResidueId.from_string("ALA216.A")
         assert (lig_id, res) in fp_simple.ifp[0].keys()
         u.trajectory[0]
 

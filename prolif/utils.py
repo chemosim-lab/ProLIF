@@ -243,13 +243,11 @@ def to_dataframe(
     ifp = deepcopy(ifp)
     n_interactions = len(interactions)
     empty_value = dtype(False) if dtype else False
-    # residue pairs
-    keys = sorted(set([k for d in ifp for k in d.keys() if k != index_col]))
     # check if each interaction value is a list of atom indices or smthg else
     has_atom_indices = False
-    for d in ifp:
-        for key, value in d.items():
-            if key != index_col:
+    for frame_ifp in ifp:
+        for residue_tuple, value in frame_ifp.items():
+            if residue_tuple != index_col:
                 has_atom_indices = isinstance(value[0], Iterable)
                 break
     if return_atoms and not has_atom_indices:
@@ -259,25 +257,36 @@ def to_dataframe(
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
     if has_atom_indices and return_atoms:
-        empty_arr = [[None, None]] * n_interactions
+        empty_arr = [(None, None) for _ in range(n_interactions)]
     else:
-        empty_arr = np.array([empty_value] * n_interactions)
+        empty_arr = np.array([empty_value for _ in range(n_interactions)])
+    # residue pairs
+    residue_pairs = sorted(
+        set(
+            [
+                residue_tuple
+                for frame_ifp in ifp
+                for residue_tuple in frame_ifp
+                if residue_tuple != index_col
+            ]
+        )
+    )
     # sparse to dense
     data = defaultdict(list)
     index = []
-    for d in ifp:
-        index.append(d.pop(index_col))
-        for key in keys:
+    for frame_ifp in ifp:
+        index.append(frame_ifp.pop(index_col))
+        for residue_tuple in residue_pairs:
             try:
-                arr = d[key]
+                arr = frame_ifp[residue_tuple]
             except KeyError:
-                data[key].append(empty_arr)
+                data[residue_tuple].append(empty_arr)
             else:
                 if has_atom_indices and return_atoms:
                     arr = list(zip(*arr[1:]))
                 elif has_atom_indices:
                     arr = arr[0]
-                data[key].append(arr)
+                data[residue_tuple].append(arr)
     index = pd.Series(index, name=index_col)
     # create dataframes
     if not data:
@@ -289,8 +298,8 @@ def to_dataframe(
     if has_atom_indices and return_atoms:
         columns = pd.MultiIndex.from_tuples(
             [
-                (str(k[0]), str(k[1]), i, a)
-                for k in keys
+                (str(lig_res), str(prot_res), i, a)
+                for lig_res, prot_res in residue_pairs
                 for i in interactions
                 for a in ["ligand", "protein"]
             ],
@@ -298,7 +307,11 @@ def to_dataframe(
         )
     else:
         columns = pd.MultiIndex.from_tuples(
-            [(str(k[0]), str(k[1]), i) for k in keys for i in interactions],
+            [
+                (str(lig_res), str(prot_res), i)
+                for lig_res, prot_res in residue_pairs
+                for i in interactions
+            ],
             names=["ligand", "protein", "interaction"],
         )
     df = pd.DataFrame(values, columns=columns, index=index)

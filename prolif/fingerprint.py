@@ -115,7 +115,7 @@ class Fingerprint:
     .. ipython:: python
 
         fp.bitvector_atoms(lig, prot["ASP129.A"])
-        fp.hbdonor.__wrapped__(lig, prot["ASP129.A"])
+        fp.hbdonor(lig, prot["ASP129.A"], metadata=True)
 
 
     .. versionchanged:: 1.0.0
@@ -205,10 +205,9 @@ class Fingerprint:
             An array storing the encoded interactions between res1 and res2
         """
         bitvector = []
-        for func in self.interactions.values():
-            bit = func(res1, res2)
-            bitvector.append(bit)
-        return np.array(bitvector)
+        for interaction in self.interactions.values():
+            bitvector.append(interaction(res1, res2))
+        return np.array(bitvector, dtype=bool)
 
     def bitvector_atoms(self, res1, res2):
         """Generates the complete bitvector for the interactions between two
@@ -242,12 +241,17 @@ class Fingerprint:
         bitvector = []
         lig_atoms = []
         prot_atoms = []
-        for func in self.interactions.values():
-            bit, la, pa = func.__wrapped__(res1, res2)
-            bitvector.append(bit)
-            lig_atoms.append(la)
-            prot_atoms.append(pa)
-        bitvector = np.array(bitvector)
+        for interaction in self.interactions.values():
+            int_data = interaction(res1, res2, metadata=True)
+            if int_data is None:
+                bitvector.append(False)
+                lig_atoms.append(None)
+                prot_atoms.append(None)
+            else:
+                bitvector.append(True)
+                lig_atoms.append(int_data["indices"]["ligand"][0])
+                prot_atoms.append(int_data["indices"]["protein"][0])
+        bitvector = np.array(bitvector, dtype=bool)
         return bitvector, lig_atoms, prot_atoms
 
     def generate(self, lig, prot, residues=None, return_atoms=False):
@@ -553,6 +557,9 @@ class Fingerprint:
         self, lig_iterable, prot_mol, residues=None, progress=True, n_jobs=None
     ):
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
+        previous_pkl_props = Chem.GetDefaultPickleProperties()
+        Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
+
         if isinstance(lig_iterable, Chem.SDMolSupplier) or (
             isinstance(lig_iterable, Iterable) and not isgenerator(lig_iterable)
         ):
@@ -577,6 +584,7 @@ class Fingerprint:
                 results.append(data)
         results.sort(key=lambda ifp: ifp["Frame"])
         self.ifp = results
+        Chem.SetDefaultPickleProperties(previous_pkl_props)
         return self
 
     def to_dataframe(self, **kwargs):

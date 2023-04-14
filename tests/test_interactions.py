@@ -15,17 +15,24 @@ from . import mol2factory
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
-benzene = mda.Universe(prolif.datafiles.datapath / "benzene.mol2")
-elements = mda.topology.guessers.guess_types(benzene.atoms.names)
-benzene.add_TopologyAttr("elements", elements)
-benzene.segments.segids = np.array(["U1"], dtype=object)
-benzene.transfer_to_memory()
 
-interaction_instances = {
-    name: cls()
-    for name, cls in _INTERACTIONS.items()
-    if name not in ["Interaction", "_Distance"]
-}
+@pytest.fixture(scope="module")
+def benzene():
+    benzene = mda.Universe(prolif.datafiles.datapath / "benzene.mol2")
+    elements = mda.topology.guessers.guess_types(benzene.atoms.names)
+    benzene.add_TopologyAttr("elements", elements)
+    benzene.segments.segids = np.array(["U1"], dtype=object)
+    benzene.transfer_to_memory()
+    return benzene
+
+
+@pytest.fixture(scope="module")
+def interaction_instances():
+    return {
+        name: cls()
+        for name, cls in _INTERACTIONS.items()
+        if name not in ["Interaction", "_Distance"]
+    }
 
 
 @pytest.fixture(scope="module")
@@ -39,7 +46,7 @@ def prot_mol(request):
 
 
 @pytest.fixture(scope="module")
-def interaction_qmol(request):
+def interaction_qmol(request, interaction_instances):
     int_name, parameter = request.param.split(".")
     return getattr(interaction_instances[int_name], parameter)
 
@@ -113,7 +120,7 @@ class TestInteractions:
     )
     def test_interaction(self, fingerprint, func_name, lig_mol, prot_mol, expected):
         interaction = getattr(fingerprint, func_name)
-        assert interaction(lig_mol, prot_mol) is expected
+        assert interaction(lig_mol[0], prot_mol[0]) is expected
 
     def test_warning_supersede(self):
         old = id(_INTERACTIONS["Hydrophobic"])
@@ -136,6 +143,7 @@ class TestInteractions:
 
         with pytest.raises(TypeError, match="Can't instantiate abstract class _Dummy"):
             _Dummy()
+        _INTERACTIONS.pop("_Dummy")
 
     @pytest.mark.parametrize("index", [0, 1, 3, 42, 78])
     def test_get_mapindex(self, index, ligand_mol):
@@ -152,7 +160,7 @@ class TestInteractions:
     def test_vdwcontact_cache(self, lig_mol, prot_mol):
         vdw = VdWContact()
         assert vdw._vdw_cache == {}
-        vdw.detect(lig_mol, prot_mol)
+        vdw.detect(lig_mol[0], prot_mol[0])
         for (lig, res), value in vdw._vdw_cache.items():
             vdw_dist = vdwradii[lig] + vdwradii[res] + vdw.tolerance
             assert vdw_dist == value
@@ -260,8 +268,8 @@ class TestInteractions:
             ([0, 1.5, -4.5], [75, 0, 0], "edgetoface", False),
         ],
     )
-    def test_pi_stacking(self, xyz, rotation, pi_type, expected, fingerprint):
-        r1, r2 = self.create_rings(xyz, rotation)
+    def test_pi_stacking(self, benzene, xyz, rotation, pi_type, expected, fingerprint):
+        r1, r2 = self.create_rings(benzene, xyz, rotation)
         assert getattr(fingerprint, pi_type)(r1, r2) is expected
         if expected is True:
             other = "edgetoface" if pi_type == "facetoface" else "facetoface"
@@ -269,7 +277,7 @@ class TestInteractions:
             assert getattr(fingerprint, "pistacking")(r1, r2) is expected
 
     @staticmethod
-    def create_rings(xyz, rotation):
+    def create_rings(benzene, xyz, rotation):
         r2 = benzene.copy()
         r2.segments.segids = np.array(["U2"], dtype=object)
         tr = translate(xyz)
@@ -277,7 +285,7 @@ class TestInteractions:
         roty = rotateby(rotation[1], [0, 1, 0], ag=r2.atoms)
         rotz = rotateby(rotation[2], [0, 0, 1], ag=r2.atoms)
         r2.trajectory.add_transformations(tr, rotx, roty, rotz)
-        return prolif.Molecule.from_mda(benzene), prolif.Molecule.from_mda(r2)
+        return prolif.Molecule.from_mda(benzene)[0], prolif.Molecule.from_mda(r2)[0]
 
     def test_edgetoface_phe331(self, ligand_mol, protein_mol):
         fp = Fingerprint()
