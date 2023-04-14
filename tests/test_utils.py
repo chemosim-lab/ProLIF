@@ -21,34 +21,33 @@ from prolif.utils import (
 
 @pytest.fixture
 def ifp_bitvector():
-    return [
-        {
-            "Frame": 0,
+    return {
+        0: {
             ("LIG", "ALA1"): np.array([True, False, False]),
             ("LIG", "GLU2"): np.array([False, True, False]),
         },
-        {
-            "Frame": 1,
+        1: {
             ("LIG", "ALA1"): np.array([True, True, False]),
             ("LIG", "ASP3"): np.array([False, True, False]),
         },
-    ]
+    }
 
 
 @pytest.fixture
 def ifp_metadata():
-    return [
-        {
-            "Frame": 0,
-            ("LIG", "ALA1"): [[1, 0, 0], [0, None, None], [1, None, None]],
-            ("LIG", "GLU2"): [[0, 1, 0], [None, 1, None], [None, 3, None]],
+    return {
+        0: {
+            ("LIG", "ALA1"): {"A": {"indices": {"ligand": (0,), "protein": (1,)}}},
+            ("LIG", "GLU2"): {"B": {"indices": {"ligand": (1,), "protein": (3,)}}},
         },
-        {
-            "Frame": 1,
-            ("LIG", "ALA1"): [[1, 1, 0], [2, 2, None], [4, 5, None]],
-            ("LIG", "ASP3"): [[0, 1, 0], [None, 8, None], [None, 10, None]],
+        1: {
+            ("LIG", "ALA1"): {
+                "A": {"indices": {"ligand": (2,), "protein": (4,)}},
+                "B": {"indices": {"ligand": (2,), "protein": (5,)}},
+            },
+            ("LIG", "ASP3"): {"B": {"indices": {"ligand": (8,), "protein": (10,)}}},
         },
-    ]
+    }
 
 
 @pytest.fixture(params=["ifp_bitvector", "ifp_metadata"])
@@ -183,8 +182,8 @@ def test_series_to_bv():
     assert bv.GetNumOnBits() == 3
 
 
-def test_to_df_bitvector(ifp_bitvector):
-    df = to_dataframe(ifp_bitvector, ["A", "B", "C"])
+def test_to_df(ifp):
+    df = to_dataframe(ifp, ["A", "B", "C"])
     assert df.shape == (2, 4)
     assert df.dtypes[0].type is np.bool_
     assert df.index.name == "Frame"
@@ -196,20 +195,6 @@ def test_to_df_bitvector(ifp_bitvector):
     assert ("LIG", "GLU2", "A") not in df.columns
     assert ("LIG", "ASP3", "B") in df.columns
     assert df[("LIG", "ASP3", "B")][0] is np.bool_(False)
-
-
-def test_to_df_metadata(ifp_metadata):
-    df = to_dataframe(ifp_metadata, ["A", "B", "C"], return_atoms=True)
-    assert df.shape == (2, 4)
-    assert df.index.name == "Frame"
-    assert ("LIG", "ALA1", "A") in df.columns
-    assert df[("LIG", "ALA1", "A")][0] == (0, 1)
-    assert ("LIG", "ALA1", "B") in df.columns
-    assert df[("LIG", "ALA1", "B")][0] == (None, None)
-    assert ("LIG", "ALA1", "C") not in df.columns
-    assert ("LIG", "GLU2", "A") not in df.columns
-    assert ("LIG", "ASP3", "B") in df.columns
-    assert df[("LIG", "ASP3", "B")][0] == (None, None)
 
 
 @pytest.mark.parametrize(
@@ -233,26 +218,14 @@ def test_to_df_drop_empty(ifp):
     assert df.shape == (2, 9)
 
 
-def test_to_df_raise_dtype_return_atoms(ifp_metadata):
-    with pytest.raises(
-        ValueError, match="`dtype` cannot be used with `return_atoms=True`"
-    ):
-        to_dataframe(ifp_metadata, ["A", "B", "C"], dtype=int, return_atoms=True)
-
-
-def test_to_df_raise_return_atoms_if_only_bitvector(ifp_bitvector):
-    with pytest.raises(ValueError, match="doesn't contain atom indices"):
-        to_dataframe(ifp_bitvector, ["A", "B", "C"], return_atoms=True)
-
-
-def test_to_df_no_interaction_in_first_frame(ifp):
+def test_to_df_no_interaction_in_first_frame(ifp_metadata):
     fp = deepcopy(ifp)
-    fp[0] = {"Frame": 0}
+    fp[0] = {}
     to_dataframe(fp, ["A", "B", "C"])
 
 
 def test_to_df_empty_ifp():
-    ifp = [{"Frame": 0}, {"Frame": 1}]
+    ifp = {0: {}, 1: {}}
     df = to_dataframe(ifp, ["A"])
     assert df.to_numpy().shape == (2, 0)
 

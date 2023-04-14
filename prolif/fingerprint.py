@@ -64,7 +64,7 @@ class Fingerprint:
     Attributes
     ----------
     interactions : dict
-        Dictionnary of interaction functions indexed by class name. For more
+        Dictionary of interaction functions indexed by class name. For more
         details, see :mod:`prolif.interactions`
     n_interactions : int
         Number of interaction functions registered by the fingerprint
@@ -72,8 +72,9 @@ class Fingerprint:
         Automatically restrict the analysis to residues within this range of the ligand.
         This parameter is ignored if the ``residues`` parameter of the ``run`` methods
         is set to anything other than ``None``.
-    ifp : list, optionnal
-        List of interactions fingerprints for the given trajectory or docking poses.
+    ifp : dict, optionnal
+        Dict of interaction fingerprints in a sparse format for the given trajectory or
+        docking poses.
 
     Raises
     ------
@@ -118,7 +119,7 @@ class Fingerprint:
 
     .. ipython:: python
 
-        fp.bitvector_atoms(lig, prot["ASP129.A"])
+        fp.metadata(lig, prot["ASP129.A"])
         fp.hbdonor(lig, prot["ASP129.A"], metadata=True)
 
 
@@ -126,11 +127,20 @@ class Fingerprint:
         Added pickle support
 
     .. versionchanged:: 2.0.0
-        Removed the `__wrapped__` attribute on interaction methods that are available
-        from the fingerprint object. These methods now accept a `metadata` parameter
-        instead. Added a ``vicinity_cutoff`` parameter controlling the distance used
+        Changed the format of the :attr:`~Fingerprint.ifp` attribute to be a dictionary
+        containing more complete interaction metadata instead of just atom indices.
+        Removed the ``return_atoms`` argument in :meth:`~Fingerprint.to_dataframe`.
+        Users should directly use :attr:`~Fingerprint.ifp` instead.
+        Added the :meth:`~Fingerprint.to_ligplot` method to generate the
+        :class:`~prolif.plotting.network.LigNetwork` plot.
+        Replaced the ``Fingerprint.bitvector_atoms`` method with
+        :meth:`Fingerprint.metadata`.
+        Added a ``vicinity_cutoff`` parameter controlling the distance used
         to automatically restrict the IFP calculation to residues within the specified
         range of the ligand.
+        Removed the ``__wrapped__`` attribute on interaction methods that are available
+        from the fingerprint object. These methods now accept a ``metadata`` parameter
+        instead.
 
     """
 
@@ -217,15 +227,13 @@ class Fingerprint:
         bitvector : numpy.ndarray
             An array storing the encoded interactions between res1 and res2
         """
-        bitvector = []
-        for interaction in self.interactions.values():
-            bitvector.append(interaction(res1, res2))
+        bitvector = [
+            interaction(res1, res2) for interaction in self.interactions.values()
+        ]
         return np.array(bitvector, dtype=bool)
 
-    def bitvector_atoms(self, res1, res2):
-        """Generates the complete bitvector for the interactions between two
-        residues, and returns the indices of atoms responsible for these
-        interactions
+    def metadata(self, res1, res2):
+        """Generates a metadata dictionary for the interactions between two residues.
 
         Parameters
         ----------
@@ -236,38 +244,27 @@ class Fingerprint:
 
         Returns
         -------
-        bitvector : numpy.ndarray
-            An array storing the encoded interactions between res1 and res2
-        lig_atoms : list
-            A list containing indices for the ligand atoms responsible for each
-            interaction
-        pro_atoms : list
-            A list containing indices for the protein atoms responsible for
-            each interaction
-
+        metadata : dict
+            Metadata dictionnary indexed by interaction name. If a specific interaction
+            is not present between residues, it is filtered out of the dictionary.
 
         .. versionchanged:: 0.3.2
             Atom indices are returned as two separate lists instead of a single
             list of tuples
 
-        """
-        bitvector = []
-        lig_atoms = []
-        prot_atoms = []
-        for interaction in self.interactions.values():
-            int_data = interaction(res1, res2, metadata=True)
-            if int_data is None:
-                bitvector.append(False)
-                lig_atoms.append(None)
-                prot_atoms.append(None)
-            else:
-                bitvector.append(True)
-                lig_atoms.append(int_data["indices"]["ligand"][0])
-                prot_atoms.append(int_data["indices"]["protein"][0])
-        bitvector = np.array(bitvector, dtype=bool)
-        return bitvector, lig_atoms, prot_atoms
+        .. versionchanged:: 2.0.0
+            Returns a dictionnary with all available metadata for each interaction,
+            rather than just atom indices.
 
-    def generate(self, lig, prot, residues=None, return_atoms=False):
+        """
+        metadata = {
+            name: metadata
+            for name, interaction in self.interactions.items()
+            if (metadata := interaction(res1, res2, metadata=True)) is not None
+        }
+        return metadata
+
+    def generate(self, lig, prot, residues=None, metadata=False):
         """Generates the interaction fingerprint between 2 molecules
 
         Parameters
@@ -284,19 +281,18 @@ class Fingerprint:
             :func:`~prolif.utils.get_residues_near_ligand` function is used to
             automatically use protein residues that are distant of 6.0 Å or
             less from each ligand residue (see :attr:`~Fingerprint.vicinity_cutoff`)
-        return_atoms : bool
-            For each residue pair and interaction, return indices of atoms
-            responsible for the interaction instead of bits.
+        metadata : bool
+            For each residue pair and interaction, return an interaction metadata
+            dictionary instead of bits.
 
         Returns
         -------
         ifp : dict
-            A dictionnary indexed by ``(ligand, protein)`` residue pairs. The
-            format for values will depend on ``return_atoms``:
+            A dictionary indexed by ``(ligand, protein)`` residue pairs. The
+            format for values will depend on ``metadata``:
 
-            - A single bitvector if ``return_atoms=False``
-            - A tuple of bitvector, ligand atom indices and protein atom
-              indices if ``return_atoms=True``
+            - A single bitvector if ``metadata=False``
+            - A sparse dictionary of metadata for each interaction if ``metadata=True``
 
         Example
         -------
@@ -309,21 +305,28 @@ class Fingerprint:
             >>> ifp = fp.generate(lig, prot)
 
         .. versionadded:: 0.3.2
+
+        .. versionchanged:: 2.0.0
+            ``return_atoms`` replaced by ``metadata``, and it now returns a sparse
+            dictionary of metadata indexed by interaction name instead of a tuple of
+            arrays.
         """
         ifp = {}
-        resids = residues
+        prot_residues = residues
         if residues == "all":
-            resids = prot.residues.keys()
+            prot_residues = prot.residues.keys()
+        get_interactions = self.metadata if metadata else self.bitvector
         for lresid, lres in lig.residues.items():
             if residues is None:
-                resids = get_residues_near_ligand(lres, prot, self.vicinity_cutoff)
-            for prot_key in resids:
+                prot_residues = get_residues_near_ligand(
+                    lres, prot, self.vicinity_cutoff
+                )
+            for prot_key in prot_residues:
                 pres = prot[prot_key]
                 key = (lresid, pres.resid)
-                if return_atoms:
-                    ifp[key] = self.bitvector_atoms(lres, pres)
-                else:
-                    ifp[key] = self.bitvector(lres, pres)
+                interactions = get_interactions(lres, pres)
+                if any(interactions):
+                    ifp[key] = interactions
         return ifp
 
     def run(
@@ -402,6 +405,11 @@ class Fingerprint:
             Added support for passing kwargs to the RDKitConverter through
             the ``converter_kwargs`` parameter
 
+        .. versionchanged:: 2.0.0
+            Changed the format of the :attr:`~Fingerprint.ifp` attribute to be a
+            dictionary containing more complete interaction metadata instead of just
+            atom indices.
+
         """
         if n_jobs is not None and n_jobs < 1:
             raise ValueError("n_jobs must be > 0 or None")
@@ -422,15 +430,12 @@ class Fingerprint:
         iterator = tqdm(traj) if progress else traj
         if residues == "all":
             residues = Molecule.from_mda(prot, **prot_kwargs).residues.keys()
-        ifp = []
+        ifp = {}
         for ts in iterator:
             prot_mol = Molecule.from_mda(prot, **prot_kwargs)
             lig_mol = Molecule.from_mda(lig, **lig_kwargs)
-            data = self.generate(
-                lig_mol, prot_mol, residues=residues, return_atoms=True
-            )
-            data["Frame"] = ts.frame
-            ifp.append(data)
+            data = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
+            ifp[ts.frame] = data
         self.ifp = ifp
         return self
 
@@ -475,11 +480,11 @@ class Fingerprint:
         ) as pool:
             pbar_thread.start()
             args = ((traj, lig, prot, chunk) for chunk in chunks)
-            results = []
+            results = {}
             for ifp in pool.imap_unordered(process_chunk, args):
-                results.extend(ifp)
-        results.sort(key=lambda ifp: ifp["Frame"])
-        self.ifp = results
+                results.update(ifp)
+        # sort
+        self.ifp = {frame: results[frame] for frame in sorted(results)}
         return self
 
     def run_from_iterable(
@@ -541,6 +546,11 @@ class Fingerprint:
         .. versionchanged:: 1.0.0
             Added support for multiprocessing
 
+        .. versionchanged:: 2.0.0
+            Changed the format of the :attr:`~Fingerprint.ifp` attribute to be a
+            dictionary containing more complete interaction metadata instead of just
+            atom indices.
+
         """
         if n_jobs is not None and n_jobs < 1:
             raise ValueError("n_jobs must be > 0 or None")
@@ -556,13 +566,10 @@ class Fingerprint:
         iterator = tqdm(lig_iterable) if progress else lig_iterable
         if residues == "all":
             residues = prot_mol.residues.keys()
-        ifp = []
+        ifp = {}
         for i, lig_mol in enumerate(iterator):
-            data = self.generate(
-                lig_mol, prot_mol, residues=residues, return_atoms=True
-            )
-            data["Frame"] = i
-            ifp.append(data)
+            data = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
+            ifp[i] = data
         self.ifp = ifp
         return self
 
@@ -588,15 +595,14 @@ class Fingerprint:
             initializer=declare_shared_objs_for_mol,
             initargs=(self, prot_mol, residues),
         ) as pool:
-            results = []
-            for data in tqdm(
+            results = {}
+            for i, data in tqdm(
                 pool.imap_unordered(process_mol, suppl),
                 total=total,
                 disable=not progress,
             ):
-                results.append(data)
-        results.sort(key=lambda ifp: ifp["Frame"])
-        self.ifp = results
+                results[i] = data
+        self.ifp = {frame: results[frame] for frame in sorted(results)}
         Chem.SetDefaultPickleProperties(previous_pkl_props)
         return self
 
@@ -610,9 +616,6 @@ class Fingerprint:
             keep the data as is
         drop_empty : bool
             Drop columns with only empty values
-        return_atoms : bool
-            For each residue pair and interaction, return indices of atoms
-            responsible for the interaction instead of bits
 
         Returns
         -------
@@ -639,6 +642,9 @@ class Fingerprint:
             0                       0          1           0           0          0
             ...
 
+        .. versionchanged:: 2.0.0
+            Removed the ``return_atoms`` parameter. You can access more metadata
+            information directly through :attr:`~Fingerprint.ifp`.
         """
         if hasattr(self, "ifp"):
             return to_dataframe(self.ifp, self.interactions.keys(), **kwargs)
@@ -730,3 +736,24 @@ class Fingerprint:
             return pickle.loads(path_or_bytes)
         with open(path_or_bytes, "rb") as f:
             return pickle.load(f)
+
+    def to_ligplot(
+        self, ligand_mol, kind="aggregate", frame=0, threshold=0.3, **kwargs
+    ):
+        """Generate a :class:`~prolif.plotting.network.LigNetwork` plot from a
+        fingerprint object that has been executed.
+
+        .. versionadded:: 2.0.0
+        """
+        from prolif.plotting.network import LigNetwork
+
+        if hasattr(self, "ifp"):
+            return LigNetwork.from_fingerprint(
+                fp=self,
+                ligand_mol=ligand_mol,
+                kind=kind,
+                frame=frame,
+                threshold=threshold,
+                **kwargs,
+            )
+        raise AttributeError("Please use the `run` method before")
