@@ -68,8 +68,12 @@ class Fingerprint:
         details, see :mod:`prolif.interactions`
     n_interactions : int
         Number of interaction functions registered by the fingerprint
+    vicinity_cutoff : float
+        Automatically restrict the analysis to residues within this range of the ligand.
+        This parameter is ignored if the ``residues`` parameter of the ``run`` methods
+        is set to anything other than ``None``.
     ifp : list, optionnal
-        List of interactions fingerprints for the given trajectory.
+        List of interactions fingerprints for the given trajectory or docking poses.
 
     Raises
     ------
@@ -107,7 +111,7 @@ class Fingerprint:
 
         # ligand-protein
         fp.hbdonor(lig, prot["ASP129.A"])
-        # protein-protein (alpha helix)
+        # protein-protein
         fp.hbacceptor(prot["ASP129.A"], prot["CYS133.A"])
 
     You can also obtain the indices of atoms responsible for the interaction:
@@ -120,6 +124,13 @@ class Fingerprint:
 
     .. versionchanged:: 1.0.0
         Added pickle support
+
+    .. versionchanged:: 2.0.0
+        Removed the `__wrapped__` attribute on interaction methods that are available
+        from the fingerprint object. These methods now accept a `metadata` parameter
+        instead. Added a ``vicinity_cutoff`` parameter controlling the distance used
+        to automatically restrict the IFP calculation to residues within the specified
+        range of the ligand.
 
     """
 
@@ -136,8 +147,10 @@ class Fingerprint:
             "PiCation",
             "VdWContact",
         ],
+        vicinity_cutoff=6.0,
     ):
         self._set_interactions(interactions)
+        self.vicinity_cutoff = vicinity_cutoff
 
     def _set_interactions(self, interactions):
         # read interactions to compute
@@ -270,7 +283,7 @@ class Fingerprint:
             used. If ``None``, at each frame the
             :func:`~prolif.utils.get_residues_near_ligand` function is used to
             automatically use protein residues that are distant of 6.0 Å or
-            less from each ligand residue.
+            less from each ligand residue (see :attr:`~Fingerprint.vicinity_cutoff`)
         return_atoms : bool
             For each residue pair and interaction, return indices of atoms
             responsible for the interaction instead of bits.
@@ -303,7 +316,7 @@ class Fingerprint:
             resids = prot.residues.keys()
         for lresid, lres in lig.residues.items():
             if residues is None:
-                resids = get_residues_near_ligand(lres, prot)
+                resids = get_residues_near_ligand(lres, prot, self.vicinity_cutoff)
             for prot_key in resids:
                 pres = prot[prot_key]
                 key = (lresid, pres.resid)
