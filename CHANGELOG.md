@@ -6,11 +6,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added the `Fingerprint.to_ligplot` method to generate a `LigNetwork` plot directly.
+- Added `LigNetwork.from_fingerprint` to generate the ligplot from a `Fingerprint`
+  instance.
+- Added `Fingerprint.metadata` to generate a dictionary containing metadata about
+  interactions between two residues. Replaces `Fingerprint.bitvector_atoms`.
+- Added a `vicinity_cutoff` parameter in `Fingerprint` to control the distance cutoff
+  used to automatically restrict the IFP calculation to residues within the specified
+  range of the ligand.
+- Added a `metadata` method to the base `Interaction` class to easily generate metadata
+  for custom interactions.
+- Added an `Interaction.invert_class` classmethod to easily invert the role of the
+  ligand and protein residues in an interaction, e.g. to create a donor class from an
+  acceptor class.
+- Added an `Interaction.update_parameters` classmethod to easily update the
+  initialisation parameters shared between parent and child classes.
+
 ### Changed
+- Changed the format of the `Fingerprint.ifp` attribute to be a dictionary
+  containing more complete interaction metadata instead of just atom indices. It can
+  also be more easily indexed by using residue identifier strings (e.g. `ALA216.A`)
+  rather than `ResidueId` objects.
+- All interaction classes now return more complete details about the interaction (e.g.
+  distances, angles, atom indices in the residue and parent molecule).
 - Converting the IFP to a dataframe with atom indices has been optimized and now runs
-  about 5 times faster (Issue #112, PR #113 by @ReneHamburger1993).
+  about 5 times faster (Issue #112, PR #113 by @ReneHamburger1993). *Note: discarded*
+  *by the subsequent updates to the codebase which removed the ability to have*
+  *atom indices in the dataframe.*
 - Various changes related to packaging, code formatting, linting and CI pipelines
   (PR #114).
+
+### Removed
+- Removed the `return_atoms` argument in `Fingerprint.to_dataframe`. Users should
+  directly use `Fingerprint.ifp` instead (the documentation's tutorials have been
+  updated accordingly).
+- Removed the `Fingerprint.bitvector_atoms` method, replaced by `Fingerprint.metadata`.
+- Removed the `__wrapped__` attribute on interaction methods that are available
+  from the `Fingerprint` object. These methods now accept a `metadata` parameter
+  instead.
+- Removed `LigNetwork.from_ifp` in favor of `LigNetwork.from_fingerprint`.
 
 
 ## [1.1.0] - 2022-11-18
