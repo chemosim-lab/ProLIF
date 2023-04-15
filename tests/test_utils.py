@@ -219,7 +219,7 @@ def test_to_df_drop_empty(ifp):
 
 
 def test_to_df_no_interaction_in_first_frame(ifp_metadata):
-    fp = deepcopy(ifp)
+    fp = deepcopy(ifp_metadata)
     fp[0] = {}
     to_dataframe(fp, ["A", "B", "C"])
 
