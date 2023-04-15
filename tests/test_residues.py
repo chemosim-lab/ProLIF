@@ -204,20 +204,20 @@ class TestResidueGroup:
 
     def test_select(self, protein_mol):
         rg = protein_mol.residues
-        assert rg.select(rg.name == "LYS").n_residues == 16
-        assert rg.select(rg.number == 300).n_residues == 1
+        assert rg.select(rg.name == "TYR").n_residues == 6
+        assert rg.select(rg.number == 109).n_residues == 1
         assert rg.select(rg.number == 1).n_residues == 0
-        assert rg.select(rg.chain == "B").n_residues == 90
+        assert rg.select(rg.chain == "A").n_residues == 36
         # and
-        assert rg.select((rg.chain == "B") & (rg.name == "ALA")).n_residues == 7
+        assert rg.select((rg.chain == "A") & (rg.name == "TYR")).n_residues == 5
         # or
-        assert rg.select((rg.chain == "B") | (rg.name == "ALA")).n_residues == 110
+        assert rg.select((rg.chain == "A") | (rg.name == "TYR")).n_residues == 37
         # xor
-        assert rg.select((rg.chain == "B") ^ (rg.name == "ALA")).n_residues == 103
+        assert rg.select((rg.chain == "A") ^ (rg.name == "TYR")).n_residues == 32
         # not
-        assert rg.select(~(rg.chain == "B")).n_residues == 212
+        assert rg.select(~(rg.chain == "A")).n_residues == 20
 
     def test_select_sameas_getitem(self, protein_mol):
         rg = protein_mol.residues
-        sel = rg.select((rg.name == "LYS") & (rg.number == 49))[0]
-        assert sel.resid is rg["LYS49.A"].resid
+        sel = rg.select((rg.name == "TYR") & (rg.number == 38))[0]
+        assert sel.resid is rg["TYR38.A"].resid

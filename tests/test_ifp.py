@@ -22,7 +22,7 @@ def test_ifp_filtering(ifp):
     lig_id, prot_id = "LIG1.G", "LEU126.A"
     assert ifp[lig_id] == ifp
     assert (
-        ifp[prot_id]
+        next(iter(ifp[prot_id].values()))
         == ifp[(ResidueId.from_string(lig_id), ResidueId.from_string(prot_id))]
     )
 
