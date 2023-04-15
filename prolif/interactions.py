@@ -16,7 +16,7 @@ You can declare your own interaction class like this::
             if (dist_matrix <= self.contact_threshold).any():
                 # indices of atoms with the shortest distance
                 ligand_index, protein_index = divmod(
-                    dist_matrix.argmin(), dist_matrix.shape[1]
+                    int(dist_matrix.argmin()), dist_matrix.shape[1]
                 )
                 # shortest distance value
                 min_dist = dist_matrix[ligand_index, protein_index]
