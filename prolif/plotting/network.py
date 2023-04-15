@@ -304,6 +304,10 @@ class LigNetwork:
         kwargs : object
             Other arguments passed to the :class:`LigNetwork` class
         """
+        if not hasattr(fp, "ifp"):
+            raise AttributeError(
+                "Please run the interaction fingerprint analysis before plotting."
+            )
         if kind == "frame":
             df = cls._make_frame_df_from_fp(fp, frame=frame)
             return cls(df, ligand_mol, **kwargs)

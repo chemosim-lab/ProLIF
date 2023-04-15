@@ -5,6 +5,7 @@ import MDAnalysis as mda
 import pytest
 
 import prolif as plf
+from prolif.plotting.network import LigNetwork
 
 
 class TestLigNetwork:
@@ -49,6 +50,14 @@ class TestLigNetwork:
         with open(output, "r") as f:
             assert "PHE331.B" in f.read()
 
-    def test_from_ifp_raises_kind(self, get_ligplot):
+    def test_from_fingerprint_raises_kind(self, get_ligplot):
         with pytest.raises(ValueError, match='must be "aggregate" or "frame"'):
             get_ligplot(kind="foo")
+
+    def test_from_fingerprint_raises_not_executed(self, ligand_mol):
+        fp = plf.Fingerprint()
+        with pytest.raises(
+            AttributeError,
+            match="Please run the interaction fingerprint analysis before plotting",
+        ):
+            LigNetwork.from_fingerprint(fp, ligand_mol)
