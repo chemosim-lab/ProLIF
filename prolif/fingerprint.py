@@ -104,8 +104,7 @@ class Fingerprint:
         prot = prolif.Molecule.from_mda(prot)
         lig = prolif.Molecule.from_mda(lig)
         ifp = fp.generate(lig, prot)
-        ifp["Frame"] = 0
-        prolif.to_dataframe([ifp], fp.interactions.keys())
+        prolif.to_dataframe({0: ifp}, fp.interactions.keys())
 
     - On a specific pair of residues for a specific interaction:
 
