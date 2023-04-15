@@ -46,7 +46,6 @@ build = [
 tests = [
     "pytest>=6.1.2",
     "pytest-cov",
-    "codecov",
 ]
 dev = [
     "prolif[build,tests]",
