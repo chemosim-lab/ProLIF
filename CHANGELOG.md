@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   initialisation parameters shared between parent and child classes.
 
 ### Changed
+- The `LigNetwork` plot now displays the distance for each interaction on mouse hover.
 - Changed the format of the `Fingerprint.ifp` attribute to be a dictionary
   containing more complete interaction metadata instead of just atom indices. It can
   also be more easily indexed by using residue identifier strings (e.g. `ALA216.A`)

@@ -325,6 +325,7 @@ class LigNetwork:
                 "protein": str(prot_resid),
                 "interaction": int_name,
                 "atoms": metadata["indices"]["ligand"],
+                "distance": metadata.get("distance", 0),
             }
             for frame, ifp in fp.ifp.items()
             for (lig_resid, prot_resid), int_data in ifp.items()
@@ -333,14 +334,15 @@ class LigNetwork:
         df = pd.DataFrame(data)
         df["weight"] = 1
         df = df.groupby(["ligand", "protein", "interaction", "atoms"]).agg(
-            weight=("weight", "sum")
+            weight=("weight", "sum"), distance=("distance", "mean")
         )
         df["weight"] = df["weight"] / len(fp.ifp)
         # merge different ligand atoms of the same residue/interaction group before
         # applying the threshold
         df = df.join(
-            df.groupby(level=["ligand", "protein", "interaction"]).sum(),
-            rsuffix="_total",
+            df.groupby(level=["ligand", "protein", "interaction"]).agg(
+                weight_total=("weight", "sum")
+            ),
         )
         # threshold and keep most occuring ligand atom
         df = (
@@ -362,13 +364,16 @@ class LigNetwork:
                 "protein": str(prot_resid),
                 "interaction": int_name,
                 "atoms": metadata["indices"]["ligand"],
+                "distance": metadata.get("distance", 0),
             }
             for (lig_resid, prot_resid), int_data in ifp.items()
             for int_name, metadata in int_data.items()
         ]
         df = pd.DataFrame(data)
         df["weight"] = 1
-        df.set_index(["ligand", "protein", "interaction", "atoms"], inplace=True)
+        df = df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
+            columns=["weight", "distance"]
+        )
         return df
 
     def _make_carbon(self):
@@ -515,6 +520,7 @@ class LigNetwork:
             self.nodes[prot_res] = node
         for (lig_res, prot_res, interaction, lig_indices), (
             weight,
+            distance,
         ) in self.df.iterrows():
             if interaction in self._LIG_PI_INTERACTIONS:
                 centroid = self._get_ring_centroid(lig_indices)
@@ -534,7 +540,7 @@ class LigNetwork:
             edge = {
                 "from": origin,
                 "to": prot_res,
-                "title": interaction,
+                "title": f"{interaction}: {distance:.2f}Å",
                 "interaction_type": self._interaction_types.get(
                     interaction, interaction
                 ),
