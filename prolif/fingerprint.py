@@ -35,6 +35,7 @@ import numpy as np
 from rdkit import Chem
 from tqdm.auto import tqdm
 
+from .ifp import IFP
 from .interactions import _INTERACTIONS
 from .molecule import Molecule
 from .parallel import (
@@ -311,7 +312,7 @@ class Fingerprint:
             dictionary of metadata indexed by interaction name instead of a tuple of
             arrays.
         """
-        ifp = {}
+        ifp = IFP()
         prot_residues = residues
         if residues == "all":
             prot_residues = prot.residues.keys()
@@ -434,8 +435,9 @@ class Fingerprint:
         for ts in iterator:
             prot_mol = Molecule.from_mda(prot, **prot_kwargs)
             lig_mol = Molecule.from_mda(lig, **lig_kwargs)
-            data = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
-            ifp[ts.frame] = data
+            ifp[ts.frame] = self.generate(
+                lig_mol, prot_mol, residues=residues, metadata=True
+            )
         self.ifp = ifp
         return self
 
@@ -480,11 +482,11 @@ class Fingerprint:
         ) as pool:
             pbar_thread.start()
             args = ((traj, lig, prot, chunk) for chunk in chunks)
-            results = {}
-            for ifp in pool.imap_unordered(process_chunk, args):
-                results.update(ifp)
+            ifp = {}
+            for ifp_data_chunk in pool.imap_unordered(process_chunk, args):
+                ifp.update(ifp_data_chunk)
         # sort
-        self.ifp = {frame: results[frame] for frame in sorted(results)}
+        self.ifp = {frame: ifp[frame] for frame in sorted(ifp)}
         return self
 
     def run_from_iterable(
@@ -568,8 +570,7 @@ class Fingerprint:
             residues = prot_mol.residues.keys()
         ifp = {}
         for i, lig_mol in enumerate(iterator):
-            data = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
-            ifp[i] = data
+            ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
         self.ifp = ifp
         return self
 
@@ -596,12 +597,12 @@ class Fingerprint:
             initargs=(self, prot_mol, residues),
         ) as pool:
             results = {}
-            for i, data in tqdm(
+            for i, ifp_data in tqdm(
                 pool.imap_unordered(process_mol, suppl),
                 total=total,
                 disable=not progress,
             ):
-                results[i] = data
+                results[i] = ifp_data
         self.ifp = {frame: results[frame] for frame in sorted(results)}
         Chem.SetDefaultPickleProperties(previous_pkl_props)
         return self
