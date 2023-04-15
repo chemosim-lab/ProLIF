@@ -44,8 +44,8 @@ def ligand_mol(ligand_ag):
 
 
 @pytest.fixture(scope="session")
-def protein_ag(u):
-    return u.select_atoms("protein")
+def protein_ag(u, ligand_ag):
+    return u.select_atoms("protein and byres around 6.5 group ligand", ligand=ligand_ag)
 
 
 @pytest.fixture(scope="session")

@@ -7,7 +7,7 @@ from pandas import DataFrame
 from rdkit.DataStructs import ExplicitBitVect
 
 from prolif.datafiles import datapath
-from prolif.fingerprint import Fingerprint, _InteractionWrapper
+from prolif.fingerprint import Fingerprint
 from prolif.interactions import _INTERACTIONS, Interaction
 from prolif.molecule import sdf_supplier
 from prolif.residue import ResidueId
@@ -15,34 +15,14 @@ from prolif.residue import ResidueId
 
 class Dummy(Interaction):
     def detect(self, res1, res2):
-        return True, 4, 2
+        return self.metadata(res1, res2, (2,), (4,), distance=4.2)
 
 
-class Return:
-    def detect(self, *args):
-        return args if len(args) > 1 else args[0]
-
-
-def test_wrapper_return():
-    detect = Dummy().detect
-    mod = _InteractionWrapper(detect)
-    assert detect("foo", "bar") == (True, 4, 2)
-    assert mod("foo", "bar") is True
-    assert mod.__wrapped__("foo", "bar") == (True, 4, 2)
-
-
-def test_wrapper_repr():
-    mod = _InteractionWrapper(Dummy().detect)
-    _repr = repr(mod)
+def test_interaction_base():
+    interaction = Dummy()
+    _repr = repr(interaction)
     assert _repr.startswith("<") and ".Dummy at " in _repr
-
-
-@pytest.mark.parametrize("returned", [True, (True,), (True, 4)])
-def test_wrapper_incorrect_return(returned):
-    mod = _InteractionWrapper(Return().detect)
-    assert mod.__wrapped__(returned) == returned
-    with pytest.raises(TypeError, match="Incorrect function signature"):
-        mod(returned)
+    assert callable(interaction)
 
 
 class TestFingerprint:
@@ -74,51 +54,47 @@ class TestFingerprint:
     def test_n_interactions(self, fp):
         assert fp.n_interactions == len(fp.interactions)
 
-    def test_wrapped(self, fp_simple):
-        assert fp_simple.dummy("foo", "bar") == 1
-        assert fp_simple.dummy.__wrapped__("foo", "bar") == (True, 4, 2)
-
     def test_bitvector(self, fp, ligand_mol, protein_mol):
-        bv = fp.bitvector(ligand_mol, protein_mol["ASP129.A"])
+        bv = fp.bitvector(ligand_mol[0], protein_mol["ASP129.A"])
         assert len(bv) == fp.n_interactions
         assert bv.sum() > 0
 
-    def test_bitvector_atoms(self, fp, ligand_mol, protein_mol):
-        bv, lig_ix, prot_ix = fp.bitvector_atoms(ligand_mol, protein_mol["ASP129.A"])
-        assert len(bv) == fp.n_interactions
-        assert len(lig_ix) == fp.n_interactions
-        assert len(prot_ix) == fp.n_interactions
-        assert bv.sum() > 0
-        ids = np.where(bv == 1)[0]
-        assert lig_ix[ids[0]] is not None and prot_ix[ids[0]] is not None
+    def test_metadata(self, fp, ligand_mol, protein_mol):
+        metadata = fp.metadata(ligand_mol[0], protein_mol["ASP129.A"])
+        assert metadata
+        assert isinstance(metadata["HBDonor"]["indices"]["ligand"], tuple)
 
     def test_run_residues(self, fp_simple, u, ligand_ag, protein_ag):
         fp_simple.run(
-            u.trajectory[0:1], ligand_ag, protein_ag, residues="all", progress=False
+            u.trajectory[0:1],
+            ligand_ag,
+            protein_ag,
+            residues=["TYR109.A"],
+            progress=False,
         )
         lig_id = ResidueId.from_string("LIG1.G")
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
-        res = ResidueId.from_string("LYS387.B")
+        res = ResidueId.from_string("TYR109.A")
         assert (lig_id, res) in fp_simple.ifp[0].keys()
         fp_simple.run(
             u.trajectory[1:2],
             ligand_ag,
             protein_ag,
-            residues=["ASP129.A"],
+            residues="all",
             progress=False,
         )
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
-        res = ResidueId.from_string("ASP129.A")
-        assert (lig_id, res) in fp_simple.ifp[0].keys()
+        res = ResidueId.from_string("TRP125.A")
+        assert (lig_id, res) in fp_simple.ifp[1].keys()
         fp_simple.run(
             u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
         )
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 3
         assert len(fp_simple.ifp[0]) > 1
-        res = ResidueId.from_string("VAL201.A")
+        res = ResidueId.from_string("ALA216.A")
         assert (lig_id, res) in fp_simple.ifp[0].keys()
         u.trajectory[0]
 
@@ -135,11 +111,12 @@ class TestFingerprint:
         )
         assert hasattr(fp_simple, "ifp")
         ifp = fp_simple.ifp[0]
-        ifp.pop("Frame")
-        data = list(ifp.values())[0]
-        assert isinstance(data[0], np.ndarray)
-        assert isinstance(data[1], list)
-        assert isinstance(data[2], list)
+        interactions = next(iter(ifp.values()))
+        assert isinstance(interactions, dict)
+        metadata = next(iter(interactions.values()))
+        assert all(
+            [key in metadata for key in ["indices", "parent_indices", "distance"]]
+        )
 
     def test_run_from_iterable(self, fp_simple, protein_mol):
         path = str(datapath / "vina" / "vina_output.sdf")
@@ -164,7 +141,7 @@ class TestFingerprint:
         df = fp_simple.to_dataframe(dtype=np.uint8)
         assert df.dtypes[0].type is np.uint8
         df = fp_simple.to_dataframe(drop_empty=False)
-        resids = set([key for d in fp_simple.ifp for key in d.keys() if key != "Frame"])
+        resids = set([key for d in fp_simple.ifp.values() for key in d.keys()])
         assert df.shape == (3, len(resids))
 
     def test_to_bv(self, fp_simple, u, ligand_ag, protein_ag):
@@ -221,17 +198,8 @@ class TestFingerprint:
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
         assert fp.interactions.keys() == fp_pkled.interactions.keys()
         assert len(fp.ifp) == len(fp_pkled.ifp)
-        for d1, d2 in zip(fp.ifp, fp_pkled.ifp):
-            d1.setdefault("Frame", None)
-            assert d1.keys() == d2.keys()
-            d1.pop("Frame", None)
-            d2.pop("Frame")
-            for (fp1, fpal1, fpap1), (fp2, fpal2, fpap2) in zip(
-                d1.values(), d2.values()
-            ):
-                assert (fp1 == fp2).all()
-                assert fpal1 == fpal2
-                assert fpap1 == fpap2
+        for frame_ifp, frame_pkl_ifp in zip(fp.ifp, fp_pkled.ifp):
+            assert frame_ifp == frame_pkl_ifp
 
     def test_pickle_custom_interaction(self, fp_unpkl):
         assert hasattr(fp_unpkl, "dummy")

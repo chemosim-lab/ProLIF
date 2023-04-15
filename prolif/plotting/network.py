@@ -4,6 +4,10 @@ Plot a Ligand Interaction Network --- :mod:`prolif.plotting.network`
 
 .. versionadded:: 0.3.2
 
+.. versionchanged:: 2.0.0
+    Replaced ``LigNetwork.from_ifp`` with ``LigNetwork.from_fingerprint`` which works
+    without requiring a dataframe with atom indices.
+
 .. autoclass:: LigNetwork
    :members:
 
@@ -14,6 +18,7 @@ import warnings
 from collections import defaultdict
 from copy import deepcopy
 from html import escape
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -39,7 +44,7 @@ class LigNetwork:
     Parameters
     ----------
     df : pandas.DataFrame
-        Dataframe with a 4-level index (ligand, protein, interaction, atom)
+        Dataframe with a 4-level index (ligand, protein, interaction, atoms)
         and a weight column for values
     lig_mol : rdkit.Chem.rdChem.Mol
         Ligand molecule
@@ -77,6 +82,10 @@ class LigNetwork:
     You can customize the diagram by tweaking :attr:`LigNetwork.COLORS` and
     :attr:`LigNetwork.RESIDUE_TYPES` by adding or modifying the
     dictionaries inplace.
+
+    .. versionchanged:: 2.0.0
+        Replaced ``LigNetwork.from_ifp`` with ``LigNetwork.from_fingerprint`` which
+        works without requiring a dataframe with atom indices.
     """
 
     COLORS = {
@@ -146,6 +155,10 @@ class LigNetwork:
         "MET": "Sulfur",
     }
     _LIG_PI_INTERACTIONS = ["EdgeToFace", "FaceToFace", "PiStacking", "PiCation"]
+    _DISPLAYED_ATOM = {  # index 0 in indices tuple by default
+        "HBDonor": 1,
+        "XBDonor": 1,
+    }
     _JS_TEMPLATE = """
         var ifp, legend, nodes, edges, legend_buttons;
         function drawGraph(_id, nodes, edges, options) {
@@ -205,9 +218,10 @@ class LigNetwork:
         carbon=0.16,
     ):
         self.df = df
+        self._interacting_atoms = set(
+            [atom for atoms in df.index.get_level_values("atoms") for atom in atoms]
+        )
         mol = deepcopy(lig_mol)
-        Chem.SanitizeMol(mol, Chem.SanitizeFlags.SANITIZE_SETAROMATICITY)
-        self._ring_info = mol.GetRingInfo()
         if kekulize:
             Chem.Kekulize(mol)
         if match3D:
@@ -258,79 +272,109 @@ class LigNetwork:
         }
 
     @classmethod
-    def from_ifp(cls, ifp, lig, kind="aggregate", frame=0, threshold=0.3, **kwargs):
-        """Helper method to create a ligand interaction diagram from an IFP
-        DataFrame obtained with ``fp.to_dataframe(return_atoms=True)``
+    def from_fingerprint(
+        cls, fp, ligand_mol, kind="aggregate", frame=0, threshold=0.3, **kwargs
+    ):
+        """Helper method to create a ligand interaction diagram from a
+        :class:`~prolif.fingerprint.Fingerprint` object.
 
         Notes
         -----
         Two kinds of diagrams can be rendered: either for a designated frame or
         by aggregating the results on the whole IFP and optionnally discarding
         interactions that occur less frequently than a threshold. In the latter
-        case (aggregate), only the most frequent ligand atom interaction is
-        rendered.
+        case (aggregate), only the group of atoms most frequently involved in
+        each interaction is used to draw the edge.
 
         Parameters
         ----------
-        ifp : pandas.DataFrame
-            The result of ``fp.to_dataframe(return_atoms=True)``
+        fp : prolif.fingerprint.Fingerprint
+            The fingerprint object already executed using one of the ``run`` or
+            ``run_from_iterable`` methods.
         lig : rdkit.Chem.rdChem.Mol
             Ligand molecule
         kind : str
-            One of "aggregate" or "frame"
+            One of ``"aggregate"`` or ``"frame"``
         frame : int or str
-            Frame number, as read in ``ifp.index``. Only applicable for
-            ``kind="frame"``
+            Frame number (see :attr:`~prolif.fingerprint.Fingerprint.ifp`). Only
+            applicable for ``kind="frame"``
         threshold : float
             Frequency threshold, between 0 and 1. Only applicable for
             ``kind="aggregate"``
         kwargs : object
             Other arguments passed to the :class:`LigNetwork` class
         """
+        if not hasattr(fp, "ifp"):
+            raise AttributeError(
+                "Please run the interaction fingerprint analysis before plotting."
+            )
+        if kind == "frame":
+            df = cls._make_frame_df_from_fp(fp, frame=frame)
+            return cls(df, ligand_mol, **kwargs)
         if kind == "aggregate":
-            data = (
-                pd.get_dummies(
-                    ifp.applymap(lambda x: x[0]).astype(object), prefix_sep=", "
-                )
-                .rename(columns=lambda x: x.translate({ord(c): None for c in "()'"}))
-                .mean()
-            )
-            index = [i.split(", ") for i in data.index]
-            index = [[j for j in i[:-1] + [int(float(i[-1]))]] for i in index]
-            data.index = pd.MultiIndex.from_tuples(
-                index, names=["ligand", "protein", "interaction", "atom"]
-            )
-            data = data.to_frame()
-            data.rename(columns={data.columns[-1]: "weight"}, inplace=True)
-            # merge different ligand atoms before applying the threshold
-            data = data.join(
-                data.groupby(level=["ligand", "protein", "interaction"]).sum(),
-                rsuffix="_total",
-            )
-            # threshold and keep most occuring atom
-            data = (
-                data.loc[data["weight_total"] >= threshold]
-                .drop(columns="weight_total")
-                .sort_values("weight", ascending=False)
-                .groupby(level=["ligand", "protein", "interaction"])
-                .head(1)
-                .sort_index()
-            )
-            return cls(data, lig, **kwargs)
-        elif kind == "frame":
-            data = (
-                ifp.loc[ifp.index == frame]
-                .T.applymap(lambda x: x[0])
-                .dropna()
-                .astype(int)
-                .reset_index()
-            )
-            data.rename(columns={data.columns[-1]: "atom"}, inplace=True)
-            data["weight"] = 1
-            data.set_index(["ligand", "protein", "interaction", "atom"], inplace=True)
-            return cls(data, lig, **kwargs)
-        else:
-            raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
+            df = cls._make_agg_df_from_fp(fp, threshold=threshold)
+            return cls(df, ligand_mol, **kwargs)
+        raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
+
+    @staticmethod
+    def _make_agg_df_from_fp(fp, threshold=0.3):
+        data = [
+            {
+                "Frame": frame,
+                "ligand": str(lig_resid),
+                "protein": str(prot_resid),
+                "interaction": int_name,
+                "atoms": metadata["indices"]["ligand"],
+                "distance": metadata.get("distance", 0),
+            }
+            for frame, ifp in fp.ifp.items()
+            for (lig_resid, prot_resid), int_data in ifp.items()
+            for int_name, metadata in int_data.items()
+        ]
+        df = pd.DataFrame(data)
+        df["weight"] = 1
+        df = df.groupby(["ligand", "protein", "interaction", "atoms"]).agg(
+            weight=("weight", "sum"), distance=("distance", "mean")
+        )
+        df["weight"] = df["weight"] / len(fp.ifp)
+        # merge different ligand atoms of the same residue/interaction group before
+        # applying the threshold
+        df = df.join(
+            df.groupby(level=["ligand", "protein", "interaction"]).agg(
+                weight_total=("weight", "sum")
+            ),
+        )
+        # threshold and keep most occuring ligand atom
+        df = (
+            df.loc[df["weight_total"] >= threshold]
+            .drop(columns="weight_total")
+            .sort_values("weight", ascending=False)
+            .groupby(level=["ligand", "protein", "interaction"])
+            .head(1)
+            .sort_index()
+        )
+        return df
+
+    @staticmethod
+    def _make_frame_df_from_fp(fp, frame=0):
+        ifp = fp.ifp[frame]
+        data = [
+            {
+                "ligand": str(lig_resid),
+                "protein": str(prot_resid),
+                "interaction": int_name,
+                "atoms": metadata["indices"]["ligand"],
+                "distance": metadata.get("distance", 0),
+            }
+            for (lig_resid, prot_resid), int_data in ifp.items()
+            for int_name, metadata in int_data.items()
+        ]
+        df = pd.DataFrame(data)
+        df["weight"] = 1
+        df = df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
+            columns=["weight", "distance"]
+        )
+        return df
 
     def _make_carbon(self):
         return deepcopy(self._carbon)
@@ -339,7 +383,7 @@ class LigNetwork:
         """Prepare ligand atoms"""
         idx = atom.GetIdx()
         elem = atom.GetSymbol()
-        if elem == "H" and idx not in self.df.index.get_level_values("atom"):
+        if elem == "H" and idx not in self._interacting_atoms:
             self.exclude.append(idx)
             return
         charge = atom.GetFormalCharge()
@@ -474,9 +518,12 @@ class LigNetwork:
                 "residue_type": restype,
             }
             self.nodes[prot_res] = node
-        for (lig_res, prot_res, interaction, lig_id), (weight,) in self.df.iterrows():
+        for (lig_res, prot_res, interaction, lig_indices), (
+            weight,
+            distance,
+        ) in self.df.iterrows():
             if interaction in self._LIG_PI_INTERACTIONS:
-                centroid = self._get_ring_centroid(lig_id)
+                centroid = self._get_ring_centroid(lig_indices)
                 origin = str((lig_res, prot_res, interaction))
                 self.nodes[origin] = {
                     "id": origin,
@@ -488,11 +535,12 @@ class LigNetwork:
                     "physics": False,
                 }
             else:
-                origin = int(lig_id)
+                i = self._DISPLAYED_ATOM.get(interaction, 0)
+                origin = lig_indices[i]
             edge = {
                 "from": origin,
                 "to": prot_res,
-                "title": interaction,
+                "title": f"{interaction}: {distance:.2f}Å",
                 "interaction_type": self._interaction_types.get(
                     interaction, interaction
                 ),
@@ -506,16 +554,9 @@ class LigNetwork:
             }
             self.edges.append(edge)
 
-    def _get_ring_centroid(self, index):
-        """Find ring coordinates using the index of one of the ring atoms"""
-        for r in self._ring_info.AtomRings():
-            if index in r:
-                break
-        else:
-            raise ValueError(
-                "No ring containing this atom index was found in " "the given molecule"
-            )
-        return self.xyz[list(r)].mean(axis=0)
+    def _get_ring_centroid(self, indices):
+        """Find ring centroid coordinates using the indices of the ring atoms"""
+        return self.xyz[list(indices)].mean(axis=0)
 
     def _patch_hydrogens(self):
         """Patch hydrogens on heteroatoms
@@ -766,8 +807,8 @@ class LigNetwork:
             Name of the output file, or file-like object
         """
         html = self._get_html(**kwargs)
-        try:
-            fp.write(html)
-        except AttributeError:
+        if isinstance(fp, (str, Path)):
             with open(fp, "w") as f:
                 f.write(html)
+        elif hasattr(fp, "write") and callable(fp.write):
+            fp.write(html)

@@ -1,7 +1,5 @@
-import os
-from contextlib import contextmanager
+from functools import partial
 from io import StringIO
-from tempfile import NamedTemporaryFile
 
 import MDAnalysis as mda
 import pytest
@@ -10,66 +8,56 @@ import prolif as plf
 from prolif.plotting.network import LigNetwork
 
 
-@contextmanager
-def TempFilename(mode="w"):
-    f = NamedTemporaryFile(delete=False, mode=mode)
-    try:
-        f.close()
-        yield f.name
-    finally:
-        os.unlink(f.name)
-
-
 class TestLigNetwork:
     @pytest.fixture(scope="class")
-    def lignetwork_data(self):
-        u = mda.Universe(plf.datafiles.TOP)
-        prot = u.select_atoms("protein and resid 200:331")
+    def get_ligplot(self):
+        u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
         lig = u.select_atoms("resname LIG")
+        prot = u.select_atoms("protein and byres around 6.5 group ligand", ligand=lig)
         fp = plf.Fingerprint()
-        fp.run(u.trajectory, lig, prot)
-        df = fp.to_dataframe(return_atoms=True)
+        fp.run(u.trajectory[0:2], lig, prot)
         lig = plf.Molecule.from_mda(lig)
-        return lig, df
+        return partial(fp.to_ligplot, lig)
 
-    def test_integration_frame(self, lignetwork_data):
-        lig, df = lignetwork_data
-        net = LigNetwork.from_ifp(df, lig, kind="frame", frame=0)
+    def test_integration_frame(self, get_ligplot):
+        net = get_ligplot(kind="frame", frame=0)
         with StringIO() as buffer:
             net.save(buffer)
             buffer.seek(0)
             html = buffer.read()
         assert "PHE331.B" in html
 
-    def test_integration_agg(self, lignetwork_data):
-        lig, df = lignetwork_data
-        net = LigNetwork.from_ifp(df, lig, kind="aggregate", threshold=0)
+    def test_integration_agg(self, get_ligplot):
+        net = get_ligplot(kind="aggregate", threshold=0)
         with StringIO() as buffer:
             net.save(buffer)
             buffer.seek(0)
             html = buffer.read()
         assert "PHE331.B" in html
 
-    def test_kwargs(self, lignetwork_data):
-        lig, df = lignetwork_data
-        net = LigNetwork.from_ifp(
-            df, lig, kekulize=True, match3D=False, rotation=42, carbon=0
-        )
+    def test_kwargs(self, get_ligplot):
+        net = get_ligplot(kekulize=True, match3D=False, rotation=42, carbon=0)
         with StringIO() as buffer:
             net.save(buffer)
             buffer.seek(0)
             html = buffer.read()
         assert "PHE331.B" in html
 
-    def test_save_file(self, lignetwork_data):
-        lig, df = lignetwork_data
-        net = LigNetwork.from_ifp(df, lig)
-        with TempFilename("w+") as filename:
-            net.save(filename)
-            with open(filename, "r") as f:
-                assert "PHE331.B" in f.read()
+    def test_save_file(self, get_ligplot, tmp_path):
+        net = get_ligplot()
+        output = tmp_path / "lignetwork.html"
+        net.save(output)
+        with open(output, "r") as f:
+            assert "PHE331.B" in f.read()
 
-    def test_from_ifp_raises_kind(self, lignetwork_data):
-        lig, df = lignetwork_data
+    def test_from_fingerprint_raises_kind(self, get_ligplot):
         with pytest.raises(ValueError, match='must be "aggregate" or "frame"'):
-            LigNetwork.from_ifp(df, lig, kind="foo")
+            get_ligplot(kind="foo")
+
+    def test_from_fingerprint_raises_not_executed(self, ligand_mol):
+        fp = plf.Fingerprint()
+        with pytest.raises(
+            AttributeError,
+            match="Please run the interaction fingerprint analysis before plotting",
+        ):
+            LigNetwork.from_fingerprint(fp, ligand_mol)

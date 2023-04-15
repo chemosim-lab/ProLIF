@@ -11,13 +11,12 @@ def process_chunk(args):
     """Generates a fingerprint for a chunk of frame indices"""
     traj, lig, prot, chunk = args
     lig_kwargs, prot_kwargs = converter_kwargs
-    ifp = []
+    ifp = {}
     for ts in traj[chunk]:
         lig_mol = Molecule.from_mda(lig, **lig_kwargs)
         prot_mol = Molecule.from_mda(prot, **prot_kwargs)
-        data = fp.generate(lig_mol, prot_mol, residues=residues, return_atoms=True)
-        data["Frame"] = ts.frame
-        ifp.append(data)
+        data = fp.generate(lig_mol, prot_mol, residues=residues, metadata=True)
+        ifp[ts.frame] = data
         if display_progress:
             with pcount.lock:
                 pcount.counter.value += 1
@@ -40,9 +39,7 @@ def declare_shared_objs_for_chunk(
 def process_mol(args):
     """Generates a fingerprint for a single molecule"""
     index, mol = args
-    data = fp.generate(mol, prot_mol, residues=residues, return_atoms=True)
-    data["Frame"] = index
-    return data
+    return index, fp.generate(mol, prot_mol, residues=residues, metadata=True)
 
 
 def declare_shared_objs_for_mol(fingerprint, pmol, resid_list):
