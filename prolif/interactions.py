@@ -63,7 +63,6 @@ Note that some of the SMARTS patterns used in the interaction classes are inspir
 """
 
 import warnings
-from abc import ABC, ABCMeta, abstractmethod
 from itertools import product
 from math import radians
 
@@ -75,13 +74,18 @@ from rdkit.Chem import MolFromSmarts
 from .utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 _INTERACTIONS = {}
+VDWRADII = {symbol.capitalize(): radius for symbol, radius in vdwradii.items()}
 
 
-class _InteractionMeta(ABCMeta):
+class _InteractionMeta(type):
     """Metaclass to register interactions automatically"""
 
     def __init__(cls, name, bases, classdict):
         type.__init__(cls, name, bases, classdict)
+        if name != "Interaction" and not hasattr(cls, "detect"):
+            raise TypeError(
+                f"Can't instantiate interaction class {name} without a `detect` method."
+            )
         if name in _INTERACTIONS.keys():
             warnings.warn(
                 f"The {name!r} interaction has been superseded by a "
@@ -108,19 +112,16 @@ def get_mapindex(res, index):
     return res.GetAtomWithIdx(index).GetUnsignedProp("mapindex")
 
 
-class Interaction(ABC, metaclass=_InteractionMeta):
+class Interaction(metaclass=_InteractionMeta):
     """Base class for interactions
 
     All interaction classes must inherit this class and define a
     :meth:`~detect` method.
 
     .. versionchanged:: 2.0.0
-        Changed the return type of interactions
+        Changed the return type of interactions. Added some helper methods to easily
+        update/derive interaction classes.
     """
-
-    @abstractmethod
-    def detect(self, lig_res, prot_res):
-        pass
 
     def __call__(self, lig_res, prot_res, metadata=False):
         int_data = self.detect(lig_res, prot_res)
@@ -151,7 +152,7 @@ class Interaction(ABC, metaclass=_InteractionMeta):
         }
 
     @staticmethod
-    def invert_role(metadata):
+    def _invert_metadata(metadata):
         """Invert the role of the ligand and protein components in the dict returned
         by :meth:`~Interaction.metadata`."""
         if metadata is not None:
@@ -167,6 +168,31 @@ class Interaction(ABC, metaclass=_InteractionMeta):
                 metadata["parent_indices"]["protein"],
             )
         return metadata
+
+    @classmethod
+    def invert_class(cls, name, doc):
+        """Creates a new interaction class where the role of the ligand and protein
+        residues have been swapped. Usefull to create an HBondAcceptor class from an
+        HBondDonor class.
+        """
+        inverted = type(name, (cls,), {"__doc__": doc})
+
+        def detect(self, ligand, residue):
+            metadata = super(inverted, self).detect(residue, ligand)
+            return self._invert_metadata(metadata)
+
+        inverted.detect = detect
+        return inverted
+
+    @classmethod
+    def update_parameters(cls, source):
+        """Creates a new class with updated parameters from a source class."""
+        if issubclass(cls, source):
+            __init__ = source.__init__
+        else:
+            __init__ = cls.__init__
+            __init__.__defaults__ = source.__init__.__defaults__
+        return type(cls.__name__, (cls,), {"__init__": __init__})
 
 
 class _Distance(Interaction):
@@ -293,12 +319,9 @@ class HBAcceptor(_BaseHBond):
     """Hbond interaction between a ligand (acceptor) and a residue (donor)"""
 
 
-class HBDonor(_BaseHBond):
-    """Hbond interaction between a ligand (donor) and a residue (acceptor)"""
-
-    def detect(self, ligand, residue):
-        metadata = super().detect(residue, ligand)
-        return self.invert_role(metadata)
+HBDonor = HBAcceptor.invert_class(
+    "HBDonor", "Hbond interaction between a ligand (donor) and a residue (acceptor)"
+)
 
 
 class _BaseXBond(Interaction):
@@ -373,12 +396,9 @@ class XBAcceptor(_BaseXBond):
     """Halogen bonding between a ligand (acceptor) and a residue (donor)"""
 
 
-class XBDonor(_BaseXBond):
-    """Halogen bonding between a ligand (donor) and a residue (acceptor)"""
-
-    def detect(self, ligand, residue):
-        metadata = super().detect(residue, ligand)
-        return self.invert_role(metadata)
+XBDonor = XBAcceptor.invert_class(
+    "XBDonor", "Halogen bonding between a ligand (donor) and a residue (acceptor)"
+)
 
 
 class _BaseIonic(_Distance):
@@ -402,12 +422,9 @@ class Cationic(_BaseIonic):
     """Ionic interaction between a ligand (cation) and a residue (anion)"""
 
 
-class Anionic(_BaseIonic):
-    """Ionic interaction between a ligand (anion) and a residue (cation)"""
-
-    def detect(self, ligand, residue):
-        metadata = super().detect(residue, ligand)
-        return self.invert_role(metadata)
+Anionic = Cationic.invert_class(
+    "Anionic", "Ionic interaction between a ligand (anion) and a residue (cation)"
+)
 
 
 class _BaseCationPi(Interaction):
@@ -480,17 +497,14 @@ class _BaseCationPi(Interaction):
                     )
 
 
-class PiCation(_BaseCationPi):
-    """Cation-Pi interaction between a ligand (aromatic ring) and a residue
-    (cation)"""
-
-    def detect(self, ligand, residue):
-        metadata = super().detect(residue, ligand)
-        return self.invert_role(metadata)
-
-
 class CationPi(_BaseCationPi):
     """Cation-Pi interaction between a ligand (cation) and a residue (aromatic ring)"""
+
+
+PiCation = CationPi.invert_class(
+    "PiCation",
+    "Cation-Pi interaction between a ligand (aromatic ring) and a residue (cation)",
+)
 
 
 class _BasePiStacking(Interaction):
@@ -731,12 +745,10 @@ class MetalDonor(_BaseMetallic):
     """Metallic interaction between a metal and a residue (chelated)"""
 
 
-class MetalAcceptor(_BaseMetallic):
-    """Metallic interaction between a ligand (chelated) and a metal residue"""
-
-    def detect(self, ligand, residue):
-        metadata = super().detect(residue, ligand)
-        return self.invert_role(metadata)
+MetalAcceptor = MetalDonor.invert_class(
+    "MetalAcceptor",
+    "Metallic interaction between a ligand (chelated) and a metal residue",
+)
 
 
 class VdWContact(Interaction):
@@ -748,29 +760,36 @@ class VdWContact(Interaction):
         Tolerance added to the sum of vdW radii of atoms before comparing to
         the interatomic distance. If ``distance <= sum_vdw + tolerance`` the
         atoms are identified as a contact
+    vdwradii : dict, optional
+        Updates to the vdW radii dictionary
 
     Raises
     ------
     ValueError : ``tolerance`` parameter cannot be negative
+
+    .. versionchanged:: 2.0.0
+        Added the `vdwradii``parameter.
+
     """
 
-    def __init__(self, tolerance=0.0):
+    def __init__(self, tolerance=0.0, vdwradii=None):
         if tolerance >= 0:
             self.tolerance = tolerance
         else:
             raise ValueError("`tolerance` must be 0 or positive")
         self._vdw_cache = {}
+        self.vdwradii = {**VDWRADII, **vdwradii} if vdwradii else VDWRADII
 
     def detect(self, ligand, residue):
         lxyz = ligand.GetConformer()
         rxyz = residue.GetConformer()
         for la, ra in product(ligand.GetAtoms(), residue.GetAtoms()):
-            lig = la.GetSymbol().upper()
-            res = ra.GetSymbol().upper()
+            lig = la.GetSymbol()
+            res = ra.GetSymbol()
             try:
                 vdw = self._vdw_cache[frozenset((lig, res))]
             except KeyError:
-                vdw = vdwradii[lig] + vdwradii[res] + self.tolerance
+                vdw = self.vdwradii[lig] + self.vdwradii[res] + self.tolerance
                 self._vdw_cache[frozenset((lig, res))] = vdw
             dist = lxyz.GetAtomPosition(la.GetIdx()).Distance(
                 rxyz.GetAtomPosition(ra.GetIdx())

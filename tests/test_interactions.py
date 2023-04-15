@@ -1,7 +1,6 @@
 import MDAnalysis as mda
 import numpy as np
 import pytest
-from MDAnalysis.topology.tables import vdwradii
 from MDAnalysis.transformations import rotateby, translate
 from rdkit import Chem, RDLogger
 
@@ -138,12 +137,12 @@ class TestInteractions:
             __doc__ = prolif.interactions.Hydrophobic.__doc__
 
     def test_error_no_detect(self):
-        class _Dummy(Interaction):
-            pass
+        with pytest.raises(
+            TypeError, match="Can't instantiate interaction class _Dummy"
+        ):
 
-        with pytest.raises(TypeError, match="Can't instantiate abstract class _Dummy"):
-            _Dummy()
-        _INTERACTIONS.pop("_Dummy")
+            class _Dummy(Interaction):
+                pass
 
     @pytest.mark.parametrize("index", [0, 1, 3, 42, 78])
     def test_get_mapindex(self, index, ligand_mol):
@@ -162,8 +161,20 @@ class TestInteractions:
         assert vdw._vdw_cache == {}
         vdw.detect(lig_mol[0], prot_mol[0])
         for (lig, res), value in vdw._vdw_cache.items():
-            vdw_dist = vdwradii[lig] + vdwradii[res] + vdw.tolerance
+            vdw_dist = vdw.vdwradii[lig] + vdw.vdwradii[res] + vdw.tolerance
             assert vdw_dist == value
+
+    @pytest.mark.parametrize(
+        "lig_mol, prot_mol", [("benzene", "cation")], indirect=["lig_mol", "prot_mol"]
+    )
+    def test_vdwcontact_vdwradii_update(self, lig_mol, prot_mol):
+        class CustomVdW(VdWContact):
+            def __init__(self, tolerance=0, vdwradii={"Na": 0}):
+                super().__init__(tolerance, vdwradii)
+
+        metadata = CustomVdW().detect(lig_mol[0], prot_mol[0])
+        assert metadata is None
+        _INTERACTIONS.pop("CustomVdW")
 
     @pytest.mark.parametrize(
         ["interaction_qmol", "smiles", "expected"],
@@ -292,3 +303,26 @@ class TestInteractions:
         lig, phe331 = ligand_mol[0], protein_mol["PHE331.B"]
         assert fp.edgetoface(lig, phe331) is True
         assert fp.pistacking(lig, phe331) is True
+
+    def test_copy_parameters(self):
+        class Dummy1(VdWContact):
+            def __init__(self, tolerance=1):
+                super().__init__(tolerance)
+
+        class Dummy2(Dummy1):
+            def __init__(self, tolerance=2):
+                super().__init__(tolerance)
+
+        assert Dummy1().tolerance == 1
+        assert Dummy2().tolerance == 2
+
+        DummyUpdated = Dummy2.update_parameters(Dummy1)
+        assert DummyUpdated().tolerance == 1
+        assert _INTERACTIONS["Dummy2"] is DummyUpdated
+
+        DummyUpdated = Dummy1.update_parameters(Dummy2)
+        assert DummyUpdated().tolerance == 2
+        assert _INTERACTIONS["Dummy1"] is DummyUpdated
+
+        for name in ["Dummy1", "Dummy2"]:
+            _INTERACTIONS.pop(name)
