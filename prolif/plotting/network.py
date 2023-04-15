@@ -283,8 +283,8 @@ class LigNetwork:
         Two kinds of diagrams can be rendered: either for a designated frame or
         by aggregating the results on the whole IFP and optionnally discarding
         interactions that occur less frequently than a threshold. In the latter
-        case (aggregate), only the most frequent ligand atom interaction is
-        rendered.
+        case (aggregate), only the group of atoms most frequently involved in
+        each interaction is used to draw the edge.
 
         Parameters
         ----------
@@ -296,8 +296,8 @@ class LigNetwork:
         kind : str
             One of ``"aggregate"`` or ``"frame"``
         frame : int or str
-            Frame number, as read in ``ifp.index``. Only applicable for
-            ``kind="frame"``
+            Frame number (see :attr:`~prolif.fingerprint.Fingerprint.ifp`). Only
+            applicable for ``kind="frame"``
         threshold : float
             Frequency threshold, between 0 and 1. Only applicable for
             ``kind="aggregate"``

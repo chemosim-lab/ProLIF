@@ -1,10 +1,45 @@
+"""
+Storing interactions --- :mod:`prolif.ifp`
+==========================================
+"""
 from collections import UserDict
 
 from .residue import ResidueId
 
 
 class IFP(UserDict):
-    """Mapping between residue pairs and interactions metadata."""
+    """Mapping between residue pairs and interaction fingerprint.
+
+    Notes
+    -----
+    This class provides an easy way to access interaction data from the
+    :attr:`~prolif.fingerprint.Fingerprint.ifp` dictionary. This class is a dictionary
+    formatted as:
+
+    .. code-block:: text
+
+        {
+            tuple[<residue_id>, <residue_id>]: {
+                <interaction name>: {
+                    "indices": {
+                        "ligand": tuple[int, ...],
+                        "protein": tuple[int, ...]
+                    },
+                    "parent_indices": {
+                        "ligand": tuple[int, ...],
+                        "protein": tuple[int, ...]
+                    },
+                    <other metadata>: <value>
+                }
+            }
+        }
+
+    Here ``<residue_id>`` corresponds to a :class:`~prolif.residue.ResidueId` object.
+    For convenience, one can directly use strings rather than ``ResidueId`` objects when
+    indexing the IFP, e.g. ``ifp[("LIG1.G", "ASP129.A")]``.
+    You can also use a single ``ResidueId`` or string to returned a filtered IFP only
+    containing interactions with the specified residue, e.g. ``ifp["ASP129.A"]``.
+    """
 
     def __getitem__(self, key):
         try:

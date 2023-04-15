@@ -112,8 +112,8 @@ def get_residues_near_ligand(lig, prot, cutoff=6.0):
 
     Parameters
     ----------
-    lig : prolif.molecule.Molecule
-        Select residues that are near this ligand
+    lig : prolif.molecule.Molecule or prolif.residue.Residue
+        Select residues that are near this ligand/residue
     prot : prolif.molecule.Molecule
         Protein containing the residues
     cutoff : float
@@ -194,14 +194,13 @@ def to_dataframe(
 
     Parameters
     ----------
-    ifp : list
-        A list of dict in the format {key: bitvector}. "key" is a tuple of
-        ligand and protein ResidueId. "bitvector" is either a numpy.ndarray
-        of bits, or a list of bitarray, ligand atom indices, and protein atom
-        indices. Each dictionnary must also contain an entry that will be used
-        as an index, typically a frame number.
+    ifp : dict
+        A dict in the format
+        ``{<frame number>: {(<residue_id>, <residue_id>): <interactions>}}``.
+        ``<interactions>`` is either a :class:`numpy.ndarray` bitvector, or a dict in
+        the format ``{<interaction name>: <metadata dict>}``.
     interactions : list
-        A list of interactions, in the same order as the bitvector.
+        A list of interactions, in the same order as used to detect the interactions.
     index_col : str
         Name of the index column in the DataFrame
     dtype : object or None

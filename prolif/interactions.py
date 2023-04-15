@@ -172,8 +172,8 @@ class Interaction(metaclass=_InteractionMeta):
     @classmethod
     def invert_class(cls, name, doc):
         """Creates a new interaction class where the role of the ligand and protein
-        residues have been swapped. Usefull to create an HBondAcceptor class from an
-        HBondDonor class.
+        residues have been swapped. Usefull to create e.g. an acceptor class from a
+        donor class.
         """
         inverted = type(name, (cls,), {"__doc__": doc})
 
@@ -766,6 +766,7 @@ class VdWContact(Interaction):
     Raises
     ------
     ValueError : ``tolerance`` parameter cannot be negative
+
 
     .. versionchanged:: 2.0.0
         Added the `vdwradii``parameter.

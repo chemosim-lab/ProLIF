@@ -13,7 +13,7 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     lig = u.select_atoms("resname LIG")
     fp = prolif.Fingerprint(["HBDonor", "HBAcceptor", "PiStacking", "CationPi",
                              "Cationic"])
-    fp.run(u.trajectory[::10], lig, prot)
+    fp.run(u.trajectory[:5], lig, prot)
     df = fp.to_dataframe()
     df
     bv = fp.to_bitvectors()
@@ -22,7 +22,6 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     fp.to_pickle("fingerprint.pkl")
     # load
     fp = prolif.Fingerprint.from_pickle("fingerprint.pkl")
-    df.equals(fp.to_dataframe())
 
 """
 import multiprocessing as mp
@@ -61,21 +60,24 @@ class Fingerprint:
     interactions : list
         List of names (str) of interaction classes as found in the
         :mod:`prolif.interactions` module
-
-    Attributes
-    ----------
-    interactions : dict
-        Dictionary of interaction functions indexed by class name. For more
-        details, see :mod:`prolif.interactions`
-    n_interactions : int
-        Number of interaction functions registered by the fingerprint
     vicinity_cutoff : float
         Automatically restrict the analysis to residues within this range of the ligand.
         This parameter is ignored if the ``residues`` parameter of the ``run`` methods
         is set to anything other than ``None``.
+
+    Attributes
+    ----------
+    interactions : dict
+        Dictionary of interaction classes indexed by class name. For more
+        details, see :mod:`prolif.interactions`
+    n_interactions : int
+        Number of interaction functions registered by the fingerprint
+    vicinity_cutoff : float
+        Used when calling :func:`prolif.utils.get_residues_near_ligand`.
     ifp : dict, optionnal
         Dict of interaction fingerprints in a sparse format for the given trajectory or
-        docking poses.
+        docking poses: ``{<frame number>: <IFP>}``. See the :class:`~prolif.ifp.IFP`
+        class for more information.
 
     Raises
     ------
@@ -212,14 +214,14 @@ class Fingerprint:
 
     def bitvector(self, res1, res2):
         """Generates the complete bitvector for the interactions between two
-        residues. To get the indices of atoms responsible for each interaction,
-        see :meth:`bitvector_atoms`
+        residues. To access metadata for each interaction, see
+        :meth:`~Fingerprint.metadata`.
 
         Parameters
         ----------
-        res1 : prolif.residue.Residue or prolif.molecule.Molecule
+        res1 : prolif.residue.Residue
             A residue, usually from a ligand
-        res2 : prolif.residue.Residue or prolif.molecule.Molecule
+        res2 : prolif.residue.Residue
             A residue, usually from a protein
 
         Returns
@@ -237,9 +239,9 @@ class Fingerprint:
 
         Parameters
         ----------
-        res1 : prolif.residue.Residue or prolif.molecule.Molecule
+        res1 : prolif.residue.Residue
             A residue, usually from a ligand
-        res2 : prolif.residue.Residue or prolif.molecule.Molecule
+        res2 : prolif.residue.Residue
             A residue, usually from a protein
 
         Returns
@@ -247,6 +249,7 @@ class Fingerprint:
         metadata : dict
             Metadata dictionnary indexed by interaction name. If a specific interaction
             is not present between residues, it is filtered out of the dictionary.
+
 
         .. versionchanged:: 0.3.2
             Atom indices are returned as two separate lists instead of a single
@@ -723,7 +726,8 @@ class Fingerprint:
         ----------
         path_or_bytes : str, pathlib.Path or bytes
             The path to the pickle file, or bytes corresponding to a pickle
-            dump
+            dump.
+
 
         .. seealso::
 
