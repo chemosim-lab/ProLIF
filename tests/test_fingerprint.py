@@ -8,7 +8,7 @@ from rdkit.DataStructs import ExplicitBitVect
 
 from prolif.datafiles import datapath
 from prolif.fingerprint import Fingerprint
-from prolif.interactions import _INTERACTIONS, Interaction
+from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.molecule import sdf_supplier
 from prolif.residue import ResidueId
 
@@ -155,16 +155,16 @@ class TestFingerprint:
         assert len(bvs) == 3
 
     def test_list_avail(self):
-        avail = Fingerprint.list_available()
-        assert "Hydrophobic" in avail
-        assert "HBDonor" in avail
-        assert "_BaseHBond" not in avail
-        avail = Fingerprint.list_available(show_hidden=True)
-        assert "Hydrophobic" in avail
-        assert "HBDonor" in avail
-        assert "_BaseHBond" in avail
-        assert "_Distance" in avail
-        assert "Interaction" in avail
+        available = Fingerprint.list_available()
+        assert "Hydrophobic" in available
+        assert "HBDonor" in available
+        assert "Distance" not in available
+        assert "Interaction" not in available
+        available = Fingerprint.list_available(show_hidden=True)
+        assert "Hydrophobic" in available
+        assert "HBDonor" in available
+        assert "Distance" in available
+        assert "Interaction" not in available
 
     def test_unknown_interaction(self):
         with pytest.raises(
