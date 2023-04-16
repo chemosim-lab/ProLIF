@@ -167,8 +167,14 @@ class TestFingerprint:
         assert "Interaction" in avail
 
     def test_unknown_interaction(self):
-        with pytest.raises(NameError, match="Unknown interaction"):
+        with pytest.raises(
+            NameError, match=r"Unknown interaction\(s\) in 'interactions': foo"
+        ):
             Fingerprint(["Cationic", "foo"])
+        with pytest.raises(
+            NameError, match=r"Unknown interaction\(s\) in 'parameters': bar"
+        ):
+            Fingerprint(["Cationic"], parameters={"bar": {}})
 
     @pytest.fixture
     def fp_unpkl(self, fp, protein_mol):
@@ -249,3 +255,11 @@ class TestFingerprint:
             converter_kwargs=[dict(force=True), dict(force=True)],
         )
         assert fp.ifp
+
+    def test_interaction_params(self):
+        fp = Fingerprint()
+        assert fp.hydrophobic.distance == 4.5
+        fp = Fingerprint(parameters={"Hydrophobic": {"distance": 1.0}})
+        assert fp.hydrophobic.distance == 1.0
+        fp = Fingerprint()
+        assert fp.hydrophobic.distance == 4.5
