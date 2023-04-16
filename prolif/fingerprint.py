@@ -59,7 +59,10 @@ class Fingerprint:
     ----------
     interactions : list
         List of names (str) of interaction classes as found in the
-        :mod:`prolif.interactions` module
+        :mod:`prolif.interactions` module.
+    parameters : dict, optional
+        New parameters for the interactions. Mapping between an interaction name and a
+        dict of parameters as they appear in the interaction class.
     vicinity_cutoff : float
         Automatically restrict the analysis to residues within this range of the ligand.
         This parameter is ignored if the ``residues`` parameter of the ``run`` methods
@@ -74,7 +77,7 @@ class Fingerprint:
         Number of interaction functions registered by the fingerprint
     vicinity_cutoff : float
         Used when calling :func:`prolif.utils.get_residues_near_ligand`.
-    ifp : dict, optionnal
+    ifp : dict, optional
         Dict of interaction fingerprints in a sparse format for the given trajectory or
         docking poses: ``{<frame number>: <IFP>}``. See the :class:`~prolif.ifp.IFP`
         class for more information.
@@ -143,6 +146,8 @@ class Fingerprint:
         Removed the ``__wrapped__`` attribute on interaction methods that are available
         from the fingerprint object. These methods now accept a ``metadata`` parameter
         instead.
+        Added the ``parameters`` argument to set the interaction classes parameters
+        without having to create a new class.
 
     """
 
@@ -159,29 +164,39 @@ class Fingerprint:
             "PiCation",
             "VdWContact",
         ],
+        parameters=None,
         vicinity_cutoff=6.0,
     ):
-        self._set_interactions(interactions)
+        self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
 
-    def _set_interactions(self, interactions):
+    def _set_interactions(self, interactions, parameters):
         # read interactions to compute
-        self.interactions = {}
+        parameters = parameters or {}
         if interactions == "all":
             interactions = self.list_available()
         # sanity check
-        unsafe = set(interactions)
-        unk = unsafe.symmetric_difference(_INTERACTIONS.keys()) & unsafe
-        if unk:
-            raise NameError(f"Unknown interaction(s): {', '.join(unk)}")
+        self._check_valid_interactions(interactions, "interactions")
+        self._check_valid_interactions(parameters, "parameters")
         # add interaction methods
+        self.interactions = {}
         for name, interaction_cls in _INTERACTIONS.items():
             if name.startswith("_") or name == "Interaction":
                 continue
-            interaction = interaction_cls()
+            # create instance with custom parameters if available
+            interaction = interaction_cls(**parameters.get(name, {}))
             setattr(self, name.lower(), interaction)
             if name in interactions:
                 self.interactions[name] = interaction
+
+    def _check_valid_interactions(self, interactions_iterable, varname):
+        """Raises a NameError if an unknown interaction is given."""
+        unsafe = set(interactions_iterable)
+        unknown = unsafe.symmetric_difference(_INTERACTIONS.keys()) & unsafe
+        if unknown:
+            raise NameError(
+                f"Unknown interaction(s) in {varname!r}: {', '.join(unknown)}"
+            )
 
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
