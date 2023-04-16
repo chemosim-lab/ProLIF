@@ -98,7 +98,9 @@ class Interaction:
         residues have been swapped. Usefull to create e.g. an acceptor class from a
         donor class.
         """
-        inverted = type(name, (cls,), {"__doc__": doc})
+        parameters_docs = cls.__doc__.split("\n", maxsplit=1)[1]
+        docstring = f"{doc}\n{parameters_docs}"
+        inverted = type(name, (cls,), {"__doc__": docstring})
 
         def detect(self, ligand, residue):
             metadata = super(inverted, self).detect(residue, ligand)
