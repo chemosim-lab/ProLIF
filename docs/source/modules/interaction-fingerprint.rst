@@ -7,7 +7,10 @@ Interaction fingerprint
 .. automodule:: prolif.ifp
     :members:
 
-.. automodule:: prolif.interactions
+.. automodule:: prolif.interactions.interactions
     :members:
     :show-inheritance:
-    :private-members:
+
+.. automodule:: prolif.interactions.base
+    :members:
+    :show-inheritance:
