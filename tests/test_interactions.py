@@ -303,26 +303,3 @@ class TestInteractions:
         lig, phe331 = ligand_mol[0], protein_mol["PHE331.B"]
         assert fp.edgetoface(lig, phe331) is True
         assert fp.pistacking(lig, phe331) is True
-
-    def test_copy_parameters(self):
-        class Dummy1(VdWContact):
-            def __init__(self, tolerance=1):
-                super().__init__(tolerance)
-
-        class Dummy2(Dummy1):
-            def __init__(self, tolerance=2):
-                super().__init__(tolerance)
-
-        assert Dummy1().tolerance == 1
-        assert Dummy2().tolerance == 2
-
-        DummyUpdated = Dummy2.update_parameters(Dummy1)
-        assert DummyUpdated().tolerance == 1
-        assert _INTERACTIONS["Dummy2"] is DummyUpdated
-
-        DummyUpdated = Dummy1.update_parameters(Dummy2)
-        assert DummyUpdated().tolerance == 2
-        assert _INTERACTIONS["Dummy1"] is DummyUpdated
-
-        for name in ["Dummy1", "Dummy2"]:
-            _INTERACTIONS.pop(name)

@@ -2,58 +2,6 @@
 Detecting interactions between residues --- :mod:`prolif.interactions`
 ======================================================================
 
-You can declare your own interaction class like this::
-
-    from scipy.spatial import distance_matrix
-
-    class CloseContact(prolif.interactions.Interaction):
-        def __init__(self, contact_threshold=2.0):
-            self.contact_threshold = contact_threshold
-
-        def detect(self, ligand_residue, protein_residue):
-            # distance matrix between atoms of both residues
-            dist_matrix = distance_matrix(ligand_residue.xyz, protein_residue.xyz)
-            if (dist_matrix <= self.contact_threshold).any():
-                # indices of atoms with the shortest distance
-                ligand_index, protein_index = divmod(
-                    int(dist_matrix.argmin()), dist_matrix.shape[1]
-                )
-                # shortest distance value
-                min_dist = dist_matrix[ligand_index, protein_index]
-                # return dict with metadata on the interaction
-                # required arguments: input residues, and tuple of indices of atoms
-                #                     responsible for the interaction
-                # optional arguments: any additional `key=value` pair (e.g. distance)
-                return self.metadata(
-                    lig_res=ligand_residue,
-                    prot_res=protein_residue,
-                    lig_indices=(ligand_index,),
-                    prot_indices=(protein_index,),
-                    distance=min_dist,
-                )
-
-.. warning:: Your custom class must inherit from :class:`prolif.interactions.Interaction`
-
-The new "CloseContact" class is then automatically added to the list of
-interactions available to the fingerprint generator::
-
-    >>> u = mda.Universe(prolif.datafiles.TOP, prolif.datafiles.TRAJ)
-    >>> prot = u.select_atoms("protein")
-    >>> lig = u.select_atoms("resname LIG")
-    >>> fp = prolif.Fingerprint(interactions=["CloseContact"])
-    >>> fp.run(u.trajectory[0:1], lig, prot)
-    >>> df = fp.to_dataframe()
-    >>> df.xs("CloseContact", level=1, axis=1)
-    ligand            LIG1.G             
-    protein         ASP129.A     VAL201.A
-    interaction CloseContact CloseContact
-    Frame                                
-    0                   True         True
-    >>> lmol = prolif.Molecule.from_mda(lig)
-    >>> pmol = prolif.Molecule.from_mda(prot)
-    >>> fp.closecontact(lmol, pmol["ASP129.A"])
-    {'indices': {'ligand': (52,), 'protein': (8,)}, 'parent_indices': {'ligand': (52,), 'protein': (1489,)}, 'distance': 1.7540241205623204}
-
 Note that some of the SMARTS patterns used in the interaction classes are inspired from
 `Pharmit`_ and `RDKit`_.
 
@@ -183,16 +131,6 @@ class Interaction(metaclass=_InteractionMeta):
 
         inverted.detect = detect
         return inverted
-
-    @classmethod
-    def update_parameters(cls, source):
-        """Creates a new class with updated parameters from a source class."""
-        if issubclass(cls, source):
-            __init__ = source.__init__
-        else:
-            __init__ = cls.__init__
-            __init__.__defaults__ = source.__init__.__defaults__
-        return type(cls.__name__, (cls,), {"__init__": __init__})
 
 
 class _Distance(Interaction):
