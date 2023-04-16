@@ -34,10 +34,10 @@ import numpy as np
 from rdkit import Chem
 from tqdm.auto import tqdm
 
-from .ifp import IFP
-from .interactions import _INTERACTIONS
-from .molecule import Molecule
-from .parallel import (
+from prolif.ifp import IFP
+from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
+from prolif.molecule import Molecule
+from prolif.parallel import (
     Progress,
     ProgressCounter,
     declare_shared_objs_for_chunk,
@@ -45,7 +45,7 @@ from .parallel import (
     process_chunk,
     process_mol,
 )
-from .utils import get_residues_near_ligand, to_bitvectors, to_dataframe
+from prolif.utils import get_residues_near_ligand, to_bitvectors, to_dataframe
 
 
 class Fingerprint:
@@ -210,18 +210,12 @@ class Fingerprint:
         Parameters
         ----------
         show_hidden : bool
-            Show hidden classes (usually base classes whose name starts with an
-            underscore ``_``. Those are not supposed to be called directly)
+            Show hidden classes (base classes meant to be inherited from to create
+            custom interactions).
         """
         if show_hidden:
-            interactions = [name for name in _INTERACTIONS.keys()]
-        else:
-            interactions = [
-                name
-                for name in _INTERACTIONS.keys()
-                if not (name.startswith("_") or name == "Interaction")
-            ]
-        return sorted(interactions)
+            return sorted(_BASE_INTERACTIONS) + sorted(_INTERACTIONS)
+        return sorted(_INTERACTIONS)
 
     @property
     def n_interactions(self):

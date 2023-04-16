@@ -25,8 +25,8 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import rdDepictor
 
-from ..residue import ResidueId
-from ..utils import requires
+from prolif.residue import ResidueId
+from prolif.utils import requires
 
 try:
     from IPython.display import HTML

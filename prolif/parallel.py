@@ -4,7 +4,7 @@ from time import sleep
 
 from tqdm.auto import tqdm
 
-from .molecule import Molecule
+from prolif.molecule import Molecule
 
 
 def process_chunk(args):

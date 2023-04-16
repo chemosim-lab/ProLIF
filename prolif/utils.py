@@ -18,7 +18,7 @@ from rdkit.DataStructs import ExplicitBitVect
 from rdkit.Geometry import Point3D
 from scipy.spatial import cKDTree
 
-from .residue import ResidueId
+from prolif.residue import ResidueId
 
 _90_deg_to_rad = pi / 2
 

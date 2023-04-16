@@ -4,7 +4,7 @@ Storing interactions --- :mod:`prolif.ifp`
 """
 from collections import UserDict
 
-from .residue import ResidueId
+from prolif.residue import ResidueId
 
 
 class IFP(UserDict):
