@@ -24,12 +24,10 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     fp = prolif.Fingerprint.from_pickle("fingerprint.pkl")
 
 """
-import multiprocessing as mp
-import pickle
-from collections.abc import Iterable
-from inspect import isgenerator
-from threading import Thread
+from collections import Sized
 
+import dill
+import multiprocess as mp
 import numpy as np
 from rdkit import Chem
 from tqdm.auto import tqdm
@@ -37,14 +35,7 @@ from tqdm.auto import tqdm
 from prolif.ifp import IFP
 from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
 from prolif.molecule import Molecule
-from prolif.parallel import (
-    Progress,
-    ProgressCounter,
-    declare_shared_objs_for_chunk,
-    declare_shared_objs_for_mol,
-    process_chunk,
-    process_mol,
-)
+from prolif.parallel import MolIterablePool, TrajectoryPool
 from prolif.utils import get_residues_near_ligand, to_bitvectors, to_dataframe
 
 
@@ -324,12 +315,10 @@ class Fingerprint:
             arrays.
         """
         ifp = IFP()
-        prot_residues = residues
-        if residues == "all":
-            prot_residues = prot.residues.keys()
+        prot_residues = prot.residues if residues == "all" else residues
         get_interactions = self.metadata if metadata else self.bitvector
         for lresid, lres in lig.residues.items():
-            if residues is None:
+            if prot_residues is None:
                 prot_residues = get_residues_near_ligand(
                     lres, prot, self.vicinity_cutoff
                 )
@@ -427,6 +416,10 @@ class Fingerprint:
             raise ValueError("n_jobs must be > 0 or None")
         if converter_kwargs is not None and len(converter_kwargs) != 2:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
+
+        converter_kwargs = converter_kwargs or ({}, {})
+        if residues == "all":
+            residues = list(Molecule.from_mda(prot, **converter_kwargs[1]).residues)
         if n_jobs != 1:
             return self._run_parallel(
                 traj,
@@ -437,15 +430,12 @@ class Fingerprint:
                 progress=progress,
                 n_jobs=n_jobs,
             )
-        lig_kwargs, prot_kwargs = converter_kwargs or ({}, {})
 
         iterator = tqdm(traj) if progress else traj
-        if residues == "all":
-            residues = Molecule.from_mda(prot, **prot_kwargs).residues.keys()
         ifp = {}
         for ts in iterator:
-            prot_mol = Molecule.from_mda(prot, **prot_kwargs)
-            lig_mol = Molecule.from_mda(lig, **lig_kwargs)
+            lig_mol = Molecule.from_mda(lig, **converter_kwargs[0])
+            prot_mol = Molecule.from_mda(prot, **converter_kwargs[1])
             ifp[ts.frame] = self.generate(
                 lig_mol, prot_mol, residues=residues, metadata=True
             )
@@ -472,32 +462,21 @@ class Fingerprint:
             traj = lig.universe.trajectory
         else:
             frames = range(n_frames)
-        lig_kwargs, prot_kwargs = converter_kwargs or ({}, {})
-
-        if residues == "all":
-            residues = Molecule.from_mda(prot, **prot_kwargs).residues.keys()
         chunks = np.array_split(frames, n_chunks)
-        # setup parallel progress bar
-        pcount = ProgressCounter()
-        if progress:
-            pbar = Progress(pcount, total=len(frames))
-        else:
-            pbar = lambda: None
-        pbar_thread = Thread(target=pbar, daemon=True)
+        args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
+        ifp = {}
 
-        # run pool of workers
-        with mp.Pool(
+        with TrajectoryPool(
             n_jobs,
-            initializer=declare_shared_objs_for_chunk,
-            initargs=(self, residues, progress, pcount, (lig_kwargs, prot_kwargs)),
+            fingerprint=self,
+            residues=residues,
+            tqdm_kwargs={"total": len(frames), "disable": not progress},
+            rdkitconverter_kwargs=converter_kwargs,
         ) as pool:
-            pbar_thread.start()
-            args = ((traj, lig, prot, chunk) for chunk in chunks)
-            ifp = {}
-            for ifp_data_chunk in pool.imap_unordered(process_chunk, args):
+            for ifp_data_chunk in pool.process(args_iterable):
                 ifp.update(ifp_data_chunk)
-        # sort
-        self.ifp = {frame: ifp[frame] for frame in sorted(ifp)}
+
+        self.ifp = ifp
         return self
 
     def run_from_iterable(
@@ -567,6 +546,8 @@ class Fingerprint:
         """
         if n_jobs is not None and n_jobs < 1:
             raise ValueError("n_jobs must be > 0 or None")
+        if residues == "all":
+            residues = list(prot_mol.residues)
         if n_jobs != 1:
             return self._run_iter_parallel(
                 lig_iterable=lig_iterable,
@@ -577,8 +558,6 @@ class Fingerprint:
             )
 
         iterator = tqdm(lig_iterable) if progress else lig_iterable
-        if residues == "all":
-            residues = prot_mol.residues.keys()
         ifp = {}
         for i, lig_mol in enumerate(iterator):
             ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
@@ -589,33 +568,25 @@ class Fingerprint:
         self, lig_iterable, prot_mol, residues=None, progress=True, n_jobs=None
     ):
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
-        previous_pkl_props = Chem.GetDefaultPickleProperties()
-        Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
+        total = (
+            len(lig_iterable)
+            if isinstance(lig_iterable, Chem.SDMolSupplier)
+            or isinstance(lig_iterable, Sized)
+            else None
+        )
+        ifp = {}
 
-        if isinstance(lig_iterable, Chem.SDMolSupplier) or (
-            isinstance(lig_iterable, Iterable) and not isgenerator(lig_iterable)
-        ):
-            total = len(lig_iterable)
-        else:
-            total = None
-        suppl = enumerate(lig_iterable)
-        if residues == "all":
-            residues = prot_mol.residues.keys()
-
-        with mp.Pool(
+        with MolIterablePool(
             n_jobs,
-            initializer=declare_shared_objs_for_mol,
-            initargs=(self, prot_mol, residues),
+            fingerprint=self,
+            prot_mol=prot_mol,
+            residues=residues,
+            tqdm_kwargs={"total": total, "disable": not progress},
         ) as pool:
-            results = {}
-            for i, ifp_data in tqdm(
-                pool.imap_unordered(process_mol, suppl),
-                total=total,
-                disable=not progress,
-            ):
-                results[i] = ifp_data
-        self.ifp = {frame: results[frame] for frame in sorted(results)}
-        Chem.SetDefaultPickleProperties(previous_pkl_props)
+            for i, ifp_data in enumerate(pool.process(lig_iterable)):
+                ifp[i] = ifp_data
+
+        self.ifp = ifp
         return self
 
     def to_dataframe(self, **kwargs):
@@ -720,12 +691,15 @@ class Fingerprint:
 
         .. versionadded:: 1.0.0
 
+        .. versionchanged:: 2.0.0
+            Switched to dill instead of pickle
+
         """
         if path:
             with open(path, "wb") as f:
-                pickle.dump(self, f)
+                dill.dump(self, f)
             return None
-        return pickle.dumps(self)
+        return dill.dumps(self)
 
     @classmethod
     def from_pickle(cls, path_or_bytes):
@@ -744,11 +718,14 @@ class Fingerprint:
 
         .. versionadded:: 1.0.0
 
+        .. versionchanged:: 2.0.0
+            Switched to dill instead of pickle
+
         """
         if isinstance(path_or_bytes, bytes):
-            return pickle.loads(path_or_bytes)
+            return dill.loads(path_or_bytes)
         with open(path_or_bytes, "rb") as f:
-            return pickle.load(f)
+            return dill.load(f)
 
     def to_ligplot(
         self, ligand_mol, kind="aggregate", frame=0, threshold=0.3, **kwargs
