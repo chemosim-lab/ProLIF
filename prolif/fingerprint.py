@@ -24,7 +24,7 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     fp = prolif.Fingerprint.from_pickle("fingerprint.pkl")
 
 """
-from collections import Sized
+from collections.abc import Sized
 
 import dill
 import multiprocess as mp
