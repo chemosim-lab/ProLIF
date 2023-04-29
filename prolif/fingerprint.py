@@ -318,7 +318,7 @@ class Fingerprint:
         prot_residues = prot.residues if residues == "all" else residues
         get_interactions = self.metadata if metadata else self.bitvector
         for lresid, lres in lig.residues.items():
-            if prot_residues is None:
+            if residues is None:
                 prot_residues = get_residues_near_ligand(
                     lres, prot, self.vicinity_cutoff
                 )
