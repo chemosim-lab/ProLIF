@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added a `parameters` argument in `Fingerprint` to easily update the parameters used
+  by an interaction, instead of defining a new interaction class (Issue #118).
 - Added the `Fingerprint.to_ligplot` method to generate a `LigNetwork` plot directly.
 - Added `LigNetwork.from_fingerprint` to generate the ligplot from a `Fingerprint`
   instance.
@@ -20,10 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added an `Interaction.invert_class` classmethod to easily invert the role of the
   ligand and protein residues in an interaction, e.g. to create a donor class from an
   acceptor class.
-- Added an `Interaction.update_parameters` classmethod to easily update the
-  initialisation parameters shared between parent and child classes.
 
 ### Changed
+- The multiprocessing and pickling backends have been switched to `multiprocess` and
+  `dill` respectively, and the parallel implementation has been improved. Users should
+  now be able to define custom interactions in Jupyter notebooks, IPython and so on
+  without any issue (Issue #117, Issue #86).
 - The `LigNetwork` plot now displays the distance for each interaction on mouse hover.
 - Changed the format of the `Fingerprint.ifp` attribute to be a dictionary
   containing more complete interaction metadata instead of just atom indices. It can
