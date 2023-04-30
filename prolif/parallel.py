@@ -28,7 +28,7 @@ class Progress:
     killswitch : threading.Event
         A threading.Event instance created and controlled by the :class:`TrajectoryPool`
         to kill the thread updating the :class:`~tqdm.std.tqdm` progress bar.
-    tracker : multiprocess.sharedctypes.Value
+    tracker : multiprocess.Value
         Value holding a :class:`ctypes.c_uint32` ctype updated by the
         :class:`TrajectoryPool`, storing how many frames were processed since the last
         progress bar update.
@@ -94,7 +94,7 @@ class TrajectoryPool:
 
     Attributes
     ----------
-    tracker : multiprocess.sharedctypes.Value
+    tracker : multiprocess.Value
         Value holding a :class:`ctypes.c_uint32` ctype storing how many frames were
         processed since the last progress bar update.
     pool : multiprocess.pool.Pool
@@ -153,7 +153,7 @@ class TrajectoryPool:
 
         Parameters
         ----------
-        args_iterable : Iterable
+        args_iterable : typing.Iterable[tuple]
             Iterable of tuple of trajectory, ligand atomgroup, protein atomgroup, and
             array of frame indices.
 
@@ -242,7 +242,7 @@ class MolIterablePool:
 
         Returns
         -------
-        ifp : Iterable[prolif.ifp.IFP]
+        ifp : typing.Iterable[prolif.ifp.IFP]
             An iterable of :class:`~prolif.ifp.IFP` dictionaries.
         """
         results = self.pool.imap(self.executor, args_iterable, chunksize=1)

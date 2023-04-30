@@ -443,7 +443,8 @@ class VdWContact(Interaction):
 
     Raises
     ------
-    ValueError : ``tolerance`` parameter cannot be negative
+    ValueError
+        ``tolerance`` parameter cannot be negative
 
 
     .. versionchanged:: 2.0.0

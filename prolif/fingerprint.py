@@ -75,7 +75,8 @@ class Fingerprint:
 
     Raises
     ------
-    NameError : Unknown interaction in the ``interactions`` parameter
+    NameError
+        Unknown interaction in the ``interactions`` or ``parameters`` parameters.
 
     Notes
     -----
@@ -371,7 +372,8 @@ class Fingerprint:
 
         Raises
         ------
-        ValueError : if ``n_jobs <= 0``
+        ValueError
+            If ``n_jobs <= 0``
 
         Returns
         -------
@@ -507,7 +509,8 @@ class Fingerprint:
 
         Raises
         ------
-        ValueError : if ``n_jobs <= 0``
+        ValueError
+            If ``n_jobs <= 0``
 
         Returns
         -------
