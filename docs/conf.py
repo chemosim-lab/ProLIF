@@ -83,6 +83,7 @@ intersphinx_mapping = {
     "https://docs.mdanalysis.org/stable/": None,
     "https://www.rdkit.org/docs/": None,
     "https://pandas.pydata.org/docs/": None,
+    "https://multiprocess.readthedocs.io/en/latest/": None,
 }
 
 

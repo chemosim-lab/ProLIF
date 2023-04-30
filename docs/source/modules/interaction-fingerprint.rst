@@ -14,3 +14,6 @@ Interaction fingerprint
 .. automodule:: prolif.interactions.base
     :members:
     :show-inheritance:
+
+.. automodule:: prolif.parallel
+    :members:

@@ -290,7 +290,7 @@ class Fingerprint:
 
         Returns
         -------
-        ifp : dict
+        ifp : prolif.ifp.IFP
             A dictionary indexed by ``(ligand, protein)`` residue pairs. The
             format for values will depend on ``metadata``:
 
@@ -463,7 +463,7 @@ class Fingerprint:
         else:
             frames = range(n_frames)
         chunks = np.array_split(frames, n_chunks)
-        args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
+        args_iterable = ((traj, lig, prot, chunk) for chunk in chunks)
         ifp = {}
 
         with TrajectoryPool(
@@ -570,8 +570,7 @@ class Fingerprint:
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
         total = (
             len(lig_iterable)
-            if isinstance(lig_iterable, Chem.SDMolSupplier)
-            or isinstance(lig_iterable, Sized)
+            if isinstance(lig_iterable, (Chem.SDMolSupplier, Sized))
             else None
         )
         ifp = {}
