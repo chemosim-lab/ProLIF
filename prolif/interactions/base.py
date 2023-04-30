@@ -300,6 +300,7 @@ class BasePiStacking(Interaction, is_abstract=True):
         If ``intersect=True``, used to check whether the intersect point falls within
         ``intersect_radius`` of the opposite ring's centroid.
 
+
     .. versionchanged:: 1.1.0
         The implementation now relies on the angle between the vector normal to a ring's
         plane and the vector between centroids (``normal_centroids_angles``) instead of
