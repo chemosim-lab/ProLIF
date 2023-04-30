@@ -28,7 +28,7 @@ class Progress:
     killswitch : threading.Event
         A threading.Event instance created and controlled by the :class:`TrajectoryPool`
         to kill the thread updating the :class:`~tqdm.std.tqdm` progress bar.
-    tracker : multiprocess.Value
+    tracker : multiprocess.sharedctypes.Value
         Value holding a :class:`ctypes.c_uint32` ctype updated by the
         :class:`TrajectoryPool`, storing how many frames were processed since the last
         progress bar update.
@@ -94,7 +94,7 @@ class TrajectoryPool:
 
     Attributes
     ----------
-    tracker : multiprocess.Value
+    tracker : multiprocess.sharedctypes.Value
         Value holding a :class:`ctypes.c_uint32` ctype storing how many frames were
         processed since the last progress bar update.
     pool : multiprocess.pool.Pool
