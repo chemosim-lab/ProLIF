@@ -3,7 +3,9 @@ Generating an IFP in parallel --- :mod:`prolif.parallel`
 ========================================================
 
 This module provides two classes, :class:`TrajectoryPool` and :class:`MolIterablePool`
-to execute the analysis in parallel.
+to execute the analysis in parallel. These are used in the parallel implementation used
+in :meth:`~prolif.fingerprint.Fingerprint.run` and
+:meth:`~prolif.fingerprint.Fingerprint.run_from_iterable` respectively.
 """
 from ctypes import c_uint32
 from threading import Event, Thread
@@ -18,26 +20,28 @@ from prolif.molecule import Molecule
 
 
 class Progress:
-    """Tracks the number of frames processed by the :class:`TrajectoryPool`.
+    """Helper class to track the number of frames processed by the
+    :class:`TrajectoryPool`.
 
     Parameters
     ----------
-    killswitch : Event
+    killswitch : threading.Event
         A threading.Event instance created and controlled by the :class:`TrajectoryPool`
-        to kill the thread updating the ``tqdm`` progress bar.
-    tracker : Value
-        A ``Value`` of type ``c_uint32`` updated by the :class:`TrajectoryPool`, storing
-        how many frames were processed since the last progress bar update.
+        to kill the thread updating the :class:`~tqdm.std.tqdm` progress bar.
+    tracker : multiprocess.Value
+        Value holding a :class:`ctypes.c_uint32` ctype updated by the
+        :class:`TrajectoryPool`, storing how many frames were processed since the last
+        progress bar update.
     **kwargs : object
-        Used to create the ``tqdm`` progress bar.
+        Used to create the :class:`~tqdm.std.tqdm` progress bar.
 
     Attributes
     ----------
-    delay : float
+    delay : float, default = 0.5
         Delay between progress bar updates. This requires locking access to the
         ``tracker`` object which the :class:`TrajectoryPool` needs access to, so too
         small values might cause delays in the analysis.
-    tqdm_pbar : tqdm
+    tqdm_pbar : tqdm.std.tqdm
         The progress bar displayed
     """
 
@@ -83,16 +87,16 @@ class TrajectoryPool:
     residues : list, optional
         List of protein residues considered for the IFP
     tqdm_kwargs : dict
-        Parameters for the TQDM progress bar
-    rdkitconverter_kwargs : tuple[dict]
+        Parameters for the :class:`~tqdm.std.tqdm` progress bar
+    rdkitconverter_kwargs : tuple[dict, dict]
         Parameters for the :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
         from MDAnalysis: the first for the ligand, and the second for the protein
 
     Attributes
     ----------
-    tracker : Value
-        A ``Value`` of type ``c_uint32`` storing how many frames were processed since
-        the last progress bar update.
+    tracker : multiprocess.Value
+        Value holding a :class:`ctypes.c_uint32` ctype storing how many frames were
+        processed since the last progress bar update.
     pool : multiprocess.pool.Pool
         The underlying pool instance.
     """
@@ -128,7 +132,7 @@ class TrajectoryPool:
 
         Returns
         -------
-        ifp_chunk: dict
+        ifp_chunk: dict[int, prolif.ifp.IFP]
             A dictionary of :class:`~prolif.ifp.IFP` indexed by frame number
         """
         traj, lig, prot, chunk = args
@@ -155,7 +159,7 @@ class TrajectoryPool:
 
         Returns
         -------
-        ifp: Iterable[dict]
+        ifp: typing.Iterable[dict[int, prolif.ifp.IFP]]
             An iterable of dictionaries of :class:`~prolif.ifp.IFP` indexed by frame
             number.
         """
@@ -191,7 +195,7 @@ class MolIterablePool:
     residues : list, optional
         List of protein residues considered for the IFP
     tqdm_kwargs : dict
-        Parameters for the TQDM progress bar
+        Parameters for the :class:`~tqdm.std.tqdm` progress bar
 
     Attributes
     ----------
@@ -233,9 +237,8 @@ class MolIterablePool:
 
         Parameters
         ----------
-        args_iterable : Iterable
-            An iterable yielding ligand molecules as :class:`~prolif.molecule.Molecule`
-            objects
+        args_iterable : typing.Iterable[prolif.molecule.Molecule]
+            An iterable yielding ligand molecules
 
         Returns
         -------

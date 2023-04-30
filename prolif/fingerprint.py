@@ -359,12 +359,11 @@ class Fingerprint:
             :func:`~prolif.utils.get_residues_near_ligand` function is used to
             automatically use protein residues that are distant of 6.0 Å or
             less from each ligand residue.
-        converter_kwargs : list or None
-            List of kwargs passed to the underlying :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
+        converter_kwargs : tuple[dict, dict], optional
+            Tuple of kwargs passed to the underlying :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
             from MDAnalysis: the first for the ligand, and the second for the protein
         progress : bool
-            Use the `tqdm <https://tqdm.github.io/>`_ package to display a
-            progressbar while running the calculation
+            Display a :class:`~tqdm.std.tqdm` progressbar while running the calculation
         n_jobs : int or None
             Number of processes to run in parallel. If ``n_jobs=None``, the
             analysis will use all available CPU threads, while if ``n_jobs=1``,
@@ -500,8 +499,7 @@ class Fingerprint:
             automatically use protein residues that are distant of 6.0 Å or
             less from each ligand residue.
         progress : bool
-            Use the `tqdm <https://tqdm.github.io/>`_ package to display a
-            progressbar while running the calculation
+            Display a :class:`~tqdm.std.tqdm` progressbar while running the calculation
         n_jobs : int or None
             Number of processes to run in parallel. If ``n_jobs=None``, the
             analysis will use all available CPU threads, while if ``n_jobs=1``,
