@@ -11,9 +11,9 @@ import MDAnalysis as mda
 from rdkit import Chem
 from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
 
-from .rdkitmol import BaseRDKitMol
-from .residue import Residue, ResidueGroup
-from .utils import catch_rdkit_logs, catch_warning, split_mol_by_residues
+from prolif.rdkitmol import BaseRDKitMol
+from prolif.residue import Residue, ResidueGroup
+from prolif.utils import catch_rdkit_logs, catch_warning, split_mol_by_residues
 
 
 class Molecule(BaseRDKitMol):

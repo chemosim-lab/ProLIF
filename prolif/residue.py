@@ -9,10 +9,9 @@ from typing import List, Optional
 import numpy as np
 from rdkit.Chem.rdmolops import FastFindRings
 
-from .rdkitmol import BaseRDKitMol
+from prolif.rdkitmol import BaseRDKitMol
 
 _RE_RESID = re.compile(r"([A-Z]{,3})?(\d*)\.?(\w)?")
-NoneType = type(None)
 
 
 class ResidueId:

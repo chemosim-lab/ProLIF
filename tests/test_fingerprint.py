@@ -8,7 +8,7 @@ from rdkit.DataStructs import ExplicitBitVect
 
 from prolif.datafiles import datapath
 from prolif.fingerprint import Fingerprint
-from prolif.interactions import _INTERACTIONS, Interaction
+from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.molecule import sdf_supplier
 from prolif.residue import ResidueId
 
@@ -155,20 +155,26 @@ class TestFingerprint:
         assert len(bvs) == 3
 
     def test_list_avail(self):
-        avail = Fingerprint.list_available()
-        assert "Hydrophobic" in avail
-        assert "HBDonor" in avail
-        assert "_BaseHBond" not in avail
-        avail = Fingerprint.list_available(show_hidden=True)
-        assert "Hydrophobic" in avail
-        assert "HBDonor" in avail
-        assert "_BaseHBond" in avail
-        assert "_Distance" in avail
-        assert "Interaction" in avail
+        available = Fingerprint.list_available()
+        assert "Hydrophobic" in available
+        assert "HBDonor" in available
+        assert "Distance" not in available
+        assert "Interaction" not in available
+        available = Fingerprint.list_available(show_hidden=True)
+        assert "Hydrophobic" in available
+        assert "HBDonor" in available
+        assert "Distance" in available
+        assert "Interaction" not in available
 
     def test_unknown_interaction(self):
-        with pytest.raises(NameError, match="Unknown interaction"):
+        with pytest.raises(
+            NameError, match=r"Unknown interaction\(s\) in 'interactions': foo"
+        ):
             Fingerprint(["Cationic", "foo"])
+        with pytest.raises(
+            NameError, match=r"Unknown interaction\(s\) in 'parameters': bar"
+        ):
+            Fingerprint(["Cationic"], parameters={"bar": {}})
 
     @pytest.fixture
     def fp_unpkl(self, fp, protein_mol):
@@ -249,3 +255,11 @@ class TestFingerprint:
             converter_kwargs=[dict(force=True), dict(force=True)],
         )
         assert fp.ifp
+
+    def test_interaction_params(self):
+        fp = Fingerprint()
+        assert fp.hydrophobic.distance == 4.5
+        fp = Fingerprint(parameters={"Hydrophobic": {"distance": 1.0}})
+        assert fp.hydrophobic.distance == 1.0
+        fp = Fingerprint()
+        assert fp.hydrophobic.distance == 4.5

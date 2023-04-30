@@ -24,28 +24,19 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     fp = prolif.Fingerprint.from_pickle("fingerprint.pkl")
 
 """
-import multiprocessing as mp
-import pickle
-from collections.abc import Iterable
-from inspect import isgenerator
-from threading import Thread
+from collections.abc import Sized
 
+import dill
+import multiprocess as mp
 import numpy as np
 from rdkit import Chem
 from tqdm.auto import tqdm
 
-from .ifp import IFP
-from .interactions import _INTERACTIONS
-from .molecule import Molecule
-from .parallel import (
-    Progress,
-    ProgressCounter,
-    declare_shared_objs_for_chunk,
-    declare_shared_objs_for_mol,
-    process_chunk,
-    process_mol,
-)
-from .utils import get_residues_near_ligand, to_bitvectors, to_dataframe
+from prolif.ifp import IFP
+from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
+from prolif.molecule import Molecule
+from prolif.parallel import MolIterablePool, TrajectoryPool
+from prolif.utils import get_residues_near_ligand, to_bitvectors, to_dataframe
 
 
 class Fingerprint:
@@ -59,7 +50,10 @@ class Fingerprint:
     ----------
     interactions : list
         List of names (str) of interaction classes as found in the
-        :mod:`prolif.interactions` module
+        :mod:`prolif.interactions` module.
+    parameters : dict, optional
+        New parameters for the interactions. Mapping between an interaction name and a
+        dict of parameters as they appear in the interaction class.
     vicinity_cutoff : float
         Automatically restrict the analysis to residues within this range of the ligand.
         This parameter is ignored if the ``residues`` parameter of the ``run`` methods
@@ -74,14 +68,15 @@ class Fingerprint:
         Number of interaction functions registered by the fingerprint
     vicinity_cutoff : float
         Used when calling :func:`prolif.utils.get_residues_near_ligand`.
-    ifp : dict, optionnal
+    ifp : dict, optional
         Dict of interaction fingerprints in a sparse format for the given trajectory or
         docking poses: ``{<frame number>: <IFP>}``. See the :class:`~prolif.ifp.IFP`
         class for more information.
 
     Raises
     ------
-    NameError : Unknown interaction in the ``interactions`` parameter
+    NameError
+        Unknown interaction in the ``interactions`` or ``parameters`` parameters.
 
     Notes
     -----
@@ -143,6 +138,8 @@ class Fingerprint:
         Removed the ``__wrapped__`` attribute on interaction methods that are available
         from the fingerprint object. These methods now accept a ``metadata`` parameter
         instead.
+        Added the ``parameters`` argument to set the interaction classes parameters
+        without having to create a new class.
 
     """
 
@@ -159,29 +156,39 @@ class Fingerprint:
             "PiCation",
             "VdWContact",
         ],
+        parameters=None,
         vicinity_cutoff=6.0,
     ):
-        self._set_interactions(interactions)
+        self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
 
-    def _set_interactions(self, interactions):
+    def _set_interactions(self, interactions, parameters):
         # read interactions to compute
-        self.interactions = {}
+        parameters = parameters or {}
         if interactions == "all":
             interactions = self.list_available()
         # sanity check
-        unsafe = set(interactions)
-        unk = unsafe.symmetric_difference(_INTERACTIONS.keys()) & unsafe
-        if unk:
-            raise NameError(f"Unknown interaction(s): {', '.join(unk)}")
+        self._check_valid_interactions(interactions, "interactions")
+        self._check_valid_interactions(parameters, "parameters")
         # add interaction methods
+        self.interactions = {}
         for name, interaction_cls in _INTERACTIONS.items():
             if name.startswith("_") or name == "Interaction":
                 continue
-            interaction = interaction_cls()
+            # create instance with custom parameters if available
+            interaction = interaction_cls(**parameters.get(name, {}))
             setattr(self, name.lower(), interaction)
             if name in interactions:
                 self.interactions[name] = interaction
+
+    def _check_valid_interactions(self, interactions_iterable, varname):
+        """Raises a NameError if an unknown interaction is given."""
+        unsafe = set(interactions_iterable)
+        unknown = unsafe.symmetric_difference(_INTERACTIONS.keys()) & unsafe
+        if unknown:
+            raise NameError(
+                f"Unknown interaction(s) in {varname!r}: {', '.join(unknown)}"
+            )
 
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
@@ -195,18 +202,12 @@ class Fingerprint:
         Parameters
         ----------
         show_hidden : bool
-            Show hidden classes (usually base classes whose name starts with an
-            underscore ``_``. Those are not supposed to be called directly)
+            Show hidden classes (base classes meant to be inherited from to create
+            custom interactions).
         """
         if show_hidden:
-            interactions = [name for name in _INTERACTIONS.keys()]
-        else:
-            interactions = [
-                name
-                for name in _INTERACTIONS.keys()
-                if not (name.startswith("_") or name == "Interaction")
-            ]
-        return sorted(interactions)
+            return sorted(_BASE_INTERACTIONS) + sorted(_INTERACTIONS)
+        return sorted(_INTERACTIONS)
 
     @property
     def n_interactions(self):
@@ -290,7 +291,7 @@ class Fingerprint:
 
         Returns
         -------
-        ifp : dict
+        ifp : prolif.ifp.IFP
             A dictionary indexed by ``(ligand, protein)`` residue pairs. The
             format for values will depend on ``metadata``:
 
@@ -315,9 +316,7 @@ class Fingerprint:
             arrays.
         """
         ifp = IFP()
-        prot_residues = residues
-        if residues == "all":
-            prot_residues = prot.residues.keys()
+        prot_residues = prot.residues if residues == "all" else residues
         get_interactions = self.metadata if metadata else self.bitvector
         for lresid, lres in lig.residues.items():
             if residues is None:
@@ -361,12 +360,11 @@ class Fingerprint:
             :func:`~prolif.utils.get_residues_near_ligand` function is used to
             automatically use protein residues that are distant of 6.0 Å or
             less from each ligand residue.
-        converter_kwargs : list or None
-            List of kwargs passed to the underlying :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
+        converter_kwargs : tuple[dict, dict], optional
+            Tuple of kwargs passed to the underlying :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
             from MDAnalysis: the first for the ligand, and the second for the protein
         progress : bool
-            Use the `tqdm <https://tqdm.github.io/>`_ package to display a
-            progressbar while running the calculation
+            Display a :class:`~tqdm.std.tqdm` progressbar while running the calculation
         n_jobs : int or None
             Number of processes to run in parallel. If ``n_jobs=None``, the
             analysis will use all available CPU threads, while if ``n_jobs=1``,
@@ -374,7 +372,8 @@ class Fingerprint:
 
         Raises
         ------
-        ValueError : if ``n_jobs <= 0``
+        ValueError
+            If ``n_jobs <= 0``
 
         Returns
         -------
@@ -418,6 +417,10 @@ class Fingerprint:
             raise ValueError("n_jobs must be > 0 or None")
         if converter_kwargs is not None and len(converter_kwargs) != 2:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
+
+        converter_kwargs = converter_kwargs or ({}, {})
+        if residues == "all":
+            residues = list(Molecule.from_mda(prot, **converter_kwargs[1]).residues)
         if n_jobs != 1:
             return self._run_parallel(
                 traj,
@@ -428,15 +431,12 @@ class Fingerprint:
                 progress=progress,
                 n_jobs=n_jobs,
             )
-        lig_kwargs, prot_kwargs = converter_kwargs or ({}, {})
 
         iterator = tqdm(traj) if progress else traj
-        if residues == "all":
-            residues = Molecule.from_mda(prot, **prot_kwargs).residues.keys()
         ifp = {}
         for ts in iterator:
-            prot_mol = Molecule.from_mda(prot, **prot_kwargs)
-            lig_mol = Molecule.from_mda(lig, **lig_kwargs)
+            lig_mol = Molecule.from_mda(lig, **converter_kwargs[0])
+            prot_mol = Molecule.from_mda(prot, **converter_kwargs[1])
             ifp[ts.frame] = self.generate(
                 lig_mol, prot_mol, residues=residues, metadata=True
             )
@@ -463,32 +463,21 @@ class Fingerprint:
             traj = lig.universe.trajectory
         else:
             frames = range(n_frames)
-        lig_kwargs, prot_kwargs = converter_kwargs or ({}, {})
-
-        if residues == "all":
-            residues = Molecule.from_mda(prot, **prot_kwargs).residues.keys()
         chunks = np.array_split(frames, n_chunks)
-        # setup parallel progress bar
-        pcount = ProgressCounter()
-        if progress:
-            pbar = Progress(pcount, total=len(frames))
-        else:
-            pbar = lambda: None
-        pbar_thread = Thread(target=pbar, daemon=True)
+        args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
+        ifp = {}
 
-        # run pool of workers
-        with mp.Pool(
+        with TrajectoryPool(
             n_jobs,
-            initializer=declare_shared_objs_for_chunk,
-            initargs=(self, residues, progress, pcount, (lig_kwargs, prot_kwargs)),
+            fingerprint=self,
+            residues=residues,
+            tqdm_kwargs={"total": len(frames), "disable": not progress},
+            rdkitconverter_kwargs=converter_kwargs,
         ) as pool:
-            pbar_thread.start()
-            args = ((traj, lig, prot, chunk) for chunk in chunks)
-            ifp = {}
-            for ifp_data_chunk in pool.imap_unordered(process_chunk, args):
+            for ifp_data_chunk in pool.process(args_iterable):
                 ifp.update(ifp_data_chunk)
-        # sort
-        self.ifp = {frame: ifp[frame] for frame in sorted(ifp)}
+
+        self.ifp = ifp
         return self
 
     def run_from_iterable(
@@ -512,8 +501,7 @@ class Fingerprint:
             automatically use protein residues that are distant of 6.0 Å or
             less from each ligand residue.
         progress : bool
-            Use the `tqdm <https://tqdm.github.io/>`_ package to display a
-            progressbar while running the calculation
+            Display a :class:`~tqdm.std.tqdm` progressbar while running the calculation
         n_jobs : int or None
             Number of processes to run in parallel. If ``n_jobs=None``, the
             analysis will use all available CPU threads, while if ``n_jobs=1``,
@@ -521,7 +509,8 @@ class Fingerprint:
 
         Raises
         ------
-        ValueError : if ``n_jobs <= 0``
+        ValueError
+            If ``n_jobs <= 0``
 
         Returns
         -------
@@ -558,6 +547,8 @@ class Fingerprint:
         """
         if n_jobs is not None and n_jobs < 1:
             raise ValueError("n_jobs must be > 0 or None")
+        if residues == "all":
+            residues = list(prot_mol.residues)
         if n_jobs != 1:
             return self._run_iter_parallel(
                 lig_iterable=lig_iterable,
@@ -568,8 +559,6 @@ class Fingerprint:
             )
 
         iterator = tqdm(lig_iterable) if progress else lig_iterable
-        if residues == "all":
-            residues = prot_mol.residues.keys()
         ifp = {}
         for i, lig_mol in enumerate(iterator):
             ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
@@ -580,33 +569,24 @@ class Fingerprint:
         self, lig_iterable, prot_mol, residues=None, progress=True, n_jobs=None
     ):
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
-        previous_pkl_props = Chem.GetDefaultPickleProperties()
-        Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
+        total = (
+            len(lig_iterable)
+            if isinstance(lig_iterable, (Chem.SDMolSupplier, Sized))
+            else None
+        )
+        ifp = {}
 
-        if isinstance(lig_iterable, Chem.SDMolSupplier) or (
-            isinstance(lig_iterable, Iterable) and not isgenerator(lig_iterable)
-        ):
-            total = len(lig_iterable)
-        else:
-            total = None
-        suppl = enumerate(lig_iterable)
-        if residues == "all":
-            residues = prot_mol.residues.keys()
-
-        with mp.Pool(
+        with MolIterablePool(
             n_jobs,
-            initializer=declare_shared_objs_for_mol,
-            initargs=(self, prot_mol, residues),
+            fingerprint=self,
+            prot_mol=prot_mol,
+            residues=residues,
+            tqdm_kwargs={"total": total, "disable": not progress},
         ) as pool:
-            results = {}
-            for i, ifp_data in tqdm(
-                pool.imap_unordered(process_mol, suppl),
-                total=total,
-                disable=not progress,
-            ):
-                results[i] = ifp_data
-        self.ifp = {frame: results[frame] for frame in sorted(results)}
-        Chem.SetDefaultPickleProperties(previous_pkl_props)
+            for i, ifp_data in enumerate(pool.process(lig_iterable)):
+                ifp[i] = ifp_data
+
+        self.ifp = ifp
         return self
 
     def to_dataframe(self, **kwargs):
@@ -711,12 +691,15 @@ class Fingerprint:
 
         .. versionadded:: 1.0.0
 
+        .. versionchanged:: 2.0.0
+            Switched to dill instead of pickle
+
         """
         if path:
             with open(path, "wb") as f:
-                pickle.dump(self, f)
+                dill.dump(self, f)
             return None
-        return pickle.dumps(self)
+        return dill.dumps(self)
 
     @classmethod
     def from_pickle(cls, path_or_bytes):
@@ -735,11 +718,14 @@ class Fingerprint:
 
         .. versionadded:: 1.0.0
 
+        .. versionchanged:: 2.0.0
+            Switched to dill instead of pickle
+
         """
         if isinstance(path_or_bytes, bytes):
-            return pickle.loads(path_or_bytes)
+            return dill.loads(path_or_bytes)
         with open(path_or_bytes, "rb") as f:
-            return pickle.load(f)
+            return dill.load(f)
 
     def to_ligplot(
         self, ligand_mol, kind="aggregate", frame=0, threshold=0.3, **kwargs

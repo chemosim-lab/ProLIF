@@ -10,6 +10,8 @@ Requirements:
 * `NumPy <https://numpy.org/>`_
 * `SciPy <https://www.scipy.org/scipylib/index.html>`_
 * `tqdm <https://tqdm.github.io/>`_
+* `multiprocess <https://multiprocess.readthedocs.io/>`_
+* `dill <https://dill.readthedocs.io/>`_
 
 The recommanded way to install ProLIF is to use `conda`_.
 

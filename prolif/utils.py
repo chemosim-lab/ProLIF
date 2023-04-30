@@ -18,7 +18,7 @@ from rdkit.DataStructs import ExplicitBitVect
 from rdkit.Geometry import Point3D
 from scipy.spatial import cKDTree
 
-from .residue import ResidueId
+from prolif.residue import ResidueId
 
 _90_deg_to_rad = pi / 2
 
@@ -91,7 +91,7 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
     max_angle : float
         Upper bound angle, in radians
     ring : bool
-        Wether the angle being checked involves a ring or not
+        Whether the angle being checked involves a ring or not
 
     Notes
     -----

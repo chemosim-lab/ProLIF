@@ -6,7 +6,8 @@ from rdkit import Chem, RDLogger
 
 import prolif
 from prolif.fingerprint import Fingerprint
-from prolif.interactions import _INTERACTIONS, Interaction, VdWContact, get_mapindex
+from prolif.interactions import VdWContact
+from prolif.interactions.base import _INTERACTIONS, Interaction, get_mapindex
 
 from . import mol2factory
 
@@ -30,7 +31,7 @@ def interaction_instances():
     return {
         name: cls()
         for name, cls in _INTERACTIONS.items()
-        if name not in ["Interaction", "_Distance"]
+        if name != "Interaction" and not name.startswith("_")
     }
 
 
@@ -189,34 +190,34 @@ class TestInteractions:
             ("Hydrophobic.lig_pattern", "C=O", 0),
             ("Hydrophobic.lig_pattern", "C=N", 0),
             ("Hydrophobic.lig_pattern", "CF", 0),
-            ("_BaseHBond.donor", "[OH2]", 2),
-            ("_BaseHBond.donor", "[NH3]", 3),
-            ("_BaseHBond.donor", "[NH4+]", 4),
-            ("_BaseHBond.donor", "[SH2]", 2),
-            ("_BaseHBond.donor", "O=C=O", 0),
-            ("_BaseHBond.donor", "c1c[nH+]ccc1", 0),
-            ("_BaseHBond.donor", "c1c[nH]cc1", 1),
-            ("_BaseHBond.acceptor", "O", 1),
-            ("_BaseHBond.acceptor", "N", 1),
-            ("_BaseHBond.acceptor", "[NH4+]", 0),
-            ("_BaseHBond.acceptor", "N-C=O", 1),
-            ("_BaseHBond.acceptor", "N-C=[SH2]", 0),
-            ("_BaseHBond.acceptor", "[nH+]1ccccc1", 0),
-            ("_BaseHBond.acceptor", "n1ccccc1", 1),
-            ("_BaseHBond.acceptor", "Nc1ccccc1", 0),
-            ("_BaseHBond.acceptor", "o1cccc1", 1),
-            ("_BaseHBond.acceptor", "COC=O", 1),
-            ("_BaseHBond.acceptor", "c1ccccc1Oc1ccccc1", 0),
-            ("_BaseHBond.acceptor", "FC", 1),
-            ("_BaseHBond.acceptor", "Fc1ccccc1", 1),
-            ("_BaseHBond.acceptor", "FCF", 0),
-            ("_BaseXBond.donor", "CCl", 1),
-            ("_BaseXBond.donor", "c1ccccc1Cl", 1),
-            ("_BaseXBond.donor", "NCl", 1),
-            ("_BaseXBond.donor", "c1cccc[n+]1Cl", 1),
-            ("_BaseXBond.acceptor", "[NH3]", 3),
-            ("_BaseXBond.acceptor", "[NH+]C", 0),
-            ("_BaseXBond.acceptor", "c1ccccc1", 12),
+            ("HBAcceptor.prot_pattern", "[OH2]", 2),
+            ("HBAcceptor.prot_pattern", "[NH3]", 3),
+            ("HBAcceptor.prot_pattern", "[NH4+]", 4),
+            ("HBAcceptor.prot_pattern", "[SH2]", 2),
+            ("HBAcceptor.prot_pattern", "O=C=O", 0),
+            ("HBAcceptor.prot_pattern", "c1c[nH+]ccc1", 0),
+            ("HBAcceptor.prot_pattern", "c1c[nH]cc1", 1),
+            ("HBAcceptor.lig_pattern", "O", 1),
+            ("HBAcceptor.lig_pattern", "N", 1),
+            ("HBAcceptor.lig_pattern", "[NH4+]", 0),
+            ("HBAcceptor.lig_pattern", "N-C=O", 1),
+            ("HBAcceptor.lig_pattern", "N-C=[SH2]", 0),
+            ("HBAcceptor.lig_pattern", "[nH+]1ccccc1", 0),
+            ("HBAcceptor.lig_pattern", "n1ccccc1", 1),
+            ("HBAcceptor.lig_pattern", "Nc1ccccc1", 0),
+            ("HBAcceptor.lig_pattern", "o1cccc1", 1),
+            ("HBAcceptor.lig_pattern", "COC=O", 1),
+            ("HBAcceptor.lig_pattern", "c1ccccc1Oc1ccccc1", 0),
+            ("HBAcceptor.lig_pattern", "FC", 1),
+            ("HBAcceptor.lig_pattern", "Fc1ccccc1", 1),
+            ("HBAcceptor.lig_pattern", "FCF", 0),
+            ("XBAcceptor.prot_pattern", "CCl", 1),
+            ("XBAcceptor.prot_pattern", "c1ccccc1Cl", 1),
+            ("XBAcceptor.prot_pattern", "NCl", 1),
+            ("XBAcceptor.prot_pattern", "c1cccc[n+]1Cl", 1),
+            ("XBAcceptor.lig_pattern", "[NH3]", 3),
+            ("XBAcceptor.lig_pattern", "[NH+]C", 0),
+            ("XBAcceptor.lig_pattern", "c1ccccc1", 12),
             ("Cationic.lig_pattern", "[NH4+]", 1),
             ("Cationic.lig_pattern", "[Ca+2]", 1),
             ("Cationic.lig_pattern", "CC(=[NH2+])N", 2),
@@ -225,25 +226,25 @@ class TestInteractions:
             ("Cationic.prot_pattern", "CC(=O)[O-]", 2),
             ("Cationic.prot_pattern", "CS(=O)[O-]", 2),
             ("Cationic.prot_pattern", "CP(=O)[O-]", 2),
-            ("_BaseCationPi.cation", "[NH4+]", 1),
-            ("_BaseCationPi.cation", "[Ca+2]", 1),
-            ("_BaseCationPi.cation", "CC(=[NH2+])N", 2),
-            ("_BaseCationPi.cation", "NC(=[NH2+])N", 3),
-            ("_BaseCationPi.pi_ring", "c1ccccc1", 1),
-            ("_BaseCationPi.pi_ring", "c1cocc1", 1),
+            ("CationPi.cation", "[NH4+]", 1),
+            ("CationPi.cation", "[Ca+2]", 1),
+            ("CationPi.cation", "CC(=[NH2+])N", 2),
+            ("CationPi.cation", "NC(=[NH2+])N", 3),
+            ("CationPi.pi_ring", "c1ccccc1", 1),
+            ("CationPi.pi_ring", "c1cocc1", 1),
             ("EdgeToFace.pi_ring", "c1ccccc1", 1),
             ("EdgeToFace.pi_ring", "c1cocc1", 1),
             ("FaceToFace.pi_ring", "c1ccccc1", 1),
             ("FaceToFace.pi_ring", "c1cocc1", 1),
-            ("_BaseMetallic.lig_pattern", "[Mg]", 1),
-            ("_BaseMetallic.prot_pattern", "O", 1),
-            ("_BaseMetallic.prot_pattern", "N", 1),
-            ("_BaseMetallic.prot_pattern", "[NH+]", 0),
-            ("_BaseMetallic.prot_pattern", "N-C=[SH2]", 0),
-            ("_BaseMetallic.prot_pattern", "[nH+]1ccccc1", 0),
-            ("_BaseMetallic.prot_pattern", "Nc1ccccc1", 0),
-            ("_BaseMetallic.prot_pattern", "o1cccc1", 0),
-            ("_BaseMetallic.prot_pattern", "COC=O", 2),
+            ("MetalDonor.lig_pattern", "[Mg]", 1),
+            ("MetalDonor.prot_pattern", "O", 1),
+            ("MetalDonor.prot_pattern", "N", 1),
+            ("MetalDonor.prot_pattern", "[NH+]", 0),
+            ("MetalDonor.prot_pattern", "N-C=[SH2]", 0),
+            ("MetalDonor.prot_pattern", "[nH+]1ccccc1", 0),
+            ("MetalDonor.prot_pattern", "Nc1ccccc1", 0),
+            ("MetalDonor.prot_pattern", "o1cccc1", 0),
+            ("MetalDonor.prot_pattern", "COC=O", 2),
         ],
         indirect=["interaction_qmol"],
     )
@@ -303,26 +304,3 @@ class TestInteractions:
         lig, phe331 = ligand_mol[0], protein_mol["PHE331.B"]
         assert fp.edgetoface(lig, phe331) is True
         assert fp.pistacking(lig, phe331) is True
-
-    def test_copy_parameters(self):
-        class Dummy1(VdWContact):
-            def __init__(self, tolerance=1):
-                super().__init__(tolerance)
-
-        class Dummy2(Dummy1):
-            def __init__(self, tolerance=2):
-                super().__init__(tolerance)
-
-        assert Dummy1().tolerance == 1
-        assert Dummy2().tolerance == 2
-
-        DummyUpdated = Dummy2.update_parameters(Dummy1)
-        assert DummyUpdated().tolerance == 1
-        assert _INTERACTIONS["Dummy2"] is DummyUpdated
-
-        DummyUpdated = Dummy1.update_parameters(Dummy2)
-        assert DummyUpdated().tolerance == 2
-        assert _INTERACTIONS["Dummy1"] is DummyUpdated
-
-        for name in ["Dummy1", "Dummy2"]:
-            _INTERACTIONS.pop(name)
