@@ -438,7 +438,8 @@ class VdWContact(Interaction):
         the interatomic distance. If ``distance <= sum_vdw + tolerance`` the
         atoms are identified as a contact
     vdwradii : dict, optional
-        Updates to the vdW radii dictionary
+        Updates to the vdW radii dictionary, with elements (first letter uppercase) as a
+        key and the radius as a value.
 
     Raises
     ------
@@ -446,7 +447,7 @@ class VdWContact(Interaction):
 
 
     .. versionchanged:: 2.0.0
-        Added the `vdwradii``parameter.
+        Added the ``vdwradii`` parameter.
 
     """
 
@@ -464,11 +465,12 @@ class VdWContact(Interaction):
         for la, ra in product(ligand.GetAtoms(), residue.GetAtoms()):
             lig = la.GetSymbol()
             res = ra.GetSymbol()
+            elements = frozenset((lig, res))
             try:
-                vdw = self._vdw_cache[frozenset((lig, res))]
+                vdw = self._vdw_cache[elements]
             except KeyError:
                 vdw = self.vdwradii[lig] + self.vdwradii[res] + self.tolerance
-                self._vdw_cache[frozenset((lig, res))] = vdw
+                self._vdw_cache[elements] = vdw
             dist = lxyz.GetAtomPosition(la.GetIdx()).Distance(
                 rxyz.GetAtomPosition(ra.GetIdx())
             )
