@@ -463,7 +463,7 @@ class Fingerprint:
         else:
             frames = range(n_frames)
         chunks = np.array_split(frames, n_chunks)
-        args_iterable = ((traj, lig, prot, chunk) for chunk in chunks)
+        args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
         ifp = {}
 
         with TrajectoryPool(

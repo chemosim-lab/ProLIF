@@ -159,7 +159,7 @@ class TrajectoryPool:
             An iterable of dictionaries of :class:`~prolif.ifp.IFP` indexed by frame
             number.
         """
-        return self.pool.imap(self.executor, args_iterable, chunksize=1)
+        return self.pool.map(self.executor, args_iterable, chunksize=1)
 
     def __enter__(self):
         """Sets up the :class:`Progress` instance and associated killswitch event, and
