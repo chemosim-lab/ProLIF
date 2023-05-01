@@ -20,7 +20,7 @@ class IFP(UserDict):
 
         {
             tuple[<residue_id>, <residue_id>]: {
-                <interaction name>: {
+                <interaction name>: tuple[{
                     "indices": {
                         "ligand": tuple[int, ...],
                         "protein": tuple[int, ...]
@@ -30,7 +30,7 @@ class IFP(UserDict):
                         "protein": tuple[int, ...]
                     },
                     <other metadata>: <value>
-                }
+                }, ...]
             }
         }
 

@@ -45,8 +45,8 @@ class Interaction:
         register[name] = cls
 
     def __call__(self, lig_res, prot_res, metadata=False):
-        int_data = self.detect(lig_res, prot_res)
-        return int_data if metadata else (int_data is not None)
+        for int_data in self.detect(lig_res, prot_res):
+            yield int_data if metadata else True
 
     def __repr__(self):  # pragma: no cover
         cls = self.__class__
@@ -93,18 +93,19 @@ class Interaction:
         return metadata
 
     @classmethod
-    def invert_role(cls, name, doc):
+    def invert_role(cls, name, docstring):
         """Creates a new interaction class where the role of the ligand and protein
         residues have been swapped. Usefull to create e.g. an acceptor class from a
         donor class.
         """
-        parameters_docs = cls.__doc__.split("\n", maxsplit=1)[1]
-        docstring = f"{doc}\n{parameters_docs}"
-        inverted = type(name, (cls,), {"__doc__": docstring})
+        cls_docstring = cls.__doc__ or "\n"
+        parameters_doc = cls_docstring.split("\n", maxsplit=1)[1]
+        __doc__ = f"{docstring}\n{parameters_doc}"
+        inverted = type(name, (cls,), {"__doc__": __doc__})
 
         def detect(self, ligand, residue):
-            metadata = super(inverted, self).detect(residue, ligand)
-            return self._invert_metadata(metadata)
+            for metadata in super(inverted, self).detect(residue, ligand):
+                yield self._invert_metadata(metadata)
 
         inverted.detect = detect
         return inverted
@@ -137,7 +138,7 @@ class Distance(Interaction, is_abstract=True):
                 aprot = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
                 dist = alig.Distance(aprot)
                 if dist <= self.distance:
-                    return self.metadata(
+                    yield self.metadata(
                         lig_res, prot_res, lig_match, prot_match, distance=dist
                     )
 
@@ -200,7 +201,7 @@ class SingleAngle(Interaction, is_abstract=True):
                     p2l1 = p2.DirectionVector(l1)
                     angle = p2p1.AngleTo(p2l1)
                     if angle_between_limits(angle, *self.angle):
-                        return self.metadata(
+                        yield self.metadata(
                             lig_res,
                             prot_res,
                             lig_match,
@@ -268,7 +269,7 @@ class DoubleAngle(Interaction, is_abstract=True):
                         l1l2 = l1.DirectionVector(l2)
                         l2l1p2 = l1p2.AngleTo(l1l2)
                         if angle_between_limits(l2l1p2, *self.L2L1P2_angle):
-                            return self.metadata(
+                            yield self.metadata(
                                 lig_res,
                                 prot_res,
                                 lig_match,
@@ -382,7 +383,7 @@ class BasePiStacking(Interaction, is_abstract=True):
                         res_centroid.Distance(intersect),
                     )
                     if intersect_dist <= self.intersect_radius:
-                        return self.metadata(
+                        yield self.metadata(
                             ligand,
                             residue,
                             lig_match,
@@ -393,7 +394,7 @@ class BasePiStacking(Interaction, is_abstract=True):
                             intersect_distance=intersect_dist,
                         )
                 else:
-                    return self.metadata(
+                    yield self.metadata(
                         ligand,
                         residue,
                         lig_match,

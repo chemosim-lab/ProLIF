@@ -3,7 +3,7 @@ from MDAnalysis import Universe
 from rdkit import Chem
 
 from prolif.datafiles import TOP, TRAJ, datapath
-from prolif.molecule import Molecule
+from prolif.molecule import Molecule, sdf_supplier
 
 
 def pytest_sessionstart(session):
@@ -56,3 +56,9 @@ def protein_rdkit(protein_ag):
 @pytest.fixture(scope="session")
 def protein_mol(protein_ag):
     return Molecule.from_mda(protein_ag)
+
+
+@pytest.fixture(scope="session")
+def sdf_suppl():
+    path = str(datapath / "vina" / "vina_output.sdf")
+    return sdf_supplier(path)

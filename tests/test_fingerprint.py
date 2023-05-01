@@ -15,14 +15,24 @@ from prolif.residue import ResidueId
 
 class Dummy(Interaction):
     def detect(self, res1, res2):
-        return self.metadata(res1, res2, (2,), (4,), distance=4.2)
+        yield self.metadata(res1, res2, (2,), (4,), distance=4.2)
 
 
-def test_interaction_base():
+def test_interaction_base(sdf_suppl):
     interaction = Dummy()
     _repr = repr(interaction)
     assert _repr.startswith("<") and ".Dummy at " in _repr
     assert callable(interaction)
+    mol = sdf_suppl[0]
+    metadata = next(interaction.detect(mol, mol))
+    assert metadata["indices"] == {"ligand": (2,), "protein": (4,)}
+    assert metadata["parent_indices"] == {"ligand": (2,), "protein": (4,)}
+    # invert
+    inverted = Dummy.invert_role("Dummy", "inverted")
+    inverted_interaction = inverted()
+    metadata = next(inverted_interaction.detect(mol, mol))
+    assert metadata["indices"] == {"ligand": (4,), "protein": (2,)}
+    assert metadata["parent_indices"] == {"ligand": (4,), "protein": (2,)}
 
 
 class TestFingerprint:
@@ -30,6 +40,15 @@ class TestFingerprint:
     def fp(self):
         yield Fingerprint()
         _INTERACTIONS.pop("Dummy", None)
+
+    @pytest.fixture(scope="class")
+    def fp_count(self):
+        yield Fingerprint(count=True)
+        _INTERACTIONS.pop("Dummy", None)
+
+    @pytest.fixture(scope="class", params=["fp", "fp_count"])
+    def any_fp(self, request):
+        return request.getfixturevalue(request.param)
 
     @pytest.fixture(scope="class")
     def fp_simple(self):
@@ -49,20 +68,27 @@ class TestFingerprint:
     def test_init_all(self):
         fp = Fingerprint("all")
         for name, func in fp.interactions.items():
-            assert getattr(fp, name.lower()) is func
+            assert getattr(fp, name.lower()) is func.__wrapped__
 
     def test_n_interactions(self, fp):
         assert fp.n_interactions == len(fp.interactions)
 
-    def test_bitvector(self, fp, ligand_mol, protein_mol):
-        bv = fp.bitvector(ligand_mol[0], protein_mol["ASP129.A"])
-        assert len(bv) == fp.n_interactions
+    def test_bitvector(self, any_fp, ligand_mol, protein_mol):
+        bv = any_fp.bitvector(ligand_mol[0], protein_mol["ASP129.A"])
+        assert len(bv) == any_fp.n_interactions
+        assert (bv == 0).any()
         assert bv.sum() > 0
+        if any_fp.count:
+            assert (bv > 1).any()
 
-    def test_metadata(self, fp, ligand_mol, protein_mol):
-        metadata = fp.metadata(ligand_mol[0], protein_mol["ASP129.A"])
+    def test_metadata(self, any_fp, ligand_mol, protein_mol):
+        metadata = any_fp.metadata(ligand_mol[0], protein_mol["ASP129.A"])
         assert metadata
-        assert isinstance(metadata["HBDonor"]["indices"]["ligand"], tuple)
+        assert "HBAcceptor" not in metadata
+        assert all(
+            isinstance(cationic["indices"]["ligand"], tuple)
+            for cationic in metadata["Cationic"]
+        )
 
     def test_run_residues(self, fp_simple, u, ligand_ag, protein_ag):
         fp_simple.run(
@@ -105,6 +131,12 @@ class TestFingerprint:
         assert isinstance(bv, np.ndarray)
         assert bv[0] is np.True_
 
+    def test_generate_metadata(self, fp_simple, ligand_mol, protein_mol):
+        ifp = fp_simple.generate(ligand_mol, protein_mol, metadata=True)
+        key = (ResidueId("LIG", 1, "G"), ResidueId("VAL", 201, "A"))
+        int_data = ifp[key]
+        assert "Hydrophobic" in int_data
+
     def test_run(self, fp_simple, u, ligand_ag, protein_ag):
         fp_simple.run(
             u.trajectory[0:1], ligand_ag, protein_ag, residues=None, progress=False
@@ -113,9 +145,12 @@ class TestFingerprint:
         ifp = fp_simple.ifp[0]
         interactions = next(iter(ifp.values()))
         assert isinstance(interactions, dict)
-        metadata = next(iter(interactions.values()))
+        metadata_tuple = next(iter(interactions.values()))
         assert all(
-            [key in metadata for key in ["indices", "parent_indices", "distance"]]
+            [
+                key in metadata_tuple[0]
+                for key in ["indices", "parent_indices", "distance"]
+            ]
         )
 
     def test_run_from_iterable(self, fp_simple, protein_mol):

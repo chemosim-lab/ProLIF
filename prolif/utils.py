@@ -197,8 +197,8 @@ def to_dataframe(
     ifp : dict
         A dict in the format
         ``{<frame number>: {(<residue_id>, <residue_id>): <interactions>}}``.
-        ``<interactions>`` is either a :class:`numpy.ndarray` bitvector, or a dict in
-        the format ``{<interaction name>: <metadata dict>}``.
+        ``<interactions>`` is either a :class:`numpy.ndarray` bitvector, or a tuple of
+        dict in the format ``{<interaction name>: <metadata dict>}``.
     interactions : list
         A list of interactions, in the same order as used to detect the interactions.
     index_col : str
