@@ -20,37 +20,48 @@ from prolif.utils import (
 
 
 @pytest.fixture
-def ifp_bitvector():
+def ifp_single():
     return {
         0: {
-            ("LIG", "ALA1"): np.array([True, False, False]),
-            ("LIG", "GLU2"): np.array([False, True, False]),
+            ("LIG", "ALA1"): {"A": ({"indices": {"ligand": (0,), "protein": (1,)}},)},
+            ("LIG", "GLU2"): {"B": ({"indices": {"ligand": (1,), "protein": (3,)}},)},
         },
         1: {
-            ("LIG", "ALA1"): np.array([True, True, False]),
-            ("LIG", "ASP3"): np.array([False, True, False]),
+            ("LIG", "ALA1"): {
+                "A": ({"indices": {"ligand": (2,), "protein": (4,)}},),
+                "B": ({"indices": {"ligand": (2,), "protein": (5,)}},),
+            },
+            ("LIG", "ASP3"): {"B": ({"indices": {"ligand": (8,), "protein": (10,)}},)},
         },
     }
 
 
 @pytest.fixture
-def ifp_metadata():
+def ifp_count():
     return {
         0: {
-            ("LIG", "ALA1"): {"A": {"indices": {"ligand": (0,), "protein": (1,)}}},
-            ("LIG", "GLU2"): {"B": {"indices": {"ligand": (1,), "protein": (3,)}}},
+            ("LIG", "ALA1"): {
+                "A": (
+                    {"indices": {"ligand": (0,), "protein": (1,)}},
+                    {"indices": {"ligand": (1,), "protein": (1,)}},
+                )
+            },
+            ("LIG", "GLU2"): {"B": ({"indices": {"ligand": (1,), "protein": (3,)}},)},
         },
         1: {
             ("LIG", "ALA1"): {
-                "A": {"indices": {"ligand": (2,), "protein": (4,)}},
-                "B": {"indices": {"ligand": (2,), "protein": (5,)}},
+                "A": (
+                    {"indices": {"ligand": (2,), "protein": (4,)}},
+                    {"indices": {"ligand": (2,), "protein": (1,)}},
+                ),
+                "B": ({"indices": {"ligand": (2,), "protein": (5,)}},),
             },
-            ("LIG", "ASP3"): {"B": {"indices": {"ligand": (8,), "protein": (10,)}}},
+            ("LIG", "ASP3"): {"B": ({"indices": {"ligand": (8,), "protein": (10,)}},)},
         },
     }
 
 
-@pytest.fixture(params=["ifp_bitvector", "ifp_metadata"])
+@pytest.fixture(params=["ifp_single", "ifp_count"])
 def ifp(request):
     return request.getfixturevalue(request.param)
 
@@ -218,10 +229,18 @@ def test_to_df_drop_empty(ifp):
     assert df.shape == (2, 9)
 
 
-def test_to_df_no_interaction_in_first_frame(ifp_metadata):
-    fp = deepcopy(ifp_metadata)
+def test_to_df_no_interaction_in_first_frame(ifp_single):
+    fp = deepcopy(ifp_single)
     fp[0] = {}
     to_dataframe(fp, ["A", "B", "C"])
+
+
+def test_to_df_count(ifp_count):
+    df = to_dataframe(ifp_count, ["A", "B", "C"], count=True)
+    assert df[df > 1].any().any()
+    value = df[("LIG", "ALA1", "A")][0]
+    assert value.dtype == np.uint8
+    assert value == 2
 
 
 def test_to_df_empty_ifp():

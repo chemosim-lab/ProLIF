@@ -37,7 +37,12 @@ from prolif.ifp import IFP
 from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
 from prolif.molecule import Molecule
 from prolif.parallel import MolIterablePool, TrajectoryPool
-from prolif.utils import get_residues_near_ligand, to_bitvectors, to_dataframe
+from prolif.utils import (
+    get_residues_near_ligand,
+    to_bitvectors,
+    to_countvectors,
+    to_dataframe,
+)
 
 
 def first_occurence(interaction):
@@ -623,18 +628,20 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
-    def to_dataframe(self, **kwargs):
+    def to_dataframe(self, count=None, dtype=None, drop_empty=True, index_col="Frame"):
         """Converts fingerprints to a pandas DataFrame
 
         Parameters
         ----------
-        index_col : str
-            Name of the index column in the DataFrame
+        count : bool or None
+            Whether to output a count fingerprint or not.
         dtype : object or None
-            Cast the input of each bit in the bitvector to this type. If None,
-            keep the data as is
+            Cast the dataframe values to this type. If ``None``, uses ``np.uint8`` if
+            ``count=True``, else ``bool``.
         drop_empty : bool
             Drop columns with only empty values
+        index_col : str
+            Name of the index column in the DataFrame
 
         Returns
         -------
@@ -663,10 +670,18 @@ class Fingerprint:
 
         .. versionchanged:: 2.0.0
             Removed the ``return_atoms`` parameter. You can access more metadata
-            information directly through :attr:`~Fingerprint.ifp`.
+            information directly through :attr:`~Fingerprint.ifp`. Added the ``count``
+            parameter.
         """
         if hasattr(self, "ifp"):
-            return to_dataframe(self.ifp, self.interactions.keys(), **kwargs)
+            return to_dataframe(
+                self.ifp,
+                self.interactions.keys(),
+                count=self.count if count is None else count,
+                dtype=dtype,
+                drop_empty=drop_empty,
+                index_col=index_col,
+            )
         raise AttributeError("Please use the `run` method before")
 
     def to_bitvectors(self):
@@ -696,6 +711,37 @@ class Fingerprint:
         if hasattr(self, "ifp"):
             df = self.to_dataframe()
             return to_bitvectors(df)
+        raise AttributeError("Please use the `run` method before")
+
+    def to_countvectors(self):
+        """Converts fingerprints to a list of RDKit UIntSparseIntVect
+
+        Returns
+        -------
+        cvs : list
+            A list of :class:`~rdkit.DataStructs.cDataStructs.UIntSparseIntVect`
+            for each frame
+
+        Raises
+        ------
+        AttributeError
+            If the :meth:`run` method hasn't been used
+
+        Example
+        -------
+        ::
+
+            >>> from rdkit.DataStructs import TanimotoSimilarity
+            >>> cv = fp.to_countvectors()
+            >>> TanimotoSimilarity(cv[0], cv[1])
+            0.42
+
+
+        .. versionadded: 2.0.0
+        """
+        if hasattr(self, "ifp"):
+            df = self.to_dataframe()
+            return to_countvectors(df)
         raise AttributeError("Please use the `run` method before")
 
     def to_pickle(self, path=None):

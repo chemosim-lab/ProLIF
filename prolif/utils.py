@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from rdkit import rdBase
 from rdkit.Chem import FragmentOnBonds, GetMolFrags, SplitMolByPDBResidues
-from rdkit.DataStructs import ExplicitBitVect
+from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 from rdkit.Geometry import Point3D
 from scipy.spatial import cKDTree
 
@@ -186,9 +186,10 @@ def is_peptide_bond(bond, resids):
 def to_dataframe(
     ifp,
     interactions,
-    index_col="Frame",
+    count=False,
     dtype=None,
     drop_empty=True,
+    index_col="Frame",
 ):
     """Converts IFPs to a pandas DataFrame
 
@@ -201,13 +202,15 @@ def to_dataframe(
         dict in the format ``{<interaction name>: <metadata dict>}``.
     interactions : list
         A list of interactions, in the same order as used to detect the interactions.
-    index_col : str
-        Name of the index column in the DataFrame
+    count : bool
+        Whether to output a count fingerprint or not.
     dtype : object or None
-        Cast the input of each bit in the bitvector to this type. If None, keep
-        the data as is.
+        Cast the dataframe values to this type. If ``None``, uses ``np.uint8`` if
+        ``count=True``, else ``bool``.
     drop_empty : bool
         Drop columns with only empty values
+    index_col : str
+        Name of the index column in the DataFrame
 
     Returns
     -------
@@ -233,20 +236,17 @@ def to_dataframe(
         dataframe conversion code
 
     .. versionchanged:: 2.0.0
-        Removed the ``return_atoms`` parameter.
+        Removed the ``return_atoms`` parameter. Added the ``count`` parameter. Removed
+        support for ``ifp`` containing ``np.ndarray`` bitvectors.
     """
     ifp = deepcopy(ifp)
     n_interactions = len(interactions)
-    empty_value = dtype(False) if dtype else False
-    # check if each interaction value is a list of atom indices or smthg else
-    has_atom_indices = False
-    for frame_ifp in ifp.values():
-        for residue_tuple, value in frame_ifp.items():
-            has_atom_indices = isinstance(value, dict)
-            break
+    if dtype is None:
+        dtype = np.uint8 if count else bool
+    empty_value = dtype(0)
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
-    empty_arr = np.array([empty_value for _ in range(n_interactions)])
+    empty_arr = np.array([empty_value for _ in range(n_interactions)], dtype=dtype)
     # residue pairs
     residue_pairs = sorted(
         set(
@@ -260,23 +260,29 @@ def to_dataframe(
         index.append(i)
         for residue_tuple in residue_pairs:
             try:
-                # np.ndarray or sparse metadata dict
-                bitvector = frame_ifp[residue_tuple]
+                ifp_dict = frame_ifp[residue_tuple]
             except KeyError:
                 data[residue_tuple].append(empty_arr[:])
             else:
-                if has_atom_indices:
+                if count:
                     bitvector = np.array(
-                        [i in bitvector for i in interactions], dtype=bool
+                        [len(ifp_dict.get(i, ())) for i in interactions], dtype=dtype
+                    )
+                else:
+                    bitvector = np.array(
+                        [i in ifp_dict for i in interactions], dtype=bool
                     )
                 data[residue_tuple].append(bitvector)
     index = pd.Series(index, name=index_col)
-    # create dataframes
+    # create dataframe
     if not data:
         warnings.warn("No interaction detected")
         return pd.DataFrame([], index=index)
     values = np.array(
-        [np.hstack([np.ravel(a[i]) for a in data.values()]) for i in range(len(index))]
+        [
+            np.hstack([bitvector_list[frame] for bitvector_list in data.values()])
+            for frame in range(len(index))
+        ]
     )
     columns = pd.MultiIndex.from_tuples(
         [
@@ -287,8 +293,7 @@ def to_dataframe(
         names=["ligand", "protein", "interaction"],
     )
     df = pd.DataFrame(values, columns=columns, index=index)
-    if dtype:
-        df = df.astype(dtype)
+    df = df.astype(dtype)
     if drop_empty:
         mask = (df != empty_value).any(axis=0)
         df = df.loc[:, mask]
@@ -328,3 +333,29 @@ def to_bitvectors(df):
 
     """
     return df.apply(pandas_series_to_bv, axis=1).tolist()
+
+
+def pandas_series_to_countvector(s):
+    size = len(s)
+    cv = UIntSparseIntVect(size)
+    for i in range(size):
+        cv[i] = int(s[i])
+    return cv
+
+
+def to_countvectors(df):
+    """Converts an interaction DataFrame to a list of RDKit UIntSparseIntVect
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        A DataFrame where each column corresponds to the count for an interaction
+        between two residues
+
+    Returns
+    -------
+    cv : list
+        A list of :class:`~rdkit.DataStructs.cDataStructs.UIntSparseIntVect`
+        for each frame
+    """
+    return df.apply(pandas_series_to_countvector, axis=1).tolist()

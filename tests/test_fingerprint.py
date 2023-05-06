@@ -4,7 +4,7 @@ import MDAnalysis as mda
 import numpy as np
 import pytest
 from pandas import DataFrame
-from rdkit.DataStructs import ExplicitBitVect
+from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
 from prolif.datafiles import datapath
 from prolif.fingerprint import Fingerprint
@@ -179,7 +179,7 @@ class TestFingerprint:
         resids = set([key for d in fp_simple.ifp.values() for key in d.keys()])
         assert df.shape == (3, len(resids))
 
-    def test_to_bv(self, fp_simple, u, ligand_ag, protein_ag):
+    def test_to_bitvector(self, fp_simple, u, ligand_ag, protein_ag):
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_bitvectors()
         fp_simple.run(
@@ -188,6 +188,17 @@ class TestFingerprint:
         bvs = fp_simple.to_bitvectors()
         assert isinstance(bvs[0], ExplicitBitVect)
         assert len(bvs) == 3
+
+    def test_to_countvectors(self, fp_count, u, ligand_ag, protein_ag):
+        with pytest.raises(AttributeError, match="use the `run` method"):
+            Fingerprint().to_countvectors()
+        fp_count.run(
+            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+        )
+        cvs = fp_count.to_countvectors()
+        assert isinstance(cvs[0], UIntSparseIntVect)
+        assert cvs[0][0] == 4
+        assert len(cvs) == 3
 
     def test_list_avail(self):
         available = Fingerprint.list_available()
