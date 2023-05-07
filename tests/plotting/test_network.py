@@ -10,11 +10,22 @@ from prolif.plotting.network import LigNetwork
 
 class TestLigNetwork:
     @pytest.fixture(scope="class")
-    def get_ligplot(self):
+    def simple_fp(self):
+        return plf.Fingerprint(count=False)
+
+    @pytest.fixture(scope="class")
+    def count_fp(self):
+        return plf.Fingerprint(count=True)
+
+    @pytest.fixture(scope="class", params=["simple_fp", "count_fp"])
+    def fp(self, request):
+        return request.getfixturevalue(request.param)
+
+    @pytest.fixture(scope="class")
+    def get_ligplot(self, fp):
         u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
         lig = u.select_atoms("resname LIG")
         prot = u.select_atoms("protein and byres around 6.5 group ligand", ligand=lig)
-        fp = plf.Fingerprint()
         fp.run(u.trajectory[0:2], lig, prot)
         lig = plf.Molecule.from_mda(lig)
         return partial(fp.to_ligplot, lig)

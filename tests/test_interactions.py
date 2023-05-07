@@ -120,7 +120,7 @@ class TestInteractions:
     )
     def test_interaction(self, fingerprint, func_name, lig_mol, prot_mol, expected):
         interaction = getattr(fingerprint, func_name)
-        assert interaction(lig_mol[0], prot_mol[0]) is expected
+        assert next(interaction(lig_mol[0], prot_mol[0]), False) is expected
 
     def test_warning_supersede(self):
         old = id(_INTERACTIONS["Hydrophobic"])
@@ -169,13 +169,9 @@ class TestInteractions:
         "lig_mol, prot_mol", [("benzene", "cation")], indirect=["lig_mol", "prot_mol"]
     )
     def test_vdwcontact_vdwradii_update(self, lig_mol, prot_mol):
-        class CustomVdW(VdWContact):
-            def __init__(self, tolerance=0, vdwradii={"Na": 0}):
-                super().__init__(tolerance, vdwradii)
-
-        metadata = CustomVdW().detect(lig_mol[0], prot_mol[0])
-        assert metadata is None
-        _INTERACTIONS.pop("CustomVdW")
+        vdw = VdWContact(vdwradii={"Na": 0})
+        metadata = vdw.detect(lig_mol[0], prot_mol[0])
+        assert next(metadata, None) is None
 
     @pytest.mark.parametrize(
         ["interaction_qmol", "smiles", "expected"],
@@ -282,11 +278,14 @@ class TestInteractions:
     )
     def test_pi_stacking(self, benzene, xyz, rotation, pi_type, expected, fingerprint):
         r1, r2 = self.create_rings(benzene, xyz, rotation)
-        assert getattr(fingerprint, pi_type)(r1, r2) is expected
+        evaluate = lambda pistacking_type, r1, r2: next(
+            getattr(fingerprint, pistacking_type)(r1, r2), False
+        )
+        assert evaluate(pi_type, r1, r2) is expected
         if expected is True:
             other = "edgetoface" if pi_type == "facetoface" else "facetoface"
-            assert getattr(fingerprint, other)(r1, r2) is not expected
-            assert getattr(fingerprint, "pistacking")(r1, r2) is expected
+            assert evaluate(other, r1, r2) is not expected
+            assert evaluate("pistacking", r1, r2) is expected
 
     @staticmethod
     def create_rings(benzene, xyz, rotation):
@@ -302,5 +301,5 @@ class TestInteractions:
     def test_edgetoface_phe331(self, ligand_mol, protein_mol):
         fp = Fingerprint()
         lig, phe331 = ligand_mol[0], protein_mol["PHE331.B"]
-        assert fp.edgetoface(lig, phe331) is True
-        assert fp.pistacking(lig, phe331) is True
+        assert next(fp.edgetoface(lig, phe331)) is True
+        assert next(fp.pistacking(lig, phe331)) is True

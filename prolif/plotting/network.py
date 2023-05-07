@@ -45,7 +45,7 @@ class LigNetwork:
     ----------
     df : pandas.DataFrame
         Dataframe with a 4-level index (ligand, protein, interaction, atoms)
-        and a weight column for values
+        and ``weight`` and ``distance`` columns for values
     lig_mol : rdkit.Chem.rdChem.Mol
         Ligand molecule
     match3D : bool
@@ -324,14 +324,20 @@ class LigNetwork:
                 "ligand": str(lig_resid),
                 "protein": str(prot_resid),
                 "interaction": int_name,
-                "atoms": metadata["indices"]["ligand"],
-                "distance": metadata.get("distance", 0),
+                "metadata_tuple": metadata_tuple,
             }
             for frame, ifp in fp.ifp.items()
             for (lig_resid, prot_resid), int_data in ifp.items()
-            for int_name, metadata in int_data.items()
+            for int_name, metadata_tuple in int_data.items()
         ]
+        # extract interaction with shortest distance
+        for entry in data:
+            metadata_tuple = entry.pop("metadata_tuple")
+            metadata = min(metadata_tuple, key=lambda m: m.get("distance", np.nan))
+            entry["atoms"] = metadata["indices"]["ligand"]
+            entry["distance"] = metadata.get("distance", 0)
         df = pd.DataFrame(data)
+        # add weight for each atoms, and average distance
         df["weight"] = 1
         df = df.groupby(["ligand", "protein", "interaction", "atoms"]).agg(
             weight=("weight", "sum"), distance=("distance", "mean")
@@ -363,12 +369,17 @@ class LigNetwork:
                 "ligand": str(lig_resid),
                 "protein": str(prot_resid),
                 "interaction": int_name,
-                "atoms": metadata["indices"]["ligand"],
-                "distance": metadata.get("distance", 0),
+                "metadata_tuple": metadata_tuple,
             }
             for (lig_resid, prot_resid), int_data in ifp.items()
-            for int_name, metadata in int_data.items()
+            for int_name, metadata_tuple in int_data.items()
         ]
+        # extract interaction with shortest distance
+        for entry in data:
+            metadata_tuple = entry.pop("metadata_tuple")
+            metadata = min(metadata_tuple, key=lambda m: m.get("distance", np.nan))
+            entry["atoms"] = metadata["indices"]["ligand"]
+            entry["distance"] = metadata.get("distance", 0)
         df = pd.DataFrame(data)
         df["weight"] = 1
         df = df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(

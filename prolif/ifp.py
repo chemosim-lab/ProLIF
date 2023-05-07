@@ -20,7 +20,7 @@ class IFP(UserDict):
 
         {
             tuple[<residue_id>, <residue_id>]: {
-                <interaction name>: {
+                <interaction name>: tuple[{
                     "indices": {
                         "ligand": tuple[int, ...],
                         "protein": tuple[int, ...]
@@ -30,15 +30,15 @@ class IFP(UserDict):
                         "protein": tuple[int, ...]
                     },
                     <other metadata>: <value>
-                }
+                }, ...]
             }
         }
 
     Here ``<residue_id>`` corresponds to a :class:`~prolif.residue.ResidueId` object.
     For convenience, one can directly use strings rather than ``ResidueId`` objects when
     indexing the IFP, e.g. ``ifp[("LIG1.G", "ASP129.A")]``.
-    You can also use a single ``ResidueId`` or string to returned a filtered IFP only
-    containing interactions with the specified residue, e.g. ``ifp["ASP129.A"]``.
+    You can also use a single ``ResidueId`` or string to return a filtered IFP that only
+    contains interactions with the specified residue, e.g. ``ifp["ASP129.A"]``.
     """
 
     def __getitem__(self, key):

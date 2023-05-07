@@ -25,6 +25,7 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
 
 """
 from collections.abc import Sized
+from functools import wraps
 
 import dill
 import multiprocess as mp
@@ -36,7 +37,28 @@ from prolif.ifp import IFP
 from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
 from prolif.molecule import Molecule
 from prolif.parallel import MolIterablePool, TrajectoryPool
-from prolif.utils import get_residues_near_ligand, to_bitvectors, to_dataframe
+from prolif.utils import (
+    get_residues_near_ligand,
+    to_bitvectors,
+    to_countvectors,
+    to_dataframe,
+)
+
+
+def first_occurence(interaction):
+    @wraps(interaction)
+    def wrapped(*args, **kwargs):
+        return next(interaction(*args, **kwargs), None)
+
+    return wrapped
+
+
+def all_occurences(interaction):
+    @wraps(interaction)
+    def wrapped(*args, **kwargs):
+        return tuple(interaction(*args, **kwargs))
+
+    return wrapped
 
 
 class Fingerprint:
@@ -54,6 +76,14 @@ class Fingerprint:
     parameters : dict, optional
         New parameters for the interactions. Mapping between an interaction name and a
         dict of parameters as they appear in the interaction class.
+    count : bool
+        For a given interaction class and pair of residues, there might be multiple
+        combinations of atoms that satisfy the interaction constraints. This parameter
+        controls how the fingerprint treats these different combinations:
+
+        * ``False``: returns the first combination that satisfy the constraints (fast)
+        * ``True``: returns all the combinations (slow)
+
     vicinity_cutoff : float
         Automatically restrict the analysis to residues within this range of the ligand.
         This parameter is ignored if the ``residues`` parameter of the ``run`` methods
@@ -68,6 +98,8 @@ class Fingerprint:
         Number of interaction functions registered by the fingerprint
     vicinity_cutoff : float
         Used when calling :func:`prolif.utils.get_residues_near_ligand`.
+    count : bool
+        Whether to keep track of all interaction occurences or just the first one.
     ifp : dict, optional
         Dict of interaction fingerprints in a sparse format for the given trajectory or
         docking poses: ``{<frame number>: <IFP>}``. See the :class:`~prolif.ifp.IFP`
@@ -100,24 +132,24 @@ class Fingerprint:
         u.trajectory[0]  # use coordinates of the first frame
         prot = prolif.Molecule.from_mda(prot)
         lig = prolif.Molecule.from_mda(lig)
-        ifp = fp.generate(lig, prot)
-        prolif.to_dataframe({0: ifp}, fp.interactions.keys())
+        ifp = fp.generate(lig, prot, metadata=True)
+        prolif.to_dataframe({0: ifp}, fp.interactions)
 
     - On a specific pair of residues for a specific interaction:
 
     .. ipython:: python
 
         # ligand-protein
-        fp.hbdonor(lig, prot["ASP129.A"])
+        next(fp.hbdonor(lig, prot["ASP129.A"]))
         # protein-protein
-        fp.hbacceptor(prot["ASP129.A"], prot["CYS133.A"])
+        next(fp.hbacceptor(prot["ASP129.A"], prot["CYS133.A"]))
 
     You can also obtain the indices of atoms responsible for the interaction:
 
     .. ipython:: python
 
         fp.metadata(lig, prot["ASP129.A"])
-        fp.hbdonor(lig, prot["ASP129.A"], metadata=True)
+        next(fp.hbdonor(lig, prot["ASP129.A"], metadata=True), None)
 
 
     .. versionchanged:: 1.0.0
@@ -140,6 +172,8 @@ class Fingerprint:
         instead.
         Added the ``parameters`` argument to set the interaction classes parameters
         without having to create a new class.
+        Added the ``count`` argument to control for a given pair of residues whether to
+        return all occurences of an interaction or only the first one.
 
     """
 
@@ -157,8 +191,10 @@ class Fingerprint:
             "VdWContact",
         ],
         parameters=None,
+        count=False,
         vicinity_cutoff=6.0,
     ):
+        self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
 
@@ -172,14 +208,13 @@ class Fingerprint:
         self._check_valid_interactions(parameters, "parameters")
         # add interaction methods
         self.interactions = {}
+        wrapper = all_occurences if self.count else first_occurence
         for name, interaction_cls in _INTERACTIONS.items():
-            if name.startswith("_") or name == "Interaction":
-                continue
             # create instance with custom parameters if available
             interaction = interaction_cls(**parameters.get(name, {}))
             setattr(self, name.lower(), interaction)
             if name in interactions:
-                self.interactions[name] = interaction
+                self.interactions[name] = wrapper(interaction)
 
     def _check_valid_interactions(self, interactions_iterable, varname):
         """Raises a NameError if an unknown interaction is given."""
@@ -228,11 +263,14 @@ class Fingerprint:
         Returns
         -------
         bitvector : numpy.ndarray
-            An array storing the encoded interactions between res1 and res2
+            An array storing the encoded interactions between res1 and res2. Depending
+            on :attr:`Fingerprint.count`, the dtype of the array will be bool or uint8.
         """
         bitvector = [
             interaction(res1, res2) for interaction in self.interactions.values()
         ]
+        if self.count:
+            return np.array([sum(bits) for bits in bitvector], dtype=np.uint8)
         return np.array(bitvector, dtype=bool)
 
     def metadata(self, res1, res2):
@@ -247,9 +285,10 @@ class Fingerprint:
 
         Returns
         -------
-        metadata : dict
-            Metadata dictionnary indexed by interaction name. If a specific interaction
-            is not present between residues, it is filtered out of the dictionary.
+        metadata : dict[str, tuple[dict, ...]]
+            Dict containing tuples of metadata dictionaries indexed by interaction
+            name. If a specific interaction is not present between residues, it is
+            filtered out of the dictionary.
 
 
         .. versionchanged:: 0.3.2
@@ -261,12 +300,11 @@ class Fingerprint:
             rather than just atom indices.
 
         """
-        metadata = {
-            name: metadata
+        return {
+            name: metadata if self.count else (metadata,)
             for name, interaction in self.interactions.items()
-            if (metadata := interaction(res1, res2, metadata=True)) is not None
+            if (metadata := interaction(res1, res2, metadata=True))
         }
-        return metadata
 
     def generate(self, lig, prot, residues=None, metadata=False):
         """Generates the interaction fingerprint between 2 molecules
@@ -295,8 +333,9 @@ class Fingerprint:
             A dictionary indexed by ``(ligand, protein)`` residue pairs. The
             format for values will depend on ``metadata``:
 
-            - A single bitvector if ``metadata=False``
-            - A sparse dictionary of metadata for each interaction if ``metadata=True``
+            - A single numpy array if ``metadata=False``
+            - A sparse dictionary of metadata tuples indexed by interaction name if
+              ``metadata=True``
 
         Example
         -------
@@ -312,8 +351,8 @@ class Fingerprint:
 
         .. versionchanged:: 2.0.0
             ``return_atoms`` replaced by ``metadata``, and it now returns a sparse
-            dictionary of metadata indexed by interaction name instead of a tuple of
-            arrays.
+            dictionary of metadata tuples indexed by interaction name instead of a
+            tuple of arrays.
         """
         ifp = IFP()
         prot_residues = prot.residues if residues == "all" else residues
@@ -589,16 +628,20 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
-    def to_dataframe(self, **kwargs):
+    def to_dataframe(self, count=None, dtype=None, drop_empty=True, index_col="Frame"):
         """Converts fingerprints to a pandas DataFrame
 
         Parameters
         ----------
+        count : bool or None
+            Whether to output a count fingerprint or not.
         dtype : object or None
-            Cast the input of each bit in the bitvector to this type. If None,
-            keep the data as is
+            Cast the dataframe values to this type. If ``None``, uses ``np.uint8`` if
+            ``count=True``, else ``bool``.
         drop_empty : bool
             Drop columns with only empty values
+        index_col : str
+            Name of the index column in the DataFrame
 
         Returns
         -------
@@ -627,10 +670,18 @@ class Fingerprint:
 
         .. versionchanged:: 2.0.0
             Removed the ``return_atoms`` parameter. You can access more metadata
-            information directly through :attr:`~Fingerprint.ifp`.
+            information directly through :attr:`~Fingerprint.ifp`. Added the ``count``
+            parameter.
         """
         if hasattr(self, "ifp"):
-            return to_dataframe(self.ifp, self.interactions.keys(), **kwargs)
+            return to_dataframe(
+                self.ifp,
+                self.interactions,
+                count=self.count if count is None else count,
+                dtype=dtype,
+                drop_empty=drop_empty,
+                index_col=index_col,
+            )
         raise AttributeError("Please use the `run` method before")
 
     def to_bitvectors(self):
@@ -660,6 +711,37 @@ class Fingerprint:
         if hasattr(self, "ifp"):
             df = self.to_dataframe()
             return to_bitvectors(df)
+        raise AttributeError("Please use the `run` method before")
+
+    def to_countvectors(self):
+        """Converts fingerprints to a list of RDKit UIntSparseIntVect
+
+        Returns
+        -------
+        cvs : list
+            A list of :class:`~rdkit.DataStructs.cDataStructs.UIntSparseIntVect`
+            for each frame
+
+        Raises
+        ------
+        AttributeError
+            If the :meth:`run` method hasn't been used
+
+        Example
+        -------
+        ::
+
+            >>> from rdkit.DataStructs import TanimotoSimilarity
+            >>> cv = fp.to_countvectors()
+            >>> TanimotoSimilarity(cv[0], cv[1])
+            0.42
+
+
+        .. versionadded: 2.0.0
+        """
+        if hasattr(self, "ifp"):
+            df = self.to_dataframe()
+            return to_countvectors(df)
         raise AttributeError("Please use the `run` method before")
 
     def to_pickle(self, path=None):

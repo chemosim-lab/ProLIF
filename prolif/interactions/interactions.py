@@ -262,7 +262,7 @@ class CationPi(Interaction):
                 # centroid-cation
                 angle = normal.AngleTo(centroid_cation)
                 if angle_between_limits(angle, *self.angle, ring=True):
-                    return self.metadata(
+                    yield self.metadata(
                         cation,
                         pi,
                         cation_match,
@@ -392,7 +392,8 @@ class PiStacking(Interaction):
         self.etf = EdgeToFace(**etf_kwargs or {})
 
     def detect(self, ligand, residue):
-        return self.ftf.detect(ligand, residue) or self.etf.detect(ligand, residue)
+        yield from self.ftf.detect(ligand, residue)
+        yield from self.etf.detect(ligand, residue)
 
 
 class MetalDonor(Distance):
@@ -476,6 +477,6 @@ class VdWContact(Interaction):
                 rxyz.GetAtomPosition(ra.GetIdx())
             )
             if dist <= vdw:
-                return self.metadata(
+                yield self.metadata(
                     ligand, residue, (la.GetIdx(),), (ra.GetIdx(),), distance=dist
                 )
