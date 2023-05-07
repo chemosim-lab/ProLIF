@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added a `count` argument in `Fingerprint`. If `count=True`, enumerates all groups of
+  atoms that satisfy interaction constraints (instead of stopping at the first one),
+  allowing users to generate a count-fingerprint. The `Fingerprint.to_dataframe` method
+  has been modified accordingly, and a `Fingerprint.to_countvectors` method has been
+  added to generate a list of RDKit's `UIntSparseIntVect` from the count-fingerprint.
+  The visualisation scripts have been updated to display the occurence with the shortest
+  distance when a count-fingerprint is being used.
 - Added a `parameters` argument in `Fingerprint` to easily update the parameters used
   by an interaction, instead of defining a new interaction class (Issue #118).
 - Added new abstract interaction classes `SingleAngle` and `DoubleAngle` to more easily
