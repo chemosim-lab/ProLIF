@@ -230,6 +230,10 @@ class DoubleAngle(Interaction, is_abstract=True):
         Which atoms to use for the distance calculation: L1 or L2, and P1 or P2
     metadata_mapping : dict, optional
         Mapping for names used in the metadata dict for the distance and angle variables
+
+
+    .. versionadded:: 2.0.0
+
     """
 
     def __init__(

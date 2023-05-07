@@ -1,3 +1,11 @@
+"""
+Utility functions for interactions --- :mod:`prolif.interactions.utils`
+=======================================================================
+
+This module contains some utilities used by the interaction classes.
+"""
+
+
 def get_mapindex(res, index):
     """Get the index of the atom in the original molecule
 
