@@ -132,8 +132,8 @@ class Fingerprint:
         u.trajectory[0]  # use coordinates of the first frame
         prot = prolif.Molecule.from_mda(prot)
         lig = prolif.Molecule.from_mda(lig)
-        ifp = fp.generate(lig, prot)
-        prolif.to_dataframe({0: ifp}, fp.interactions.keys())
+        ifp = fp.generate(lig, prot, metadata=True)
+        prolif.to_dataframe({0: ifp}, fp.interactions)
 
     - On a specific pair of residues for a specific interaction:
 
@@ -149,7 +149,7 @@ class Fingerprint:
     .. ipython:: python
 
         fp.metadata(lig, prot["ASP129.A"])
-        next(fp.hbdonor(lig, prot["ASP129.A"], metadata=True))
+        next(fp.hbdonor(lig, prot["ASP129.A"], metadata=True), None)
 
 
     .. versionchanged:: 1.0.0
@@ -676,7 +676,7 @@ class Fingerprint:
         if hasattr(self, "ifp"):
             return to_dataframe(
                 self.ifp,
-                self.interactions.keys(),
+                self.interactions,
                 count=self.count if count is None else count,
                 dtype=dtype,
                 drop_empty=drop_empty,
