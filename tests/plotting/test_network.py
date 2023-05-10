@@ -22,21 +22,29 @@ class TestLigNetwork:
         return request.getfixturevalue(request.param)
 
     @pytest.fixture(scope="class")
-    def get_ligplot(self, fp):
+    def fp_mol(self, fp):
         u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
         lig = u.select_atoms("resname LIG")
         prot = u.select_atoms("protein and byres around 6.5 group ligand", ligand=lig)
         fp.run(u.trajectory[0:2], lig, prot)
-        lig = plf.Molecule.from_mda(lig)
-        return partial(fp.to_ligplot, lig)
+        lig_mol = plf.Molecule.from_mda(lig)
+        return fp, lig_mol
 
-    def test_integration_frame(self, get_ligplot):
-        net = get_ligplot(kind="frame", frame=0)
+    @pytest.fixture(scope="class")
+    def get_ligplot(self, fp_mol):
+        fp, lig_mol = fp_mol
+        return partial(fp.to_ligplot, lig_mol)
+
+    def test_integration_frame(self, fp_mol):
+        fp, lig_mol = fp_mol
+        net = fp.to_ligplot(lig_mol, kind="frame", frame=0, display_all=fp.count)
         with StringIO() as buffer:
             net.save(buffer)
             buffer.seek(0)
             html = buffer.read()
-        assert "PHE331.B" in html
+        assert '"from": 18, "to": "PHE351.B", "title": "Hydrophobic' in html
+        if fp.count:
+            assert '"from": 19, "to": "PHE351.B", "title": "Hydrophobic' in html
 
     def test_integration_agg(self, get_ligplot):
         net = get_ligplot(kind="aggregate", threshold=0)

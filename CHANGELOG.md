@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   radii it uses.
 - Added the `Fingerprint.to_ligplot` method to generate a `LigNetwork` plot directly.
 - Added `LigNetwork.from_fingerprint` to generate the ligplot from a `Fingerprint`
-  instance.
+  instance. Added a `display_all` parameter for displaying all interactions instead
+  of only the shortest one for a given pair of residues.
 - Added `Fingerprint.metadata` to generate a dictionary containing metadata about
   interactions between two residues. Replaces `Fingerprint.bitvector_atoms`.
 - Added a `vicinity_cutoff` parameter in `Fingerprint` to control the distance cutoff

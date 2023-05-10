@@ -273,7 +273,14 @@ class LigNetwork:
 
     @classmethod
     def from_fingerprint(
-        cls, fp, ligand_mol, kind="aggregate", frame=0, threshold=0.3, **kwargs
+        cls,
+        fp,
+        ligand_mol,
+        kind="aggregate",
+        frame=0,
+        display_all=False,
+        threshold=0.3,
+        **kwargs,
     ):
         """Helper method to create a ligand interaction diagram from a
         :class:`~prolif.fingerprint.Fingerprint` object.
@@ -295,21 +302,29 @@ class LigNetwork:
             Ligand molecule
         kind : str
             One of ``"aggregate"`` or ``"frame"``
-        frame : int or str
+        frame : int
             Frame number (see :attr:`~prolif.fingerprint.Fingerprint.ifp`). Only
             applicable for ``kind="frame"``
+        display_all : bool
+            Display all occurences for a given pair of residues and interaction, or only
+            the shortest one. Only applicable for ``kind="frame"``. Not relevant if
+            ``count=False`` in the ``Fingerprint`` object.
         threshold : float
             Frequency threshold, between 0 and 1. Only applicable for
             ``kind="aggregate"``
         kwargs : object
             Other arguments passed to the :class:`LigNetwork` class
+
+
+        .. versionchanged:: 2.0.0
+            Added the ``display_all`` parameter.
         """
         if not hasattr(fp, "ifp"):
             raise AttributeError(
                 "Please run the interaction fingerprint analysis before plotting."
             )
         if kind == "frame":
-            df = cls._make_frame_df_from_fp(fp, frame=frame)
+            df = cls._make_frame_df_from_fp(fp, frame=frame, display_all=display_all)
             return cls(df, ligand_mol, **kwargs)
         if kind == "aggregate":
             df = cls._make_agg_df_from_fp(fp, threshold=threshold)
@@ -317,25 +332,39 @@ class LigNetwork:
         raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
 
     @staticmethod
-    def _make_agg_df_from_fp(fp, threshold=0.3):
-        data = [
-            {
-                "Frame": frame,
-                "ligand": str(lig_resid),
-                "protein": str(prot_resid),
-                "interaction": int_name,
-                "metadata_tuple": metadata_tuple,
-            }
-            for frame, ifp in fp.ifp.items()
-            for (lig_resid, prot_resid), int_data in ifp.items()
-            for int_name, metadata_tuple in int_data.items()
-        ]
-        # extract interaction with shortest distance
-        for entry in data:
-            metadata_tuple = entry.pop("metadata_tuple")
-            metadata = min(metadata_tuple, key=lambda m: m.get("distance", np.nan))
-            entry["atoms"] = metadata["indices"]["ligand"]
-            entry["distance"] = metadata.get("distance", 0)
+    def _get_records(ifp, all_metadata):
+        records = []
+        for (lig_resid, prot_resid), int_data in ifp.items():
+            for int_name, metadata_tuple in int_data.items():
+                entry = {
+                    "ligand": str(lig_resid),
+                    "protein": str(prot_resid),
+                    "interaction": int_name,
+                }
+                if all_metadata:
+                    for metadata in metadata_tuple:
+                        records.append(
+                            {
+                                **entry,
+                                "atoms": metadata["indices"]["ligand"],
+                                "distance": metadata.get("distance", 0),
+                            }
+                        )
+                else:
+                    # extract interaction with shortest distance
+                    metadata = min(
+                        metadata_tuple, key=lambda m: m.get("distance", np.nan)
+                    )
+                    entry["atoms"] = metadata["indices"]["ligand"]
+                    entry["distance"] = metadata.get("distance", 0)
+                    records.append(entry)
+        return records
+
+    @classmethod
+    def _make_agg_df_from_fp(cls, fp, threshold=0.3):
+        data = []
+        for ifp in fp.ifp.values():
+            data.extend(cls._get_records(ifp, all_metadata=False))
         df = pd.DataFrame(data)
         # add weight for each atoms, and average distance
         df["weight"] = 1
@@ -361,25 +390,10 @@ class LigNetwork:
         )
         return df
 
-    @staticmethod
-    def _make_frame_df_from_fp(fp, frame=0):
+    @classmethod
+    def _make_frame_df_from_fp(cls, fp, frame=0, display_all=False):
         ifp = fp.ifp[frame]
-        data = [
-            {
-                "ligand": str(lig_resid),
-                "protein": str(prot_resid),
-                "interaction": int_name,
-                "metadata_tuple": metadata_tuple,
-            }
-            for (lig_resid, prot_resid), int_data in ifp.items()
-            for int_name, metadata_tuple in int_data.items()
-        ]
-        # extract interaction with shortest distance
-        for entry in data:
-            metadata_tuple = entry.pop("metadata_tuple")
-            metadata = min(metadata_tuple, key=lambda m: m.get("distance", np.nan))
-            entry["atoms"] = metadata["indices"]["ligand"]
-            entry["distance"] = metadata.get("distance", 0)
+        data = cls._get_records(ifp, all_metadata=display_all)
         df = pd.DataFrame(data)
         df["weight"] = 1
         df = df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
@@ -535,7 +549,7 @@ class LigNetwork:
         ) in self.df.iterrows():
             if interaction in self._LIG_PI_INTERACTIONS:
                 centroid = self._get_ring_centroid(lig_indices)
-                origin = str((lig_res, prot_res, interaction))
+                origin = f"centroid({lig_res}, {prot_res}, {interaction})"
                 self.nodes[origin] = {
                     "id": origin,
                     "x": centroid[0],
@@ -544,6 +558,7 @@ class LigNetwork:
                     "label": " ",
                     "fixed": True,
                     "physics": False,
+                    "group": "ligand",
                 }
             else:
                 i = self._DISPLAYED_ATOM.get(interaction, 0)

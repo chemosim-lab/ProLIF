@@ -810,10 +810,35 @@ class Fingerprint:
             return dill.load(f)
 
     def to_ligplot(
-        self, ligand_mol, kind="aggregate", frame=0, threshold=0.3, **kwargs
+        self,
+        ligand_mol,
+        kind="aggregate",
+        frame=0,
+        display_all=False,
+        threshold=0.3,
+        **kwargs,
     ):
         """Generate a :class:`~prolif.plotting.network.LigNetwork` plot from a
         fingerprint object that has been executed.
+
+        Parameters
+        ----------
+        ligand_mol : rdkit.Chem.rdChem.Mol
+            Ligand molecule
+        kind : str
+            One of ``"aggregate"`` or ``"frame"``
+        frame : int
+            Frame number (see :attr:`~prolif.fingerprint.Fingerprint.ifp`). Only
+            applicable for ``kind="frame"``
+        display_all : bool
+            Display all occurences for a given pair of residues and interaction, or only
+            the shortest one. Only applicable for ``kind="frame"``. Not relevant if
+            ``count=False`` in the ``Fingerprint`` object.
+        threshold : float
+            Frequency threshold, between 0 and 1. Only applicable for
+            ``kind="aggregate"``
+        kwargs : object
+            Other arguments passed to the :class:`LigNetwork` class
 
         .. versionadded:: 2.0.0
         """
@@ -825,6 +850,7 @@ class Fingerprint:
                 ligand_mol=ligand_mol,
                 kind=kind,
                 frame=frame,
+                display_all=display_all,
                 threshold=threshold,
                 **kwargs,
             )
