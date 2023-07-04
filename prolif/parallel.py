@@ -13,10 +13,10 @@ from time import sleep
 
 from multiprocess import Value
 from multiprocess.pool import Pool
-from rdkit import Chem
 from tqdm.auto import tqdm
 
 from prolif.molecule import Molecule
+from prolif.pickling import PICKLE_HANDLER
 
 
 class Progress:
@@ -250,10 +250,9 @@ class MolIterablePool:
 
     def __enter__(self):
         """Sets up which properties will be pickled by RDKit by default"""
-        self.previous_pkl_props = Chem.GetDefaultPickleProperties()
-        Chem.SetDefaultPickleProperties(Chem.PropertyPickleOptions.AllProps)
+        PICKLE_HANDLER.set()
         return self
 
     def __exit__(self, *exc):
         """Resets RDKit's default pickled properties"""
-        Chem.SetDefaultPickleProperties(self.previous_pkl_props)
+        PICKLE_HANDLER.reset()

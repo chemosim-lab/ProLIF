@@ -55,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Various changes related to packaging, code formatting, linting and CI pipelines
   (PR #114).
 
+### Fixed
+- Fixed pickling properties on RDKit molecules for Windows.
+
 ### Removed
 - Removed the `return_atoms` argument in `Fingerprint.to_dataframe`. Users should
   directly use `Fingerprint.ifp` instead (the documentation's tutorials have been
