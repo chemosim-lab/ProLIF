@@ -14,13 +14,19 @@ from typing import Optional
 
 from rdkit import Chem
 
+PROLIF_PICKLE_OPTIONS = (
+    Chem.PropertyPickleOptions.AtomProps ^ Chem.PropertyPickleOptions.MolProps
+)
+
 
 class RDKitPickleHandler:
     def __init__(self, pickle_options: int) -> None:
         self.pickle_options = pickle_options
         self.default_pickle = self.get()
+        self.is_patched = False
 
-    def get(self) -> int:
+    @staticmethod
+    def get() -> int:
         """Get RDKit's current pickle properties option"""
         return Chem.GetDefaultPickleProperties()
 
@@ -32,21 +38,25 @@ class RDKitPickleHandler:
             pickle_options = self.pickle_options
         Chem.SetDefaultPickleProperties(pickle_options)
 
-    def reset(self) -> None:
+    def reset(self, force: bool = False) -> None:
         """Reset RDKit's pickle options to their default (before instantiating this
         class).
         """
-        self.set(self.default_pickle)
+        if force or not self.is_patched:
+            self.set(self.default_pickle)
 
-    def __enter__(self):
-        self.set()
-        return self
+    def patch(self) -> None:
+        """Patches property pickling on Windows.
 
-    def __exit__(self, *exc):
-        self.reset()
+        Notes
+        -----
+        For some reason RDKit properties pickling need to be set early (before the
+        context manager of the parallel classes) to work as expected on Windows.
+        """
+        if sys.platform == "win32":
+            self.set()
+            self.is_patched = True
 
 
-PICKLE_HANDLER = RDKitPickleHandler(Chem.PropertyPickleOptions.AllProps)
-
-if sys.platform == "win32":
-    PICKLE_HANDLER.set()
+PICKLE_HANDLER = RDKitPickleHandler(PROLIF_PICKLE_OPTIONS)
+PICKLE_HANDLER.patch()
