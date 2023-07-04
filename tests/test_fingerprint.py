@@ -221,34 +221,31 @@ class TestFingerprint:
             Fingerprint(["Cationic"], parameters={"bar": {}})
 
     @pytest.fixture
-    def fp_unpkl(self, fp, protein_mol):
+    def fp_to_pickle(self, fp, protein_mol):
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
-        pkl = fp.to_pickle()
+        return fp
+
+    @pytest.fixture
+    def fp_unpkl(self, fp_to_pickle):
+        pkl = fp_to_pickle.to_pickle()
         return Fingerprint.from_pickle(pkl)
 
     @pytest.fixture
-    def fp_unpkl_file(self, fp, protein_mol, tmp_path):
-        path = str(datapath / "vina" / "vina_output.sdf")
+    def fp_unpkl_file(self, fp_to_pickle, tmp_path):
         pkl_path = tmp_path / "fp.pkl"
-        lig_suppl = list(sdf_supplier(path))
-        fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
-        fp.to_pickle(pkl_path)
-        fp_unpkl = Fingerprint.from_pickle(pkl_path)
-        return fp_unpkl
+        fp_to_pickle.to_pickle(pkl_path)
+        return Fingerprint.from_pickle(pkl_path)
 
     @pytest.fixture(params=["fp_unpkl", "fp_unpkl_file"])
     def fp_pkled(self, request):
         return request.getfixturevalue(request.param)
 
-    def test_pickle(self, fp, fp_pkled, protein_mol):
-        path = str(datapath / "vina" / "vina_output.sdf")
-        lig_suppl = list(sdf_supplier(path))
-        fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
-        assert fp.interactions.keys() == fp_pkled.interactions.keys()
-        assert len(fp.ifp) == len(fp_pkled.ifp)
-        for frame_ifp, frame_pkl_ifp in zip(fp.ifp, fp_pkled.ifp):
+    def test_pickle(self, fp_to_pickle, fp_pkled):
+        assert fp_to_pickle.interactions.keys() == fp_pkled.interactions.keys()
+        assert len(fp_to_pickle.ifp) == len(fp_pkled.ifp)
+        for frame_ifp, frame_pkl_ifp in zip(fp_to_pickle.ifp, fp_pkled.ifp):
             assert frame_ifp == frame_pkl_ifp
 
     def test_pickle_custom_interaction(self, fp_unpkl):
