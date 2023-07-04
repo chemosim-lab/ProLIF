@@ -1,5 +1,3 @@
-from tempfile import NamedTemporaryFile
-
 import MDAnalysis as mda
 import numpy as np
 import pytest
@@ -231,13 +229,13 @@ class TestFingerprint:
         return Fingerprint.from_pickle(pkl)
 
     @pytest.fixture
-    def fp_unpkl_file(self, fp, protein_mol):
+    def fp_unpkl_file(self, fp, protein_mol, tmp_path):
         path = str(datapath / "vina" / "vina_output.sdf")
+        pkl_path = tmp_path / "fp.pkl"
         lig_suppl = list(sdf_supplier(path))
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
-        with NamedTemporaryFile("w+b") as tempf:
-            fp.to_pickle(tempf.name)
-            fp_unpkl = Fingerprint.from_pickle(tempf.name)
+        fp.to_pickle(pkl_path)
+        fp_unpkl = Fingerprint.from_pickle(pkl_path)
         return fp_unpkl
 
     @pytest.fixture(params=["fp_unpkl", "fp_unpkl_file"])
