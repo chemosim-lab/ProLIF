@@ -89,7 +89,8 @@ class LigNetwork:
         Replaced ``LigNetwork.from_ifp`` with ``LigNetwork.from_fingerprint`` which
         works without requiring a dataframe with atom indices. Replaced ``match3D``
         parameter with ``use_coordinates`` and ``flatten_coordinates`` to give users
-        more control and allow them to provide their own 2D coordinates.
+        more control and allow them to provide their own 2D coordinates. Added support
+        for displaying peptides as the "ligand".
     """
 
     COLORS = {
@@ -352,7 +353,7 @@ class LigNetwork:
                         records.append(
                             {
                                 **entry,
-                                "atoms": metadata["indices"]["ligand"],
+                                "atoms": metadata["parent_indices"]["ligand"],
                                 "distance": metadata.get("distance", 0),
                             }
                         )
@@ -361,7 +362,7 @@ class LigNetwork:
                     metadata = min(
                         metadata_tuple, key=lambda m: m.get("distance", np.nan)
                     )
-                    entry["atoms"] = metadata["indices"]["ligand"]
+                    entry["atoms"] = metadata["parent_indices"]["ligand"]
                     entry["distance"] = metadata.get("distance", 0)
                     records.append(entry)
         return records

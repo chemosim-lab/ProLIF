@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instance. Added a `display_all` parameter for displaying all interactions instead
   of only the shortest one for a given pair of residues. Added `use_coordinates` and
   `flatten_coordinates` to control how the ligand structure is displayed.
+- Added support for displaying peptides with the `LigNetwork`.
 - Added `Fingerprint.metadata` to generate a dictionary containing metadata about
   interactions between two residues. Replaces `Fingerprint.bitvector_atoms`.
 - Added a `vicinity_cutoff` parameter in `Fingerprint` to control the distance cutoff
