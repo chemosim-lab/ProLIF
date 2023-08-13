@@ -48,10 +48,12 @@ class LigNetwork:
         and ``weight`` and ``distance`` columns for values
     lig_mol : rdkit.Chem.rdChem.Mol
         Ligand molecule
-    match3D : bool
-        If ``True``, generates 2D coordines that are constrained to fit the
-        3D conformation of the ligand as best as possible. Else, generate 2D
-        coordinates from scratch
+    use_coordinates : bool
+        If ``True``, uses the coordinates of the molecule directly, otherwise generates
+        2D coordinates from scratch. See also ``flatten_coordinates``.
+    flatten_coordinates : bool
+        If this is ``True`` and ``use_coordinates=True``, generates 2D coordinates that
+        are constrained to fit the 3D conformation of the ligand as best as possible.
     kekulize : bool
         Kekulize the ligand
     molsize : int
@@ -85,7 +87,9 @@ class LigNetwork:
 
     .. versionchanged:: 2.0.0
         Replaced ``LigNetwork.from_ifp`` with ``LigNetwork.from_fingerprint`` which
-        works without requiring a dataframe with atom indices.
+        works without requiring a dataframe with atom indices. Replaced ``match3D``
+        parameter with ``use_coordinates`` and ``flatten_coordinates`` to give users
+        more control and allow them to provide their own 2D coordinates.
     """
 
     COLORS = {
@@ -211,7 +215,8 @@ class LigNetwork:
         self,
         df,
         lig_mol,
-        match3D=True,
+        use_coordinates=False,
+        flatten_coordinates=True,
         kekulize=False,
         molsize=35,
         rotation=0,
@@ -224,8 +229,9 @@ class LigNetwork:
         mol = deepcopy(lig_mol)
         if kekulize:
             Chem.Kekulize(mol)
-        if match3D:
-            rdDepictor.GenerateDepictionMatching3DStructure(mol, lig_mol)
+        if use_coordinates:
+            if flatten_coordinates:
+                rdDepictor.GenerateDepictionMatching3DStructure(mol, lig_mol)
         else:
             rdDepictor.Compute2DCoords(mol, clearConfs=True)
         xyz = mol.GetConformer().GetPositions()

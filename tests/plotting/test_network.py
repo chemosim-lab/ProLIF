@@ -55,7 +55,13 @@ class TestLigNetwork:
         assert "PHE331.B" in html
 
     def test_kwargs(self, get_ligplot):
-        net = get_ligplot(kekulize=True, match3D=False, rotation=42, carbon=0)
+        net = get_ligplot(
+            kekulize=True,
+            use_coordinates=True,
+            flatten_coordinates=False,
+            rotation=42,
+            carbon=0,
+        )
         with StringIO() as buffer:
             net.save(buffer)
             buffer.seek(0)

@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added the `Fingerprint.to_ligplot` method to generate a `LigNetwork` plot directly.
 - Added `LigNetwork.from_fingerprint` to generate the ligplot from a `Fingerprint`
   instance. Added a `display_all` parameter for displaying all interactions instead
-  of only the shortest one for a given pair of residues.
+  of only the shortest one for a given pair of residues. Added `use_coordinates` and
+  `flatten_coordinates` to control how the ligand structure is displayed.
 - Added `Fingerprint.metadata` to generate a dictionary containing metadata about
   interactions between two residues. Replaces `Fingerprint.bitvector_atoms`.
 - Added a `vicinity_cutoff` parameter in `Fingerprint` to control the distance cutoff
@@ -67,6 +68,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from the `Fingerprint` object. These methods now accept a `metadata` parameter
   instead.
 - Removed `LigNetwork.from_ifp` in favor of `LigNetwork.from_fingerprint`.
+- Removed the `match3D` parameter in `LigNetwork`. Replaced by `use_coordinates` and
+  `flatten_coordinates` to give users more control and allow them to provide their own
+  2D coordinates.
 
 
 ## [1.1.0] - 2022-11-18
