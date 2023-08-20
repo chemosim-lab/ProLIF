@@ -12,7 +12,7 @@ dependencies:
   - nbsphinx==0.8.7
   - networkx
   - recommonmark
-  - seaborn==0.11.0
+  - matplotlib==3.5.2
   - sphinx==4.1.2
   - tqdm
   - python==3.9.*
