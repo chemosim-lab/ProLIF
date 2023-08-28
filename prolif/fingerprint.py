@@ -162,7 +162,7 @@ class Fingerprint:
         containing more complete interaction metadata instead of just atom indices.
         Removed the ``return_atoms`` argument in :meth:`~Fingerprint.to_dataframe`.
         Users should directly use :attr:`~Fingerprint.ifp` instead.
-        Added the :meth:`~Fingerprint.to_ligplot` method to generate the
+        Added the :meth:`~Fingerprint.plot_lignetwork` method to generate the
         :class:`~prolif.plotting.network.LigNetwork` plot.
         Replaced the ``Fingerprint.bitvector_atoms`` method with
         :meth:`Fingerprint.metadata`.
@@ -814,7 +814,7 @@ class Fingerprint:
         with open(path_or_bytes, "rb") as f:
             return dill.load(f)
 
-    def to_ligplot(
+    def plot_lignetwork(
         self,
         ligand_mol,
         *,
@@ -895,7 +895,7 @@ class Fingerprint:
         )
         return ligplot.display(width=width, height=height)
 
-    def to_barcode_plot(
+    def plot_barcode(
         self,
         *,
         figsize: Tuple[int, int] = (8, 10),
@@ -952,7 +952,7 @@ class Fingerprint:
             tight_layout_kwargs=tight_layout_kwargs,
         )
 
-    def to_3d(
+    def plot_3d(
         self,
         ligand_mol: Molecule,
         protein_mol: Molecule,

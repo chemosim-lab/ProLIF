@@ -48,8 +48,8 @@ class TestBarcode:
         )
         assert isinstance(ax, plt.Axes)
 
-    def test_fp_to_barcode_plot(self, fp_run: plf.Fingerprint) -> None:
-        ax = fp_run.to_barcode_plot(
+    def test_fp_plot_barcode(self, fp_run: plf.Fingerprint) -> None:
+        ax = fp_run.plot_barcode(
             figsize=(1, 2),
             dpi=200,
             interactive=True,

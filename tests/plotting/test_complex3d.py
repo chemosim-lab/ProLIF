@@ -57,8 +57,8 @@ class TestComplex3D:
                 frame=0,
             )
 
-    def test_fp_to_3d(self, fp_mols):
+    def test_fp_plot_3d(self, fp_mols):
         fp, lig_mol, prot_mol = fp_mols
-        view = fp.to_3d(lig_mol, prot_mol, frame=0, display_all=fp.count)
+        view = fp.plot_3d(lig_mol, prot_mol, frame=0, display_all=fp.count)
         html = view._make_html()
         assert "Hydrophobic" in html
