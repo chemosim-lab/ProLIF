@@ -8,7 +8,9 @@ Plot interactions as a barcode --- :mod:`prolif.plotting.barcode`
    :members:
 
 """
-from typing import ClassVar, Dict, List, Literal, Optional, Tuple
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, ClassVar, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -17,8 +19,10 @@ from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 
 from prolif.exceptions import RunRequiredError
-from prolif.fingerprint import Fingerprint
 from prolif.plotting.utils import IS_NOTEBOOK, separated_interaction_colors
+
+if TYPE_CHECKING:
+    from prolif.fingerprint import Fingerprint
 
 
 class Barcode:
@@ -77,7 +81,7 @@ class Barcode:
         self.df = df.astype(np.uint8).T.apply(_bit_to_color_value, axis=1)
 
     @classmethod
-    def from_fingerprint(cls, fp: Fingerprint) -> "Barcode":
+    def from_fingerprint(cls, fp: Fingerprint) -> Barcode:
         """Creates a barcode object from a fingerprint."""
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
