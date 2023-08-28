@@ -20,11 +20,15 @@ class TestBarcode:
         return request.getfixturevalue(request.param)
 
     @pytest.fixture(scope="class")
-    def barcode(
+    def fp_run(
         self, u: mda.Universe, ligand_ag, protein_ag, fp: plf.Fingerprint
-    ) -> Barcode:
+    ) -> plf.Fingerprint:
         fp.run(u.trajectory[0:2], ligand_ag, protein_ag)
-        return Barcode.from_fingerprint(fp)
+        return fp
+
+    @pytest.fixture(scope="class")
+    def barcode(self, fp_run: plf.Fingerprint) -> Barcode:
+        return Barcode.from_fingerprint(fp_run)
 
     def test_display(self, barcode: Barcode) -> None:
         ax = barcode.display()
@@ -32,6 +36,19 @@ class TestBarcode:
 
     def test_display_kwargs(self, barcode: Barcode) -> None:
         ax = barcode.display(
+            figsize=(1, 2),
+            dpi=200,
+            interactive=True,
+            n_frame_ticks=2,
+            residues_tick_location="bottom",
+            xlabel="foobar",
+            subplots_kwargs={},
+            tight_layout_kwargs={"pad": 2},
+        )
+        assert isinstance(ax, plt.Axes)
+
+    def test_fp_to_barcode_plot(self, fp_run: plf.Fingerprint) -> None:
+        ax = fp_run.to_barcode_plot(
             figsize=(1, 2),
             dpi=200,
             interactive=True,

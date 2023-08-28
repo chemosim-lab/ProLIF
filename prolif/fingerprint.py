@@ -26,6 +26,7 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
 """
 from collections.abc import Sized
 from functools import wraps
+from typing import Literal, Optional, Tuple
 
 import dill
 import multiprocess as mp
@@ -38,6 +39,7 @@ from prolif.ifp import IFP
 from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
 from prolif.molecule import Molecule
 from prolif.parallel import MolIterablePool, TrajectoryPool
+from prolif.plotting.utils import IS_NOTEBOOK
 from prolif.utils import (
     get_residues_near_ligand,
     to_bitvectors,
@@ -890,6 +892,66 @@ class Fingerprint:
                 carbon=carbon,
             )
             return ligplot.display(width=width, height=height)
+        raise RunRequiredError(
+            "Please run the fingerprint analysis before attempting to display results."
+        )
+
+    def to_barcode_plot(
+        self,
+        figsize: Tuple[int, int] = (8, 10),
+        dpi: int = 100,
+        interactive: bool = IS_NOTEBOOK,
+        n_frame_ticks: int = 10,
+        residues_tick_location: Literal["top", "bottom"] = "top",
+        xlabel: str = "Frame",
+        subplots_kwargs: Optional[dict] = None,
+        tight_layout_kwargs: Optional[dict] = None,
+    ):
+        """Generate and display a :class:`~prolif.plotting.barcode.Barcode` plot from
+        a fingerprint object that has been used to run an analysis.
+
+        Parameters
+        ----------
+        figsize: Tuple[int, int] = (8, 10)
+            Size of the matplotlib figure.
+        dpi: int = 100
+            DPI used for the matplotlib figure.
+        interactive: bool
+            Add hover interactivity to the plot (only relevant for notebooks). You may
+            need to add ``%matplotlib notebook`` or ``%matplotlib ipympl`` for it to
+            work as expected.
+        n_frame_ticks: int = 10
+            Number of ticks on the X axis. May use ±1 tick to have them evenly spaced.
+        residues_tick_location: Literal["top", "bottom"] = "top"
+            Whether the Y ticks appear at the top or at the bottom of the series of
+            interactions of each residue.
+        xlabel: str = "Frame"
+            Label displayed for the X axis.
+        subplots_kwargs: Optional[dict] = None
+            Other parameters passed to :func:`matplotlib.pyplot.subplots`.
+        tight_layout_kwargs: Optional[dict] = None
+            Other parameters passed to :meth:`matplotlib.figure.Figure.tight_layout`.
+
+        See Also
+        --------
+        :class:`prolif.plotting.barcode.Barcode`
+
+        .. versionadded:: 2.0.0
+        """
+        if hasattr(self, "ifp"):
+            from prolif.plotting.barcode import Barcode
+
+            barcode = Barcode.from_fingerprint(self)
+            return barcode.display(
+                figsize=figsize,
+                dpi=dpi,
+                interactive=interactive,
+                n_frame_ticks=n_frame_ticks,
+                residues_tick_location=residues_tick_location,
+                xlabel=xlabel,
+                subplots_kwargs=subplots_kwargs,
+                tight_layout_kwargs=tight_layout_kwargs,
+            )
         raise RunRequiredError(
             "Please run the fingerprint analysis before attempting to display results."
         )

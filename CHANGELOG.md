@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added a `Barcode` class for plotting interactions.
+- Added a `Barcode` class for plotting interactions. Added the
+  `Fingerprint.to_barcode_plot` method to generate the plot directly from an FP object.
 - Added a `count` argument in `Fingerprint`. If `count=True`, enumerates all groups of
   atoms that satisfy interaction constraints (instead of stopping at the first one),
   allowing users to generate a count-fingerprint. The `Fingerprint.to_dataframe` method

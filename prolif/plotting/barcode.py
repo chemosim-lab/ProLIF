@@ -8,8 +8,7 @@ Plot interactions as a barcode --- :mod:`prolif.plotting.barcode`
    :members:
 
 """
-import builtins
-from typing import ClassVar, Literal, Optional
+from typing import ClassVar, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -18,9 +17,7 @@ from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 
 from prolif.fingerprint import Fingerprint
-from prolif.plotting.colors import separated_interaction_colors
-
-_IS_NOTEBOOK = hasattr(builtins, "__IPYTHON__")
+from prolif.plotting.utils import IS_NOTEBOOK, separated_interaction_colors
 
 
 class Barcode:
@@ -38,21 +35,37 @@ class Barcode:
 
     """
 
-    COLORS: ClassVar[dict[Optional[str], str]] = {
+    COLORS: ClassVar[Dict[Optional[str], str]] = {
         None: "white",
         **separated_interaction_colors,
     }
 
     def __init__(self, df: pd.DataFrame) -> None:
+        # mapping interaction type (HBond...etc.) to an arbitrary value which
+        # corresponds to a color
         self.color_mapper = {
             interaction: value for value, interaction in enumerate(self.COLORS)
         }
+        # reverse: map value to interaction type
         self.inv_color_mapper = {
             value: interaction for interaction, value in self.color_mapper.items()
         }
+        # matplotlib colormap
         self.cmap = ListedColormap(list(self.COLORS.values()))
 
+        # drop ligand level if single residue
+        # else concatenate ligand with protein and drop ligand if peptide
+        n_ligand_residues = len(np.unique(df.columns.get_level_values("ligand")))
+        if n_ligand_residues == 1:
+            df = df.droplevel("ligand", axis=1)
+        else:
+            df.columns = pd.MultiIndex.from_tuples(
+                [(f"{items[0]}-{items[1]}", items[2]) for items in df.columns],
+                names=["protein", "interaction"],
+            )
+
         def _bit_to_color_value(s: pd.Series) -> pd.Series:
+            """Replaces a bit value with it's corresponding color value"""
             interaction = s.name[-1]
             return s.apply(
                 lambda v: self.color_mapper[interaction]
@@ -60,21 +73,18 @@ class Barcode:
                 else self.color_mapper[None]
             )
 
-        self.df = (
-            df.droplevel("ligand", axis=1)
-            .astype(np.uint8)
-            .T.apply(_bit_to_color_value, axis=1)
-        )
+        self.df = df.astype(np.uint8).T.apply(_bit_to_color_value, axis=1)
 
     @classmethod
     def from_fingerprint(cls, fp: Fingerprint) -> "Barcode":
+        """Creates a barcode object from a fingerprint."""
         return cls(fp.to_dataframe())
 
     def display(
         self,
-        figsize: tuple[int, int] = (8, 10),
+        figsize: Tuple[int, int] = (8, 10),
         dpi: int = 100,
-        interactive: bool = _IS_NOTEBOOK,
+        interactive: bool = IS_NOTEBOOK,
         n_frame_ticks: int = 10,
         residues_tick_location: Literal["top", "bottom"] = "top",
         xlabel: str = "Frame",
@@ -85,7 +95,7 @@ class Barcode:
 
         Parameters
         ----------
-        figsize: tuple[int, int] = (8, 10)
+        figsize: Tuple[int, int] = (8, 10)
             Size of the matplotlib figure.
         dpi: int = 100
             DPI used for the matplotlib figure.
@@ -159,7 +169,7 @@ class Barcode:
         ax.yaxis.set_ticks(indices, residues[indices])
 
         # legend
-        values: list[int] = np.unique(self.df.values).tolist()
+        values: List[int] = np.unique(self.df.values).tolist()
         values.pop(values.index(0))  # remove None color
         legend_colors = {
             self.inv_color_mapper[value]: im.cmap(value) for value in values
@@ -172,42 +182,52 @@ class Barcode:
 
         # interactive
         if interactive:
-            annot = ax.annotate(
-                "",
-                xy=(0, 0),
-                xytext=(5, 5),
-                textcoords="offset points",
-                alpha=0.8,
-                bbox={"boxstyle": "round", "facecolor": "w"},
-                wrap=True,
+            self._add_interaction_callback(
+                fig,
+                ax,
+                im=im,
+                frames=frames,
+                residues=residues,
+                interactions=interactions,
             )
-            annot.set_visible(False)
-
-            def hover(event):
-                if (
-                    event.inaxes is ax
-                    and event.xdata is not None
-                    and event.ydata is not None
-                ):
-                    x, y = round(event.xdata), round(event.ydata)
-                    if self.df.values[y, x]:
-                        annot.xy = (x, y)
-                        frame = frames[x]
-                        interaction = interactions[y]
-                        residue = residues[y]
-                        annot.set_text(f"Frame {frame}: {residue}")
-                        color = im.cmap(self.color_mapper[interaction])
-                        annot.get_bbox_patch().set_facecolor(color)
-                        annot.set_visible(True)
-                        fig.canvas.draw_idle()
-                        return
-                if annot.get_visible():
-                    annot.set_visible(False)
-                    fig.canvas.draw_idle()
-
-            fig.canvas.mpl_connect("motion_notify_event", hover)
-            fig.canvas.header_visible = False
-            fig.canvas.footer_visible = False
 
         fig.tight_layout(**tight_layout_kwargs)
         return ax
+
+    def _add_interaction_callback(self, fig, ax, *, im, frames, residues, interactions):
+        annot = ax.annotate(
+            "",
+            xy=(0, 0),
+            xytext=(5, 5),
+            textcoords="offset points",
+            alpha=0.8,
+            bbox={"boxstyle": "round", "facecolor": "w"},
+            wrap=True,
+        )
+        annot.set_visible(False)
+
+        def hover_callback(event):
+            if (
+                event.inaxes is ax
+                and event.xdata is not None
+                and event.ydata is not None
+            ):
+                x, y = round(event.xdata), round(event.ydata)
+                if self.df.values[y, x]:
+                    annot.xy = (x, y)
+                    frame = frames[x]
+                    interaction = interactions[y]
+                    residue = residues[y]
+                    annot.set_text(f"Frame {frame}: {residue}")
+                    color = im.cmap(self.color_mapper[interaction])
+                    annot.get_bbox_patch().set_facecolor(color)
+                    annot.set_visible(True)
+                    fig.canvas.draw_idle()
+                    return
+            if annot.get_visible():
+                annot.set_visible(False)
+                fig.canvas.draw_idle()
+
+        fig.canvas.mpl_connect("motion_notify_event", hover_callback)
+        fig.canvas.header_visible = False
+        fig.canvas.footer_visible = False
