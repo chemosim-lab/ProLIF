@@ -378,6 +378,7 @@ class Fingerprint:
         traj,
         lig,
         prot,
+        *,
         residues=None,
         converter_kwargs=None,
         progress=True,
@@ -523,7 +524,7 @@ class Fingerprint:
         return self
 
     def run_from_iterable(
-        self, lig_iterable, prot_mol, residues=None, progress=True, n_jobs=None
+        self, lig_iterable, prot_mol, *, residues=None, progress=True, n_jobs=None
     ):
         """Generates the fingerprint between a list of ligands and a protein
 
@@ -631,7 +632,9 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
-    def to_dataframe(self, count=None, dtype=None, drop_empty=True, index_col="Frame"):
+    def to_dataframe(
+        self, *, count=None, dtype=None, drop_empty=True, index_col="Frame"
+    ):
         """Converts fingerprints to a pandas DataFrame
 
         Parameters
@@ -815,6 +818,7 @@ class Fingerprint:
     def to_ligplot(
         self,
         ligand_mol,
+        *,
         kind: Literal["aggregate", "frame"] = "aggregate",
         frame: int = 0,
         display_all: bool = False,
@@ -898,6 +902,7 @@ class Fingerprint:
 
     def to_barcode_plot(
         self,
+        *,
         figsize: Tuple[int, int] = (8, 10),
         dpi: int = 100,
         interactive: bool = IS_NOTEBOOK,
