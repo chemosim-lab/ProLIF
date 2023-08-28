@@ -25,6 +25,8 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import rdDepictor
 
+from prolif.exceptions import RunRequiredError
+from prolif.plotting.utils import grouped_interaction_colors
 from prolif.residue import ResidueId
 from prolif.utils import requires
 
@@ -90,25 +92,12 @@ class LigNetwork:
         works without requiring a dataframe with atom indices. Replaced ``match3D``
         parameter with ``use_coordinates`` and ``flatten_coordinates`` to give users
         more control and allow them to provide their own 2D coordinates. Added support
-        for displaying peptides as the "ligand".
+        for displaying peptides as the "ligand". Changed the default color for
+        VanDerWaals.
     """
 
     COLORS = {
-        "interactions": {
-            "Hydrophobic": "#59e382",
-            "HBAcceptor": "#59bee3",
-            "HBDonor": "#59bee3",
-            "XBAcceptor": "#59bee3",
-            "XBDonor": "#59bee3",
-            "Cationic": "#e35959",
-            "Anionic": "#5979e3",
-            "CationPi": "#e359d8",
-            "PiCation": "#e359d8",
-            "PiStacking": "#b559e3",
-            "EdgeToFace": "#b559e3",
-            "FaceToFace": "#b559e3",
-            "VdWContact": "#59e3ad",
-        },
+        "interactions": {**grouped_interaction_colors},
         "atoms": {
             "C": "black",
             "N": "blue",
@@ -327,8 +316,8 @@ class LigNetwork:
             Added the ``display_all`` parameter.
         """
         if not hasattr(fp, "ifp"):
-            raise AttributeError(
-                "Please run the interaction fingerprint analysis before plotting."
+            raise RunRequiredError(
+                "Please run the fingerprint analysis before attempting to display results."
             )
         if kind == "frame":
             df = cls._make_frame_df_from_fp(fp, frame=frame, display_all=display_all)

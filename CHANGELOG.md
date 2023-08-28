@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added a `Barcode` class for plotting interactions. Added the
+  `Fingerprint.to_barcode_plot` method to generate the plot directly from an FP object.
 - Added a `count` argument in `Fingerprint`. If `count=True`, enumerates all groups of
   atoms that satisfy interaction constraints (instead of stopping at the first one),
   allowing users to generate a count-fingerprint. The `Fingerprint.to_dataframe` method
@@ -50,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   atom indices.
 - All interaction classes now return more complete details about the interaction (e.g.
   distances, angles, atom indices in the residue and parent molecule).
+- Changed the default color for `VanDerWaals` interactions in the builtin plots.
 - Converting the IFP to a dataframe with atom indices has been optimized and now runs
   about 5 times faster (Issue #112, PR #113 by @ReneHamburger1993). *Note: discarded*
   *by the subsequent updates to the codebase which removed the ability to have*

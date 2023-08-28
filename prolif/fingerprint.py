@@ -26,6 +26,7 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
 """
 from collections.abc import Sized
 from functools import wraps
+from typing import Literal, Optional, Tuple
 
 import dill
 import multiprocess as mp
@@ -37,6 +38,7 @@ from prolif.ifp import IFP
 from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
 from prolif.molecule import Molecule
 from prolif.parallel import MolIterablePool, TrajectoryPool
+from prolif.plotting.utils import IS_NOTEBOOK
 from prolif.utils import (
     get_residues_near_ligand,
     to_bitvectors,
@@ -375,6 +377,7 @@ class Fingerprint:
         traj,
         lig,
         prot,
+        *,
         residues=None,
         converter_kwargs=None,
         progress=True,
@@ -520,7 +523,7 @@ class Fingerprint:
         return self
 
     def run_from_iterable(
-        self, lig_iterable, prot_mol, residues=None, progress=True, n_jobs=None
+        self, lig_iterable, prot_mol, *, residues=None, progress=True, n_jobs=None
     ):
         """Generates the fingerprint between a list of ligands and a protein
 
@@ -628,7 +631,9 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
-    def to_dataframe(self, count=None, dtype=None, drop_empty=True, index_col="Frame"):
+    def to_dataframe(
+        self, *, count=None, dtype=None, drop_empty=True, index_col="Frame"
+    ):
         """Converts fingerprints to a pandas DataFrame
 
         Parameters
@@ -812,46 +817,137 @@ class Fingerprint:
     def to_ligplot(
         self,
         ligand_mol,
-        kind="aggregate",
-        frame=0,
-        display_all=False,
-        threshold=0.3,
-        **kwargs,
+        *,
+        kind: Literal["aggregate", "frame"] = "aggregate",
+        frame: int = 0,
+        display_all: bool = False,
+        threshold: float = 0.3,
+        use_coordinates: bool = False,
+        flatten_coordinates: bool = True,
+        kekulize: bool = False,
+        molsize: int = 35,
+        rotation: float = 0,
+        carbon: float = 0.16,
+        width: str = "100%",
+        height: str = "500px",
     ):
-        """Generate a :class:`~prolif.plotting.network.LigNetwork` plot from a
-        fingerprint object that has been executed.
+        """Generate and display a :class:`~prolif.plotting.network.LigNetwork` plot from
+        a fingerprint object that has been used to run an analysis.
 
         Parameters
         ----------
         ligand_mol : rdkit.Chem.rdChem.Mol
-            Ligand molecule
+            Ligand molecule.
         kind : str
-            One of ``"aggregate"`` or ``"frame"``
+            One of ``"aggregate"`` or ``"frame"``.
         frame : int
             Frame number (see :attr:`~prolif.fingerprint.Fingerprint.ifp`). Only
-            applicable for ``kind="frame"``
+            applicable for ``kind="frame"``.
         display_all : bool
             Display all occurences for a given pair of residues and interaction, or only
             the shortest one. Only applicable for ``kind="frame"``. Not relevant if
             ``count=False`` in the ``Fingerprint`` object.
         threshold : float
             Frequency threshold, between 0 and 1. Only applicable for
-            ``kind="aggregate"``
-        kwargs : object
-            Other arguments passed to the :class:`LigNetwork` class
+            ``kind="aggregate"``.
+        use_coordinates : bool
+            If ``True``, uses the coordinates of the molecule directly, otherwise generates
+            2D coordinates from scratch. See also ``flatten_coordinates``.
+        flatten_coordinates : bool
+            If this is ``True`` and ``use_coordinates=True``, generates 2D coordinates that
+            are constrained to fit the 3D conformation of the ligand as best as possible.
+        kekulize : bool
+            Kekulize the ligand.
+        molsize : int
+            Multiply the coordinates by this number to create a bigger and
+            more readable depiction.
+        rotation : int
+            Rotate the structure on the XY plane.
+        carbon : float
+            Size of the carbon atom dots on the depiction. Use `0` to hide the
+            carbon dots.
+        width : str
+            Width of the IFrame window.
+        height : str
+            Height of the IFrame window.
+
+        See Also
+        --------
+        :class:`prolif.plotting.network.LigNetwork`
 
         .. versionadded:: 2.0.0
         """
         from prolif.plotting.network import LigNetwork
 
-        if hasattr(self, "ifp"):
-            return LigNetwork.from_fingerprint(
-                fp=self,
-                ligand_mol=ligand_mol,
-                kind=kind,
-                frame=frame,
-                display_all=display_all,
-                threshold=threshold,
-                **kwargs,
-            )
-        raise AttributeError("Please use the `run` method before")
+        ligplot = LigNetwork.from_fingerprint(
+            fp=self,
+            ligand_mol=ligand_mol,
+            kind=kind,
+            frame=frame,
+            display_all=display_all,
+            threshold=threshold,
+            use_coordinates=use_coordinates,
+            flatten_coordinates=flatten_coordinates,
+            kekulize=kekulize,
+            molsize=molsize,
+            rotation=rotation,
+            carbon=carbon,
+        )
+        return ligplot.display(width=width, height=height)
+
+    def to_barcode_plot(
+        self,
+        *,
+        figsize: Tuple[int, int] = (8, 10),
+        dpi: int = 100,
+        interactive: bool = IS_NOTEBOOK,
+        n_frame_ticks: int = 10,
+        residues_tick_location: Literal["top", "bottom"] = "top",
+        xlabel: str = "Frame",
+        subplots_kwargs: Optional[dict] = None,
+        tight_layout_kwargs: Optional[dict] = None,
+    ):
+        """Generate and display a :class:`~prolif.plotting.barcode.Barcode` plot from
+        a fingerprint object that has been used to run an analysis.
+
+        Parameters
+        ----------
+        figsize: Tuple[int, int] = (8, 10)
+            Size of the matplotlib figure.
+        dpi: int = 100
+            DPI used for the matplotlib figure.
+        interactive: bool
+            Add hover interactivity to the plot (only relevant for notebooks). You may
+            need to add ``%matplotlib notebook`` or ``%matplotlib ipympl`` for it to
+            work as expected.
+        n_frame_ticks: int = 10
+            Number of ticks on the X axis. May use ±1 tick to have them evenly spaced.
+        residues_tick_location: Literal["top", "bottom"] = "top"
+            Whether the Y ticks appear at the top or at the bottom of the series of
+            interactions of each residue.
+        xlabel: str = "Frame"
+            Label displayed for the X axis.
+        subplots_kwargs: Optional[dict] = None
+            Other parameters passed to :func:`matplotlib.pyplot.subplots`.
+        tight_layout_kwargs: Optional[dict] = None
+            Other parameters passed to :meth:`matplotlib.figure.Figure.tight_layout`.
+
+        See Also
+        --------
+        :class:`prolif.plotting.barcode.Barcode`
+
+        .. versionadded:: 2.0.0
+        """
+        from prolif.plotting.barcode import Barcode
+
+        barcode = Barcode.from_fingerprint(self)
+        return barcode.display(
+            figsize=figsize,
+            dpi=dpi,
+            interactive=interactive,
+            n_frame_ticks=n_frame_ticks,
+            residues_tick_location=residues_tick_location,
+            xlabel=xlabel,
+            subplots_kwargs=subplots_kwargs,
+            tight_layout_kwargs=tight_layout_kwargs,
+        )
