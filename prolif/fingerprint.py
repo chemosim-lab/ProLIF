@@ -33,6 +33,7 @@ import numpy as np
 from rdkit import Chem
 from tqdm.auto import tqdm
 
+from prolif.exceptions import RunRequiredError
 from prolif.ifp import IFP
 from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
 from prolif.molecule import Molecule
@@ -812,46 +813,83 @@ class Fingerprint:
     def to_ligplot(
         self,
         ligand_mol,
-        kind="aggregate",
-        frame=0,
-        display_all=False,
-        threshold=0.3,
-        **kwargs,
+        kind: Literal["aggregate", "frame"] = "aggregate",
+        frame: int = 0,
+        display_all: bool = False,
+        threshold: float = 0.3,
+        use_coordinates: bool = False,
+        flatten_coordinates: bool = True,
+        kekulize: bool = False,
+        molsize: int = 35,
+        rotation: float = 0,
+        carbon: float = 0.16,
+        width: str = "100%",
+        height: str = "500px",
     ):
-        """Generate a :class:`~prolif.plotting.network.LigNetwork` plot from a
-        fingerprint object that has been executed.
+        """Generate and display a :class:`~prolif.plotting.network.LigNetwork` plot from
+        a fingerprint object that has been used to run an analysis.
 
         Parameters
         ----------
         ligand_mol : rdkit.Chem.rdChem.Mol
-            Ligand molecule
+            Ligand molecule.
         kind : str
-            One of ``"aggregate"`` or ``"frame"``
+            One of ``"aggregate"`` or ``"frame"``.
         frame : int
             Frame number (see :attr:`~prolif.fingerprint.Fingerprint.ifp`). Only
-            applicable for ``kind="frame"``
+            applicable for ``kind="frame"``.
         display_all : bool
             Display all occurences for a given pair of residues and interaction, or only
             the shortest one. Only applicable for ``kind="frame"``. Not relevant if
             ``count=False`` in the ``Fingerprint`` object.
         threshold : float
             Frequency threshold, between 0 and 1. Only applicable for
-            ``kind="aggregate"``
-        kwargs : object
-            Other arguments passed to the :class:`LigNetwork` class
+            ``kind="aggregate"``.
+        use_coordinates : bool
+            If ``True``, uses the coordinates of the molecule directly, otherwise generates
+            2D coordinates from scratch. See also ``flatten_coordinates``.
+        flatten_coordinates : bool
+            If this is ``True`` and ``use_coordinates=True``, generates 2D coordinates that
+            are constrained to fit the 3D conformation of the ligand as best as possible.
+        kekulize : bool
+            Kekulize the ligand.
+        molsize : int
+            Multiply the coordinates by this number to create a bigger and
+            more readable depiction.
+        rotation : int
+            Rotate the structure on the XY plane.
+        carbon : float
+            Size of the carbon atom dots on the depiction. Use `0` to hide the
+            carbon dots.
+        width : str
+            Width of the IFrame window.
+        height : str
+            Height of the IFrame window.
+
+        See Also
+        --------
+        :class:`prolif.plotting.network.LigNetwork`
 
         .. versionadded:: 2.0.0
         """
-        from prolif.plotting.network import LigNetwork
-
         if hasattr(self, "ifp"):
-            return LigNetwork.from_fingerprint(
+            from prolif.plotting.network import LigNetwork
+
+            ligplot = LigNetwork.from_fingerprint(
                 fp=self,
                 ligand_mol=ligand_mol,
                 kind=kind,
                 frame=frame,
                 display_all=display_all,
                 threshold=threshold,
-                **kwargs,
+                use_coordinates=use_coordinates,
+                flatten_coordinates=flatten_coordinates,
+                kekulize=kekulize,
+                molsize=molsize,
+                rotation=rotation,
+                carbon=carbon,
             )
-        raise AttributeError("Please use the `run` method before")
+            return ligplot.display(width=width, height=height)
+        raise RunRequiredError(
+            "Please run the fingerprint analysis before attempting to display results."
+        )

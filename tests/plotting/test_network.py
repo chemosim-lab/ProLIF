@@ -5,6 +5,7 @@ import MDAnalysis as mda
 import pytest
 
 import prolif as plf
+from prolif.exceptions import RunRequiredError
 from prolif.plotting.network import LigNetwork
 
 
@@ -82,7 +83,7 @@ class TestLigNetwork:
     def test_from_fingerprint_raises_not_executed(self, ligand_mol):
         fp = plf.Fingerprint()
         with pytest.raises(
-            AttributeError,
-            match="Please run the interaction fingerprint analysis before plotting",
+            RunRequiredError,
+            match="Please run the fingerprint analysis before attempting to display results",
         ):
             LigNetwork.from_fingerprint(fp, ligand_mol)
