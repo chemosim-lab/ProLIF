@@ -34,7 +34,6 @@ import numpy as np
 from rdkit import Chem
 from tqdm.auto import tqdm
 
-from prolif.exceptions import RunRequiredError
 from prolif.ifp import IFP
 from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
 from prolif.molecule import Molecule
@@ -878,27 +877,23 @@ class Fingerprint:
 
         .. versionadded:: 2.0.0
         """
-        if hasattr(self, "ifp"):
-            from prolif.plotting.network import LigNetwork
+        from prolif.plotting.network import LigNetwork
 
-            ligplot = LigNetwork.from_fingerprint(
-                fp=self,
-                ligand_mol=ligand_mol,
-                kind=kind,
-                frame=frame,
-                display_all=display_all,
-                threshold=threshold,
-                use_coordinates=use_coordinates,
-                flatten_coordinates=flatten_coordinates,
-                kekulize=kekulize,
-                molsize=molsize,
-                rotation=rotation,
-                carbon=carbon,
-            )
-            return ligplot.display(width=width, height=height)
-        raise RunRequiredError(
-            "Please run the fingerprint analysis before attempting to display results."
+        ligplot = LigNetwork.from_fingerprint(
+            fp=self,
+            ligand_mol=ligand_mol,
+            kind=kind,
+            frame=frame,
+            display_all=display_all,
+            threshold=threshold,
+            use_coordinates=use_coordinates,
+            flatten_coordinates=flatten_coordinates,
+            kekulize=kekulize,
+            molsize=molsize,
+            rotation=rotation,
+            carbon=carbon,
         )
+        return ligplot.display(width=width, height=height)
 
     def to_barcode_plot(
         self,
@@ -943,20 +938,16 @@ class Fingerprint:
 
         .. versionadded:: 2.0.0
         """
-        if hasattr(self, "ifp"):
-            from prolif.plotting.barcode import Barcode
+        from prolif.plotting.barcode import Barcode
 
-            barcode = Barcode.from_fingerprint(self)
-            return barcode.display(
-                figsize=figsize,
-                dpi=dpi,
-                interactive=interactive,
-                n_frame_ticks=n_frame_ticks,
-                residues_tick_location=residues_tick_location,
-                xlabel=xlabel,
-                subplots_kwargs=subplots_kwargs,
-                tight_layout_kwargs=tight_layout_kwargs,
-            )
-        raise RunRequiredError(
-            "Please run the fingerprint analysis before attempting to display results."
+        barcode = Barcode.from_fingerprint(self)
+        return barcode.display(
+            figsize=figsize,
+            dpi=dpi,
+            interactive=interactive,
+            n_frame_ticks=n_frame_ticks,
+            residues_tick_location=residues_tick_location,
+            xlabel=xlabel,
+            subplots_kwargs=subplots_kwargs,
+            tight_layout_kwargs=tight_layout_kwargs,
         )

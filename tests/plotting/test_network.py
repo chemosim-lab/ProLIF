@@ -34,11 +34,13 @@ class TestLigNetwork:
     @pytest.fixture(scope="class")
     def get_ligplot(self, fp_mol):
         fp, lig_mol = fp_mol
-        return partial(fp.to_ligplot, lig_mol)
+        return partial(LigNetwork.from_fingerprint, fp, lig_mol)
 
     def test_integration_frame(self, fp_mol):
         fp, lig_mol = fp_mol
-        net = fp.to_ligplot(lig_mol, kind="frame", frame=0, display_all=fp.count)
+        net = LigNetwork.from_fingerprint(
+            fp, lig_mol, kind="frame", frame=0, display_all=fp.count
+        )
         with StringIO() as buffer:
             net.save(buffer)
             buffer.seek(0)
@@ -87,3 +89,8 @@ class TestLigNetwork:
             match="Please run the fingerprint analysis before attempting to display results",
         ):
             LigNetwork.from_fingerprint(fp, ligand_mol)
+
+    def test_fp_to_ligplot(self, fp_mol):
+        fp, lig_mol = fp_mol
+        html = fp.to_ligplot(lig_mol, kind="frame", frame=0, display_all=fp.count)
+        assert "<iframe" in html.data

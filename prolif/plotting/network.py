@@ -25,6 +25,7 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import rdDepictor
 
+from prolif.exceptions import RunRequiredError
 from prolif.plotting.utils import grouped_interaction_colors
 from prolif.residue import ResidueId
 from prolif.utils import requires
@@ -315,8 +316,8 @@ class LigNetwork:
             Added the ``display_all`` parameter.
         """
         if not hasattr(fp, "ifp"):
-            raise AttributeError(
-                "Please run the interaction fingerprint analysis before plotting."
+            raise RunRequiredError(
+                "Please run the fingerprint analysis before attempting to display results."
             )
         if kind == "frame":
             df = cls._make_frame_df_from_fp(fp, frame=frame, display_all=display_all)

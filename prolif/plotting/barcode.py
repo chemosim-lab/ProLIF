@@ -16,6 +16,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 
+from prolif.exceptions import RunRequiredError
 from prolif.fingerprint import Fingerprint
 from prolif.plotting.utils import IS_NOTEBOOK, separated_interaction_colors
 
@@ -78,6 +79,10 @@ class Barcode:
     @classmethod
     def from_fingerprint(cls, fp: Fingerprint) -> "Barcode":
         """Creates a barcode object from a fingerprint."""
+        if not hasattr(fp, "ifp"):
+            raise RunRequiredError(
+                "Please run the fingerprint analysis before attempting to display results."
+            )
         return cls(fp.to_dataframe())
 
     def display(

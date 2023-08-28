@@ -3,6 +3,7 @@ import pytest
 from matplotlib import pyplot as plt
 
 import prolif as plf
+from prolif.exceptions import RunRequiredError
 from prolif.plotting.barcode import Barcode
 
 
@@ -59,3 +60,11 @@ class TestBarcode:
             tight_layout_kwargs={"pad": 2},
         )
         assert isinstance(ax, plt.Axes)
+
+    def test_from_fingerprint_raises_not_executed(self) -> None:
+        fp = plf.Fingerprint()
+        with pytest.raises(
+            RunRequiredError,
+            match="Please run the fingerprint analysis before attempting to display results",
+        ):
+            Barcode.from_fingerprint(fp)
