@@ -25,7 +25,7 @@ import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import rdDepictor
 
-from prolif.plotting.colors import grouped_interaction_colors
+from prolif.plotting.utils import grouped_interaction_colors
 from prolif.residue import ResidueId
 from prolif.utils import requires
 

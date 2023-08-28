@@ -1,3 +1,7 @@
+import builtins
+
+IS_NOTEBOOK = hasattr(builtins, "__IPYTHON__")
+
 separated_interaction_colors = {
     "Hydrophobic": "#59e382",
     "VdWContact": "#dfab43",
