@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added a `Barcode` class for plotting interactions. Added the
+- Added a `Complex3D` class for plotting interactions in 3D. Added the corresponding
+  `Fingerprint.to_3d` method to generate the plot directly from an FP object.
+- Added a `Barcode` class for plotting interactions. Added the corresponding
   `Fingerprint.to_barcode_plot` method to generate the plot directly from an FP object.
 - Added a `count` argument in `Fingerprint`. If `count=True`, enumerates all groups of
   atoms that satisfy interaction constraints (instead of stopping at the first one),
