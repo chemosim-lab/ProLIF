@@ -14,12 +14,8 @@ Welcome to ProLIF's documentation!
 .. toctree::
    :caption: Tutorials
    :maxdepth: 2
-   :numbered:
 
-   notebooks/quickstart
-   notebooks/how-to
-   notebooks/protein-protein_interactions
-   notebooks/visualisation
+   source/tutorials
 
 .. toctree::
    :caption: Documentation
