@@ -90,7 +90,7 @@ class TestLigNetwork:
         ):
             LigNetwork.from_fingerprint(fp, ligand_mol)
 
-    def test_fp_to_ligplot(self, fp_mol):
+    def test_fp_plot_lignetwork(self, fp_mol):
         fp, lig_mol = fp_mol
-        html = fp.to_ligplot(lig_mol, kind="frame", frame=0, display_all=fp.count)
+        html = fp.plot_lignetwork(lig_mol, kind="frame", frame=0, display_all=fp.count)
         assert "<iframe" in html.data

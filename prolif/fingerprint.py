@@ -162,7 +162,7 @@ class Fingerprint:
         containing more complete interaction metadata instead of just atom indices.
         Removed the ``return_atoms`` argument in :meth:`~Fingerprint.to_dataframe`.
         Users should directly use :attr:`~Fingerprint.ifp` instead.
-        Added the :meth:`~Fingerprint.to_ligplot` method to generate the
+        Added the :meth:`~Fingerprint.plot_lignetwork` method to generate the
         :class:`~prolif.plotting.network.LigNetwork` plot.
         Replaced the ``Fingerprint.bitvector_atoms`` method with
         :meth:`Fingerprint.metadata`.
@@ -814,7 +814,7 @@ class Fingerprint:
         with open(path_or_bytes, "rb") as f:
             return dill.load(f)
 
-    def to_ligplot(
+    def plot_lignetwork(
         self,
         ligand_mol,
         *,
@@ -895,7 +895,7 @@ class Fingerprint:
         )
         return ligplot.display(width=width, height=height)
 
-    def to_barcode_plot(
+    def plot_barcode(
         self,
         *,
         figsize: Tuple[int, int] = (8, 10),
@@ -951,3 +951,44 @@ class Fingerprint:
             subplots_kwargs=subplots_kwargs,
             tight_layout_kwargs=tight_layout_kwargs,
         )
+
+    def plot_3d(
+        self,
+        ligand_mol: Molecule,
+        protein_mol: Molecule,
+        *,
+        frame: int,
+        size: Tuple[int, int] = (650, 600),
+        display_all: bool = False,
+    ):
+        """Generate and display the complex in 3D with py3Dmol from a fingerprint object
+        that has been used to run an analysis.
+
+        Parameters
+        ----------
+        ligand_mol : Molecule
+            The ligand molecule to display.
+        protein_mol : Molecule
+            The protein molecule to display.
+        frame : int
+            The frame number chosen to select which interactions are going to be
+            displayed.
+        size: Tuple[int, int] = (650, 600)
+            The size of the py3Dmol widget view.
+        display_all : bool
+            Display all occurences for a given pair of residues and interaction, or only
+            the shortest one. Not relevant if ``count=False`` in the ``Fingerprint``
+            object.
+
+        See Also
+        --------
+        :class:`prolif.plotting.complex3d.Complex3D`
+
+        .. versionadded:: 2.0.0
+        """
+        from prolif.plotting.complex3d import Complex3D
+
+        plot3d = Complex3D.from_fingerprint(
+            self, frame=frame, lig_mol=ligand_mol, prot_mol=protein_mol
+        )
+        return plot3d.display(size=size, display_all=display_all)

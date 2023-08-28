@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Added a `Barcode` class for plotting interactions. Added the
-  `Fingerprint.to_barcode_plot` method to generate the plot directly from an FP object.
+- Added a `Complex3D` class for plotting interactions in 3D. Added the corresponding
+  `Fingerprint.plot_3d` method to generate the plot directly from an FP object.
+- Added a `Barcode` class for plotting interactions. Added the corresponding
+  `Fingerprint.plot_barcode` method to generate the plot directly from an FP object.
 - Added a `count` argument in `Fingerprint`. If `count=True`, enumerates all groups of
   atoms that satisfy interaction constraints (instead of stopping at the first one),
   allowing users to generate a count-fingerprint. The `Fingerprint.to_dataframe` method
@@ -22,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   create custom interactions.
 - Added the `vdwradii` parameter to the `VdWContact` interaction class to update the
   radii it uses.
-- Added the `Fingerprint.to_ligplot` method to generate a `LigNetwork` plot directly.
+- Added the `Fingerprint.plot_lignetwork` method to generate a `LigNetwork` plot directly.
 - Added `LigNetwork.from_fingerprint` to generate the ligplot from a `Fingerprint`
   instance. Added a `display_all` parameter for displaying all interactions instead
   of only the shortest one for a given pair of residues. Added `use_coordinates` and

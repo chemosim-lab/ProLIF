@@ -42,6 +42,10 @@ dependencies = [
 file = "LICENSE"
 
 [project.optional-dependencies]
+plots = [
+    "py3Dmol",
+    "matplotlib",
+]
 build = [
     "build",
 ]
@@ -49,6 +53,7 @@ tests = [
     "pytest>=6.1.2",
     "pytest-cov",
     "ipython",
+    "prolif[plots]"
 ]
 dev = [
     "prolif[build,tests]",
