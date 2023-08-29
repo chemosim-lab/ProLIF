@@ -49,4 +49,3 @@ Advanced usage
 TODO:
 - interaction parameters
 - custom interaction
-- fp.ifp explanation
