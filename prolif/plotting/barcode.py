@@ -179,7 +179,11 @@ class Barcode:
 
         # legend
         values: List[int] = np.unique(self.df.values).tolist()
-        values.pop(values.index(0))  # remove None color
+        try:
+            values.pop(values.index(0))  # remove None color
+        except ValueError:
+            # 0 not in values (e.g. plotting a single frame)
+            pass
         legend_colors = {
             self.inv_color_mapper[value]: im.cmap(value) for value in values
         }
