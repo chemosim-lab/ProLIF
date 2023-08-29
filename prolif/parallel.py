@@ -143,7 +143,7 @@ class TrajectoryPool:
             data = cls.fp.generate(
                 lig_mol, prot_mol, residues=cls.residues, metadata=True
             )
-            ifp[ts.frame] = data
+            ifp[int(ts.frame)] = data
             with cls.tracker.get_lock():
                 cls.tracker.value += 1
         return ifp

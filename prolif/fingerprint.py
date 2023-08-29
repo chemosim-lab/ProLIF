@@ -480,7 +480,7 @@ class Fingerprint:
         for ts in iterator:
             lig_mol = Molecule.from_mda(lig, **converter_kwargs[0])
             prot_mol = Molecule.from_mda(prot, **converter_kwargs[1])
-            ifp[ts.frame] = self.generate(
+            ifp[int(ts.frame)] = self.generate(
                 lig_mol, prot_mol, residues=residues, metadata=True
             )
         self.ifp = ifp
