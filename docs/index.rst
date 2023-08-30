@@ -4,7 +4,7 @@ Welcome to ProLIF's documentation!
 .. include:: ../README.rst
 
 .. toctree::
-   :caption: User guide
+   :caption: Information
    :maxdepth: 2
 
    source/installation
@@ -12,7 +12,7 @@ Welcome to ProLIF's documentation!
    source/changelog
 
 .. toctree::
-   :caption: Tutorials
+   :caption: User Guide
    :maxdepth: 2
 
    source/tutorials

@@ -30,5 +30,9 @@ Alternatively, you can install ProLIF with pip instead of conda::
 
     pip install rdkit prolif
 
+To run the tutorials, you can install the optional dependencies with::
+
+    pip install prolif[tutorials]
+
 
 .. _conda: https://docs.conda.io/projects/conda/en/latest/user-guide/index.html
