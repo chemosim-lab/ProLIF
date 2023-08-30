@@ -10,4 +10,4 @@ python:
   - method: pip
     path: .
 conda:
-  environment: .binder/environment.yml
+  environment: environment.yml
