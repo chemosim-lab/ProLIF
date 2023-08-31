@@ -40,7 +40,7 @@ There are two tutorial notebooks for MD simulations, depending on the type of co
 that are being analyzed:
 
 - :ref:`notebooks/md-ligand-protein:Ligand-protein MD`
-.. - :ref:`notebooks/md-protein-protein:Protein-protein MD`
+- :ref:`notebooks/md-protein-protein:Protein-protein MD`
 
 Docking
 -------
