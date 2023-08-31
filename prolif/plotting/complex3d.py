@@ -49,6 +49,10 @@ class Complex3D:
         interactions.
     PROTEIN_STYLE : Dict[str, Dict] = {"cartoon": {"style": "edged"}}
         Style object passed to ``3Dmol.js`` for the entire protein.
+    PEPTIDE_STYLE : Dict[str, Dict] = "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"}
+        Style object passed to ``3Dmol.js`` for the ligand as a peptide if appropriate.
+    PEPTIDE_THRESHOLD : int = 5
+        Ligands with more than 5 residues will be also displayed using ``PEPTIDE_STYLE``.
     LIGAND_DISPLAYED_ATOM : Dict[str, int]
         Which atom should be used to display an atom-to-atom interaction for the ligand.
         Refers to the order defined in the SMARTS pattern used in interaction
@@ -73,6 +77,10 @@ class Complex3D:
     LIGAND_STYLE: ClassVar[Dict] = {"stick": {"colorscheme": "cyanCarbon"}}
     RESIDUES_STYLE: ClassVar[Dict] = {"stick": {}}
     PROTEIN_STYLE: ClassVar[Dict] = {"cartoon": {"style": "edged"}}
+    PEPTIDE_STYLE: ClassVar[Dict] = {
+        "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"}
+    }
+    PEPTIDE_THRESHOLD: ClassVar[int] = 5
     LIGAND_DISPLAYED_ATOM = {
         "HBDonor": 1,
         "XBDonor": 1,
@@ -272,6 +280,14 @@ class Complex3D:
         v.addModel(pdb, "pdb")
         model = v.getModel()
         model.setStyle({}, self.PROTEIN_STYLE)
+
+        # do the same for ligand if large peptide
+        if self.lig_mol.n_residues > self.PEPTIDE_THRESHOLD:
+            mol = Chem.RemoveAllHs(self.lig_mol)
+            pdb = Chem.MolToPDBBlock(mol, flavor=0x20 | 0x10)
+            v.addModel(pdb, "pdb")
+            model = v.getModel()
+            model.setStyle({}, self.PEPTIDE_STYLE)
 
         v.zoomTo({"model": list(models.values())})
         return v
