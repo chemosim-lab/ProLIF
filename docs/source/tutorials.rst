@@ -56,5 +56,7 @@ Advanced usage
 --------------
 
 TODO:
+
 - interaction parameters
 - custom interaction
+- ignoring backbone
