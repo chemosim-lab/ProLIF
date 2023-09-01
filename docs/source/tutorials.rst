@@ -45,7 +45,7 @@ that are being analyzed:
 Docking
 -------
 
-TODO
+:ref:`notebooks/docking:Docking`
 
 PDB file
 --------
