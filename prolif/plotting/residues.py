@@ -4,7 +4,7 @@ Plot residues --- :mod:`prolif.plotting.residues`
 
 .. versionadded:: 2.0.0
 
-.. autofunc:: display_residues
+.. autofunction:: display_residues
 
 """
 from typing import Any, Optional, Tuple
