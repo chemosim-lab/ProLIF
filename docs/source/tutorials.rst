@@ -11,8 +11,7 @@ modules for a more in-depth explanation.
 
 All the examples here showcase a transmembrane protein (GPCR family) in complex with a
 small molecule. For convenience, the different files used for this tutorial are included
-with the ProLIF installation,
-and you can access these through either:
+with the ProLIF installation, and you can access these through either:
 
 - ``prolif.datafiles.TOP`` and ``prolif.datafiles.TRAJ`` for the topology (PDB file) and
   trajectory (XTC file) used in the molecular dynamics tutorials.
@@ -45,12 +44,16 @@ that are being analyzed:
 Docking
 -------
 
+Follow this tutorial for docking of a ligand with a protein:
+
 :ref:`notebooks/docking:Docking`
 
 PDB file
 --------
 
-TODO
+This tutorial showcases how to use ProLIF from a PDB file:
+
+:ref:`notebooks/pdb:PDB`
 
 Advanced usage
 --------------
