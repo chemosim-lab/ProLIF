@@ -58,8 +58,8 @@ This tutorial showcases how to use ProLIF from a PDB file:
 Advanced usage
 --------------
 
-TODO:
+For more advanced usecases such as modifying interaction parameters, defining your own
+interactions, ignoring backbone interactions and such, you can have a look at this
+tutorial:
 
-- interaction parameters
-- custom interaction
-- ignoring backbone
+:ref:`notebooks/advanced:Advanced usage`
