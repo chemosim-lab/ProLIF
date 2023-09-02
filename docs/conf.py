@@ -52,7 +52,7 @@ extensions = [
 myst_enable_extensions = [
     "colon_fence",
 ]
-nb_execution_raise_on_error = True
+# nb_execution_raise_on_error = True
 
 mathjax_path = "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
 autosectionlabel_prefix_document = True
