@@ -2,18 +2,36 @@ name: build
 on:
   release:
     types: [released]
+  workflow_dispatch:
 
 defaults:
   run:
     shell: bash -l {0}
 
+env:
+  IS_PRERELEASE: ${{ github.event_name == 'workflow_dispatch' }}
+
 jobs:
   build-n-publish:
     name: Build and publish to PyPI
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Get prerelease version tags
+      if: env.IS_PRERELEASE == 'true'
+      run: |
+        py_dirty_tag=$(awk '/__version__ = "[[:digit:]+]\.[[:digit:]+]\.[[:digit:]+]\-.+"/ {print $3}' ./prolif/_version.py)
+        py_is_pre=$(test -z "$py_dirty_tag" && echo "false" || echo "true")
+        echo "py_is_pre=$py_is_pre" >> $GITHUB_ENV
+
+    - name: Fail if prerelease is not correctly versioned
+      if: ( env.IS_PRERELEASE == 'true' ) && !( env.py_is_pre )
+      uses: actions/github-script@v3
+      with:
+        script: |
+          core.setFailed("Versions are not tagged as a prerelease")
 
     - name: Install python with pip
       uses: actions/setup-python@v4
@@ -36,6 +54,6 @@ jobs:
         python -m build
 
     - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@master
+      uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.PYPI_TOKEN }}
