@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Added a `display_residues` function to quickly visualize the residues in a `Molecule`
+  object.
 - Added a `Complex3D` class for plotting interactions in 3D. Added the corresponding
   `Fingerprint.plot_3d` method to generate the plot directly from an FP object.
 - Added a `Barcode` class for plotting interactions. Added the corresponding

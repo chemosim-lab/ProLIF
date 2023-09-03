@@ -24,6 +24,7 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     fp = prolif.Fingerprint.from_pickle("fingerprint.pkl")
 
 """
+import warnings
 from collections.abc import Sized
 from functools import wraps
 from typing import Literal, Optional, Tuple
@@ -479,7 +480,7 @@ class Fingerprint:
         for ts in iterator:
             lig_mol = Molecule.from_mda(lig, **converter_kwargs[0])
             prot_mol = Molecule.from_mda(prot, **converter_kwargs[1])
-            ifp[ts.frame] = self.generate(
+            ifp[int(ts.frame)] = self.generate(
                 lig_mol, prot_mol, residues=residues, metadata=True
             )
         self.ifp = ifp
@@ -809,10 +810,15 @@ class Fingerprint:
             Switched to dill instead of pickle
 
         """
-        if isinstance(path_or_bytes, bytes):
-            return dill.loads(path_or_bytes)
-        with open(path_or_bytes, "rb") as f:
-            return dill.load(f)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                r"The .+ interaction has been superseded by a new class",  # pragma: no cover
+            )
+            if isinstance(path_or_bytes, bytes):
+                return dill.loads(path_or_bytes)
+            with open(path_or_bytes, "rb") as f:
+                return dill.load(f)
 
     def plot_lignetwork(
         self,

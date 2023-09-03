@@ -46,6 +46,14 @@ plots = [
     "py3Dmol",
     "matplotlib",
 ]
+tutorials = [
+    "rdkit",
+    "matplotlib>=3.7",
+    "seaborn<1.0",
+    "networkx",
+    "pyvis",
+    "prolif[plots]",
+]
 build = [
     "build",
 ]
