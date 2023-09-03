@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   acceptor class.
 
 ### Changed
+- The tutorials have been overhauled and should now be much easier to navigate.
 - The multiprocessing and pickling backends have been switched to `multiprocess` and
   `dill` respectively, and the parallel implementation has been improved. Users should
   now be able to define custom interactions in Jupyter notebooks, IPython and so on
