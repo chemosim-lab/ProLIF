@@ -7,10 +7,8 @@ from prolif.datafiles import datapath
 from prolif.molecule import Molecule, mol2_supplier, pdbqt_supplier, sdf_supplier
 from prolif.residue import ResidueId
 
-from .test_base import TestBaseRDKitMol
 
-
-class TestMolecule(TestBaseRDKitMol):
+class TestMolecule(pytest.BaseTestMixinRDKitMol):
     @pytest.fixture(scope="class")
     def mol(self, rdkit_mol):
         return Molecule(rdkit_mol)

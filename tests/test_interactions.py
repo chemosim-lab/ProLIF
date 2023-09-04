@@ -9,15 +9,13 @@ from prolif.fingerprint import Fingerprint
 from prolif.interactions import VdWContact
 from prolif.interactions.base import _INTERACTIONS, Interaction, get_mapindex
 
-from . import mol2factory
-
 # disable rdkit warnings
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
 
 @pytest.fixture(scope="module")
-def benzene():
+def benzene_universe():
     benzene = mda.Universe(prolif.datafiles.datapath / "benzene.mol2")
     elements = mda.topology.guessers.guess_types(benzene.atoms.names)
     benzene.add_TopologyAttr("elements", elements)
@@ -35,14 +33,14 @@ def interaction_instances():
     }
 
 
-@pytest.fixture(scope="module")
-def lig_mol(request):
-    return getattr(mol2factory, request.param)()
+@pytest.fixture(scope="session")
+def any_mol(request):
+    return request.getfixturevalue(request.param)
 
 
-@pytest.fixture(scope="module")
-def prot_mol(request):
-    return getattr(mol2factory, request.param)()
+@pytest.fixture(scope="session")
+def any_other_mol(request):
+    return request.getfixturevalue(request.param)
 
 
 @pytest.fixture(scope="module")
@@ -57,7 +55,7 @@ class TestInteractions:
         return Fingerprint()
 
     @pytest.mark.parametrize(
-        "func_name, lig_mol, prot_mol, expected",
+        "func_name, any_mol, any_other_mol, expected",
         [
             ("cationic", "cation", "anion", True),
             ("cationic", "anion", "cation", False),
@@ -116,11 +114,13 @@ class TestInteractions:
             ("vdwcontact", "benzene", "etf", True),
             ("vdwcontact", "hb_acceptor", "metal_false", False),
         ],
-        indirect=["lig_mol", "prot_mol"],
+        indirect=["any_mol", "any_other_mol"],
     )
-    def test_interaction(self, fingerprint, func_name, lig_mol, prot_mol, expected):
+    def test_interaction(
+        self, fingerprint, func_name, any_mol, any_other_mol, expected
+    ):
         interaction = getattr(fingerprint, func_name)
-        assert next(interaction(lig_mol[0], prot_mol[0]), False) is expected
+        assert next(interaction(any_mol[0], any_other_mol[0]), False) is expected
 
     def test_warning_supersede(self):
         old = id(_INTERACTIONS["Hydrophobic"])
@@ -155,22 +155,26 @@ class TestInteractions:
             VdWContact(tolerance=-1)
 
     @pytest.mark.parametrize(
-        "lig_mol, prot_mol", [("benzene", "cation")], indirect=["lig_mol", "prot_mol"]
+        "any_mol, any_other_mol",
+        [("benzene", "cation")],
+        indirect=["any_mol", "any_other_mol"],
     )
-    def test_vdwcontact_cache(self, lig_mol, prot_mol):
+    def test_vdwcontact_cache(self, any_mol, any_other_mol):
         vdw = VdWContact()
         assert vdw._vdw_cache == {}
-        vdw.detect(lig_mol[0], prot_mol[0])
+        vdw.detect(any_mol[0], any_other_mol[0])
         for (lig, res), value in vdw._vdw_cache.items():
             vdw_dist = vdw.vdwradii[lig] + vdw.vdwradii[res] + vdw.tolerance
             assert vdw_dist == value
 
     @pytest.mark.parametrize(
-        "lig_mol, prot_mol", [("benzene", "cation")], indirect=["lig_mol", "prot_mol"]
+        "any_mol, any_other_mol",
+        [("benzene", "cation")],
+        indirect=["any_mol", "any_other_mol"],
     )
-    def test_vdwcontact_vdwradii_update(self, lig_mol, prot_mol):
+    def test_vdwcontact_vdwradii_update(self, any_mol, any_other_mol):
         vdw = VdWContact(vdwradii={"Na": 0})
-        metadata = vdw.detect(lig_mol[0], prot_mol[0])
+        metadata = vdw.detect(any_mol[0], any_other_mol[0])
         assert next(metadata, None) is None
 
     @pytest.mark.parametrize(
@@ -276,8 +280,10 @@ class TestInteractions:
             ([0, 1.5, -4.5], [75, 0, 0], "edgetoface", False),
         ],
     )
-    def test_pi_stacking(self, benzene, xyz, rotation, pi_type, expected, fingerprint):
-        r1, r2 = self.create_rings(benzene, xyz, rotation)
+    def test_pi_stacking(
+        self, benzene_universe, xyz, rotation, pi_type, expected, fingerprint
+    ):
+        r1, r2 = self.create_rings(benzene_universe, xyz, rotation)
         evaluate = lambda pistacking_type, r1, r2: next(
             getattr(fingerprint, pistacking_type)(r1, r2), False
         )
@@ -288,15 +294,18 @@ class TestInteractions:
             assert evaluate("pistacking", r1, r2) is expected
 
     @staticmethod
-    def create_rings(benzene, xyz, rotation):
-        r2 = benzene.copy()
+    def create_rings(benzene_universe, xyz, rotation):
+        r2 = benzene_universe.copy()
         r2.segments.segids = np.array(["U2"], dtype=object)
         tr = translate(xyz)
         rotx = rotateby(rotation[0], [1, 0, 0], ag=r2.atoms)
         roty = rotateby(rotation[1], [0, 1, 0], ag=r2.atoms)
         rotz = rotateby(rotation[2], [0, 0, 1], ag=r2.atoms)
         r2.trajectory.add_transformations(tr, rotx, roty, rotz)
-        return prolif.Molecule.from_mda(benzene)[0], prolif.Molecule.from_mda(r2)[0]
+        return (
+            prolif.Molecule.from_mda(benzene_universe)[0],
+            prolif.Molecule.from_mda(r2)[0],
+        )
 
     def test_edgetoface_phe331(self, ligand_mol, protein_mol):
         fp = Fingerprint()

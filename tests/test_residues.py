@@ -5,8 +5,6 @@ from rdkit.Chem import AllChem
 
 from prolif.residue import Residue, ResidueGroup, ResidueId
 
-from .test_base import TestBaseRDKitMol
-
 
 class TestResidueId:
     @pytest.mark.parametrize(
@@ -126,7 +124,7 @@ class TestResidueId:
         assert str(resid) == resid_str
 
 
-class TestResidue(TestBaseRDKitMol):
+class TestResidue(pytest.BaseTestMixinRDKitMol):
     @pytest.fixture(scope="class")
     def mol(self):
         mol = Chem.MolFromSequence("A")
