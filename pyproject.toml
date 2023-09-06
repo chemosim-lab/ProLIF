@@ -44,7 +44,7 @@ file = "LICENSE"
 [project.optional-dependencies]
 plots = [
     "py3Dmol",
-    "matplotlib",
+    "matplotlib>=3.5",
 ]
 tutorials = [
     "rdkit",
