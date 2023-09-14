@@ -139,6 +139,7 @@ class Barcode:
         im = ax.imshow(
             self.df.values,
             aspect="auto",
+            interpolation="none",
             cmap=self.cmap,
             vmin=0,
             vmax=max(self.color_mapper.values()),
