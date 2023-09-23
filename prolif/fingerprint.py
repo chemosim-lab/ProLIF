@@ -877,6 +877,14 @@ class Fingerprint:
         height : str
             Height of the IFrame window.
 
+        Notes
+        -----
+        Two kinds of diagrams can be rendered: either for a designated frame or
+        by aggregating the results on the whole IFP and optionnally discarding
+        interactions that occur less frequently than a threshold. In the latter
+        case (aggregate), only the group of atoms most frequently involved in
+        each interaction is used to draw the edge.
+
         See Also
         --------
         :class:`prolif.plotting.network.LigNetwork`
