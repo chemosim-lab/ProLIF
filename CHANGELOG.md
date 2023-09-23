@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The barcode plot would display artifacts due to downsampling in the underlying
   matplotlib `imshow` call when generating the plot for large fingerprints.
   Interpolation has been disabled to address the issue.
+- Parsing residue names/number was broken for TIP3 water molecules and others.
 
 ## [2.0.0.post1] - 2023-09-13
 

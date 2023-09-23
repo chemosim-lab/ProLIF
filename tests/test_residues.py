@@ -91,6 +91,14 @@ class TestResidueId:
             ("DA2.A", ("DA", 2, "A")),
             ("DA2", ("DA", 2, None)),
             ("DA", ("DA", 0, None)),
+            ("8NU", ("8NU", 0, None)),
+            ("8NU1", ("8NU", 1, None)),
+            ("8NU1.A", ("8NU", 1, "A")),
+            ("8NU.A", ("8NU", 0, "A")),
+            ("TIP3", ("TIP3", 0, None)),
+            ("TIP3.A", ("TIP3", 0, "A")),
+            ("TIP31", ("TIP3", 1, None)),
+            ("TIP31.A", ("TIP3", 1, "A")),
         ],
     )
     def test_from_string(self, resid_str, expected):

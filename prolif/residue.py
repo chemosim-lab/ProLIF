@@ -11,7 +11,7 @@ from rdkit.Chem.rdmolops import FastFindRings
 
 from prolif.rdkitmol import BaseRDKitMol
 
-_RE_RESID = re.compile(r"([A-Z]{,3})?(\d*)\.?(\w)?")
+_RE_RESID = re.compile(r"(TIP3|[A-Z0-9]?[A-Z]{2,3})?(\d*)\.?(\w)?")
 
 
 class ResidueId:
