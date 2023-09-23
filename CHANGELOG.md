@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- In `Complex3D` you can now use the `compare` method to display two 3D structures side
+  by side.
+
 ### Fixed
 
 - The barcode plot would display artifacts due to downsampling in the underlying

@@ -44,6 +44,11 @@ class TestComplex3D:
         html = view._make_html()
         assert "Hydrophobic" in html
 
+    def test_integration_compare(self, plot_3d):
+        view = plot_3d.compare(plot_3d)
+        html = view._make_html()
+        assert "Hydrophobic" in html
+
     def test_from_fingerprint_raises_not_executed(self, ligand_mol, protein_mol):
         fp = plf.Fingerprint()
         with pytest.raises(
