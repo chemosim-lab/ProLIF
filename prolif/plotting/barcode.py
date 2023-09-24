@@ -167,7 +167,7 @@ class Barcode:
             indices = [
                 i
                 for i in range(n_items)
-                if (i - 1 > 0 and residues[i - 1] != residues[i]) or i == 0
+                if (i - 1 >= 0 and residues[i - 1] != residues[i]) or i == 0
             ]
         else:
             indices = [
