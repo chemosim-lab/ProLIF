@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+## [2.0.1] - 2023-10-11
+
 ### Added
 
 - In `Complex3D` you can now use the `compare` method to display two 3D structures side
@@ -19,14 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The barcode plot would skip labelling the second residue on the Y axis.
 - Parsing residue names/number was broken for TIP3 water molecules and others.
 
+
 ## [2.0.0.post1] - 2023-09-13
 
 This is a post-release to fix releases not containing the complete test suite.
+
 
 ## [2.0.0.post0] - 2023-09-13
 
 This is a post-release to fix an issue with the conda build not being able to run the
 tests.
+
 
 ## [2.0.0] - 2023-09-03
 
