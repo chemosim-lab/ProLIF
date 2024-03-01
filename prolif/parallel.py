@@ -7,6 +7,7 @@ to execute the analysis in parallel. These are used in the parallel implementati
 in :meth:`~prolif.fingerprint.Fingerprint.run` and
 :meth:`~prolif.fingerprint.Fingerprint.run_from_iterable` respectively.
 """
+
 from ctypes import c_uint32
 from threading import Event, Thread
 from time import sleep

@@ -4,6 +4,7 @@ Base interaction classes --- :mod:`prolif.interactions.base`
 
 This module contains the base classes used to build most of the interactions.
 """
+
 import warnings
 from itertools import product
 from math import degrees, radians

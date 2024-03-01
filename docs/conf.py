@@ -54,7 +54,7 @@ myst_enable_extensions = [
 ]
 nb_execution_allow_errors = False
 nb_execution_raise_on_error = True
-nb_execution_timeout = 180
+nb_execution_timeout = 300
 
 mathjax_path = "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
 autosectionlabel_prefix_document = True

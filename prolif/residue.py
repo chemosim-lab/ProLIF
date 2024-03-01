@@ -2,6 +2,7 @@
 Residue-related classes --- :mod:`prolif.residue`
 =================================================
 """
+
 import re
 from collections import UserDict
 from typing import List, Optional
@@ -182,8 +183,7 @@ class ResidueGroup(UserDict):
         # bool is a subclass of int but shouldn't be used here
         if isinstance(key, bool):
             raise KeyError(
-                "Expected a ResidueId, int, or str, "
-                f"got {type(key).__name__!r} instead"
+                f"Expected a ResidueId, int, or str, got {type(key).__name__!r} instead"
             )
         if isinstance(key, int):
             return self._residues[key]
@@ -193,7 +193,7 @@ class ResidueGroup(UserDict):
         elif isinstance(key, ResidueId):
             return self.data[key]
         raise KeyError(
-            "Expected a ResidueId, int, or str, " f"got {type(key).__name__!r} instead"
+            f"Expected a ResidueId, int, or str, got {type(key).__name__!r} instead"
         )
 
     def select(self, mask):

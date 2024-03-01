@@ -23,8 +23,8 @@ jobs:
     # only run once if internal PR
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
-        matrix:
-          include:
+      matrix:
+        include:
           - label: earliest
             os: ubuntu-latest
             python-version: 3.8
@@ -32,97 +32,117 @@ jobs:
             coverage: false
           - label: baseline
             os: ubuntu-latest
-            python-version: 3.9
+            python-version: "3.10"
             rdkit-version: "rdkit~=2022.09"
             coverage: true
           - label: latest
             os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.12"
             rdkit-version: "rdkit"
             coverage: false
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup Conda
-      uses: conda-incubator/setup-miniconda@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-        auto-update-conda: true
-        channel-priority: flexible
-        channels: conda-forge, defaults
-        add-pip-as-python-dependency: true
-        architecture: x64
-        use-mamba: true
-        miniforge-variant: Mambaforge
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+          auto-update-conda: true
+          channel-priority: flexible
+          channels: conda-forge, defaults
+          add-pip-as-python-dependency: true
+          architecture: x64
+          use-mamba: true
+          miniforge-variant: Mambaforge
 
-    - name: Check conda and pip
-      run: |
-        which python
-        python --version
-        pip --version
-        conda --version
-        mamba --version
+      - name: Check conda and pip
+        run: |
+          which python
+          python --version
+          pip --version
+          conda --version
+          mamba --version
 
-    - name: Install conda dependencies
-      run: |
-        mamba install ${{ matrix.rdkit-version }}
-        mamba list
+      - name: Install conda dependencies
+        run: |
+          mamba install ${{ matrix.rdkit-version }}
+          mamba list
 
-    - name: Install package through pip
-      run: |
-        pip install .[dev]
-        pip list
+      - name: Install package through pip
+        run: |
+          pip install .[dev]
+          pip list
 
-    - name: Run tests
-      run: |
-        pytest --color=yes --disable-pytest-warnings --cov=prolif --cov-report=xml tests/
+      - name: Build
+        run: |
+          python -m build
 
-    - name: Measure tests coverage
-      if: matrix.coverage
-      uses: codecov/codecov-action@v3
-      with:
-        files: ./coverage.xml
-        fail_ci_if_error: true
-        verbose: true
-        token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Ensure tests and data included in source dist
+        run: |
+          tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/tests/.+' || exit 1
+          tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/data/.+' || exit 1
+          tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/data/vina/.+' || exit 1
 
-    - name: Build
-      run: |
-        python -m build
+      - name: Run tests
+        run: |
+          pytest --color=yes --disable-pytest-warnings --cov=prolif --cov-report=xml tests/
 
-    - name: Remove previous ProLIF install
-      run: |
-        pip uninstall -y prolif
+      - name: Measure tests coverage
+        if: matrix.coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
 
-    - name: Install from tar.gz
-      run: |
-        pip install dist/prolif-*.tar.gz
+      - name: Build
+        run: |
+          python -m build
 
-    - name: Test tar.gz install
-      run: |
-        python <<EOF
-        import prolif
-        import os
-        print(prolif.__version__)
-        from prolif.plotting.network import LigNetwork
-        assert os.path.isfile(prolif.datafiles.TOP)
-        EOF
+      - name: Remove previous ProLIF install
+        run: |
+          pip uninstall -y prolif
 
-    - name: Remove previous ProLIF install
-      run: |
-        pip uninstall -y prolif
+      - name: Install from tar.gz
+        run: |
+          pip install dist/prolif-*.tar.gz
 
-    - name: Install from wheel
-      run: |
-        pip install dist/prolif-*.whl
+      - name: Test tar.gz install
+        working-directory: /
+        run: |
+          python <<EOF
+          from pathlib import Path
+          from contextlib import suppress
+          import prolif
+          print(prolif.__version__)
+          from prolif.plotting.network import LigNetwork
+          assert Path(prolif.datafiles.TOP).is_file()
+          with suppress(ImportError, ModuleNotFoundError):
+              import tests
+              assert next(Path(tests.__file__).parent.glob("test_fingerprint.py"), None) is None
+          EOF
 
-    - name: Test wheel install
-      run: |
-        python <<EOF
-        import prolif
-        import os
-        print(prolif.__version__)
-        from prolif.plotting.network import LigNetwork
-        assert os.path.isfile(prolif.datafiles.TOP)
-        EOF
+      - name: Remove previous ProLIF install
+        run: |
+          pip uninstall -y prolif
+
+      - name: Install from wheel
+        run: |
+          pip install dist/prolif-*.whl
+
+      - name: Test wheel install
+        working-directory: /
+        run: |
+          python <<EOF
+          from pathlib import Path
+          from contextlib import suppress
+          import prolif
+          print(prolif.__version__)
+          from prolif.plotting.network import LigNetwork
+          assert Path(prolif.datafiles.TOP).is_file()
+          with suppress(ImportError, ModuleNotFoundError):
+              import tests
+              assert next(Path(tests.__file__).parent.glob("test_fingerprint.py"), None) is None
+          EOF

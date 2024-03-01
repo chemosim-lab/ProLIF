@@ -7,6 +7,7 @@ Plot residues --- :mod:`prolif.plotting.residues`
 .. autofunction:: display_residues
 
 """
+
 from typing import Any, Optional, Tuple
 
 from rdkit import Chem

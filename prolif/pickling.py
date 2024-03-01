@@ -9,6 +9,7 @@ Note that on Windows the preconfigured handler will modify RDKit's default pickl
 behavior upon importing the `prolif` package to ensure that the parallelization code
 works as on other platforms.
 """
+
 import sys
 from typing import Optional
 

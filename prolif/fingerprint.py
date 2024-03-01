@@ -24,6 +24,8 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
     fp = prolif.Fingerprint.from_pickle("fingerprint.pkl")
 
 """
+
+import os
 import warnings
 from collections.abc import Sized
 from functools import wraps
@@ -462,6 +464,8 @@ class Fingerprint:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
 
         converter_kwargs = converter_kwargs or ({}, {})
+        if n_jobs is None:
+            n_jobs = int(os.environ.get("PROLIF_N_JOBS", 0)) or None
         if residues == "all":
             residues = list(Molecule.from_mda(prot, **converter_kwargs[1]).residues)
         if n_jobs != 1:
