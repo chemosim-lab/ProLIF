@@ -12,6 +12,7 @@ Plot a Ligand Interaction Network --- :mod:`prolif.plotting.network`
    :members:
 
 """
+
 import json
 import re
 import warnings
@@ -791,7 +792,9 @@ class LigNetwork:
         });
         legend.appendChild(div_residues);
         legend.appendChild(div_interactions);
-        """ % dict(div_id="networklegend", buttons=json.dumps(buttons))
+        """ % dict(
+            div_id="networklegend", buttons=json.dumps(buttons)
+        )
 
     @requires("IPython.display")
     def display(self, **kwargs):
