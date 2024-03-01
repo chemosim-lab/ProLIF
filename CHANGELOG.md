@@ -11,9 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Maintenance update:
 
+### Added
+
+- `PROLIF_N_JOBS` environment variable to control multiprocessing during the
+  documentation build.
+
 ### Changed
 
-- Updated CI pipelines to test on Python 3.8, 3.10 and 3.12
+- Updated CI pipelines to test on Python 3.8, 3.10 and 3.12.
 
 ### Fixed
 
