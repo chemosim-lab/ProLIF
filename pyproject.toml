@@ -16,6 +16,8 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Chemistry",
 ]
@@ -76,14 +78,15 @@ Changelog = "https://github.com/chemosim-lab/ProLIF/blob/master/CHANGELOG.md"
 
 [tool.setuptools]
 zip-safe = false
-include-package-data = false
 
 [tool.setuptools.packages.find]
-include = ["prolif*", "tests*"]
+include = ["prolif*"]
 
 [tool.setuptools.package-data]
 "prolif.data" = ["*"]
 "prolif.data.vina" = ["*"]
+"tests" = ["*"]
+"tests.plotting" = ["*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "prolif._version.__version__" }

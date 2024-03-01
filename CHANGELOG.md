@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 
+## [2.0.2] - 2024-03-01
+
+Maintenance update:
+
+### Changed
+
+- Updated CI pipelines to test on Python 3.8, 3.10 and 3.12
+
+### Fixed
+
+- Packaging maintenance to fix the `tests/` directory being included as a module rather
+  than as plain data files. This could interfere with `pytest` during test collection
+  in other packages.
+
+
 ## [2.0.1] - 2023-10-11
 
 ### Added
