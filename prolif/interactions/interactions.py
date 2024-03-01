@@ -146,7 +146,7 @@ class XBAcceptor(DoubleAngle):
 
     def __init__(
         self,
-        acceptor="[#7,#8,P,S,Se,Te,a;!+{1-}][*]",
+        acceptor="[#7,#8,P,S,Se,Te,a;!+{1-}]!#[*]",
         donor="[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
         distance=3.5,
         AXD_angle=(130, 180),
