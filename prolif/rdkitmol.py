@@ -2,6 +2,7 @@
 Reading RDKit molecules --- :mod:`prolif.rdkitmol`
 ==================================================
 """
+
 from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
 

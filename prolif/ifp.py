@@ -2,6 +2,7 @@
 Storing interactions --- :mod:`prolif.ifp`
 ==========================================
 """
+
 from collections import UserDict
 
 from prolif.residue import ResidueId

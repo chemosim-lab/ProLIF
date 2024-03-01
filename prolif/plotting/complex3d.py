@@ -8,6 +8,7 @@ Plot interactions in 3D --- :mod:`prolif.plotting.complex3d`
    :members:
 
 """
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -101,7 +102,8 @@ class Complex3D:
     PROTEIN_RING_INTERACTIONS: ClassVar[Set[str]] = {*RING_SYSTEMS, "CationPi"}
     RESIDUE_HOVER_CALLBACK: ClassVar[
         str
-    ] = """function(atom,viewer) {
+    ] = """
+    function(atom,viewer) {
         if(!atom.label) {
             atom.label = viewer.addLabel('%s:'+atom.atom+atom.serial,
                 {position: atom, backgroundColor: 'mintcream', fontColor:'black'});
@@ -157,7 +159,8 @@ class Complex3D:
         """
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
-                "Please run the fingerprint analysis before attempting to display results."
+                "Please run the fingerprint analysis before attempting to display"
+                " results."
             )
         ifp = fp.ifp[frame]
         return cls(ifp, lig_mol, prot_mol)

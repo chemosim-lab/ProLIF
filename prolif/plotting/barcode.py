@@ -8,6 +8,7 @@ Plot interactions as a barcode --- :mod:`prolif.plotting.barcode`
    :members:
 
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar, Dict, List, Literal, Optional, Tuple
@@ -73,9 +74,9 @@ class Barcode:
             """Replaces a bit value with it's corresponding color value"""
             interaction = s.name[-1]
             return s.apply(
-                lambda v: self.color_mapper[interaction]
-                if v
-                else self.color_mapper[None]
+                lambda v: (
+                    self.color_mapper[interaction] if v else self.color_mapper[None]
+                )
             )
 
         self.df = df.astype(np.uint8).T.apply(_bit_to_color_value, axis=1)
@@ -85,7 +86,8 @@ class Barcode:
         """Creates a barcode object from a fingerprint."""
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
-                "Please run the fingerprint analysis before attempting to display results."
+                "Please run the fingerprint analysis before attempting to display"
+                " results."
             )
         return cls(fp.to_dataframe())
 

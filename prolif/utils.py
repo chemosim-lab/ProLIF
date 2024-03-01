@@ -2,6 +2,7 @@
 Helper functions --- :mod:`prolif.utils`
 ========================================
 """
+
 import warnings
 from collections import defaultdict
 from contextlib import contextmanager

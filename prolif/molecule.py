@@ -2,6 +2,7 @@
 Reading proteins and ligands --- :mod:`prolif.molecule`
 =======================================================
 """
+
 import copy
 from collections import defaultdict
 from collections.abc import Sequence
@@ -116,7 +117,7 @@ class Molecule(BaseRDKitMol):
         """
         ag = obj.select_atoms(selection) if selection else obj.atoms
         if ag.n_atoms == 0:
-            raise mda.SelectionError(f"AtomGroup is empty, please check your selection")
+            raise mda.SelectionError("AtomGroup is empty, please check your selection")
         mol = ag.convert_to.rdkit(**kwargs)
         return cls(mol)
 

@@ -317,7 +317,8 @@ class LigNetwork:
         """
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
-                "Please run the fingerprint analysis before attempting to display results."
+                "Please run the fingerprint analysis before attempting to display"
+                " results."
             )
         if kind == "frame":
             df = cls._make_frame_df_from_fp(fp, frame=frame, display_all=display_all)
@@ -790,9 +791,7 @@ class LigNetwork:
         });
         legend.appendChild(div_residues);
         legend.appendChild(div_interactions);
-        """ % dict(
-            div_id="networklegend", buttons=json.dumps(buttons)
-        )
+        """ % dict(div_id="networklegend", buttons=json.dumps(buttons))
 
     @requires("IPython.display")
     def display(self, **kwargs):
