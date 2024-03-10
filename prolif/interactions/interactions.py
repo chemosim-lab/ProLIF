@@ -142,6 +142,10 @@ class XBAcceptor(DoubleAngle):
         ``axd_angles`` and ``xar_angles`` parameters renamed to ``AXD_angle`` and
         ``XAR_angle``.
 
+    .. versionchanged:: 2.0.3
+        Fixed the SMARTS pattern for acceptors that was not allowing carbonyles and
+        other groups with double bonds to match.
+
     """
 
     def __init__(
