@@ -218,6 +218,8 @@ class TestInteractions:
             ("XBAcceptor.lig_pattern", "[NH3]", 3),
             ("XBAcceptor.lig_pattern", "[NH+]C", 0),
             ("XBAcceptor.lig_pattern", "c1ccccc1", 12),
+            ("XBAcceptor.lig_pattern", "C(=O)C", 1),
+            ("XBAcceptor.lig_pattern", "C#N", 0),
             ("Cationic.lig_pattern", "[NH4+]", 1),
             ("Cationic.lig_pattern", "[Ca+2]", 1),
             ("Cationic.lig_pattern", "CC(=[NH2+])N", 2),

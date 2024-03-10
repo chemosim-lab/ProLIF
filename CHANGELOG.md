@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The SMARTS pattern for halogen bond acceptors was not allowing carbonyles and other
+  groups with double bonds to match (PR #190 by @asiomchen).
 
 ## [2.0.2] - 2024-03-01
 
