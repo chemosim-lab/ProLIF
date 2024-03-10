@@ -85,8 +85,6 @@ include = ["prolif*"]
 [tool.setuptools.package-data]
 "prolif.data" = ["*"]
 "prolif.data.vina" = ["*"]
-"tests" = ["*"]
-"tests.plotting" = ["*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "prolif._version.__version__" }
