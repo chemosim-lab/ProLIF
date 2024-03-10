@@ -1,0 +1,161 @@
+name: build-package
+on:
+    workflow_call:
+      inputs:
+        check-prerelease:
+          default: false
+          required: false
+          type: boolean
+        test-files:
+          default: true
+          required: false
+          type: boolean
+        test-imports:
+          default: false
+          required: false
+          type: boolean
+        cache-package:
+          default: true
+          required: false
+          type: boolean
+        upload-package:
+          default: false
+          required: false
+          type: boolean
+
+defaults:
+  run:
+    shell: bash -l {0}
+
+jobs:
+  build:
+    name: Build ProLIF package
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Get prerelease version tags
+      if: inputs.check-prerelease
+      id: prerelease-check
+      run: |
+        py_dirty_tag=$(awk '/__version__ = "[[:digit:]+]\.[[:digit:]+]\.[[:digit:]+]\-.+"/ {print $3}' ./prolif/_version.py)
+        py_is_pre=$(test -z "$py_dirty_tag" && echo "false" || echo "true")
+        echo "py=$py_is_pre" >> $GITHUB_OUTPUT
+
+    - name: Fail if prerelease is not correctly versioned
+      if: (inputs.check-prerelease) && !( steps.prerelease-check.outputs.py )
+      uses: actions/github-script@v3
+      with:
+        script: |
+          core.setFailed("Version is not tagged as a prerelease")
+
+    - name: Install python with pip
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+        cache: "pip"
+
+    - name: Install dependencies for packaging
+      run: |
+        pip install setuptools wheel build virtualenv
+
+    - name: Check python installation
+      run: |
+        which python
+        python --version
+        pip --version
+        pip list
+
+    - name: Build package
+      run: |
+        python -m build .
+    
+    - name: List output
+      run: |
+        ls -lah dist/*
+
+    - name: List .tar.gz content
+      run: |
+        tar -ztvf dist/prolif-*.tar.gz
+    
+    - name: Ensure tests and data included in source dist
+      if: inputs.test-files
+      run: |
+        tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/tests/.+' || exit 1
+        tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/tests/conftest.py' || exit 1
+        tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/tests/plotting/.+' || exit 1
+        tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/data/.+' || exit 1
+        tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/data/vina/.+' || exit 1
+
+    - name: Cache package
+      if: inputs.cache-package
+      uses: actions/cache/save@v3
+      with:
+        path: |
+          dist/prolif-*.whl
+          dist/prolif-*.tar.gz
+        key: prolif-${{ runner.os }}-${{ github.sha }}
+
+    - name: Expose package as artifact
+      if: inputs.upload-package
+      uses: actions/upload-artifact@v4
+      with:
+        name: prolif-package
+        path: |
+          dist/prolif-*.whl
+          dist/prolif-*.tar.gz
+        if-no-files-found: error
+        retention-days: 20
+
+  test-build:
+    name: Test ProLIF build
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: (inputs.test-imports) && (inputs.cache-package)
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install python with pip
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+        cache: "pip"
+    
+    - name: Install requirements
+      run: |
+        pip install rdkit
+
+    - name: Retrieve cached package
+      uses: actions/cache/restore@v3
+      id: cache-prolif
+      with:
+        path: |
+          dist/prolif-*.whl
+          dist/prolif-*.tar.gz
+        key: prolif-${{ runner.os }}-${{ github.sha }}
+    
+    - name: Install from tar.gz
+      run: |
+        pip install dist/prolif-*.tar.gz
+
+    - name: Test tar.gz install
+      working-directory: scripts/
+      run: |
+        python test_build.py
+
+    - name: Remove previous ProLIF install
+      run: |
+        pip uninstall -y prolif
+
+    - name: Install from wheel
+      run: |
+        pip install dist/prolif-*.whl
+
+    - name: Test wheel install
+      working-directory: scripts/
+      run: |
+        python test_build.py

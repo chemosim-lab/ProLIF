@@ -8,50 +8,29 @@ defaults:
   run:
     shell: bash -l {0}
 
-env:
-  IS_PRERELEASE: ${{ github.event_name == 'workflow_dispatch' }}
-
 jobs:
-  build-n-publish:
-    name: Build and publish to PyPI
+  build:
+    name: Build package
+    uses: ./.github/workflows/_build-package.yml
+    with:
+      check-prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+      cache-package: true
+      upload-package: true
+      test-files: true
+      test-imports: true
+
+  publish:
+    name: Publish to PyPI
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Get prerelease version tags
-      if: env.IS_PRERELEASE == 'true'
-      run: |
-        py_dirty_tag=$(awk '/__version__ = "[[:digit:]+]\.[[:digit:]+]\.[[:digit:]+]\-.+"/ {print $3}' ./prolif/_version.py)
-        py_is_pre=$(test -z "$py_dirty_tag" && echo "false" || echo "true")
-        echo "py_is_pre=$py_is_pre" >> $GITHUB_ENV
-
-    - name: Fail if prerelease is not correctly versioned
-      if: ( env.IS_PRERELEASE == 'true' ) && !( env.py_is_pre )
-      uses: actions/github-script@v3
+    - name: Retrieve cached package
+      uses: actions/cache/restore@v3
+      id: cache-prolif
       with:
-        script: |
-          core.setFailed("Versions are not tagged as a prerelease")
-
-    - name: Install python with pip
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.8
-
-    - name: Install dependencies for packaging
-      run: |
-        pip install build
-
-    - name: Check python installation
-      run: |
-        which python
-        python --version
-        pip --version
-        pip list
-
-    - name: Build package
-      run: |
-        python -m build
+        path: |
+          dist/prolif-*.whl
+          dist/prolif-*.tar.gz
+        key: prolif-${{ runner.os }}-${{ github.sha }}
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1

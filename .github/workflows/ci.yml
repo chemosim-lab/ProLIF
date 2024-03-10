@@ -17,8 +17,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  tests:
-    name: ${{ matrix.label }}
+  build:
+    name: Build
+    # only run once if internal PR
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    uses: ./.github/workflows/_build-package.yml
+    with:
+      check-prerelease: ${{ github.event_name == 'workflow_dispatch' }}
+      cache-package: true
+      upload-package: true
+      test-files: true
+      test-imports: true
+
+  unit-tests:
+    name: Test ${{ matrix.label }}
     runs-on: ${{ matrix.os }}
     # only run once if internal PR
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
@@ -42,7 +54,8 @@ jobs:
             coverage: false
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v2
@@ -74,16 +87,6 @@ jobs:
           pip install .[dev]
           pip list
 
-      - name: Build
-        run: |
-          python -m build
-
-      - name: Ensure tests and data included in source dist
-        run: |
-          tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/tests/.+' || exit 1
-          tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/data/.+' || exit 1
-          tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/data/vina/.+' || exit 1
-
       - name: Run tests
         run: |
           pytest --color=yes --disable-pytest-warnings --cov=prolif --cov-report=xml tests/
@@ -96,53 +99,3 @@ jobs:
           fail_ci_if_error: true
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Build
-        run: |
-          python -m build
-
-      - name: Remove previous ProLIF install
-        run: |
-          pip uninstall -y prolif
-
-      - name: Install from tar.gz
-        run: |
-          pip install dist/prolif-*.tar.gz
-
-      - name: Test tar.gz install
-        working-directory: /
-        run: |
-          python <<EOF
-          from pathlib import Path
-          from contextlib import suppress
-          import prolif
-          print(prolif.__version__)
-          from prolif.plotting.network import LigNetwork
-          assert Path(prolif.datafiles.TOP).is_file()
-          with suppress(ImportError, ModuleNotFoundError):
-              import tests
-              assert next(Path(tests.__file__).parent.glob("test_fingerprint.py"), None) is None
-          EOF
-
-      - name: Remove previous ProLIF install
-        run: |
-          pip uninstall -y prolif
-
-      - name: Install from wheel
-        run: |
-          pip install dist/prolif-*.whl
-
-      - name: Test wheel install
-        working-directory: /
-        run: |
-          python <<EOF
-          from pathlib import Path
-          from contextlib import suppress
-          import prolif
-          print(prolif.__version__)
-          from prolif.plotting.network import LigNetwork
-          assert Path(prolif.datafiles.TOP).is_file()
-          with suppress(ImportError, ModuleNotFoundError):
-              import tests
-              assert next(Path(tests.__file__).parent.glob("test_fingerprint.py"), None) is None
-          EOF
