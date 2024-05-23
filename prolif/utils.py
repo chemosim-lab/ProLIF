@@ -151,6 +151,9 @@ def split_mol_by_residues(mol):
     -----
     Code adapted from Maciek Wójcikowski on the RDKit discussion list
     """
+    if len(GetMolFrags(mol, asMols=True, sanitizeFrags=False)) == 1:
+        # if there is only one fragment, return the molecule as a singular residue
+        return [mol]
     residues = []
     for res in SplitMolByPDBResidues(mol).values():
         for frag in GetMolFrags(res, asMols=True, sanitizeFrags=False):
