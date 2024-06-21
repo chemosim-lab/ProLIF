@@ -340,7 +340,7 @@ def pandas_series_to_countvector(s):
     size = len(s)
     cv = UIntSparseIntVect(size)
     for i in range(size):
-        cv[i] = int(s[i])
+        cv[i] = int(s.iloc[i])
     return cv
 
 

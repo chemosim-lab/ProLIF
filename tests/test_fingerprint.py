@@ -172,7 +172,7 @@ class TestFingerprint:
             u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
         )
         df = fp_simple.to_dataframe(dtype=np.uint8)
-        assert df.dtypes[0].type is np.uint8
+        assert df.dtypes.iloc[0].type is np.uint8
         df = fp_simple.to_dataframe(drop_empty=False)
         resids = set([key for d in fp_simple.ifp.values() for key in d.keys()])
         assert df.shape == (3, len(resids))
