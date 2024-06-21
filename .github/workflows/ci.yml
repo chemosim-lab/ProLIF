@@ -39,13 +39,13 @@ jobs:
         include:
           - label: earliest
             os: ubuntu-latest
-            python-version: 3.8
-            rdkit-version: "rdkit=2021.03.1"
+            python-version: 3.9
+            rdkit-version: "rdkit==2022.09.1"
             coverage: false
           - label: baseline
             os: ubuntu-latest
             python-version: "3.10"
-            rdkit-version: "rdkit~=2022.09"
+            rdkit-version: "rdkit~=2023.03.1"
             coverage: true
           - label: latest
             os: ubuntu-latest
@@ -58,14 +58,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
           auto-update-conda: true
-          channel-priority: flexible
-          channels: conda-forge, defaults
-          add-pip-as-python-dependency: true
-          architecture: x64
           use-mamba: true
           miniforge-variant: Mambaforge
 
@@ -79,13 +75,13 @@ jobs:
 
       - name: Install conda dependencies
         run: |
-          mamba install ${{ matrix.rdkit-version }}
+          mamba install uv ${{ matrix.rdkit-version }}
           mamba list
 
       - name: Install package through pip
         run: |
-          pip install .[dev]
-          pip list
+          uv pip install .[dev]
+          uv pip list
 
       - name: Run tests
         run: |
