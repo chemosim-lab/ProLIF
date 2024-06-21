@@ -253,9 +253,12 @@ class pdbqt_supplier(Sequence):
         pdbqt.add_TopologyAttr("chainIDs", pdbqt.atoms.segids)
         pdbqt.atoms.types = pdbqt.atoms.elements
         # convert without infering bond orders and charges
-        with catch_rdkit_logs(), catch_warning(
-            message=r"^(Could not sanitize molecule)|"
-            r"(No `bonds` attribute in this AtomGroup)"
+        with (
+            catch_rdkit_logs(),
+            catch_warning(
+                message=r"^(Could not sanitize molecule)|"
+                r"(No `bonds` attribute in this AtomGroup)"
+            ),
         ):
             pdbqt_mol = pdbqt.atoms.convert_to.rdkit(
                 NoImplicit=False, **self.converter_kwargs
