@@ -1,7 +1,6 @@
 name: prolif
 channels:
   - conda-forge
-  - anaconda
   - defaults
 dependencies:
   - ipykernel
