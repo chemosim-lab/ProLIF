@@ -196,7 +196,7 @@ def test_series_to_bv():
 def test_to_df(ifp):
     df = to_dataframe(ifp, ["A", "B", "C"])
     assert df.shape == (2, 4)
-    assert df.dtypes[0].type is np.bool_
+    assert df.dtypes.iloc[0].type is np.bool_
     assert df.index.name == "Frame"
     assert ("LIG", "ALA1", "A") in df.columns
     assert df[("LIG", "ALA1", "A")][0] is np.bool_(True)
@@ -218,7 +218,7 @@ def test_to_df(ifp):
 )
 def test_to_df_dtype(dtype, ifp):
     df = to_dataframe(ifp, ["A", "B", "C"], dtype=dtype)
-    assert df.dtypes[0].type is dtype
+    assert df.dtypes.iloc[0].type is dtype
     assert df[("LIG", "ALA1", "A")][0] == dtype(True)
     assert df[("LIG", "ALA1", "B")][0] == dtype(False)
     assert df[("LIG", "ASP3", "B")][0] == dtype(False)
