@@ -40,6 +40,9 @@ def display_residues(
         Number of residues displayed per row.
     use_svg: bool = True
         Generate an SVG or PNG image.
+
+    .. versionchanged:: 2.0.4
+        Disabled sanitization of residues for easier debugging.
     """
     frags = []
     residues_iterable = (
@@ -50,7 +53,7 @@ def display_residues(
     )
 
     for residue in residues_iterable:
-        resmol = Chem.RemoveHs(residue)
+        resmol = Chem.RemoveHs(residue, sanitize=False)
         resmol.RemoveAllConformers()
         resmol.SetProp("_Name", str(residue.resid))
         frags.append(resmol)
