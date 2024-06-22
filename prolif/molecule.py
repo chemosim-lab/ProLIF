@@ -362,6 +362,9 @@ class mol2_supplier(Sequence):
     ----------
     path : str
         A path to the .mol2 file
+    cleanup_substructures : bool
+        Toggles standardizing some substructures found in mol2 files, based on atom
+        types.
     resname : str
         Residue name for every ligand
     resnumber : int
@@ -385,11 +388,14 @@ class mol2_supplier(Sequence):
     .. versionchanged:: 1.0.0
         Molecule suppliers are now sequences that can be reused, indexed,
         and can return their length, instead of single-use generators.
+    .. versionchanged:: 2.0.4
+        Added ``cleanup_substructures`` parameter.
 
     """
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path, cleanup_substructures=True, **kwargs):
         self.path = path
+        self.cleanup_substructures = cleanup_substructures
         self._kwargs = kwargs
 
     def __iter__(self):
