@@ -10,19 +10,19 @@ from prolif.datafiles import TOP, TRAJ, datapath
 from prolif.molecule import Molecule, sdf_supplier
 
 
-def pytest_sessionstart(session):
+def pytest_sessionstart(session):  # noqa: ARG001
     if not datapath.exists():
         pytest.exit(
-            f"Example data files are not accessible: {datapath!s} does not exist"
+            f"Example data files are not accessible: {datapath!s} does not exist",
         )
     vina_path = datapath / "vina"
     if not vina_path.exists():
         pytest.exit(
-            f"Example Vina data files are not accessible: {vina_path!s} does not exist"
+            f"Example Vina data files are not accessible: {vina_path!s} does not exist",
         )
     # ugly patch to add Mixin class as attribute to pytest so that we don't have to
     # worry about relative imports in the test codebase
-    setattr(pytest, "BaseTestMixinRDKitMol", BaseTestMixinRDKitMol)
+    pytest.BaseTestMixinRDKitMol = BaseTestMixinRDKitMol
 
 
 @pytest.fixture(scope="session")

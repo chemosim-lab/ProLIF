@@ -5,7 +5,7 @@ import prolif as plf
 
 
 @pytest.mark.parametrize(
-    "kwargs, expected_size",
+    ("kwargs", "expected_size"),
     [
         ({"residues_slice": slice(10)}, "width='800px' height='420px'"),
         ({"residues_slice": slice(10, 20)}, "width='800px' height='420px'"),
@@ -15,7 +15,9 @@ import prolif as plf
     ],
 )
 def test_display_residues_svg(
-    protein_mol: plf.Molecule, kwargs: dict, expected_size: str
+    protein_mol: plf.Molecule,
+    kwargs: dict,
+    expected_size: str,
 ) -> None:
     img = plf.display_residues(protein_mol, **kwargs)
     assert "<svg" in img

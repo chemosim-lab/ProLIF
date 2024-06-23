@@ -55,7 +55,7 @@ class TestInteractions:
         return Fingerprint()
 
     @pytest.mark.parametrize(
-        "func_name, any_mol, any_other_mol, expected",
+        ("func_name", "any_mol", "any_other_mol", "expected"),
         [
             ("cationic", "cation", "anion", True),
             ("cationic", "anion", "cation", False),
@@ -117,7 +117,12 @@ class TestInteractions:
         indirect=["any_mol", "any_other_mol"],
     )
     def test_interaction(
-        self, fingerprint, func_name, any_mol, any_other_mol, expected
+        self,
+        fingerprint,
+        func_name,
+        any_mol,
+        any_other_mol,
+        expected,
     ):
         interaction = getattr(fingerprint, func_name)
         assert next(interaction(any_mol[0], any_other_mol[0]), False) is expected
@@ -134,12 +139,13 @@ class TestInteractions:
         assert old != new
         # fix dummy Hydrophobic class being reused in later unrelated tests
 
-        class Hydrophobic(prolif.interactions.Hydrophobic):
+        class Hydrophobic(prolif.interactions.Hydrophobic):  # noqa: F811
             __doc__ = prolif.interactions.Hydrophobic.__doc__
 
     def test_error_no_detect(self):
         with pytest.raises(
-            TypeError, match="Can't instantiate interaction class _Dummy"
+            TypeError,
+            match="Can't instantiate interaction class _Dummy",
         ):
 
             class _Dummy(Interaction):
@@ -155,7 +161,7 @@ class TestInteractions:
             VdWContact(tolerance=-1)
 
     @pytest.mark.parametrize(
-        "any_mol, any_other_mol",
+        ("any_mol", "any_other_mol"),
         [("benzene", "cation")],
         indirect=["any_mol", "any_other_mol"],
     )
@@ -168,7 +174,7 @@ class TestInteractions:
             assert vdw_dist == value
 
     @pytest.mark.parametrize(
-        "any_mol, any_other_mol",
+        ("any_mol", "any_other_mol"),
         [("benzene", "cation")],
         indirect=["any_mol", "any_other_mol"],
     )
@@ -178,7 +184,7 @@ class TestInteractions:
         assert next(metadata, None) is None
 
     @pytest.mark.parametrize(
-        ["interaction_qmol", "smiles", "expected"],
+        ("interaction_qmol", "smiles", "expected"),
         [
             ("Hydrophobic.lig_pattern", "C", 1),
             ("Hydrophobic.lig_pattern", "C=[SH2]", 1),
@@ -262,7 +268,7 @@ class TestInteractions:
         assert n_matches == expected
 
     @pytest.mark.parametrize(
-        ["xyz", "rotation", "pi_type", "expected"],
+        ("xyz", "rotation", "pi_type", "expected"),
         [
             ([0, 2.5, 4.0], [0, 0, 0], "facetoface", True),
             ([0, 3, 4.5], [0, 0, 0], "facetoface", False),
@@ -283,12 +289,19 @@ class TestInteractions:
         ],
     )
     def test_pi_stacking(
-        self, benzene_universe, xyz, rotation, pi_type, expected, fingerprint
+        self,
+        benzene_universe,
+        xyz,
+        rotation,
+        pi_type,
+        expected,
+        fingerprint,
     ):
         r1, r2 = self.create_rings(benzene_universe, xyz, rotation)
-        evaluate = lambda pistacking_type, r1, r2: next(
-            getattr(fingerprint, pistacking_type)(r1, r2), False
-        )
+
+        def evaluate(pistacking_type, r1, r2):
+            return next(getattr(fingerprint, pistacking_type)(r1, r2), False)
+
         assert evaluate(pi_type, r1, r2) is expected
         if expected is True:
             other = "edgetoface" if pi_type == "facetoface" else "facetoface"

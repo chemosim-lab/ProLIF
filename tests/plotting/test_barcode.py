@@ -22,7 +22,11 @@ class TestBarcode:
 
     @pytest.fixture(scope="class")
     def fp_run(
-        self, u: mda.Universe, ligand_ag, protein_ag, fp: plf.Fingerprint
+        self,
+        u: mda.Universe,
+        ligand_ag,
+        protein_ag,
+        fp: plf.Fingerprint,
     ) -> plf.Fingerprint:
         fp.run(u.trajectory[0:2], ligand_ag, protein_ag)
         return fp
@@ -65,6 +69,7 @@ class TestBarcode:
         fp = plf.Fingerprint()
         with pytest.raises(
             RunRequiredError,
-            match="Please run the fingerprint analysis before attempting to display results",
+            match="Please run the fingerprint analysis before attempting to display"
+            " results",
         ):
             Barcode.from_fingerprint(fp)

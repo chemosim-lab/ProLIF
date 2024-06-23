@@ -10,6 +10,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+# ruff: noqa: PTH100
 import os
 import sys
 
@@ -24,7 +25,7 @@ from recommonmark.transform import AutoStructify
 # -- Project information -----------------------------------------------------
 
 project = "ProLIF"
-copyright = f"2017-{datetime.now().year}, Cédric Bouysset"
+copyright = f"2017-{datetime.now().year}, Cédric Bouysset"  # noqa: A001
 author = "Cédric Bouysset"
 
 
@@ -99,7 +100,7 @@ html_theme_options = {
             "url": "https://github.com/chemosim-lab/ProLIF",
             "icon": "fa-brands fa-square-github",
             "type": "fontawesome",
-        }
+        },
     ],
 }
 
@@ -123,7 +124,7 @@ def setup(app):
     app.add_config_value(
         "recommonmark_config",
         {
-            #'url_resolver': lambda url: github_doc_root + url,
+            # 'url_resolver': lambda url: github_doc_root + url,
             "auto_toc_tree_section": "Contents",
             "enable_math": False,
             "enable_inline_math": False,

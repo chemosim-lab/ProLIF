@@ -7,7 +7,7 @@ from prolif.pickling import PROLIF_PICKLE_OPTIONS, RDKitPickleHandler
 
 
 @pytest.fixture(autouse=True)
-def reset_default_pickle_properties():
+def _reset_default_pickle_properties():
     default = Chem.GetDefaultPickleProperties()
     yield
     Chem.SetDefaultPickleProperties(default)

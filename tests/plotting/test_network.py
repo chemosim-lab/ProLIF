@@ -39,7 +39,11 @@ class TestLigNetwork:
     def test_integration_frame(self, fp_mol):
         fp, lig_mol = fp_mol
         net = LigNetwork.from_fingerprint(
-            fp, lig_mol, kind="frame", frame=0, display_all=fp.count
+            fp,
+            lig_mol,
+            kind="frame",
+            frame=0,
+            display_all=fp.count,
         )
         with StringIO() as buffer:
             net.save(buffer)
@@ -75,8 +79,7 @@ class TestLigNetwork:
         net = get_ligplot()
         output = tmp_path / "lignetwork.html"
         net.save(output)
-        with open(output, "r") as f:
-            assert "PHE331.B" in f.read()
+        assert "PHE331.B" in output.read_text()
 
     def test_from_fingerprint_raises_kind(self, get_ligplot):
         with pytest.raises(ValueError, match='must be "aggregate" or "frame"'):
@@ -86,7 +89,8 @@ class TestLigNetwork:
         fp = plf.Fingerprint()
         with pytest.raises(
             RunRequiredError,
-            match="Please run the fingerprint analysis before attempting to display results",
+            match="Please run the fingerprint analysis before attempting to display"
+            " results",
         ):
             LigNetwork.from_fingerprint(fp, ligand_mol)
 

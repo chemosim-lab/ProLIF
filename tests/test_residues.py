@@ -8,7 +8,7 @@ from prolif.residue import Residue, ResidueGroup, ResidueId
 
 class TestResidueId:
     @pytest.mark.parametrize(
-        "name, number, chain",
+        ("name", "number", "chain"),
         [
             ("ALA", None, None),
             ("ALA", 1, None),
@@ -34,7 +34,7 @@ class TestResidueId:
         assert resid.chain == chain
 
     @pytest.mark.parametrize(
-        "name, number, chain",
+        ("name", "number", "chain"),
         [
             ("ALA", None, None),
             ("ALA", 1, None),
@@ -77,7 +77,7 @@ class TestResidueId:
         assert resid.chain is None
 
     @pytest.mark.parametrize(
-        "resid_str, expected",
+        ("resid_str", "expected"),
         [
             ("ALA", ("ALA", 0, None)),
             ("ALA1", ("ALA", 1, None)),
@@ -112,7 +112,7 @@ class TestResidueId:
         assert res1 == res2
 
     @pytest.mark.parametrize(
-        "res1, res2",
+        ("res1", "res2"),
         [
             ("ALA1.A", "ALA1.B"),
             ("ALA2.A", "ALA3.A"),
@@ -153,10 +153,7 @@ class TestResidueGroup:
     def residues(self):
         sequence = "ARNDCQEGHILKMFPSTWYV"
         protein = Chem.MolFromSequence(sequence)
-        residues = [
-            Residue(res) for res in Chem.SplitMolByPDBResidues(protein).values()
-        ]
-        return residues
+        return [Residue(res) for res in Chem.SplitMolByPDBResidues(protein).values()]
 
     def test_init(self, residues):
         rg = ResidueGroup(residues)
@@ -185,7 +182,7 @@ class TestResidueGroup:
         assert rg.n_residues == 20
 
     @pytest.mark.parametrize(
-        "ix, resid, resid_str",
+        ("ix", "resid", "resid_str"),
         [
             (0, ("ALA", 1, "A"), "ALA1.A"),
             (4, ("CYS", 5, "A"), "CYS5.A"),

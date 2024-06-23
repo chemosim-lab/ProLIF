@@ -1,3 +1,4 @@
+# ruff: noqa: F401
 from prolif import datafiles
 from prolif._version import __version__
 from prolif.fingerprint import Fingerprint

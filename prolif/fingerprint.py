@@ -77,7 +77,8 @@ class Fingerprint:
     ----------
     interactions : list
         List of names (str) of interaction classes as found in the
-        :mod:`prolif.interactions` module.
+        :mod:`prolif.interactions` module. Defaults to Hydrophobic, HBDonor, HBAcceptor,
+        PiStacking, Anionic, Cationic, CationPi, PiCation, VdWContact.
     parameters : dict, optional
         New parameters for the interactions. Mapping between an interaction name and a
         dict of parameters as they appear in the interaction class.
@@ -184,17 +185,7 @@ class Fingerprint:
 
     def __init__(
         self,
-        interactions=[
-            "Hydrophobic",
-            "HBDonor",
-            "HBAcceptor",
-            "PiStacking",
-            "Anionic",
-            "Cationic",
-            "CationPi",
-            "PiCation",
-            "VdWContact",
-        ],
+        interactions=None,
         parameters=None,
         count=False,
         vicinity_cutoff=6.0,
@@ -202,6 +193,19 @@ class Fingerprint:
         self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
+        if interactions is None:
+            interactions = [
+                "Hydrophobic",
+                "HBDonor",
+                "HBAcceptor",
+                "PiStacking",
+                "Anionic",
+                "Cationic",
+                "CationPi",
+                "PiCation",
+                "VdWContact",
+            ]
+        self.interactions = interactions
 
     def _set_interactions(self, interactions, parameters):
         # read interactions to compute
@@ -227,7 +231,7 @@ class Fingerprint:
         unknown = unsafe.symmetric_difference(_INTERACTIONS.keys()) & unsafe
         if unknown:
             raise NameError(
-                f"Unknown interaction(s) in {varname!r}: {', '.join(unknown)}"
+                f"Unknown interaction(s) in {varname!r}: {', '.join(unknown)}",
             )
 
     def __repr__(self):  # pragma: no cover
@@ -365,7 +369,9 @@ class Fingerprint:
         for lresid, lres in lig.residues.items():
             if residues is None:
                 prot_residues = get_residues_near_ligand(
-                    lres, prot, self.vicinity_cutoff
+                    lres,
+                    prot,
+                    self.vicinity_cutoff,
                 )
             for prot_key in prot_residues:
                 pres = prot[prot_key]
@@ -457,7 +463,7 @@ class Fingerprint:
             dictionary containing more complete interaction metadata instead of just
             atom indices.
 
-        """
+        """  # noqa: E501
         if n_jobs is not None and n_jobs < 1:
             raise ValueError("n_jobs must be > 0 or None")
         if converter_kwargs is not None and len(converter_kwargs) != 2:
@@ -485,7 +491,10 @@ class Fingerprint:
             lig_mol = Molecule.from_mda(lig, **converter_kwargs[0])
             prot_mol = Molecule.from_mda(prot, **converter_kwargs[1])
             ifp[int(ts.frame)] = self.generate(
-                lig_mol, prot_mol, residues=residues, metadata=True
+                lig_mol,
+                prot_mol,
+                residues=residues,
+                metadata=True,
             )
         self.ifp = ifp
         return self
@@ -501,7 +510,7 @@ class Fingerprint:
         n_jobs=None,
     ):
         """Parallel implementation of :meth:`~Fingerprint.run`"""
-        n_chunks = n_jobs if n_jobs else mp.cpu_count()
+        n_chunks = n_jobs or mp.cpu_count()
         try:
             n_frames = traj.n_frames
         except AttributeError:
@@ -528,7 +537,13 @@ class Fingerprint:
         return self
 
     def run_from_iterable(
-        self, lig_iterable, prot_mol, *, residues=None, progress=True, n_jobs=None
+        self,
+        lig_iterable,
+        prot_mol,
+        *,
+        residues=None,
+        progress=True,
+        n_jobs=None,
     ):
         """Generates the fingerprint between a list of ligands and a protein
 
@@ -613,7 +628,12 @@ class Fingerprint:
         return self
 
     def _run_iter_parallel(
-        self, lig_iterable, prot_mol, residues=None, progress=True, n_jobs=None
+        self,
+        lig_iterable,
+        prot_mol,
+        residues=None,
+        progress=True,
+        n_jobs=None,
     ):
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
         total = (
@@ -637,7 +657,12 @@ class Fingerprint:
         return self
 
     def to_dataframe(
-        self, *, count=None, dtype=None, drop_empty=True, index_col="Frame"
+        self,
+        *,
+        count=None,
+        dtype=None,
+        drop_empty=True,
+        index_col="Frame",
     ):
         """Converts fingerprints to a pandas DataFrame
 
@@ -817,7 +842,7 @@ class Fingerprint:
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
-                r"The .+ interaction has been superseded by a new class",  # pragma: no cover
+                r"The .+ interaction has been superseded by a new class",  # pragma: no cover  # noqa: E501
             )
             if isinstance(path_or_bytes, bytes):
                 return dill.loads(path_or_bytes)
@@ -861,11 +886,12 @@ class Fingerprint:
             Frequency threshold, between 0 and 1. Only applicable for
             ``kind="aggregate"``.
         use_coordinates : bool
-            If ``True``, uses the coordinates of the molecule directly, otherwise generates
-            2D coordinates from scratch. See also ``flatten_coordinates``.
+            If ``True``, uses the coordinates of the molecule directly, otherwise
+            generates 2D coordinates from scratch. See also ``flatten_coordinates``.
         flatten_coordinates : bool
-            If this is ``True`` and ``use_coordinates=True``, generates 2D coordinates that
-            are constrained to fit the 3D conformation of the ligand as best as possible.
+            If this is ``True`` and ``use_coordinates=True``, generates 2D coordinates
+            that are constrained to fit the 3D conformation of the ligand as best as
+            possible.
         kekulize : bool
             Kekulize the ligand.
         molsize : int
@@ -1007,6 +1033,9 @@ class Fingerprint:
         from prolif.plotting.complex3d import Complex3D
 
         plot3d = Complex3D.from_fingerprint(
-            self, frame=frame, lig_mol=ligand_mol, prot_mol=protein_mol
+            self,
+            frame=frame,
+            lig_mol=ligand_mol,
+            prot_mol=protein_mol,
         )
         return plot3d.display(size=size, display_all=display_all)
