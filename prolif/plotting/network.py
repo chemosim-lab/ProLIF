@@ -267,6 +267,8 @@ class LigNetwork:
             for interaction_group in temp.values()
             for interaction in interaction_group
         }
+        # ID for saving to PNG with JS
+        self.uuid = uuid4().hex
 
     @classmethod
     def from_fingerprint(
@@ -801,11 +803,11 @@ class LigNetwork:
         """Prepare and display the network"""
         html = self._get_html(**kwargs)
         iframe = (
-            '<iframe width="{width}" height="{height}" frameborder="0" '
+            '<iframe id="{uuid}" width="{width}" height="{height}" frameborder="0" '
             'srcdoc="{doc}"></iframe>'
         )
         return HTML(
-            iframe.format(width=self.width, height=self.height, doc=escape(html))
+            iframe.format(width=self.width, height=self.height, doc=escape(html)),
         )
 
     @requires("IPython.display")
@@ -815,11 +817,11 @@ class LigNetwork:
         with open(filename, "w") as f:
             f.write(html)
         iframe = (
-            '<iframe width="{width}" height="{height}" frameborder="0" '
-            'src="{filename}"></iframe>'
+            '<iframe id="{uuid}" width="{width}" height="{height}" frameborder="0" '
+            'src="{filename}"></iframe>'  # noqa: RUF027
         )
         return HTML(
-            iframe.format(width=self.width, height=self.height, filename=filename)
+            iframe.format(width=self.width, height=self.height, filename=filename),
         )
 
     def save(self, fp, **kwargs):
@@ -836,3 +838,22 @@ class LigNetwork:
                 f.write(html)
         elif hasattr(fp, "write") and callable(fp.write):
             fp.write(html)
+
+    @requires("IPython.display")
+    def save_png(self):
+        """Saves the current state of the ligplot to a PNG. Not available outside of a
+        notebook.
+
+        Notes
+        -----
+        Requires calling ``display`` or ``show`` first. The legend won't be exported.
+        """
+        return Javascript(f"""
+        var iframe = document.getElementById("{self.uuid}");
+        var iframe_doc = iframe.contentWindow.document;
+        var canvas = iframe_doc.getElementsByTagName("canvas")[0];
+        var link = document.createElement("a");
+        link.href = canvas.toDataURL();
+        link.download = "prolif-lignetwork.png"
+        link.click();
+        """)
