@@ -32,7 +32,7 @@ def requires(module):  # pragma: no cover
                 return func(*args, **kwargs)
             raise ModuleNotFoundError(
                 f"The module {module!r} is required to use {func.__name__!r} "
-                "but it is not installed!"
+                "but it is not installed!",
             )
 
         return wrapper
@@ -46,7 +46,7 @@ def catch_rdkit_logs():
     rdBase.DisableLog("rdApp.*")
     yield
     log_status = {st.split(":")[0]: st.split(":")[1] for st in log_status.split("\n")}
-    log_status = {k: True if v == "enabled" else False for k, v in log_status.items()}
+    log_status = {k: v == "enabled" for k, v in log_status.items()}
     for k, v in log_status.items():
         if v is True:
             rdBase.EnableLog(k)
@@ -75,9 +75,8 @@ def get_ring_normal_vector(centroid, coordinates):
     ca = centroid.DirectionVector(a)
     cb = centroid.DirectionVector(b)
     # cross product between these two vectors
-    normal = ca.CrossProduct(cb)
     # cb.CrossProduct(ca) is the normal vector in the opposite direction
-    return normal
+    return ca.CrossProduct(cb)
 
 
 def angle_between_limits(angle, min_angle, max_angle, ring=False):
@@ -129,7 +128,7 @@ def get_residues_near_ligand(lig, prot, cutoff=6.0):
     """
     tree = cKDTree(prot.xyz)
     ix = tree.query_ball_point(lig.xyz, cutoff)
-    ix = set([i for lst in ix for i in lst])
+    ix = {i for lst in ix for i in lst}
     resids = [ResidueId.from_atom(prot.GetAtomWithIdx(i)) for i in ix]
     return list(set(resids))
 
@@ -250,9 +249,7 @@ def to_dataframe(
     empty_arr = np.array([empty_value for _ in range(n_interactions)], dtype=dtype)
     # residue pairs
     residue_pairs = sorted(
-        set(
-            [residue_tuple for frame_ifp in ifp.values() for residue_tuple in frame_ifp]
-        )
+        {residue_tuple for frame_ifp in ifp.values() for residue_tuple in frame_ifp},
     )
     # sparse to dense
     data = defaultdict(list)
@@ -267,23 +264,25 @@ def to_dataframe(
             else:
                 if count:
                     bitvector = np.array(
-                        [len(ifp_dict.get(i, ())) for i in interactions], dtype=dtype
+                        [len(ifp_dict.get(i, ())) for i in interactions],
+                        dtype=dtype,
                     )
                 else:
                     bitvector = np.array(
-                        [i in ifp_dict for i in interactions], dtype=bool
+                        [i in ifp_dict for i in interactions],
+                        dtype=bool,
                     )
                 data[residue_tuple].append(bitvector)
     index = pd.Series(index, name=index_col)
     # create dataframe
     if not data:
-        warnings.warn("No interaction detected")
+        warnings.warn("No interaction detected", stacklevel=2)
         return pd.DataFrame([], index=index)
     values = np.array(
         [
             np.hstack([bitvector_list[frame] for bitvector_list in data.values()])
             for frame in range(len(index))
-        ]
+        ],
     )
     columns = pd.MultiIndex.from_tuples(
         [

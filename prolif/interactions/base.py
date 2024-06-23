@@ -36,12 +36,14 @@ class Interaction:
         register = _BASE_INTERACTIONS if is_abstract else _INTERACTIONS
         if not hasattr(cls, "detect"):
             raise TypeError(
-                f"Can't instantiate interaction class {name} without a `detect` method."
+                f"Can't instantiate interaction class {name} without a `detect`"
+                " method.",
             )
         if name in register:
             warnings.warn(
                 f"The {name!r} interaction has been superseded by a "
-                f"new class with id {id(cls):#x}"
+                f"new class with id {id(cls):#x}",
+                stacklevel=2,
             )
         register[name] = cls
 
@@ -66,10 +68,10 @@ class Interaction:
             },
             "parent_indices": {
                 "ligand": tuple(
-                    [get_mapindex(lig_res, index) for index in lig_indices]
+                    [get_mapindex(lig_res, index) for index in lig_indices],
                 ),
                 "protein": tuple(
-                    [get_mapindex(prot_res, index) for index in prot_indices]
+                    [get_mapindex(prot_res, index) for index in prot_indices],
                 ),
             },
             **data,
@@ -101,8 +103,7 @@ class Interaction:
         """
         cls_docstring = cls.__doc__ or "\n"
         parameters_doc = cls_docstring.split("\n", maxsplit=1)[1]
-        __doc__ = f"{docstring}\n{parameters_doc}"
-        inverted = type(name, (cls,), {"__doc__": __doc__})
+        inverted = type(name, (cls,), {"__doc__": f"{docstring}\n{parameters_doc}"})
 
         def detect(self, ligand, residue):
             for metadata in super(inverted, self).detect(residue, ligand):
@@ -140,7 +141,11 @@ class Distance(Interaction, is_abstract=True):
                 dist = alig.Distance(aprot)
                 if dist <= self.distance:
                     yield self.metadata(
-                        lig_res, prot_res, lig_match, prot_match, distance=dist
+                        lig_res,
+                        prot_res,
+                        lig_match,
+                        prot_match,
+                        distance=dist,
                     )
 
 
@@ -366,11 +371,15 @@ class BasePiStacking(Interaction, is_abstract=True):
                 n2c2c1 = res_normal.AngleTo(c2c1)
                 ncc_angle = None
                 if angle_between_limits(
-                    n1c1c2, *self.normal_to_centroid_angle, ring=True
+                    n1c1c2,
+                    *self.normal_to_centroid_angle,
+                    ring=True,
                 ):
                     ncc_angle = n1c1c2
                 elif angle_between_limits(
-                    n2c2c1, *self.normal_to_centroid_angle, ring=True
+                    n2c2c1,
+                    *self.normal_to_centroid_angle,
+                    ring=True,
                 ):
                     ncc_angle = n2c2c1
                 if ncc_angle is None:
@@ -378,7 +387,10 @@ class BasePiStacking(Interaction, is_abstract=True):
                 if self.intersect:
                     # look for point of intersection between both ring planes
                     intersect = self._get_intersect_point(
-                        lig_normal, lig_centroid, res_normal, res_centroid
+                        lig_normal,
+                        lig_centroid,
+                        res_normal,
+                        res_centroid,
                     )
                     if intersect is None:
                         continue
@@ -420,7 +432,7 @@ class BasePiStacking(Interaction, is_abstract=True):
         intersect_direction = plane_normal.CrossProduct(tilted_normal)
         # setup system of linear equations to solve
         A = np.array(
-            [list(plane_normal), list(tilted_normal), list(intersect_direction)]
+            [list(plane_normal), list(tilted_normal), list(intersect_direction)],
         )
         if np.linalg.det(A) == 0:
             return None

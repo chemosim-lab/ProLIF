@@ -11,6 +11,7 @@ Plot interactions as a barcode --- :mod:`prolif.plotting.barcode`
 
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import TYPE_CHECKING, ClassVar, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
@@ -76,7 +77,7 @@ class Barcode:
             return s.apply(
                 lambda v: (
                     self.color_mapper[interaction] if v else self.color_mapper[None]
-                )
+                ),
             )
 
         self.df = df.astype(np.uint8).T.apply(_bit_to_color_value, axis=1)
@@ -87,7 +88,7 @@ class Barcode:
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
                 "Please run the fingerprint analysis before attempting to display"
-                " results."
+                " results.",
             )
         return cls(fp.to_dataframe())
 
@@ -182,11 +183,9 @@ class Barcode:
 
         # legend
         values: List[int] = np.unique(self.df.values).tolist()
-        try:
-            values.pop(values.index(0))  # remove None color
-        except ValueError:
+        with suppress(ValueError):
             # 0 not in values (e.g. plotting a single frame)
-            pass
+            values.pop(values.index(0))  # remove None color
         legend_colors = {
             self.inv_color_mapper[value]: im.cmap(value) for value in values
         }
@@ -229,7 +228,7 @@ class Barcode:
                 and event.ydata is not None
             ):
                 x, y = round(event.xdata), round(event.ydata)
-                if self.df.values[y, x]:
+                if self.df.to_numpy()[y, x]:
                     annot.xy = (x, y)
                     frame = frames[x]
                     interaction = interactions[y]

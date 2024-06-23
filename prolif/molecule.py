@@ -94,8 +94,8 @@ class Molecule(BaseRDKitMol):
             Apply a selection to `obj` to create an AtomGroup. Uses all atoms
             in `obj` if ``selection=None``
         **kwargs : object
-            Other arguments passed to the :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
-            of MDAnalysis
+            Other arguments passed to the
+            :class:`~MDAnalysis.converters.RDKit.RDKitConverter` of MDAnalysis
 
         Example
         -------
@@ -160,8 +160,7 @@ class Molecule(BaseRDKitMol):
         return cls(mol)
 
     def __iter__(self):
-        for residue in self.residues.values():
-            yield residue
+        yield from self.residues.values()
 
     def __getitem__(self, key):
         return self.residues[key]
@@ -257,11 +256,12 @@ class pdbqt_supplier(Sequence):
             catch_rdkit_logs(),
             catch_warning(
                 message=r"^(Could not sanitize molecule)|"
-                r"(No `bonds` attribute in this AtomGroup)"
+                r"(No `bonds` attribute in this AtomGroup)",
             ),
         ):
             pdbqt_mol = pdbqt.atoms.convert_to.rdkit(
-                NoImplicit=False, **self.converter_kwargs
+                NoImplicit=False,
+                **self.converter_kwargs,
             )
         mol = self._adjust_hydrogens(self.template, pdbqt_mol)
         return Molecule.from_rdkit(mol, **self._kwargs)
@@ -279,7 +279,8 @@ class pdbqt_supplier(Sequence):
                 atoms_with_hydrogens[
                     atom.GetNeighbors()[0].GetIntProp("_MDAnalysis_index")
                 ].append(atom)
-        # mapping between atom that should be bearing a H in RWMol and corresponding H(s)
+        # mapping between atom that should be bearing a H in RWMol and
+        # corresponding hydrogens
         reverse_mapping = {}
         for atom in mol.GetAtoms():
             if (idx := atom.GetIntProp("_MDAnalysis_index")) in atoms_with_hydrogens:
@@ -400,7 +401,7 @@ class mol2_supplier(Sequence):
 
     def __iter__(self):
         block = []
-        with open(self.path, "r") as f:
+        with open(self.path) as f:
             for line in f:
                 if line.startswith("#"):
                     continue
@@ -411,7 +412,11 @@ class mol2_supplier(Sequence):
             yield self.block_to_mol(block)
 
     def block_to_mol(self, block):
-        mol = Chem.MolFromMol2Block("".join(block), removeHs=False)
+        mol = Chem.MolFromMol2Block(
+            "".join(block),
+            removeHs=False,
+            cleanupSubstructures=self.cleanup_substructures,
+        )
         return Molecule.from_rdkit(mol, **self._kwargs)
 
     def __getitem__(self, index):
@@ -420,7 +425,7 @@ class mol2_supplier(Sequence):
         mol_index = -1
         molblock_started = False
         block = []
-        with open(self.path, "r") as f:
+        with open(self.path) as f:
             for line in f:
                 if line.startswith("@<TRIPOS>MOLECULE"):
                     mol_index += 1
@@ -435,6 +440,5 @@ class mol2_supplier(Sequence):
         raise ValueError(f"Could not parse molecule with index {index}")
 
     def __len__(self):
-        with open(self.path, "r") as f:
-            n_mols = sum(line.startswith("@<TRIPOS>MOLECULE") for line in f)
-        return n_mols
+        with open(self.path) as f:
+            return sum(line.startswith("@<TRIPOS>MOLECULE") for line in f)

@@ -53,7 +53,8 @@ class TestComplex3D:
         fp = plf.Fingerprint()
         with pytest.raises(
             RunRequiredError,
-            match="Please run the fingerprint analysis before attempting to display results",
+            match="Please run the fingerprint analysis before attempting to display"
+            " results",
         ):
             Complex3D.from_fingerprint(
                 fp,

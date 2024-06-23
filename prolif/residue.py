@@ -183,17 +183,18 @@ class ResidueGroup(UserDict):
         # bool is a subclass of int but shouldn't be used here
         if isinstance(key, bool):
             raise KeyError(
-                f"Expected a ResidueId, int, or str, got {type(key).__name__!r} instead"
+                f"Expected a ResidueId, int, or str, got {type(key).__name__!r}"
+                " instead",
             )
         if isinstance(key, int):
             return self._residues[key]
-        elif isinstance(key, str):
+        if isinstance(key, str):
             key = ResidueId.from_string(key)
             return self.data[key]
-        elif isinstance(key, ResidueId):
+        if isinstance(key, ResidueId):
             return self.data[key]
         raise KeyError(
-            f"Expected a ResidueId, int, or str, got {type(key).__name__!r} instead"
+            f"Expected a ResidueId, int, or str, got {type(key).__name__!r} instead",
         )
 
     def select(self, mask):

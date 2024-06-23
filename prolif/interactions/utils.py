@@ -24,27 +24,27 @@ def get_mapindex(res, index):
     return res.GetAtomWithIdx(index).GetUnsignedProp("mapindex")
 
 
-def _distance_3args_l1_p1(l1, p1, p2):
+def _distance_3args_l1_p1(l1, p1, p2):  # noqa: ARG001
     return l1.Distance(p1)
 
 
-def _distance_3args_l1_p2(l1, p1, p2):
+def _distance_3args_l1_p2(l1, p1, p2):  # noqa: ARG001
     return l1.Distance(p2)
 
 
-def _distance_4args_l1_p1(l1, l2, p1, p2):
+def _distance_4args_l1_p1(l1, l2, p1, p2):  # noqa: ARG001
     return l1.Distance(p1)
 
 
-def _distance_4args_l1_p2(l1, l2, p1, p2):
+def _distance_4args_l1_p2(l1, l2, p1, p2):  # noqa: ARG001
     return l1.Distance(p2)
 
 
-def _distance_4args_l2_p1(l1, l2, p1, p2):
+def _distance_4args_l2_p1(l1, l2, p1, p2):  # noqa: ARG001
     return l2.Distance(p1)
 
 
-def _distance_4args_l2_p2(l1, l2, p1, p2):
+def _distance_4args_l2_p2(l1, l2, p1, p2):  # noqa: ARG001
     return l2.Distance(p2)
 
 

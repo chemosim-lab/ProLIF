@@ -54,13 +54,13 @@ class TestFingerprint:
         _INTERACTIONS.pop("Dummy", None)
 
     def test_init(self, fp_simple):
-        assert "Hydrophobic" in fp_simple.interactions.keys()
+        assert "Hydrophobic" in fp_simple.interactions
         assert hasattr(fp_simple, "hydrophobic") and callable(fp_simple.hydrophobic)
-        assert "Dummy" not in fp_simple.interactions.keys()
+        assert "Dummy" not in fp_simple.interactions
         assert hasattr(fp_simple, "dummy") and callable(fp_simple.dummy)
-        assert "_BaseHBond" not in fp_simple.interactions.keys()
+        assert "_BaseHBond" not in fp_simple.interactions
         assert not hasattr(fp_simple, "_basehbond")
-        assert "Interaction" not in fp_simple.interactions.keys()
+        assert "Interaction" not in fp_simple.interactions
         assert not hasattr(fp_simple, "interaction")
 
     def test_init_all(self):
@@ -100,7 +100,7 @@ class TestFingerprint:
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
         res = ResidueId.from_string("TYR109.A")
-        assert (lig_id, res) in fp_simple.ifp[0].keys()
+        assert (lig_id, res) in fp_simple.ifp[0]
         fp_simple.run(
             u.trajectory[1:2],
             ligand_ag,
@@ -111,15 +111,19 @@ class TestFingerprint:
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
         res = ResidueId.from_string("TRP125.A")
-        assert (lig_id, res) in fp_simple.ifp[1].keys()
+        assert (lig_id, res) in fp_simple.ifp[1]
         fp_simple.run(
-            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+            u.trajectory[:3],
+            ligand_ag,
+            protein_ag,
+            residues=None,
+            progress=False,
         )
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 3
         assert len(fp_simple.ifp[0]) > 1
         res = ResidueId.from_string("ALA216.A")
-        assert (lig_id, res) in fp_simple.ifp[0].keys()
+        assert (lig_id, res) in fp_simple.ifp[0]
         u.trajectory[0]
 
     def test_generate(self, fp_simple, ligand_mol, protein_mol):
@@ -137,7 +141,11 @@ class TestFingerprint:
 
     def test_run(self, fp_simple, u, ligand_ag, protein_ag):
         fp_simple.run(
-            u.trajectory[0:1], ligand_ag, protein_ag, residues=None, progress=False
+            u.trajectory[0:1],
+            ligand_ag,
+            protein_ag,
+            residues=None,
+            progress=False,
         )
         assert hasattr(fp_simple, "ifp")
         ifp = fp_simple.ifp[0]
@@ -145,10 +153,8 @@ class TestFingerprint:
         assert isinstance(interactions, dict)
         metadata_tuple = next(iter(interactions.values()))
         assert all(
-            [
-                key in metadata_tuple[0]
-                for key in ["indices", "parent_indices", "distance"]
-            ]
+            key in metadata_tuple[0]
+            for key in ["indices", "parent_indices", "distance"]
         )
 
     def test_run_from_iterable(self, fp_simple, protein_mol):
@@ -161,7 +167,11 @@ class TestFingerprint:
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_dataframe()
         fp_simple.run(
-            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+            u.trajectory[:3],
+            ligand_ag,
+            protein_ag,
+            residues=None,
+            progress=False,
         )
         df = fp_simple.to_dataframe()
         assert isinstance(df, DataFrame)
@@ -169,19 +179,27 @@ class TestFingerprint:
 
     def test_to_df_kwargs(self, fp_simple, u, ligand_ag, protein_ag):
         fp_simple.run(
-            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+            u.trajectory[:3],
+            ligand_ag,
+            protein_ag,
+            residues=None,
+            progress=False,
         )
         df = fp_simple.to_dataframe(dtype=np.uint8)
         assert df.dtypes.iloc[0].type is np.uint8
         df = fp_simple.to_dataframe(drop_empty=False)
-        resids = set([key for d in fp_simple.ifp.values() for key in d.keys()])
+        resids = {key for d in fp_simple.ifp.values() for key in d}
         assert df.shape == (3, len(resids))
 
     def test_to_bitvector(self, fp_simple, u, ligand_ag, protein_ag):
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_bitvectors()
         fp_simple.run(
-            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+            u.trajectory[:3],
+            ligand_ag,
+            protein_ag,
+            residues=None,
+            progress=False,
         )
         bvs = fp_simple.to_bitvectors()
         assert isinstance(bvs[0], ExplicitBitVect)
@@ -191,7 +209,11 @@ class TestFingerprint:
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_countvectors()
         fp_count.run(
-            u.trajectory[:3], ligand_ag, protein_ag, residues=None, progress=False
+            u.trajectory[:3],
+            ligand_ag,
+            protein_ag,
+            residues=None,
+            progress=False,
         )
         cvs = fp_count.to_countvectors()
         assert isinstance(cvs[0], UIntSparseIntVect)
@@ -212,27 +234,29 @@ class TestFingerprint:
 
     def test_unknown_interaction(self):
         with pytest.raises(
-            NameError, match=r"Unknown interaction\(s\) in 'interactions': foo"
+            NameError,
+            match=r"Unknown interaction\(s\) in 'interactions': foo",
         ):
             Fingerprint(["Cationic", "foo"])
         with pytest.raises(
-            NameError, match=r"Unknown interaction\(s\) in 'parameters': bar"
+            NameError,
+            match=r"Unknown interaction\(s\) in 'parameters': bar",
         ):
             Fingerprint(["Cationic"], parameters={"bar": {}})
 
-    @pytest.fixture
+    @pytest.fixture()
     def fp_to_pickle(self, fp, protein_mol):
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
         return fp
 
-    @pytest.fixture
+    @pytest.fixture()
     def fp_unpkl(self, fp_to_pickle):
         pkl = fp_to_pickle.to_pickle()
         return Fingerprint.from_pickle(pkl)
 
-    @pytest.fixture
+    @pytest.fixture()
     def fp_unpkl_file(self, fp_to_pickle, tmp_path):
         pkl_path = tmp_path / "fp.pkl"
         fp_to_pickle.to_pickle(pkl_path)
@@ -256,7 +280,11 @@ class TestFingerprint:
         fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag, n_jobs=1, progress=False)
         serial = fp.to_dataframe()
         fp.run(
-            u.trajectory[0:100:10], ligand_ag, protein_ag, n_jobs=None, progress=False
+            u.trajectory[0:100:10],
+            ligand_ag,
+            protein_ag,
+            n_jobs=None,
+            progress=False,
         )
         multi = fp.to_dataframe()
         assert serial.equals(multi)
@@ -273,7 +301,8 @@ class TestFingerprint:
 
     def test_converter_kwargs_raises_error(self, fp, u, ligand_ag, protein_ag):
         with pytest.raises(
-            ValueError, match="converter_kwargs must be a list of 2 dicts"
+            ValueError,
+            match="converter_kwargs must be a list of 2 dicts",
         ):
             fp.run(
                 u.trajectory[0:5],
@@ -281,7 +310,7 @@ class TestFingerprint:
                 protein_ag,
                 n_jobs=1,
                 progress=False,
-                converter_kwargs=[dict(force=True)],
+                converter_kwargs=[{"force": True}],
             )
 
     @pytest.mark.parametrize("n_jobs", [1, 2])
@@ -293,7 +322,7 @@ class TestFingerprint:
             lig,
             prot,
             n_jobs=n_jobs,
-            converter_kwargs=[dict(force=True), dict(force=True)],
+            converter_kwargs=[{"force": True}, {"force": True}],
         )
         assert fp.ifp
 

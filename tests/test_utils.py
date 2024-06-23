@@ -19,7 +19,7 @@ from prolif.utils import (
 )
 
 
-@pytest.fixture
+@pytest.fixture()
 def ifp_single():
     return {
         0: {
@@ -36,7 +36,7 @@ def ifp_single():
     }
 
 
-@pytest.fixture
+@pytest.fixture()
 def ifp_count():
     return {
         0: {
@@ -44,7 +44,7 @@ def ifp_count():
                 "A": (
                     {"indices": {"ligand": (0,), "protein": (1,)}},
                     {"indices": {"ligand": (1,), "protein": (1,)}},
-                )
+                ),
             },
             ("LIG", "GLU2"): {"B": ({"indices": {"ligand": (1,), "protein": (3,)}},)},
         },
@@ -77,7 +77,7 @@ def test_centroid():
 
 
 @pytest.mark.parametrize(
-    "angle, mina, maxa, ring, expected",
+    ("angle", "mina", "maxa", "ring", "expected"),
     [
         (0, 0, 30, False, True),
         (30, 0, 30, False, True),
@@ -161,7 +161,7 @@ def test_split_residues():
     sequence = "ARNDCQEGHILKMFPSTWYV"
     prot = Chem.MolFromSequence(sequence)
     rg = ResidueGroup(
-        [Residue(res) for res in Chem.SplitMolByPDBResidues(prot).values()]
+        [Residue(res) for res in Chem.SplitMolByPDBResidues(prot).values()],
     )
     residues = [Residue(mol) for mol in split_mol_by_residues(prot)]
     residues.sort(key=lambda x: x.resid)
@@ -172,7 +172,7 @@ def test_split_residues():
 
 def test_is_peptide_bond():
     mol = Chem.RWMol()
-    for i in range(3):
+    for _ in range(3):
         a = Chem.Atom(6)
         mol.AddAtom(a)
     mol.AddBond(0, 1)

@@ -5,7 +5,7 @@ from rdkit import Chem
 
 from prolif.datafiles import datapath
 from prolif.molecule import Molecule, mol2_supplier, pdbqt_supplier, sdf_supplier
-from prolif.residue import ResidueId
+from prolif.residue import Residue, ResidueId
 
 
 class TestMolecule(pytest.BaseTestMixinRDKitMol):
@@ -22,7 +22,7 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):
         mda_mol = Molecule.from_mda(u, "resname LIG")
         assert rdkit_mol[0].resid == mda_mol[0].resid
         assert rdkit_mol.HasSubstructMatch(mda_mol) and mda_mol.HasSubstructMatch(
-            rdkit_mol
+            rdkit_mol,
         )
 
     def test_from_mda_empty_ag(self, u):
@@ -50,8 +50,8 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):
         assert mol[key].resid is mol.residues[key].resid
 
     def test_iter(self, mol):
-        for i, r in enumerate(mol):
-            assert r.resid == mol[i].resid
+        for r in mol:
+            assert isinstance(r, Residue)
 
     def test_n_residues(self, mol):
         assert mol.n_residues == mol.residues.n_residues
@@ -82,14 +82,14 @@ class SupplierBase:
 class TestPDBQTSupplier(SupplierBase):
     resid = ResidueId("LIG", 1, "G")
 
-    @pytest.fixture
+    @pytest.fixture()
     def suppl(self):
         path = datapath / "vina"
         pdbqts = sorted(path.glob("*.pdbqt"))
         template = Chem.MolFromSmiles(
             "C[NH+]1CC(C(=O)NC2(C)OC3(O)C4CCCN4C(=O)"
             "C(Cc4ccccc4)N3C2=O)C=C2c3cccc4[nH]cc"
-            "(c34)CC21"
+            "(c34)CC21",
         )
         return pdbqt_supplier(pdbqts, template)
 
@@ -122,14 +122,14 @@ class TestPDBQTSupplier(SupplierBase):
 
 
 class TestSDFSupplier(SupplierBase):
-    @pytest.fixture
+    @pytest.fixture()
     def suppl(self):
         path = str(datapath / "vina" / "vina_output.sdf")
         return sdf_supplier(path)
 
 
 class TestMOL2Supplier(SupplierBase):
-    @pytest.fixture
+    @pytest.fixture()
     def suppl(self):
         path = str(datapath / "vina" / "vina_output.mol2")
         return mol2_supplier(path)

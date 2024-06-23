@@ -14,12 +14,15 @@ Plot a Ligand Interaction Network --- :mod:`prolif.plotting.network`
 """
 
 import json
+import operator
 import re
 import warnings
 from collections import defaultdict
 from copy import deepcopy
 from html import escape
 from pathlib import Path
+from typing import ClassVar
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
@@ -32,12 +35,13 @@ from prolif.residue import ResidueId
 from prolif.utils import requires
 
 try:
-    from IPython.display import HTML
+    from IPython.display import HTML, Javascript
 except ModuleNotFoundError:
     pass
 else:
     warnings.filterwarnings(
-        "ignore", "Consider using IPython.display.IFrame instead"  # pragma: no cover
+        "ignore",
+        "Consider using IPython.display.IFrame instead",  # pragma: no cover
     )
 
 
@@ -97,7 +101,7 @@ class LigNetwork:
         VanDerWaals.
     """
 
-    COLORS = {
+    COLORS: ClassVar = {
         "interactions": {**grouped_interaction_colors},
         "atoms": {
             "C": "black",
@@ -119,7 +123,7 @@ class LigNetwork:
             "Sulfur": "#e3ce59",
         },
     }
-    RESIDUE_TYPES = {
+    RESIDUE_TYPES: ClassVar = {
         "ALA": "Aliphatic",
         "GLY": "Aliphatic",
         "ILE": "Aliphatic",
@@ -149,8 +153,13 @@ class LigNetwork:
         "CYX": "Sulfur",
         "MET": "Sulfur",
     }
-    _LIG_PI_INTERACTIONS = ["EdgeToFace", "FaceToFace", "PiStacking", "PiCation"]
-    _DISPLAYED_ATOM = {  # index 0 in indices tuple by default
+    _LIG_PI_INTERACTIONS: ClassVar = [
+        "EdgeToFace",
+        "FaceToFace",
+        "PiStacking",
+        "PiCation",
+    ]
+    _DISPLAYED_ATOM: ClassVar = {  # index 0 in indices tuple by default
         "HBDonor": 1,
         "XBDonor": 1,
     }
@@ -200,7 +209,7 @@ class LigNetwork:
         </script>
         </body>
         </html>
-    """
+    """  # noqa: E501
 
     def __init__(
         self,
@@ -214,9 +223,9 @@ class LigNetwork:
         carbon=0.16,
     ):
         self.df = df
-        self._interacting_atoms = set(
-            [atom for atoms in df.index.get_level_values("atoms") for atom in atoms]
-        )
+        self._interacting_atoms = {
+            atom for atoms in df.index.get_level_values("atoms") for atom in atoms
+        }
         mol = deepcopy(lig_mol)
         if kekulize:
             Chem.Kekulize(mol)
@@ -254,12 +263,15 @@ class LigNetwork:
         self._default_atom_color = "grey"
         self._default_residue_color = "#dbdbdb"
         self._default_interaction_color = "#dbdbdb"
+        self._non_single_bond_spacing = 0.06
+        self._dash = [10]
         # regroup interactions of the same color
         temp = defaultdict(list)
         interactions = set(df.index.get_level_values("interaction").unique())
         for interaction in interactions:
             color = self.COLORS["interactions"].get(
-                interaction, self._default_interaction_color
+                interaction,
+                self._default_interaction_color,
             )
             temp[color].append(interaction)
         self._interaction_types = {
@@ -321,7 +333,7 @@ class LigNetwork:
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
                 "Please run the fingerprint analysis before attempting to display"
-                " results."
+                " results.",
             )
         if kind == "frame":
             df = cls._make_frame_df_from_fp(fp, frame=frame, display_all=display_all)
@@ -348,12 +360,13 @@ class LigNetwork:
                                 **entry,
                                 "atoms": metadata["parent_indices"]["ligand"],
                                 "distance": metadata.get("distance", 0),
-                            }
+                            },
                         )
                 else:
                     # extract interaction with shortest distance
                     metadata = min(
-                        metadata_tuple, key=lambda m: m.get("distance", np.nan)
+                        metadata_tuple,
+                        key=lambda m: m.get("distance", np.nan),
                     )
                     entry["atoms"] = metadata["parent_indices"]["ligand"]
                     entry["distance"] = metadata.get("distance", 0)
@@ -369,18 +382,19 @@ class LigNetwork:
         # add weight for each atoms, and average distance
         df["weight"] = 1
         df = df.groupby(["ligand", "protein", "interaction", "atoms"]).agg(
-            weight=("weight", "sum"), distance=("distance", "mean")
+            weight=("weight", "sum"),
+            distance=("distance", "mean"),
         )
-        df["weight"] = df["weight"] / len(fp.ifp)
+        df["weight"] /= len(fp.ifp)
         # merge different ligand atoms of the same residue/interaction group before
         # applying the threshold
         df = df.join(
             df.groupby(level=["ligand", "protein", "interaction"]).agg(
-                weight_total=("weight", "sum")
+                weight_total=("weight", "sum"),
             ),
         )
         # threshold and keep most occuring ligand atom
-        df = (
+        return (
             df.loc[df["weight_total"] >= threshold]
             .drop(columns="weight_total")
             .sort_values("weight", ascending=False)
@@ -388,7 +402,6 @@ class LigNetwork:
             .head(1)
             .sort_index()
         )
-        return df
 
     @classmethod
     def _make_frame_df_from_fp(cls, fp, frame=0, display_all=False):
@@ -396,10 +409,9 @@ class LigNetwork:
         data = cls._get_records(ifp, all_metadata=display_all)
         df = pd.DataFrame(data)
         df["weight"] = 1
-        df = df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
-            columns=["weight", "distance"]
+        return df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
+            columns=["weight", "distance"],
         )
-        return df
 
     def _make_carbon(self):
         return deepcopy(self._carbon)
@@ -414,7 +426,8 @@ class LigNetwork:
         charge = atom.GetFormalCharge()
         if charge != 0:
             charge = "{}{}".format(
-                "" if abs(charge) == 1 else str(charge), "+" if charge > 0 else "-"
+                "" if abs(charge) == 1 else str(charge),
+                "+" if charge > 0 else "-",
             )
             label = f"{elem}{charge}"
             shape = "ellipse"
@@ -429,7 +442,7 @@ class LigNetwork:
                 "shape": shape,
                 "color": "white",
                 "font": {
-                    "color": self.COLORS["atoms"].get(elem, self._default_atom_color)
+                    "color": self.COLORS["atoms"].get(elem, self._default_atom_color),
                 },
             }
         node.update(
@@ -440,7 +453,7 @@ class LigNetwork:
                 "fixed": True,
                 "group": "ligand",
                 "borderWidth": 0,
-            }
+            },
         )
         self.nodes[idx] = node
 
@@ -459,12 +472,12 @@ class LigNetwork:
                     "physics": False,
                     "group": "ligand",
                     "width": 4,
-                }
+                },
             )
         else:
             self._make_non_single_bond(idx, btype)
 
-    def _make_non_single_bond(self, ids, btype, bdist=0.06, dash=[10]):
+    def _make_non_single_bond(self, ids, btype):
         """Prepare double, triple and aromatic bonds"""
         xyz = self.xyz[ids]
         d = xyz[1, :2] - xyz[0, :2]
@@ -472,8 +485,8 @@ class LigNetwork:
         u = d / length
         p = np.array([-u[1], u[0]])
         nodes = []
-        dist = bdist * self._multiplier * np.ceil(btype)
-        dashes = False if btype in [2, 3] else dash
+        dist = self._non_single_bond_spacing * self._multiplier * np.ceil(btype)
+        dashes = False if btype in {2, 3} else self._dash
         for perp in (p, -p):
             for point in xyz:
                 xy = point[:2] + perp * dist
@@ -509,7 +522,7 @@ class LigNetwork:
                     "group": "ligand",
                     "width": 4,
                 },
-            ]
+            ],
         )
         if btype == 3:
             self.edges.append(
@@ -520,7 +533,7 @@ class LigNetwork:
                     "physics": False,
                     "group": "ligand",
                     "width": 4,
-                }
+                },
             )
 
     def _make_interactions(self, mass=2):
@@ -568,10 +581,12 @@ class LigNetwork:
                 "to": prot_res,
                 "title": f"{interaction}: {distance:.2f}Å",
                 "interaction_type": self._interaction_types.get(
-                    interaction, interaction
+                    interaction,
+                    interaction,
                 ),
                 "color": self.COLORS["interactions"].get(
-                    interaction, self._default_interaction_color
+                    interaction,
+                    self._default_interaction_color,
                 ),
                 "smooth": {"type": "cubicBezier", "roundness": 0.2},
                 "dashes": [10],
@@ -634,22 +649,22 @@ class LigNetwork:
                 "barnesHut": {
                     "avoidOverlap": self._avoidOverlap,
                     "springConstant": self._springConstant,
-                }
+                },
             },
         }
         options.update(self.options)
-        js = self._JS_TEMPLATE % dict(
-            div_id=div_id,
-            nodes=json.dumps(self.nodes),
-            edges=json.dumps(self.edges),
-            options=json.dumps(options),
-        )
+        js = self._JS_TEMPLATE % {
+            "div_id": div_id,
+            "nodes": json.dumps(self.nodes),
+            "edges": json.dumps(self.edges),
+            "options": json.dumps(options),
+        }
         js += self._get_legend()
         return js
 
     def _get_html(self, **kwargs):
         """Returns the HTML code to draw the network"""
-        return self._HTML_TEMPLATE % dict(js=self._get_js(**kwargs))
+        return self._HTML_TEMPLATE % {"js": self._get_js(**kwargs)}
 
     def _get_legend(self, height="90px"):
         available = {}
@@ -664,12 +679,10 @@ class LigNetwork:
             if node.get("group", "") == "protein":
                 color = node["color"]
                 available[color] = map_color_restype.get(color, "Unknown")
-        available = {
-            k: v for k, v in sorted(available.items(), key=lambda item: item[1])
-        }
+        available = dict(sorted(available.items(), key=operator.itemgetter(1)))
         for i, (color, restype) in enumerate(available.items()):
             buttons.append(
-                {"index": i, "label": restype, "color": color, "group": "residues"}
+                {"index": i, "label": restype, "color": color, "group": "residues"},
             )
         # interactions
         available.clear()
@@ -677,9 +690,7 @@ class LigNetwork:
             if edge.get("group", "") == "interaction":
                 color = edge["color"]
                 available[color] = map_color_interactions[color]
-        available = {
-            k: v for k, v in sorted(available.items(), key=lambda item: item[1])
-        }
+        available = dict(sorted(available.items(), key=operator.itemgetter(1)))
         for i, (color, interaction) in enumerate(available.items()):
             buttons.append(
                 {
@@ -687,115 +698,119 @@ class LigNetwork:
                     "label": interaction,
                     "color": color,
                     "group": "interactions",
-                }
+                },
             )
         # JS code
         if all("px" in h for h in [self.height, height]):
             h1 = int(re.findall(r"(\d+)\w+", self.height)[0])
             h2 = int(re.findall(r"(\d+)\w+", height)[0])
-            self.height = f"{h1+h2}px"
-        return """
-        legend_buttons = %(buttons)s;
-        legend = document.getElementById('%(div_id)s');
-        var div_residues = document.createElement('div');
-        var div_interactions = document.createElement('div');
-        var disabled = [];
-        var legend_callback = function() {
-            this.classList.toggle("disabled");
-            var hide = this.classList.contains("disabled");
-            var show = !hide;
-            var btn_label = this.innerHTML;
-            if (hide) {
-                disabled.push(btn_label);
-            } else {
-                disabled = disabled.filter(x => x !== btn_label);
-            }
-            var node_update = [],
-                edge_update = [];
-            // click on residue type
-            if (this.classList.contains("residues")) {
-                nodes.forEach((node) => {
-                    // find nodes corresponding to this type
-                    if (node.residue_type === btn_label) {
-                        // if hiding this type and residue isn't already hidden
-                        if (hide && !node.hidden) {
-                            node.hidden = true;
-                            node_update.push(node);
-                        // if showing this type and residue isn't already visible
-                        } else if (show && node.hidden) {
-                            // display if there's at least one of its edge that isn't hidden
-                            num_edges_active = edges.filter(x => x.to === node.id)
-                                                    .map(x => Boolean(x.hidden))
-                                                    .filter(x => !x)
-                                                    .length;
-                            if (num_edges_active > 0) {
-                                node.hidden = false;
+            self.height = f"{h1 + h2}px"
+        return (
+            """
+            legend_buttons = %(buttons)s;
+            legend = document.getElementById('%(div_id)s');
+            var div_residues = document.createElement('div');
+            var div_interactions = document.createElement('div');
+            var disabled = [];
+            var legend_callback = function() {
+                this.classList.toggle("disabled");
+                var hide = this.classList.contains("disabled");
+                var show = !hide;
+                var btn_label = this.innerHTML;
+                if (hide) {
+                    disabled.push(btn_label);
+                } else {
+                    disabled = disabled.filter(x => x !== btn_label);
+                }
+                var node_update = [],
+                    edge_update = [];
+                // click on residue type
+                if (this.classList.contains("residues")) {
+                    nodes.forEach((node) => {
+                        // find nodes corresponding to this type
+                        if (node.residue_type === btn_label) {
+                            // if hiding this type and residue isn't already hidden
+                            if (hide && !node.hidden) {
+                                node.hidden = true;
                                 node_update.push(node);
+                            // if showing this type and residue isn't already visible
+                            } else if (show && node.hidden) {
+                                // display if there's at least one of its edge that isn't hidden
+                                num_edges_active = edges.filter(x => x.to === node.id)
+                                                        .map(x => Boolean(x.hidden))
+                                                        .filter(x => !x)
+                                                        .length;
+                                if (num_edges_active > 0) {
+                                    node.hidden = false;
+                                    node_update.push(node);
+                                }
                             }
                         }
-                    }
-                });
-                ifp.body.data.nodes.update(node_update);
-            // click on interaction type
-            } else {
-                edges.forEach((edge) => {
-                    // find edges corresponding to this type
-                    if (edge.interaction_type === btn_label) {
-                        edge.hidden = !edge.hidden;
-                        edge_update.push(edge);
-                        // number of active edges for the corresponding residue
-                        var num_edges_active = edges.filter(x => x.to === edge.to)
-                                               .map(x => Boolean(x.hidden))
-                                               .filter(x => !x)
-                                               .length;
-                        // find corresponding residue
-                        var ix = nodes.findIndex(x => x.id === edge.to);
-                        // only change visibility if residue_type not being hidden
-                        if (!(disabled.includes(nodes[ix].residue_type))) {
-                            // hide if no edge being shown for this residue
-                            if (hide && (num_edges_active === 0)) {
-                                nodes[ix].hidden = true;
-                                node_update.push(nodes[ix]);
-                            // show if edges are being shown
-                            } else if (show && (num_edges_active > 0)) {
-                                nodes[ix].hidden = false;
-                                node_update.push(nodes[ix]);
+                    });
+                    ifp.body.data.nodes.update(node_update);
+                // click on interaction type
+                } else {
+                    edges.forEach((edge) => {
+                        // find edges corresponding to this type
+                        if (edge.interaction_type === btn_label) {
+                            edge.hidden = !edge.hidden;
+                            edge_update.push(edge);
+                            // number of active edges for the corresponding residue
+                            var num_edges_active = edges.filter(x => x.to === edge.to)
+                                                .map(x => Boolean(x.hidden))
+                                                .filter(x => !x)
+                                                .length;
+                            // find corresponding residue
+                            var ix = nodes.findIndex(x => x.id === edge.to);
+                            // only change visibility if residue_type not being hidden
+                            if (!(disabled.includes(nodes[ix].residue_type))) {
+                                // hide if no edge being shown for this residue
+                                if (hide && (num_edges_active === 0)) {
+                                    nodes[ix].hidden = true;
+                                    node_update.push(nodes[ix]);
+                                // show if edges are being shown
+                                } else if (show && (num_edges_active > 0)) {
+                                    nodes[ix].hidden = false;
+                                    node_update.push(nodes[ix]);
+                                }
                             }
                         }
-                    }
+                    });
+                    ifp.body.data.nodes.update(node_update);
+                    ifp.body.data.edges.update(edge_update);
+                }
+            };
+            legend_buttons.forEach(function(v,i) {
+                if (v.group === "residues") {
+                    var div = div_residues;
+                    var border = "none";
+                    var color = v.color;
+                } else {
+                    var div = div_interactions;
+                    var border = "3px dashed " + v.color;
+                    var color = "white";
+                }
+                var button = div.appendChild(document.createElement('button'));
+                button.classList.add("legend-btn", v.group);
+                button.innerHTML = v.label;
+                Object.assign(button.style, {
+                    "cursor": "pointer",
+                    "background-color": color,
+                    "border": border,
+                    "border-radius": "5px",
+                    "padding": "5px",
+                    "margin": "5px",
+                    "font": "14px 'Arial', sans-serif",
                 });
-                ifp.body.data.nodes.update(node_update);
-                ifp.body.data.edges.update(edge_update);
-            }
-        };
-        legend_buttons.forEach(function(v,i) {
-            if (v.group === "residues") {
-                var div = div_residues;
-                var border = "none";
-                var color = v.color;
-            } else {
-                var div = div_interactions;
-                var border = "3px dashed " + v.color;
-                var color = "white";
-            }
-            var button = div.appendChild(document.createElement('button'));
-            button.classList.add("legend-btn", v.group);
-            button.innerHTML = v.label;
-            Object.assign(button.style, {
-                "cursor": "pointer",
-                "background-color": color,
-                "border": border,
-                "border-radius": "5px",
-                "padding": "5px",
-                "margin": "5px",
-                "font": "14px 'Arial', sans-serif",
+                button.onclick = legend_callback;
             });
-            button.onclick = legend_callback;
-        });
-        legend.appendChild(div_residues);
-        legend.appendChild(div_interactions);
-        """ % dict(
-            div_id="networklegend", buttons=json.dumps(buttons)
+            legend.appendChild(div_residues);
+            legend.appendChild(div_interactions);
+            """  # noqa: E501, UP031
+            % {
+                "div_id": "networklegend",
+                "buttons": json.dumps(buttons),
+            }
         )
 
     @requires("IPython.display")

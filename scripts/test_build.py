@@ -2,9 +2,8 @@ from contextlib import suppress
 from pathlib import Path
 
 import prolif
-from prolif.plotting.network import LigNetwork
 
-print(prolif.__version__)
+print(prolif.__version__)  # noqa: T201
 
 assert Path(prolif.datafiles.TOP).is_file()
 

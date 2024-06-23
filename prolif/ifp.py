@@ -60,10 +60,10 @@ class IFP(UserDict):
                         residue_tuple: interactions
                         for residue_tuple, interactions in self.data.items()
                         if key in residue_tuple
-                    }
+                    },
                 )
         raise KeyError(
             f"{key} does not correspond to a valid IFP key: it must be a tuple of "
             "either ResidueId or residue string. If you need to filter the IFP, a "
-            "single ResidueId or residue string can also be used."
+            "single ResidueId or residue string can also be used.",
         )

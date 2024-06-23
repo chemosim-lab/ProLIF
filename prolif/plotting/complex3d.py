@@ -75,21 +75,21 @@ class Complex3D:
         JavaScript callback executed when hovering an interaction line.
     DISABLE_HOVER_CALLBACK : str
         JavaScript callback executed when the hovering event is finished.
-    """
+    """  # noqa: E501
 
     COLORS: ClassVar[Dict[str, str]] = {**separated_interaction_colors}
     LIGAND_STYLE: ClassVar[Dict] = {"stick": {"colorscheme": "cyanCarbon"}}
     RESIDUES_STYLE: ClassVar[Dict] = {"stick": {}}
     PROTEIN_STYLE: ClassVar[Dict] = {"cartoon": {"style": "edged"}}
     PEPTIDE_STYLE: ClassVar[Dict] = {
-        "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"}
+        "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"},
     }
     PEPTIDE_THRESHOLD: ClassVar[int] = 5
-    LIGAND_DISPLAYED_ATOM = {
+    LIGAND_DISPLAYED_ATOM: ClassVar[Dict] = {
         "HBDonor": 1,
         "XBDonor": 1,
     }
-    PROTEIN_DISPLAYED_ATOM = {
+    PROTEIN_DISPLAYED_ATOM: ClassVar[Dict] = {
         "HBAcceptor": 1,
         "XBAcceptor": 1,
     }
@@ -100,28 +100,22 @@ class Complex3D:
     }
     LIGAND_RING_INTERACTIONS: ClassVar[Set[str]] = {*RING_SYSTEMS, "PiCation"}
     PROTEIN_RING_INTERACTIONS: ClassVar[Set[str]] = {*RING_SYSTEMS, "CationPi"}
-    RESIDUE_HOVER_CALLBACK: ClassVar[
-        str
-    ] = """
+    RESIDUE_HOVER_CALLBACK: ClassVar[str] = """
     function(atom,viewer) {
         if(!atom.label) {
             atom.label = viewer.addLabel('%s:'+atom.atom+atom.serial,
                 {position: atom, backgroundColor: 'mintcream', fontColor:'black'});
         }
     }"""
-    INTERACTION_HOVER_CALLBACK: ClassVar[
-        str
-    ] = """
+    INTERACTION_HOVER_CALLBACK: ClassVar[str] = """
     function(shape,viewer) {
         if(!shape.label) {
             shape.label = viewer.addLabel(shape.interaction,
                 {position: shape, backgroundColor: 'black', fontColor:'white'});
         }
     }"""
-    DISABLE_HOVER_CALLBACK: ClassVar[
-        str
-    ] = """
-    function(obj,viewer) { 
+    DISABLE_HOVER_CALLBACK: ClassVar[str] = """
+    function(obj,viewer) {
         if(obj.label) {
             viewer.removeLabel(obj.label);
             delete obj.label;
@@ -160,7 +154,7 @@ class Complex3D:
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
                 "Please run the fingerprint analysis before attempting to display"
-                " results."
+                " results.",
             )
         ifp = fp.ifp[frame]
         return cls(ifp, lig_mol, prot_mol)
@@ -171,7 +165,9 @@ class Complex3D:
         return Point3D(*centroid)
 
     def display(
-        self, size: Tuple[int, int] = (650, 600), display_all: bool = False
+        self,
+        size: Tuple[int, int] = (650, 600),
+        display_all: bool = False,
     ) -> py3Dmol.view:
         """Display as a py3Dmol widget view.
 
@@ -229,16 +225,16 @@ class Complex3D:
         v.removeAllModels()
 
         # get set of interactions for both poses
-        interactions1 = set(
+        interactions1 = {
             (resid[1], i)
             for resid, interactions in self.ifp.items()
             for i in interactions
-        )
-        interactions2 = set(
+        }
+        interactions2 = {
             (resid[1], i)
             for resid, interactions in other.ifp.items()
             for i in interactions
-        )
+        }
 
         # get residues with interactions specific to pose 1
         highlights = (
@@ -247,7 +243,10 @@ class Complex3D:
             else {}
         )
         self._populate_view(
-            v, position=(0, 0), display_all=display_all, colormap=highlights
+            v,
+            position=(0, 0),
+            display_all=display_all,
+            colormap=highlights,
         )
 
         # get residues with interactions specific to pose 2
@@ -257,11 +256,14 @@ class Complex3D:
             else {}
         )
         other._populate_view(
-            v, position=(0, 1), display_all=display_all, colormap=highlights
+            v,
+            position=(0, 1),
+            display_all=display_all,
+            colormap=highlights,
         )
         return v
 
-    def _populate_view(
+    def _populate_view(  # noqa: PLR0912
         self,
         v: py3Dmol.view,
         position: Tuple[int, int] = (0, 0),
@@ -286,10 +288,12 @@ class Complex3D:
                     v.addModel(Chem.MolToMolBlock(res), "sdf", viewer=position)
                     model = v.getModel(viewer=position)
                     if resid in colormap:
-                        style = deepcopy(style)
-                        for key in style:
-                            style[key]["colorscheme"] = colormap[resid]
-                    model.setStyle({}, style)
+                        resid_style = deepcopy(style)
+                        for key in resid_style:
+                            resid_style[key]["colorscheme"] = colormap[resid]
+                    else:
+                        resid_style = style
+                    model.setStyle({}, resid_style)
                     # add residue label
                     model.setHoverable(
                         {},
@@ -319,23 +323,24 @@ class Complex3D:
                         p1 = lres.GetConformer().GetAtomPosition(
                             metadata["indices"]["ligand"][
                                 self.LIGAND_DISPLAYED_ATOM.get(interaction, 0)
-                            ]
+                            ],
                         )
                     if interaction in self.PROTEIN_RING_INTERACTIONS:
                         p2 = self.get_ring_centroid(
-                            pres, metadata["indices"]["protein"]
+                            pres,
+                            metadata["indices"]["protein"],
                         )
                     else:
                         p2 = pres.GetConformer().GetAtomPosition(
                             metadata["indices"]["protein"][
                                 self.PROTEIN_DISPLAYED_ATOM.get(interaction, 0)
-                            ]
+                            ],
                         )
                     # add interaction line
                     v.addCylinder(
                         {
-                            "start": dict(x=p1.x, y=p1.y, z=p1.z),
-                            "end": dict(x=p2.x, y=p2.y, z=p2.z),
+                            "start": {"x": p1.x, "y": p1.y, "z": p1.z},
+                            "end": {"x": p2.x, "y": p2.y, "z": p2.z},
                             "color": self.COLORS.get(interaction, "grey"),
                             "radius": 0.15,
                             "dashed": True,
@@ -344,7 +349,8 @@ class Complex3D:
                         },
                         viewer=position,
                     )
-                    # add label when hovering the middle of the dashed line by adding a dummy atom
+                    # add label when hovering the middle of the dashed line by adding a
+                    # dummy atom
                     c = Point3D(*get_centroid([p1, p2]))
                     modelID = models[lresid]
                     model = v.getModel(modelID, viewer=position)
@@ -357,8 +363,8 @@ class Complex3D:
                                 "y": c.y,
                                 "z": c.z,
                                 "interaction": interaction_label,
-                            }
-                        ]
+                            },
+                        ],
                     )
                     model.setStyle(
                         {"interaction": interaction_label},

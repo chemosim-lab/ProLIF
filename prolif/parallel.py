@@ -103,7 +103,7 @@ class TrajectoryPool:
     """
 
     def __init__(
-        self, n_processes, fingerprint, residues, tqdm_kwargs, rdkitconverter_kwargs
+        self, n_processes, fingerprint, residues, tqdm_kwargs, rdkitconverter_kwargs,
     ):
         self.tqdm_kwargs = tqdm_kwargs
         self.tracker = Value(c_uint32, lock=True)
@@ -142,7 +142,7 @@ class TrajectoryPool:
             lig_mol = Molecule.from_mda(lig, **cls.converter_kwargs[0])
             prot_mol = Molecule.from_mda(prot, **cls.converter_kwargs[1])
             data = cls.fp.generate(
-                lig_mol, prot_mol, residues=cls.residues, metadata=True
+                lig_mol, prot_mol, residues=cls.residues, metadata=True,
             )
             ifp[int(ts.frame)] = data
             with cls.tracker.get_lock():

@@ -27,21 +27,21 @@ from prolif.interactions.base import (
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 __all__ = [
-    "Hydrophobic",
-    "HBAcceptor",
-    "HBDonor",
-    "XBAcceptor",
-    "XBDonor",
-    "Cationic",
     "Anionic",
     "CationPi",
-    "PiCation",
-    "FaceToFace",
+    "Cationic",
     "EdgeToFace",
-    "PiStacking",
-    "MetalDonor",
+    "FaceToFace",
+    "HBAcceptor",
+    "HBDonor",
+    "Hydrophobic",
     "MetalAcceptor",
+    "MetalDonor",
+    "PiCation",
+    "PiStacking",
     "VdWContact",
+    "XBAcceptor",
+    "XBDonor",
 ]
 VDWRADII = {symbol.capitalize(): radius for symbol, radius in vdwradii.items()}
 
@@ -68,7 +68,9 @@ class Hydrophobic(Distance):
         distance=4.5,
     ):
         super().__init__(
-            lig_pattern=hydrophobic, prot_pattern=hydrophobic, distance=distance
+            lig_pattern=hydrophobic,
+            prot_pattern=hydrophobic,
+            distance=distance,
         )
 
 
@@ -113,7 +115,8 @@ class HBAcceptor(SingleAngle):
 
 
 HBDonor = HBAcceptor.invert_role(
-    "HBDonor", "Hbond interaction between a ligand (donor) and a residue (acceptor)"
+    "HBDonor",
+    "Hbond interaction between a ligand (donor) and a residue (acceptor)",
 )
 
 
@@ -171,7 +174,8 @@ class XBAcceptor(DoubleAngle):
 
 
 XBDonor = XBAcceptor.invert_role(
-    "XBDonor", "Halogen bonding between a ligand (donor) and a residue (acceptor)"
+    "XBDonor",
+    "Halogen bonding between a ligand (donor) and a residue (acceptor)",
 )
 
 
@@ -193,7 +197,8 @@ class Cationic(Distance):
 
 
 Anionic = Cationic.invert_role(
-    "Anionic", "Ionic interaction between a ligand (anion) and a residue (cation)"
+    "Anionic",
+    "Ionic interaction between a ligand (anion) and a residue (cation)",
 )
 
 
@@ -380,8 +385,9 @@ class PiStacking(Interaction):
         `shortest_distance` has been replaced by `angle_normal_centroid`
 
     .. versionchanged:: 1.1.0
-        The implementation now directly calls :class:`EdgeToFace` and :class:`FaceToFace`
-        instead of overwriting the default parameters with more generic ones.
+        The implementation now directly calls :class:`EdgeToFace` and
+        :class:`FaceToFace` instead of overwriting the default parameters with more
+        generic ones.
 
     """
 
@@ -472,9 +478,13 @@ class VdWContact(Interaction):
                 vdw = self.vdwradii[lig] + self.vdwradii[res] + self.tolerance
                 self._vdw_cache[elements] = vdw
             dist = lxyz.GetAtomPosition(la.GetIdx()).Distance(
-                rxyz.GetAtomPosition(ra.GetIdx())
+                rxyz.GetAtomPosition(ra.GetIdx()),
             )
             if dist <= vdw:
                 yield self.metadata(
-                    ligand, residue, (la.GetIdx(),), (ra.GetIdx(),), distance=dist
+                    ligand,
+                    residue,
+                    (la.GetIdx(),),
+                    (ra.GetIdx(),),
+                    distance=dist,
                 )
