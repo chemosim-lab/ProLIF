@@ -817,13 +817,12 @@ class LigNetwork:
     def display(self, **kwargs):
         """Prepare and display the network"""
         html = self._get_html(**kwargs)
+        doc = escape(html)
         iframe = (
-            '<iframe id="{uuid}" width="{width}" height="{height}" frameborder="0" '
-            'srcdoc="{doc}"></iframe>'
+            f'<iframe id="{self.uuid}" width="{self.width}" height="{self.height}"'
+            f' frameborder="0" srcdoc="{doc}"></iframe>'
         )
-        return HTML(
-            iframe.format(width=self.width, height=self.height, doc=escape(html)),
-        )
+        return HTML(iframe)
 
     @requires("IPython.display")
     def show(self, filename, **kwargs):
@@ -832,12 +831,10 @@ class LigNetwork:
         with open(filename, "w") as f:
             f.write(html)
         iframe = (
-            '<iframe id="{uuid}" width="{width}" height="{height}" frameborder="0" '
-            'src="{filename}"></iframe>'  # noqa: RUF027
+            f'<iframe id="{self.uuid}" width="{self.width}" height="{self.height}"'
+            f' frameborder="0" src="{filename}"></iframe>'
         )
-        return HTML(
-            iframe.format(width=self.width, height=self.height, filename=filename),
-        )
+        return HTML(iframe)
 
     def save(self, fp, **kwargs):
         """Save the network to an HTML file

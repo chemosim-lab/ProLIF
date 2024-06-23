@@ -190,9 +190,6 @@ class Fingerprint:
         count=False,
         vicinity_cutoff=6.0,
     ):
-        self.count = count
-        self._set_interactions(interactions, parameters)
-        self.vicinity_cutoff = vicinity_cutoff
         if interactions is None:
             interactions = [
                 "Hydrophobic",
@@ -206,6 +203,9 @@ class Fingerprint:
                 "VdWContact",
             ]
         self.interactions = interactions
+        self.count = count
+        self._set_interactions(interactions, parameters)
+        self.vicinity_cutoff = vicinity_cutoff
 
     def _set_interactions(self, interactions, parameters):
         # read interactions to compute
