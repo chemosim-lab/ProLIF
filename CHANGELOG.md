@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `LigNetwork.save_png` to save the displayed plot to a PNG file through JavaScript
+  (Issue #163).
+- `cleanup_substructures` parameter now accessible in `mol2_supplier` to skip
+  sanitization based on atom types.
+- `ruff` linter and formatter.
+
+### Fixed
+
+- `display_residues` was sanitizing each residue while preparing them for display, which
+  could make debugging faulty molecules difficult. This is now disabled.
+- Deprecation warnings
+
 ## [2.0.3] - 2024-03-10
 
 ### Fixed
