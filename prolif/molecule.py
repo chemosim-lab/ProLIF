@@ -313,6 +313,8 @@ class sdf_supplier(Sequence):
     ----------
     path : str
         A path to the .sdf file
+    sanitize : bool
+        Whether to sanitize each molecule or not.
     resname : str
         Residue name for every ligand
     resnumber : int
@@ -337,11 +339,14 @@ class sdf_supplier(Sequence):
         Molecule suppliers are now sequences that can be reused, indexed,
         and can return their length, instead of single-use generators.
 
+    .. versionchanged:: 2.0.4
+        Added ``sanitize`` parameter (defaults to ``True``, same behavior as before).
+
     """
 
-    def __init__(self, path, **kwargs):
+    def __init__(self, path, sanitize=True, **kwargs):
         self.path = path
-        self._suppl = Chem.SDMolSupplier(path, removeHs=False)
+        self._suppl = Chem.SDMolSupplier(path, removeHs=False, sanitize=sanitize)
         self._kwargs = kwargs
 
     def __iter__(self):
@@ -363,6 +368,8 @@ class mol2_supplier(Sequence):
     ----------
     path : str
         A path to the .mol2 file
+    sanitize : bool
+        Whether to sanitize each molecule or not.
     cleanup_substructures : bool
         Toggles standardizing some substructures found in mol2 files, based on atom
         types.
@@ -389,14 +396,17 @@ class mol2_supplier(Sequence):
     .. versionchanged:: 1.0.0
         Molecule suppliers are now sequences that can be reused, indexed,
         and can return their length, instead of single-use generators.
+
     .. versionchanged:: 2.0.4
-        Added ``cleanup_substructures`` parameter.
+        Added ``cleanup_substructures`` and ``sanitize`` parameters
+        (default to ``True``, same behavior as before).
 
     """
 
-    def __init__(self, path, cleanup_substructures=True, **kwargs):
+    def __init__(self, path, cleanup_substructures=True, sanitize=True, **kwargs):
         self.path = path
         self.cleanup_substructures = cleanup_substructures
+        self.sanitize = sanitize
         self._kwargs = kwargs
 
     def __iter__(self):
@@ -416,6 +426,7 @@ class mol2_supplier(Sequence):
             "".join(block),
             removeHs=False,
             cleanupSubstructures=self.cleanup_substructures,
+            sanitize=self.sanitize,
         )
         return Molecule.from_rdkit(mol, **self._kwargs)
 

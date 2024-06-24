@@ -89,7 +89,7 @@ class TestPDBQTSupplier(SupplierBase):
         template = Chem.MolFromSmiles(
             "C[NH+]1CC(C(=O)NC2(C)OC3(O)C4CCCN4C(=O)"
             "C(Cc4ccccc4)N3C2=O)C=C2c3cccc4[nH]cc"
-            "(c34)CC21",
+            "(c34)CC21"
         )
         return pdbqt_supplier(pdbqts, template)
 
@@ -127,6 +127,12 @@ class TestSDFSupplier(SupplierBase):
         path = str(datapath / "vina" / "vina_output.sdf")
         return sdf_supplier(path)
 
+    def test_sanitize(self):
+        path = str(datapath / "vina" / "vina_output.sdf")
+        suppl = sdf_supplier(path, sanitize=False)
+        mol = next(iter(suppl))
+        assert isinstance(mol, Molecule)
+
 
 class TestMOL2Supplier(SupplierBase):
     @pytest.fixture()
@@ -139,3 +145,15 @@ class TestMOL2Supplier(SupplierBase):
         suppl = mol2_supplier(path)
         mol = next(iter(suppl))
         assert mol is not None
+
+    def test_sanitize(self):
+        path = str(datapath / "vina" / "vina_output.mol2")
+        suppl = mol2_supplier(path, sanitize=False)
+        mol = next(iter(suppl))
+        assert isinstance(mol, Molecule)
+
+    def test_cleanup_substructures(self):
+        path = str(datapath / "vina" / "vina_output.mol2")
+        suppl = mol2_supplier(path, cleanup_substructures=False)
+        mol = next(iter(suppl))
+        assert isinstance(mol, Molecule)
