@@ -35,7 +35,7 @@ from prolif.residue import ResidueId
 from prolif.utils import requires
 
 try:
-    from IPython.display import HTML, Javascript
+    from IPython.display import HTML, Javascript, display
 except ModuleNotFoundError:
     pass
 else:
@@ -281,6 +281,7 @@ class LigNetwork:
         }
         # ID for saving to PNG with JS
         self.uuid = uuid4().hex
+        self._iframe = None
 
     @classmethod
     def from_fingerprint(
@@ -818,11 +819,11 @@ class LigNetwork:
         """Prepare and display the network"""
         html = self._get_html(**kwargs)
         doc = escape(html)
-        iframe = (
+        self._iframe = (
             f'<iframe id="{self.uuid}" width="{self.width}" height="{self.height}"'
             f' frameborder="0" srcdoc="{doc}"></iframe>'
         )
-        return HTML(iframe)
+        return self
 
     @requires("IPython.display")
     def show(self, filename, **kwargs):
@@ -830,11 +831,11 @@ class LigNetwork:
         html = self._get_html(**kwargs)
         with open(filename, "w") as f:
             f.write(html)
-        iframe = (
+        self._iframe = (
             f'<iframe id="{self.uuid}" width="{self.width}" height="{self.height}"'
             f' frameborder="0" src="{filename}"></iframe>'
         )
-        return HTML(iframe)
+        return self
 
     def save(self, fp, **kwargs):
         """Save the network to an HTML file
@@ -859,13 +860,22 @@ class LigNetwork:
         Notes
         -----
         Requires calling ``display`` or ``show`` first. The legend won't be exported.
+
+        .. versionadded:: 2.0.4
         """
-        return Javascript(f"""
-        var iframe = document.getElementById("{self.uuid}");
-        var iframe_doc = iframe.contentWindow.document;
-        var canvas = iframe_doc.getElementsByTagName("canvas")[0];
-        var link = document.createElement("a");
-        link.href = canvas.toDataURL();
-        link.download = "prolif-lignetwork.png"
-        link.click();
-        """)
+        return display(
+            Javascript(f"""
+            var iframe = document.getElementById("{self.uuid}");
+            var iframe_doc = iframe.contentWindow.document;
+            var canvas = iframe_doc.getElementsByTagName("canvas")[0];
+            var link = document.createElement("a");
+            link.href = canvas.toDataURL();
+            link.download = "prolif-lignetwork.png"
+            link.click();
+            """),
+        )
+
+    def _repr_html_(self):  # noqa: PLW3201
+        if self._iframe:
+            return self._iframe
+        return None

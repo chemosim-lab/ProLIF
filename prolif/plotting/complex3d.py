@@ -11,6 +11,7 @@ Plot interactions in 3D --- :mod:`prolif.plotting.complex3d`
 
 from __future__ import annotations
 
+from contextlib import suppress
 from copy import deepcopy
 from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Set, Tuple
 
@@ -20,7 +21,11 @@ from rdkit.Geometry import Point3D
 
 from prolif.exceptions import RunRequiredError
 from prolif.plotting.utils import separated_interaction_colors
-from prolif.utils import get_centroid
+from prolif.utils import get_centroid, requires
+
+with suppress(ModuleNotFoundError):
+    from IPython.display import Javascript, display
+
 
 if TYPE_CHECKING:
     from prolif.fingerprint import Fingerprint
@@ -126,6 +131,7 @@ class Complex3D:
         self.ifp = ifp
         self.lig_mol = lig_mol
         self.prot_mol = prot_mol
+        self._view: Optional[py3Dmol.view] = None
 
     @classmethod
     def from_fingerprint(
@@ -168,7 +174,7 @@ class Complex3D:
         self,
         size: Tuple[int, int] = (650, 600),
         display_all: bool = False,
-    ) -> py3Dmol.view:
+    ) -> Complex3D:
         """Display as a py3Dmol widget view.
 
         Parameters
@@ -183,7 +189,8 @@ class Complex3D:
         v = py3Dmol.view(width=size[0], height=size[1], viewergrid=(1, 1), linked=False)
         v.removeAllModels()
         self._populate_view(v, position=(0, 0), display_all=display_all)
-        return v
+        self._view = v
+        return self
 
     def compare(
         self,
@@ -193,7 +200,7 @@ class Complex3D:
         display_all: bool = False,
         linked: bool = True,
         color_unique: Optional[str] = "magentaCarbon",
-    ) -> py3Dmol.view:
+    ) -> Complex3D:
         """Displays the initial complex side-by-side with a second one for easier
         comparison.
 
@@ -261,7 +268,8 @@ class Complex3D:
             display_all=display_all,
             colormap=highlights,
         )
-        return v
+        self._view = v
+        return self
 
     def _populate_view(  # noqa: PLR0912
         self,
@@ -393,3 +401,31 @@ class Complex3D:
             model.setStyle({}, self.PEPTIDE_STYLE)
 
         v.zoomTo({"model": list(models.values())}, viewer=position)
+
+    @requires("IPython.display")
+    def save_png(self) -> None:
+        """Saves the current state of the 3D viewer to a PNG. Not available outside of a
+        notebook.
+
+        .. versionadded:: 2.0.4
+        """
+        if self._view is None:
+            raise ValueError(
+                "View not initialized, did you call `display`/`compare` first?",
+            )
+        uid = self._view.uniqueid
+        display(
+            Javascript(f"""
+            var png = viewer_{uid}.pngURI()
+            var a = document.createElement('a')
+            a.href = png
+            a.download = "prolif-3d.png"
+            a.click()
+            a.remove()
+            """),
+        )
+
+    def _repr_html_(self):  # noqa: PLW3201
+        if self._view:
+            return self._view._repr_html_()
+        return None
