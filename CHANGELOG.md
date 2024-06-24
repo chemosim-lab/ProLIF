@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `LigNetwork.save_png` to save the displayed plot to a PNG file through JavaScript
   (Issue #163).
+- `Complex3D.save_png` to save the displayed plot to a PNG file through JavaScript.
+- `fp.plot_3d` and `fp.plot_lignetwork` now return the underlying `LigNetwork` or
+  `Complex3D` object which has been enhanced with rich display functionality. From the
+  user's perspective, nothing changes apart from being able to do
+  `view = fp.plot_*(...); view.save_png()` to display a popup window for saving the
+  image.
 - `cleanup_substructures` parameter now accessible in `mol2_supplier` to skip
   sanitization based on atom types.
 - `ruff` linter and formatter.
