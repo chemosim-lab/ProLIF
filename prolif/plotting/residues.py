@@ -23,6 +23,7 @@ def display_residues(
     size: Tuple[int, int] = (200, 140),
     mols_per_row: int = 4,
     use_svg: bool = True,
+    sanitize: bool = False,
 ) -> Any:
     """Display a grid image of the residues in the molecule. The hydrogens are stripped
     and the 3D coordinates removed for a clearer visualisation.
@@ -40,9 +41,11 @@ def display_residues(
         Number of residues displayed per row.
     use_svg: bool = True
         Generate an SVG or PNG image.
+    sanitize: bool = False
+        Sanitize the residues before displaying.
 
-    .. versionchanged:: 2.0.4
-        Disabled sanitization of residues for easier debugging.
+    .. versionchanged:: 2.1.0
+        Added ``sanitize`` parameter that defaults to False for easier debugging.
     """
     frags = []
     residues_iterable = (
@@ -53,7 +56,7 @@ def display_residues(
     )
 
     for residue in residues_iterable:
-        resmol = Chem.RemoveHs(residue, sanitize=False)
+        resmol = Chem.RemoveHs(residue, sanitize=sanitize)
         resmol.RemoveAllConformers()
         resmol.SetProp("_Name", str(residue.resid))
         frags.append(resmol)

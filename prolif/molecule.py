@@ -339,7 +339,7 @@ class sdf_supplier(Sequence):
         Molecule suppliers are now sequences that can be reused, indexed,
         and can return their length, instead of single-use generators.
 
-    .. versionchanged:: 2.0.4
+    .. versionchanged:: 2.1.0
         Added ``sanitize`` parameter (defaults to ``True``, same behavior as before).
 
     """
@@ -397,7 +397,7 @@ class mol2_supplier(Sequence):
         Molecule suppliers are now sequences that can be reused, indexed,
         and can return their length, instead of single-use generators.
 
-    .. versionchanged:: 2.0.4
+    .. versionchanged:: 2.1.0
         Added ``cleanup_substructures`` and ``sanitize`` parameters
         (default to ``True``, same behavior as before).
 

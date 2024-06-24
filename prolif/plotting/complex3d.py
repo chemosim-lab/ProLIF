@@ -407,7 +407,7 @@ class Complex3D:
         """Saves the current state of the 3D viewer to a PNG. Not available outside of a
         notebook.
 
-        .. versionadded:: 2.0.4
+        .. versionadded:: 2.1.0
         """
         if self._view is None:
             raise ValueError(

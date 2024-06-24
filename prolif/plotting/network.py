@@ -861,7 +861,7 @@ class LigNetwork:
         -----
         Requires calling ``display`` or ``show`` first. The legend won't be exported.
 
-        .. versionadded:: 2.0.4
+        .. versionadded:: 2.1.0
         """
         return display(
             Javascript(f"""
