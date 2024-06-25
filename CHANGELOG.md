@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Complex3D` and `fp.plot_3d` now have access to `only_interacting` and
+  `remove_hydrogens` parameters to control which residues and hydrogen atoms are
+  displayed. Non-polar hydrogen atoms that aren't involved in interactions are now
+  hidden by default.
 - `LigNetwork.save_png` to save the displayed plot to a PNG file through JavaScript
   (Issue #163).
 - `Complex3D.save_png` to save the displayed plot to a PNG file through JavaScript.
