@@ -29,7 +29,7 @@ import os
 import warnings
 from collections.abc import Sized
 from functools import wraps
-from typing import Literal, Optional, Tuple
+from typing import Literal, Optional, Tuple, Union
 
 import dill
 import multiprocess as mp
@@ -1004,6 +1004,8 @@ class Fingerprint:
         frame: int,
         size: Tuple[int, int] = (650, 600),
         display_all: bool = False,
+        only_interacting: bool = True,
+        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
     ):
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
@@ -1023,12 +1025,24 @@ class Fingerprint:
             Display all occurences for a given pair of residues and interaction, or only
             the shortest one. Not relevant if ``count=False`` in the ``Fingerprint``
             object.
+        only_interacting : bool = True
+            Whether to show all protein residues in the vicinity of the ligand, or
+            only the ones participating in an interaction.
+        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True
+            Whether to remove non-polar hydrogens (unless they are involved in an
+            interaction).
 
         See Also
         --------
         :class:`prolif.plotting.complex3d.Complex3D`
 
         .. versionadded:: 2.0.0
+
+        .. versionchanged:: 2.1.0
+            Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
+            Non-polar hydrogen atoms that aren't involved in interactions are now
+            hidden.
+
         """
         from prolif.plotting.complex3d import Complex3D
 
@@ -1038,4 +1052,9 @@ class Fingerprint:
             lig_mol=ligand_mol,
             prot_mol=protein_mol,
         )
-        return plot3d.display(size=size, display_all=display_all)
+        return plot3d.display(
+            size=size,
+            display_all=display_all,
+            only_interacting=only_interacting,
+            remove_hydrogens=remove_hydrogens,
+        )

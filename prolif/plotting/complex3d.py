@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from copy import deepcopy
-from typing import TYPE_CHECKING, ClassVar, Dict, Optional, Set, Tuple
+from typing import TYPE_CHECKING, ClassVar, Dict, Literal, Optional, Set, Tuple, Union
 
 import py3Dmol
 from rdkit import Chem
@@ -21,7 +21,7 @@ from rdkit.Geometry import Point3D
 
 from prolif.exceptions import RunRequiredError
 from prolif.plotting.utils import separated_interaction_colors
-from prolif.utils import get_centroid, requires
+from prolif.utils import get_centroid, get_residues_near_ligand, requires
 
 with suppress(ModuleNotFoundError):
     from IPython.display import Javascript, display
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from prolif.fingerprint import Fingerprint
     from prolif.ifp import IFP
     from prolif.molecule import Molecule
-    from prolif.residue import ResidueId
+    from prolif.residue import Residue, ResidueId
 
 
 class Complex3D:
@@ -174,6 +174,8 @@ class Complex3D:
         self,
         size: Tuple[int, int] = (650, 600),
         display_all: bool = False,
+        only_interacting: bool = True,
+        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
     ) -> Complex3D:
         """Display as a py3Dmol widget view.
 
@@ -185,10 +187,28 @@ class Complex3D:
             Display all occurences for a given pair of residues and interaction, or only
             the shortest one. Not relevant if ``count=False`` in the ``Fingerprint``
             object.
+        only_interacting : bool = True
+            Whether to show all protein residues in the vicinity of the ligand, or
+            only the ones participating in an interaction.
+        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True
+            Whether to remove non-polar hydrogens (unless they are involved in an
+            interaction).
+
+        .. versionchanged:: 2.1.0
+            Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
+            Non-polar hydrogen atoms that aren't involved in interactions are now
+            hidden.
+
         """
         v = py3Dmol.view(width=size[0], height=size[1], viewergrid=(1, 1), linked=False)
         v.removeAllModels()
-        self._populate_view(v, position=(0, 0), display_all=display_all)
+        self._populate_view(
+            v,
+            position=(0, 0),
+            display_all=display_all,
+            only_interacting=only_interacting,
+            remove_hydrogens=remove_hydrogens,
+        )
         self._view = v
         return self
 
@@ -200,6 +220,8 @@ class Complex3D:
         display_all: bool = False,
         linked: bool = True,
         color_unique: Optional[str] = "magentaCarbon",
+        only_interacting: bool = True,
+        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
     ) -> Complex3D:
         """Displays the initial complex side-by-side with a second one for easier
         comparison.
@@ -219,8 +241,19 @@ class Complex3D:
         color_unique: Optional[str] = "magentaCarbon",
             Which color to use for residues that have interactions that are found in one
             complex but not the other. Use ``None`` to disable the color override.
+        only_interacting : bool = True
+            Whether to show all protein residues in the vicinity of the ligand, or
+            only the ones participating in an interaction.
+        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True
+            Whether to remove non-polar hydrogens (unless they are involved in an
+            interaction).
 
         .. versionadded:: 2.0.1
+
+        .. versionchanged:: 2.1.0
+            Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
+            Non-polar hydrogen atoms that aren't involved in interactions are now
+            hidden.
 
         """
         v = py3Dmol.view(
@@ -254,6 +287,8 @@ class Complex3D:
             position=(0, 0),
             display_all=display_all,
             colormap=highlights,
+            only_interacting=only_interacting,
+            remove_hydrogens=remove_hydrogens,
         )
 
         # get residues with interactions specific to pose 2
@@ -267,6 +302,8 @@ class Complex3D:
             position=(0, 1),
             display_all=display_all,
             colormap=highlights,
+            only_interacting=only_interacting,
+            remove_hydrogens=remove_hydrogens,
         )
         self._view = v
         return self
@@ -277,12 +314,15 @@ class Complex3D:
         position: Tuple[int, int] = (0, 0),
         display_all: bool = False,
         colormap: Optional[Dict[ResidueId, str]] = None,
+        only_interacting: bool = True,
+        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
     ) -> None:
-        if colormap is None:
-            colormap = {}
+        self._colormap = {} if colormap is None else colormap
+        self._models = {}
+        self._mid = -1
+        self._interacting_atoms = {"ligand": set(), "protein": set()}
 
-        models = {}
-        mid = -1
+        # show all interacting residues
         for (lresid, presid), interactions in self.ifp.items():
             lres = self.lig_mol[lresid]
             pres = self.prot_mol[presid]
@@ -291,25 +331,8 @@ class Complex3D:
                 (lresid, lres, self.LIGAND_STYLE),
                 (presid, pres, self.RESIDUES_STYLE),
             ]:
-                if resid not in models:
-                    mid += 1
-                    v.addModel(Chem.MolToMolBlock(res), "sdf", viewer=position)
-                    model = v.getModel(viewer=position)
-                    if resid in colormap:
-                        resid_style = deepcopy(style)
-                        for key in resid_style:
-                            resid_style[key]["colorscheme"] = colormap[resid]
-                    else:
-                        resid_style = style
-                    model.setStyle({}, resid_style)
-                    # add residue label
-                    model.setHoverable(
-                        {},
-                        True,
-                        self.RESIDUE_HOVER_CALLBACK % resid,
-                        self.DISABLE_HOVER_CALLBACK,
-                    )
-                    models[resid] = mid
+                if resid not in self._models:
+                    self._add_residue_to_view(v, position, res, style)
             for interaction, metadata_tuple in interactions.items():
                 # whether to display all interactions or only the one with the shortest
                 # distance
@@ -324,6 +347,14 @@ class Complex3D:
                     )
                 )
                 for metadata in metadata_iterator:
+                    # record indices of atoms interacting
+                    self._interacting_atoms["ligand"].update(
+                        metadata["parent_indices"]["ligand"]
+                    )
+                    self._interacting_atoms["protein"].update(
+                        metadata["parent_indices"]["protein"]
+                    )
+
                     # get coordinates for both points of the interaction
                     if interaction in self.LIGAND_RING_INTERACTIONS:
                         p1 = self.get_ring_centroid(lres, metadata["indices"]["ligand"])
@@ -360,7 +391,7 @@ class Complex3D:
                     # add label when hovering the middle of the dashed line by adding a
                     # dummy atom
                     c = Point3D(*get_centroid([p1, p2]))
-                    modelID = models[lresid]
+                    modelID = self._models[lresid]
                     model = v.getModel(modelID, viewer=position)
                     interaction_label = f"{interaction}: {metadata['distance']:.2f}Å"
                     model.addAtoms(
@@ -385,8 +416,42 @@ class Complex3D:
                         self.DISABLE_HOVER_CALLBACK,
                     )
 
+        # show "protein" residues that are close to the "ligand"
+        if not only_interacting:
+            pocket_residues = get_residues_near_ligand(self.lig_mol, self.prot_mol)
+            pocket_residues = set(pocket_residues).difference(self._models)
+            for resid in pocket_residues:
+                res = self.prot_mol[resid]
+                self._add_residue_to_view(v, position, res, self.RESIDUES_STYLE)
+
+        # hide non-polar hydrogens (except if they are involved in an interaction)
+        if remove_hydrogens:
+            to_remove = []
+            if remove_hydrogens in {"ligand", True}:
+                to_remove.append(("ligand", self.lig_mol))
+            if remove_hydrogens in {"protein", True}:
+                to_remove.append(("protein", self.prot_mol))
+
+            for resid in self._models:
+                for moltype, mol in to_remove:
+                    try:
+                        modelID = self._models[resid]
+                        res = mol[resid]
+                    except KeyError:
+                        continue
+                    model = v.getModel(modelID, viewer=position)
+                    int_atoms = self._interacting_atoms[moltype]
+                    hide = [
+                        a.GetIdx()
+                        for a in res.GetAtoms()
+                        if a.GetAtomicNum() == 1
+                        and a.GetUnsignedProp("mapindex") not in int_atoms
+                        and all(n.GetAtomicNum() in {1, 6} for n in a.GetNeighbors())
+                    ]
+                    model.setStyle({"index": hide}, {"stick": {"hidden": True}})
+
         # show protein
-        mol = Chem.RemoveAllHs(self.prot_mol)
+        mol = Chem.RemoveAllHs(self.prot_mol, sanitize=False)
         pdb = Chem.MolToPDBBlock(mol, flavor=0x20 | 0x10)
         v.addModel(pdb, "pdb", viewer=position)
         model = v.getModel(viewer=position)
@@ -394,13 +459,40 @@ class Complex3D:
 
         # do the same for ligand if multiple residues
         if self.lig_mol.n_residues >= self.PEPTIDE_THRESHOLD:
-            mol = Chem.RemoveAllHs(self.lig_mol)
+            mol = Chem.RemoveAllHs(self.lig_mol, sanitize=False)
             pdb = Chem.MolToPDBBlock(mol, flavor=0x20 | 0x10)
             v.addModel(pdb, "pdb", viewer=position)
             model = v.getModel(viewer=position)
             model.setStyle({}, self.PEPTIDE_STYLE)
 
-        v.zoomTo({"model": list(models.values())}, viewer=position)
+        v.zoomTo({"model": list(self._models.values())}, viewer=position)
+
+    def _add_residue_to_view(
+        self,
+        v: py3Dmol.view,
+        position: Tuple[int, int],
+        res: Residue,
+        style: Dict,
+    ) -> None:
+        self._mid += 1
+        resid = res.resid
+        v.addModel(Chem.MolToMolBlock(res), "sdf", viewer=position)
+        model = v.getModel(viewer=position)
+        if resid in self._colormap:
+            resid_style = deepcopy(style)
+            for key in resid_style:
+                resid_style[key]["colorscheme"] = self._colormap[resid]
+        else:
+            resid_style = style
+        model.setStyle({}, resid_style)
+        # add residue label
+        model.setHoverable(
+            {},
+            True,
+            self.RESIDUE_HOVER_CALLBACK % resid,
+            self.DISABLE_HOVER_CALLBACK,
+        )
+        self._models[resid] = self._mid
 
     @requires("IPython.display")
     def save_png(self) -> None:
