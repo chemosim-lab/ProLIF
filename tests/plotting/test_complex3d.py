@@ -36,17 +36,17 @@ class TestComplex3D:
 
     def test_integration_display_single(self, plot_3d):
         view = plot_3d.display(display_all=False)
-        html = view._make_html()
+        html = view._view._make_html()
         assert "Hydrophobic" in html
 
     def test_integration_display_all(self, plot_3d):
         view = plot_3d.display(display_all=True)
-        html = view._make_html()
+        html = view._view._make_html()
         assert "Hydrophobic" in html
 
     def test_integration_compare(self, plot_3d):
         view = plot_3d.compare(plot_3d)
-        html = view._make_html()
+        html = view._view._make_html()
         assert "Hydrophobic" in html
 
     def test_from_fingerprint_raises_not_executed(self, ligand_mol, protein_mol):
@@ -66,5 +66,5 @@ class TestComplex3D:
     def test_fp_plot_3d(self, fp_mols):
         fp, lig_mol, prot_mol = fp_mols
         view = fp.plot_3d(lig_mol, prot_mol, frame=0, display_all=fp.count)
-        html = view._make_html()
+        html = view._view._make_html()
         assert "Hydrophobic" in html

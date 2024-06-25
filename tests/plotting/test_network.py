@@ -96,5 +96,5 @@ class TestLigNetwork:
 
     def test_fp_plot_lignetwork(self, fp_mol):
         fp, lig_mol = fp_mol
-        html = fp.plot_lignetwork(lig_mol, kind="frame", frame=0, display_all=fp.count)
-        assert "<iframe" in html.data
+        view = fp.plot_lignetwork(lig_mol, kind="frame", frame=0, display_all=fp.count)
+        assert "<iframe" in view._iframe
