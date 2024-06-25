@@ -35,7 +35,7 @@ from prolif.residue import ResidueId
 from prolif.utils import requires
 
 try:
-    from IPython.display import HTML, Javascript, display
+    from IPython.display import Javascript, display
 except ModuleNotFoundError:
     pass
 else:
