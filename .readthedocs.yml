@@ -1,13 +1,15 @@
 version: 2
 build:
-  os: ubuntu-20.04
+  os: ubuntu-22.04
   tools:
-    python: mambaforge-4.10
+    python: mambaforge-22.9
 sphinx:
   configuration: docs/conf.py
 python:
   install:
-  - method: pip
-    path: .
+    - method: pip
+      path: .
+      extra_requirements:
+        - tutorials
 conda:
   environment: environment.yml
