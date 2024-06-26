@@ -23,6 +23,4 @@ dependencies:
   - dill
   - multiprocess
   - pip:
-    - pyvis
-    - py3Dmol
     - sphinx-book-theme
