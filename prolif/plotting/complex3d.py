@@ -310,13 +310,15 @@ class Complex3D:
 
     def _populate_view(  # noqa: PLR0912
         self,
-        v: py3Dmol.view,
+        v: Union[py3Dmol.view, Complex3D],
         position: Tuple[int, int] = (0, 0),
         display_all: bool = False,
         colormap: Optional[Dict[ResidueId, str]] = None,
         only_interacting: bool = True,
         remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
     ) -> None:
+        if isinstance(v, Complex3D) and v._view:
+            v = v._view
         self._colormap = {} if colormap is None else colormap
         self._models = {}
         self._mid = -1
