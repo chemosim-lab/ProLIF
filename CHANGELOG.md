@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `IFP.interactions()` iterator that yields all interaction data for a given frame in
+  a single flat structure. This makes iterating over the `fp.ifp` results a bit
+  easier / less nested.
 - `Complex3D` and `fp.plot_3d` now have access to `only_interacting` and
   `remove_hydrogens` parameters to control which residues and hydrogen atoms are
   displayed. Non-polar hydrogen atoms that aren't involved in interactions are now

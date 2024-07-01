@@ -4,8 +4,16 @@ Storing interactions --- :mod:`prolif.ifp`
 """
 
 from collections import UserDict
+from typing import Iterator, NamedTuple
 
 from prolif.residue import ResidueId
+
+
+class InteractionData(NamedTuple):
+    ligand: ResidueId
+    protein: ResidueId
+    interaction: str
+    metadata: dict
 
 
 class IFP(UserDict):
@@ -67,3 +75,19 @@ class IFP(UserDict):
             "either ResidueId or residue string. If you need to filter the IFP, a "
             "single ResidueId or residue string can also be used.",
         )
+
+    def interactions(self) -> Iterator[InteractionData]:
+        """Yields all interactions data as an :class:`InteractionData` namedtuple.
+
+        .. versionadded:: 2.1.0
+
+        """
+        for (ligand_resid, protein_resid), ifp_dict in self.data.items():
+            for int_name, metadata_tuple in ifp_dict.items():
+                for metadata in metadata_tuple:
+                    yield InteractionData(
+                        ligand=ligand_resid,
+                        protein=protein_resid,
+                        interaction=int_name,
+                        metadata=metadata,
+                    )
