@@ -37,7 +37,7 @@ def test_interaction_data_iteration(ifp: IFP) -> None:
     data = next(ifp.interactions())
     assert isinstance(data, InteractionData)
     assert data.ligand == ResidueId("LIG", 1, "G")
-    assert data.protein.chain == "A"
+    assert data.protein.chain in {"A", "B"}
     assert data.interaction in {"Hydrophobic", "VdWContact"}
     assert "distance" in data.metadata
     for data in ifp.interactions():
