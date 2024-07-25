@@ -12,10 +12,10 @@ Note that some of the SMARTS patterns used in the interaction classes are inspir
 
 from itertools import product
 from math import degrees, radians
-from typing import Dict, Literal, Optional
+from typing import Annotated, Dict, Literal, Optional
 
-from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
+from rdkit.Geometry import Point3D
 
 from prolif.interactions.base import (
     BasePiStacking,
@@ -25,6 +25,7 @@ from prolif.interactions.base import (
     SingleAngle,
 )
 from prolif.interactions.constants import VDW_PRESETS, VDWRADII  # noqa
+from prolif.types import Geometry, Pattern
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 __all__ = [
@@ -64,8 +65,10 @@ class Hydrophobic(Distance):
 
     def __init__(
         self,
-        hydrophobic="[c,s,Br,I,S&H0&v2,$([D3,D4;#6])&!$([#6]~[#7,#8,#9])&!$([#6X4H0]);+0]",
-        distance=4.5,
+        hydrophobic: Annotated[
+            str, Pattern(ligand="lig_pattern", protein="prot_pattern")
+        ] = "[c,s,Br,I,S&H0&v2,$([D3,D4;#6])&!$([#6]~[#7,#8,#9])&!$([#6X4H0]);+0]",
+        distance: Annotated[float, Geometry("distance")] = 4.5,
     ):
         super().__init__(
             lig_pattern=hydrophobic,
@@ -248,11 +251,11 @@ class CationPi(Interaction):
             if not (cation_matches and pi_matches):
                 continue
             for cation_match, pi_match in product(cation_matches, pi_matches):
-                cat = Geometry.Point3D(*cation.xyz[cation_match[0]])
+                cat = Point3D(*cation.xyz[cation_match[0]])
                 # get coordinates of atoms matching pi-system
                 pi_coords = pi.xyz[list(pi_match)]
                 # centroid of pi-system as 3d point
-                centroid = Geometry.Point3D(*get_centroid(pi_coords))
+                centroid = Point3D(*get_centroid(pi_coords))
                 # distance between cation and centroid
                 dist = cat.Distance(centroid)
                 if dist > self.distance:

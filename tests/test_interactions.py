@@ -128,6 +128,26 @@ class TestInteractions:
         interaction = getattr(fingerprint, func_name)
         assert next(interaction(any_mol[0], any_other_mol[0]), False) is expected
 
+    @pytest.mark.parametrize(
+        ("any_mol", "any_other_mol"),
+        [
+            ("benzene", "ftf"),
+        ],
+        indirect=["any_mol", "any_other_mol"],
+    )
+    def test_debugger(self, any_mol, any_other_mol):
+        from prolif.debugger import InteractionDebugger
+
+        fp = Fingerprint(
+            ["Hydrophobic"],
+            parameters={
+                "Hydrophobic": {"distance": 0},
+            },
+        )
+        debugger = InteractionDebugger(fp, distance_padding=1.0)
+        results = debugger.debug(any_mol, any_other_mol)
+        results
+
     def test_warning_supersede(self):
         old = id(_INTERACTIONS["Hydrophobic"])
         with pytest.warns(UserWarning, match="interaction has been superseded"):

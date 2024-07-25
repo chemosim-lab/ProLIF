@@ -6,14 +6,29 @@ This module contains the base classes used to build most of the interactions.
 """
 
 import warnings
+from abc import abstractmethod
 from itertools import product
 from math import degrees, radians
+from typing import (
+    Annotated,
+    Any,
+    Iterator,
+    Literal,
+    Optional,
+    Self,
+    Sequence,
+    Type,
+    Union,
+    overload,
+)
 
 import numpy as np
-from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
+from rdkit.Geometry import Point3D
 
 from prolif.interactions.utils import DISTANCE_FUNCTIONS, get_mapindex
+from prolif.residue import Residue
+from prolif.types import Angles, Geometry, Indices, Pattern
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 _INTERACTIONS = {}
@@ -30,15 +45,14 @@ class Interaction:
         update/derive interaction classes.
     """
 
-    def __init_subclass__(cls, is_abstract=False):
+    @abstractmethod
+    def detect(self, lig_res: Residue, prot_res: Residue) -> Iterator[dict]:
+        raise NotImplementedError()
+
+    def __init_subclass__(cls, is_abstract: bool = False) -> None:
         super().__init_subclass__()
         name = cls.__name__
         register = _BASE_INTERACTIONS if is_abstract else _INTERACTIONS
-        if not hasattr(cls, "detect"):
-            raise TypeError(
-                f"Can't instantiate interaction class {name} without a `detect`"
-                " method.",
-            )
         if name in register:
             warnings.warn(
                 f"The {name!r} interaction has been superseded by a "
@@ -47,7 +61,19 @@ class Interaction:
             )
         register[name] = cls
 
-    def __call__(self, lig_res, prot_res, metadata=False):
+    @overload
+    def __call__(
+        self, lig_res: Residue, prot_res: Residue, metadata: Literal[False] = False
+    ) -> Iterator[Literal[True]]: ...
+
+    @overload
+    def __call__(
+        self, lig_res: Residue, prot_res: Residue, metadata: Literal[True]
+    ) -> Iterator[dict]: ...
+
+    def __call__(
+        self, lig_res: Residue, prot_res: Residue, metadata: bool = False
+    ) -> Iterator[Union[Literal[True], dict]]:
         for int_data in self.detect(lig_res, prot_res):
             yield int_data if metadata else True
 
@@ -55,11 +81,17 @@ class Interaction:
         cls = self.__class__
         return f"<{cls.__module__}.{cls.__name__} at {id(self):#x}>"
 
-    def metadata(self, lig_res, prot_res, lig_indices, prot_indices, **data):
+    def metadata(
+        self,
+        lig_res: Residue,
+        prot_res: Residue,
+        lig_indices: Indices,
+        prot_indices: Indices,
+        **data: Any,
+    ) -> dict:
         """Returns a dict containing the indices of atoms responsible for the
         interaction, alongside any other metrics (e.g. distance, angle...etc.)."""
-        if hasattr(self, "_metadata_mapping"):
-            mapping = self._metadata_mapping or {}
+        if mapping := getattr(self, "_metadata_mapping", {}):
             data = {mapping.get(key, key): value for key, value in data.items()}
         return {
             "indices": {
@@ -76,7 +108,7 @@ class Interaction:
         }
 
     @staticmethod
-    def _invert_metadata(metadata):
+    def _invert_metadata(metadata: dict) -> dict:
         """Invert the role of the ligand and protein components in the dict returned
         by :meth:`~Interaction.metadata`."""
         if metadata is not None:
@@ -94,16 +126,18 @@ class Interaction:
         return metadata
 
     @classmethod
-    def invert_role(cls, name, docstring):
+    def invert_role(cls: Type[Self], name: str, docstring: str) -> Type[Self]:
         """Creates a new interaction class where the role of the ligand and protein
         residues have been swapped. Usefull to create e.g. an acceptor class from a
         donor class.
         """
         cls_docstring = cls.__doc__ or "\n"
         parameters_doc = cls_docstring.split("\n", maxsplit=1)[1]
-        inverted = type(name, (cls,), {"__doc__": f"{docstring}\n{parameters_doc}"})
+        inverted: Type[Self] = type(
+            name, (cls,), {"__doc__": f"{docstring}\n{parameters_doc}"}
+        )
 
-        def detect(self, ligand, residue):
+        def detect(self: Self, ligand: Residue, residue: Residue):
             for metadata in super(inverted, self).detect(residue, ligand):
                 yield self._invert_metadata(metadata)
 
@@ -124,18 +158,23 @@ class Distance(Interaction, is_abstract=True):
         Cutoff distance, measured between the first atom of each pattern
     """
 
-    def __init__(self, lig_pattern, prot_pattern, distance):
+    def __init__(
+        self,
+        lig_pattern: Annotated[str, Pattern(ligand=True)],
+        prot_pattern: Annotated[str, Pattern(protein=True)],
+        distance: Annotated[float, Geometry("distance")],
+    ) -> None:
         self.lig_pattern = MolFromSmarts(lig_pattern)
         self.prot_pattern = MolFromSmarts(prot_pattern)
         self.distance = distance
 
-    def detect(self, lig_res, prot_res):
+    def detect(self, lig_res: Residue, prot_res: Residue) -> Iterator[dict]:
         lig_matches = lig_res.GetSubstructMatches(self.lig_pattern)
         prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
         if lig_matches and prot_matches:
             for lig_match, prot_match in product(lig_matches, prot_matches):
-                alig = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
-                aprot = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
+                alig = Point3D(*lig_res.xyz[lig_match[0]])
+                aprot = Point3D(*prot_res.xyz[prot_match[0]])
                 dist = alig.Distance(aprot)
                 if dist <= self.distance:
                     yield self.metadata(
@@ -176,13 +215,13 @@ class SingleAngle(Interaction, is_abstract=True):
 
     def __init__(
         self,
-        lig_pattern,
-        prot_pattern,
-        distance,
-        angle,
-        distance_atom,
-        metadata_mapping=None,
-    ):
+        lig_pattern: Annotated[str, Pattern(ligand=True)],
+        prot_pattern: Annotated[str, Pattern(protein=True)],
+        distance: Annotated[float, Geometry("distance")],
+        angle: Annotated[Angles, Geometry("angle")],
+        distance_atom: Literal["P1", "P2"],
+        metadata_mapping: Optional[dict[str, str]] = None,
+    ) -> None:
         self.lig_pattern = MolFromSmarts(lig_pattern)
         self.prot_pattern = MolFromSmarts(prot_pattern)
         self.distance = distance
@@ -190,14 +229,14 @@ class SingleAngle(Interaction, is_abstract=True):
         self._measure_distance = DISTANCE_FUNCTIONS[distance_atom]
         self._metadata_mapping = metadata_mapping
 
-    def detect(self, lig_res, prot_res):
+    def detect(self, lig_res: Residue, prot_res: Residue) -> Iterator[dict]:
         lig_matches = lig_res.GetSubstructMatches(self.lig_pattern)
         prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
         if lig_matches and prot_matches:
             for lig_match, prot_match in product(lig_matches, prot_matches):
-                l1 = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
-                p1 = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
-                p2 = Geometry.Point3D(*prot_res.xyz[prot_match[1]])
+                l1 = Point3D(*lig_res.xyz[lig_match[0]])
+                p1 = Point3D(*prot_res.xyz[prot_match[0]])
+                p2 = Point3D(*prot_res.xyz[prot_match[1]])
                 dist = self._measure_distance(l1, p1, p2)
                 if dist <= self.distance:
                     # P1-P2 ... L1
@@ -242,14 +281,14 @@ class DoubleAngle(Interaction, is_abstract=True):
 
     def __init__(
         self,
-        lig_pattern,
-        prot_pattern,
-        distance,
-        L1P2P1_angle,
-        L2L1P2_angle,
-        distance_atoms=("L1", "P2"),
-        metadata_mapping=None,
-    ):
+        lig_pattern: Annotated[str, Pattern(ligand=True)],
+        prot_pattern: Annotated[str, Pattern(protein=True)],
+        distance: Annotated[float, Geometry("distance")],
+        L1P2P1_angle: Annotated[Angles, Geometry("angles")],
+        L2L1P2_angle: Annotated[Angles, Geometry("angles")],
+        distance_atoms: tuple[Literal["L1", "L2"], Literal["P1", "P2"]] = ("L1", "P2"),
+        metadata_mapping: Optional[dict[str, str]] = None,
+    ) -> None:
         self.lig_pattern = MolFromSmarts(lig_pattern)
         self.prot_pattern = MolFromSmarts(prot_pattern)
         self.distance = distance
@@ -258,15 +297,15 @@ class DoubleAngle(Interaction, is_abstract=True):
         self._measure_distance = DISTANCE_FUNCTIONS[distance_atoms]
         self._metadata_mapping = metadata_mapping
 
-    def detect(self, lig_res, prot_res):
+    def detect(self, lig_res: Residue, prot_res: Residue) -> Iterator[dict]:
         lig_matches = lig_res.GetSubstructMatches(self.lig_pattern)
         prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
         if lig_matches and prot_matches:
             for lig_match, prot_match in product(lig_matches, prot_matches):
-                l1 = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
-                l2 = Geometry.Point3D(*lig_res.xyz[lig_match[1]])
-                p1 = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
-                p2 = Geometry.Point3D(*prot_res.xyz[prot_match[1]])
+                l1 = Point3D(*lig_res.xyz[lig_match[0]])
+                l2 = Point3D(*lig_res.xyz[lig_match[1]])
+                p1 = Point3D(*prot_res.xyz[prot_match[0]])
+                p2 = Point3D(*prot_res.xyz[prot_match[1]])
                 dist = self._measure_distance(l1, l2, p1, p2)
                 if dist <= self.distance:
                     p2p1 = p2.DirectionVector(p1)
@@ -323,16 +362,16 @@ class BasePiStacking(Interaction, is_abstract=True):
 
     def __init__(
         self,
-        distance,
-        plane_angle,
-        normal_to_centroid_angle,
-        pi_ring=(
+        distance: Annotated[float, Geometry("distance")],
+        plane_angle: Annotated[Angles, Geometry("angles")],
+        normal_to_centroid_angle: Annotated[Angles, Geometry("angles")],
+        pi_ring: Annotated[Sequence[str], Pattern(ligand=True, protein=True)] = (
             "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
             "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
         ),
-        intersect=False,
-        intersect_radius=1.5,
-    ):
+        intersect: bool = False,
+        intersect_radius: Annotated[float, Geometry("distance")] = 1.5,
+    ) -> None:
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.distance = distance
         self.plane_angle = tuple(radians(i) for i in plane_angle)
@@ -342,7 +381,7 @@ class BasePiStacking(Interaction, is_abstract=True):
         self.intersect = intersect
         self.intersect_radius = intersect_radius
 
-    def detect(self, ligand, residue):
+    def detect(self, ligand: Residue, residue: Residue) -> Iterator[dict]:
         for pi_rings in product(self.pi_ring, repeat=2):
             res_matches = residue.GetSubstructMatches(pi_rings[0])
             lig_matches = ligand.GetSubstructMatches(pi_rings[1])
@@ -350,9 +389,9 @@ class BasePiStacking(Interaction, is_abstract=True):
                 continue
             for lig_match, res_match in product(lig_matches, res_matches):
                 lig_pi_coords = ligand.xyz[list(lig_match)]
-                lig_centroid = Geometry.Point3D(*get_centroid(lig_pi_coords))
+                lig_centroid = Point3D(*get_centroid(lig_pi_coords))
                 res_pi_coords = residue.xyz[list(res_match)]
-                res_centroid = Geometry.Point3D(*get_centroid(res_pi_coords))
+                res_centroid = Point3D(*get_centroid(res_pi_coords))
                 centroid_dist = lig_centroid.Distance(res_centroid)
                 if centroid_dist > self.distance:
                     continue
@@ -421,11 +460,11 @@ class BasePiStacking(Interaction, is_abstract=True):
 
     @staticmethod
     def _get_intersect_point(
-        plane_normal,
-        plane_centroid,
-        tilted_normal,
-        tilted_centroid,
-    ):
+        plane_normal: Point3D,
+        plane_centroid: Point3D,
+        tilted_normal: Point3D,
+        tilted_centroid: Point3D,
+    ) -> Optional[Point3D]:
         # intersect line is orthogonal to both planes normal vectors
         intersect_direction = plane_normal.CrossProduct(tilted_normal)
         # setup system of linear equations to solve
@@ -434,12 +473,12 @@ class BasePiStacking(Interaction, is_abstract=True):
         )
         if np.linalg.det(A) == 0:
             return None
-        tilted_offset = tilted_normal.DotProduct(Geometry.Point3D(*tilted_centroid))
-        plane_offset = plane_normal.DotProduct(Geometry.Point3D(*plane_centroid))
+        tilted_offset = tilted_normal.DotProduct(Point3D(*tilted_centroid))
+        plane_offset = plane_normal.DotProduct(Point3D(*plane_centroid))
         d = np.array([[plane_offset], [tilted_offset], [0.0]])
         # point on intersect line
         point = np.linalg.solve(A, d).T[0]
-        point = Geometry.Point3D(*point)
+        point = Point3D(*point)
         # find projection of centroid on intersect line using vector projection
         vec = plane_centroid - point
         intersect_direction.Normalize()
