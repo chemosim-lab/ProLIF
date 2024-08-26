@@ -106,6 +106,9 @@ exclude = [
     "site-packages",
 ]
 
+[tool.ruff.format]
+exclude = ["*.ipynb"]
+
 [tool.ruff.lint]
 select = [
     # pycodestyle
