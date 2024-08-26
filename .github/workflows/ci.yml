@@ -51,7 +51,7 @@ jobs:
             os: ubuntu-latest
             python-version: "3.12"
             # remove numpy<2 when MDAnalysis 2.8.0 is released
-            mamba-deps: "rdkit numpy<2"
+            mamba-deps: "rdkit 'numpy<2'"
             coverage: false
 
     steps:
