@@ -139,7 +139,7 @@ class TestInteractions:
         assert old != new
         # fix dummy Hydrophobic class being reused in later unrelated tests
 
-        class Hydrophobic(prolif.interactions.Hydrophobic):  # noqa: F811
+        class Hydrophobic(prolif.interactions.Hydrophobic):
             __doc__ = prolif.interactions.Hydrophobic.__doc__
 
     def test_error_no_detect(self):

@@ -67,11 +67,9 @@ class Interaction:
                 "protein": prot_indices,
             },
             "parent_indices": {
-                "ligand": tuple(
-                    [get_mapindex(lig_res, index) for index in lig_indices],
-                ),
+                "ligand": tuple(get_mapindex(lig_res, index) for index in lig_indices),
                 "protein": tuple(
-                    [get_mapindex(prot_res, index) for index in prot_indices],
+                    get_mapindex(prot_res, index) for index in prot_indices
                 ),
             },
             **data,

@@ -199,13 +199,13 @@ def test_to_df(ifp):
     assert df.dtypes.iloc[0].type is np.bool_
     assert df.index.name == "Frame"
     assert ("LIG", "ALA1", "A") in df.columns
-    assert df[("LIG", "ALA1", "A")][0] is np.bool_(True)
+    assert df["LIG", "ALA1", "A"][0] is np.bool_(True)
     assert ("LIG", "ALA1", "B") in df.columns
-    assert df[("LIG", "ALA1", "B")][0] is np.bool_(False)
+    assert df["LIG", "ALA1", "B"][0] is np.bool_(False)
     assert ("LIG", "ALA1", "C") not in df.columns
     assert ("LIG", "GLU2", "A") not in df.columns
     assert ("LIG", "ASP3", "B") in df.columns
-    assert df[("LIG", "ASP3", "B")][0] is np.bool_(False)
+    assert df["LIG", "ASP3", "B"][0] is np.bool_(False)
 
 
 @pytest.mark.parametrize(
@@ -219,9 +219,9 @@ def test_to_df(ifp):
 def test_to_df_dtype(dtype, ifp):
     df = to_dataframe(ifp, ["A", "B", "C"], dtype=dtype)
     assert df.dtypes.iloc[0].type is dtype
-    assert df[("LIG", "ALA1", "A")][0] == dtype(True)
-    assert df[("LIG", "ALA1", "B")][0] == dtype(False)
-    assert df[("LIG", "ASP3", "B")][0] == dtype(False)
+    assert df["LIG", "ALA1", "A"][0] == dtype(True)
+    assert df["LIG", "ALA1", "B"][0] == dtype(False)
+    assert df["LIG", "ASP3", "B"][0] == dtype(False)
 
 
 def test_to_df_drop_empty(ifp):
@@ -238,7 +238,7 @@ def test_to_df_no_interaction_in_first_frame(ifp_single):
 def test_to_df_count(ifp_count):
     df = to_dataframe(ifp_count, ["A", "B", "C"], count=True)
     assert df[df > 1].any().any()
-    value = df[("LIG", "ALA1", "A")][0]
+    value = df["LIG", "ALA1", "A"][0]
     assert value.dtype == np.uint8
     assert value == 2
 
