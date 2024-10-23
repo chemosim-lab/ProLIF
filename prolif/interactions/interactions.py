@@ -12,8 +12,8 @@ Note that some of the SMARTS patterns used in the interaction classes are inspir
 
 from itertools import product
 from math import degrees, radians
+from typing import Dict, Literal, Optional
 
-from MDAnalysis.topology.tables import vdwradii
 from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
 
@@ -24,6 +24,7 @@ from prolif.interactions.base import (
     Interaction,
     SingleAngle,
 )
+from prolif.interactions.constants import VDW_PRESETS, VDWRADII  # noqa
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 __all__ = [
@@ -43,7 +44,6 @@ __all__ = [
     "XBAcceptor",
     "XBDonor",
 ]
-VDWRADII = {symbol.capitalize(): radius for symbol, radius in vdwradii.items()}
 
 
 class Hydrophobic(Distance):
@@ -438,13 +438,19 @@ class VdWContact(Interaction):
 
     Parameters
     ----------
-    tolerance : float
+    tolerance : float, optional
         Tolerance added to the sum of vdW radii of atoms before comparing to
         the interatomic distance. If ``distance <= sum_vdw + tolerance`` the
-        atoms are identified as a contact
+        atoms are identified as a contact.
     vdwradii : dict, optional
         Updates to the vdW radii dictionary, with elements (first letter uppercase) as a
         key and the radius as a value.
+    preset : str, optional
+        Which preset of vdW radii to use. ``mdanalysis`` and ``rdkit`` correspond to the
+        values used by the corresponding package, ``csd`` uses values calculated from
+        the Cambridge Structural Database in doi.org/10.1039/C3DT50599E. ``rdkit`` and
+        ``csd`` should contain almost all elements, as opposed to ``mdanalysis`` which
+        only defines a limited subset.
 
     Raises
     ------
@@ -455,15 +461,24 @@ class VdWContact(Interaction):
     .. versionchanged:: 2.0.0
         Added the ``vdwradii`` parameter.
 
+    .. versionchanged:: 2.1.0
+        Added the ``preset`` parameter.
+
     """
 
-    def __init__(self, tolerance=0.0, vdwradii=None):
+    def __init__(
+        self,
+        tolerance: float = 0.0,
+        vdwradii: Optional[Dict[str, float]] = None,
+        preset: Literal["mdanalysis", "rdkit", "csd"] = "mdanalysis",
+    ) -> None:
         if tolerance >= 0:
             self.tolerance = tolerance
         else:
             raise ValueError("`tolerance` must be 0 or positive")
         self._vdw_cache = {}
-        self.vdwradii = {**VDWRADII, **vdwradii} if vdwradii else VDWRADII
+        preset_vdw = VDW_PRESETS[preset.lower()]
+        self.vdwradii = {**preset_vdw, **vdwradii} if vdwradii else preset_vdw
 
     def detect(self, ligand, residue):
         lxyz = ligand.GetConformer()
