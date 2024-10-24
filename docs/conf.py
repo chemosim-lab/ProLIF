@@ -110,12 +110,12 @@ html_theme_options = {
 html_static_path = []  # ['_static']
 
 intersphinx_mapping = {
-    "https://docs.python.org/3/": None,
-    "https://numpy.org/doc/stable/": None,
-    "https://docs.mdanalysis.org/stable/": None,
-    "https://www.rdkit.org/docs/": None,
-    "https://pandas.pydata.org/docs/": None,
-    "https://multiprocess.readthedocs.io/en/latest/": None,
+    "python": ("https://docs.python.org/3/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "mdanalysis": ("https://docs.mdanalysis.org/stable/", None),
+    "rdkit": ("https://www.rdkit.org/docs/", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
+    "multiprocess": ("https://multiprocess.readthedocs.io/en/latest/", None),
 }
 
 
