@@ -8,6 +8,7 @@ import prolif
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import VdWContact
 from prolif.interactions.base import _INTERACTIONS, Interaction, get_mapindex
+from prolif.interactions.constants import VDW_PRESETS
 
 # disable rdkit warnings
 lg = RDLogger.logger()
@@ -182,6 +183,18 @@ class TestInteractions:
         vdw = VdWContact(vdwradii={"Na": 0})
         metadata = vdw.detect(any_mol[0], any_other_mol[0])
         assert next(metadata, None) is None
+
+    @pytest.mark.parametrize(
+        ("any_mol", "any_other_mol"),
+        [("benzene", "cation")],
+        indirect=["any_mol", "any_other_mol"],
+    )
+    @pytest.mark.parametrize("preset", ["mdanalysis", "rdkit", "csd"])
+    def test_vdwcontact_preset(self, any_mol, any_other_mol, preset):
+        vdw = VdWContact(preset=preset)
+        metadata = vdw.detect(any_mol[0], any_other_mol[0])
+        assert next(metadata, None) is not None
+        assert vdw.vdwradii == VDW_PRESETS[preset]
 
     @pytest.mark.parametrize(
         ("interaction_qmol", "smiles", "expected"),
