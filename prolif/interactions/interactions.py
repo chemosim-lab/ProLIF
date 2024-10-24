@@ -477,8 +477,25 @@ class VdWContact(Interaction):
         else:
             raise ValueError("`tolerance` must be 0 or positive")
         self._vdw_cache = {}
-        preset_vdw = VDW_PRESETS[preset.lower()]
+        self.preset = preset.lower()
+        preset_vdw = VDW_PRESETS[self.preset]
         self.vdwradii = {**preset_vdw, **vdwradii} if vdwradii else preset_vdw
+
+    def _get_radii_sum(self, atom1: str, atom2: str) -> float:
+        try:
+            return self.vdwradii[atom1] + self.vdwradii[atom2]
+        except KeyError:
+            missing = []
+            if atom1 not in self.vdwradii:
+                missing.append(f"{atom1!r}")
+            if atom2 not in self.vdwradii:
+                missing.append(f"{atom2!r}")
+            raise ValueError(
+                f"van der Waals radius for atom {' and '.join(missing)} not found."
+                " Either specify the missing radii in the `vdwradii` parameter for the"
+                " VdWContact interaction, or use a preset different from the current"
+                f" {self.preset!r}."
+            ) from None
 
     def detect(self, ligand, residue):
         lxyz = ligand.GetConformer()
@@ -490,7 +507,7 @@ class VdWContact(Interaction):
             try:
                 vdw = self._vdw_cache[elements]
             except KeyError:
-                vdw = self.vdwradii[lig] + self.vdwradii[res] + self.tolerance
+                vdw = self._get_radii_sum(lig, res) + self.tolerance
                 self._vdw_cache[elements] = vdw
             dist = lxyz.GetAtomPosition(la.GetIdx()).Distance(
                 rxyz.GetAtomPosition(ra.GetIdx()),

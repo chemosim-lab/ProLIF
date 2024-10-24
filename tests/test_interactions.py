@@ -196,6 +196,13 @@ class TestInteractions:
         assert next(metadata, None) is not None
         assert vdw.vdwradii == VDW_PRESETS[preset]
 
+    def test_vdwcontact_radii_missing(self):
+        vdw = VdWContact(preset="mdanalysis")
+        with pytest.raises(
+            ValueError, match=r"van der Waals radius for atom .+ not found"
+        ):
+            vdw._get_radii_sum("X", "Y")
+
     @pytest.mark.parametrize(
         ("interaction_qmol", "smiles", "expected"),
         [

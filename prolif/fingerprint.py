@@ -81,7 +81,11 @@ class Fingerprint:
         PiStacking, Anionic, Cationic, CationPi, PiCation, VdWContact.
     parameters : dict, optional
         New parameters for the interactions. Mapping between an interaction name and a
-        dict of parameters as they appear in the interaction class.
+        dict of parameters as they appear in the interaction class (see the
+        :mod:`prolif.interactions` module's documentation for all classes parameters)::
+
+            >>> fp = plf.Fingerprint(parameters={"Hydrophobic": {"distance": 3.8}})
+
     count : bool
         For a given interaction class and pair of residues, there might be multiple
         combinations of atoms that satisfy the interaction constraints. This parameter
