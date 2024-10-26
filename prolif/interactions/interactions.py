@@ -25,7 +25,7 @@ from prolif.interactions.base import (
     SingleAngle,
 )
 from prolif.interactions.constants import VDW_PRESETS, VDWRADII  # noqa
-from prolif.types import Geometry, Pattern
+from prolif.types import Angles, Geometry, Pattern
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 __all__ = [
@@ -102,10 +102,14 @@ class HBAcceptor(SingleAngle):
 
     def __init__(
         self,
-        acceptor="[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]",
-        donor="[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
-        distance=3.5,
-        DHA_angle=(130, 180),
+        acceptor: Annotated[str, Pattern(ligand="lig_pattern")] = (
+            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
+        ),
+        donor: Annotated[
+            str, Pattern(protein="prot_pattern")
+        ] = "[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
+        distance: Annotated[float, Geometry("distance")] = 3.5,
+        DHA_angle: Annotated[Angles, Geometry("angles", attr="angle")] = (130, 180),
     ):
         super().__init__(
             lig_pattern=acceptor,
@@ -156,11 +160,21 @@ class XBAcceptor(DoubleAngle):
 
     def __init__(
         self,
-        acceptor="[#7,#8,P,S,Se,Te,a;!+{1-}]!#[*]",
-        donor="[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
-        distance=3.5,
-        AXD_angle=(130, 180),
-        XAR_angle=(80, 140),
+        acceptor: Annotated[
+            str, Pattern(ligand="lig_pattern")
+        ] = "[#7,#8,P,S,Se,Te,a;!+{1-}]!#[*]",
+        donor: Annotated[
+            str, Pattern(protein="prot_pattern")
+        ] = "[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
+        distance: Annotated[float, Geometry("distance")] = 3.5,
+        AXD_angle: Annotated[Angles, Geometry("angles", attr="L1P2P1_angle")] = (
+            130,
+            180,
+        ),
+        XAR_angle: Annotated[Angles, Geometry("angles", attr="L2L1P2_angle")] = (
+            80,
+            140,
+        ),
     ):
         super().__init__(
             lig_pattern=acceptor,

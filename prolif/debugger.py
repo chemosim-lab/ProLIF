@@ -1,7 +1,8 @@
 from abc import abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass
 from inspect import Parameter, signature
-from typing import Generic, Literal, Optional, Self, Type, TypeVar
+from typing import Generic, Literal, Optional, Self, Type, TypeVar, Union
 
 from rdkit import Chem
 
@@ -9,7 +10,7 @@ from prolif.fingerprint import Fingerprint
 from prolif.interactions.base import Interaction
 from prolif.interactions.interactions import PiStacking
 from prolif.residue import Residue
-from prolif.types import Geometry, Pattern, Specs, is_geometry, is_pattern
+from prolif.types import Angles, Geometry, Pattern, Specs, is_geometry, is_pattern
 
 T = TypeVar("T")
 
@@ -83,15 +84,15 @@ class DebugPattern(DebugAction):
             target=self.target,
             explanation=(
                 f"{self.target} does not match {self.interaction} parameter"
-                f" {self.parameter!r}={smarts}"
+                f" {self.parameter}={smarts!r}"
             ),
         )
 
 
 @dataclass
 class DebugDistance(DebugAction):
-    distance: float
     cls: Type[Interaction]
+    distance: float
     padding: float
 
     @classmethod
@@ -124,16 +125,71 @@ class DebugDistance(DebugAction):
                 value=self.distance,
                 explanation=(
                     f"Could not find {self.interaction} interaction for parameter"
-                    f" {self.parameter!r}={padded_distance}"
+                    f" {self.parameter}={padded_distance}"
+                ),
+            )
+        return None
+
+
+@dataclass
+class DebugAngles(DebugAction):
+    cls: Type[Interaction]
+    angles: Angles
+    padding: Angles
+
+    @classmethod
+    def from_spec(
+        cls, parameter: str, interaction: Interaction, spec: Geometry, padding: Angles
+    ) -> Self:
+        icls = interaction.__class__
+        itype = icls.__name__
+        attr = spec.attr or parameter
+        angles: Angles = getattr(interaction, attr)
+        return cls(
+            interaction=itype,
+            parameter=parameter,
+            attr=attr,
+            angles=angles,
+            cls=icls,
+            padding=padding,
+        )
+
+    def debug(
+        self, ligand_residue: Residue, protein_residue: Residue
+    ) -> Optional[DebugResult]:
+        padded_angles = (
+            self.angles[0] - self.padding[0],
+            self.angles[1] + self.padding[1],
+        )
+        interaction = self.cls(**{self.parameter: padded_angles})
+        metadata = next(interaction.detect(ligand_residue, protein_residue), None)
+        if metadata is None:
+            return DebugResult(
+                interaction=self.interaction,
+                parameter=self.parameter,
+                value=self.angles,
+                explanation=(
+                    f"Could not find {self.interaction} interaction for parameter"
+                    f" {self.parameter}={padded_angles}"
                 ),
             )
         return None
 
 
 class InteractionDebugger:
-    def __init__(self, fp: Fingerprint, distance_padding: float = 0.5) -> None:
+    def __init__(
+        self,
+        fp: Fingerprint,
+        distance_padding: float = 0.5,
+        angles_padding: Union[float, Angles] = 5,
+    ) -> None:
         self.fp = fp
         self.distance_padding = distance_padding
+        self.angles_padding = (
+            (angles_padding, angles_padding)
+            if isinstance(angles_padding, float)
+            else angles_padding
+        )
 
         interactions: dict[str, Interaction] = {}
         for itype in fp.interactions:
@@ -175,33 +231,51 @@ class InteractionDebugger:
         protein_residue: Residue,
         interaction: Optional[str] = None,
     ) -> list[DebugResult]:
-        actions = self.gather_actions(interaction)
-        return [
-            result
-            for action in actions
-            if (result := action.debug(ligand_residue, protein_residue)) is not None
-        ]
+        results = []
+        for actions in self.gather_actions(interaction).values():
+            for action in actions:
+                if (
+                    result := action.debug(ligand_residue, protein_residue)
+                ) is not None:
+                    results.append(result)
+                    break
+        return results
 
-    def gather_actions(self, interaction_name: Optional[str] = None):
+    def gather_actions(
+        self, interaction_name: Optional[str] = None
+    ) -> dict[str, list[DebugAction]]:
+        actions: dict[str, list[DebugAction]] = defaultdict(list)
+
         if interaction_name is None:
-            actions: list[DebugAction] = []
-            for itype in self.interactions:
-                actions.extend(self.gather_actions(itype))
-                return actions
+            for interaction_name in self.interactions:
+                acts = next(iter(self.gather_actions(interaction_name).values()))
+                actions[interaction_name].extend(acts)
+                return dict(actions)
 
         interaction = self.interactions[interaction_name]
         specs = self.specs[interaction_name]
-        actions: list[DebugAction] = []
         for parameter, spec in specs.items():
             if is_pattern(spec):
-                actions.extend(DebugPattern.from_spec(parameter, interaction, spec))
-            elif is_geometry(spec) and spec.type == "distance":
-                actions.append(
-                    DebugDistance.from_spec(
-                        parameter,
-                        interaction,
-                        spec,
-                        padding=self.distance_padding,
-                    )
+                actions[interaction_name].extend(
+                    DebugPattern.from_spec(parameter, interaction, spec)
                 )
-        return actions
+            elif is_geometry(spec):
+                if spec.type == "distance":
+                    actions[interaction_name].append(
+                        DebugDistance.from_spec(
+                            parameter,
+                            interaction,
+                            spec,
+                            padding=self.distance_padding,
+                        )
+                    )
+                else:
+                    actions[interaction_name].append(
+                        DebugAngles.from_spec(
+                            parameter,
+                            interaction,
+                            spec,
+                            padding=self.angles_padding,
+                        )
+                    )
+        return dict(actions)

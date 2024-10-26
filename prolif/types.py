@@ -19,7 +19,6 @@ class Pattern(Specs):
 class Geometry(Specs):
     type: Literal["distance", "angles"]
     attr: Optional[str] = None
-    metadata: Optional[str] = None
 
 
 def is_pattern(spec: Specs) -> TypeGuard[Pattern]:

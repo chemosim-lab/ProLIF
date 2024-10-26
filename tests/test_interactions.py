@@ -4,11 +4,13 @@ import pytest
 from MDAnalysis.transformations import rotateby, translate
 from rdkit import Chem, RDLogger
 
-import prolif
+import prolif as plf
+from prolif.debugger import DebugResult
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import VdWContact
 from prolif.interactions.base import _INTERACTIONS, Interaction, get_mapindex
 from prolif.interactions.constants import VDW_PRESETS
+from prolif.molecule import Molecule
 
 # disable rdkit warnings
 lg = RDLogger.logger()
@@ -17,7 +19,7 @@ lg.setLevel(RDLogger.ERROR)
 
 @pytest.fixture(scope="module")
 def benzene_universe():
-    benzene = mda.Universe(prolif.datafiles.datapath / "benzene.mol2")
+    benzene = mda.Universe(plf.datafiles.datapath / "benzene.mol2")
     elements = mda.topology.guessers.guess_types(benzene.atoms.names)
     benzene.add_TopologyAttr("elements", elements)
     benzene.segments.segids = np.array(["U1"], dtype=object)
@@ -35,12 +37,12 @@ def interaction_instances():
 
 
 @pytest.fixture(scope="session")
-def any_mol(request):
+def any_mol(request) -> Molecule:
     return request.getfixturevalue(request.param)
 
 
 @pytest.fixture(scope="session")
-def any_other_mol(request):
+def any_other_mol(request) -> Molecule:
     return request.getfixturevalue(request.param)
 
 
@@ -129,24 +131,47 @@ class TestInteractions:
         assert next(interaction(any_mol[0], any_other_mol[0]), False) is expected
 
     @pytest.mark.parametrize(
-        ("any_mol", "any_other_mol"),
+        ("any_mol", "any_other_mol", "fp_kwargs", "expected"),
         [
-            ("benzene", "ftf"),
+            (
+                "benzene",
+                "cation",
+                {"interactions": ["Hydrophobic"]},
+                ["hydrophobic"],
+            ),
+            (
+                "benzene",
+                "ftf",
+                {
+                    "interactions": ["Hydrophobic"],
+                    "parameters": {"Hydrophobic": {"distance": 0}},
+                },
+                ["distance"],
+            ),
+            (
+                "xb_donor",
+                "xb_acceptor_false_axd",
+                {"interactions": ["XBDonor"]},
+                ["AXD_angle"],
+            ),
         ],
         indirect=["any_mol", "any_other_mol"],
     )
-    def test_debugger(self, any_mol, any_other_mol):
+    def test_debugger(
+        self,
+        any_mol: Molecule,
+        any_other_mol: Molecule,
+        fp_kwargs: dict,
+        expected: list[DebugResult],
+    ) -> None:
         from prolif.debugger import InteractionDebugger
 
-        fp = Fingerprint(
-            ["Hydrophobic"],
-            parameters={
-                "Hydrophobic": {"distance": 0},
-            },
-        )
-        debugger = InteractionDebugger(fp, distance_padding=1.0)
+        fp = Fingerprint(**fp_kwargs)
+        debugger = InteractionDebugger(fp)
         results = debugger.debug(any_mol, any_other_mol)
-        results
+        assert len(results) == len(expected)
+        for r, e in zip(results, expected):
+            assert r.parameter == e
 
     def test_warning_supersede(self):
         old = id(_INTERACTIONS["Hydrophobic"])
@@ -160,8 +185,8 @@ class TestInteractions:
         assert old != new
         # fix dummy Hydrophobic class being reused in later unrelated tests
 
-        class Hydrophobic(prolif.interactions.Hydrophobic):
-            __doc__ = prolif.interactions.Hydrophobic.__doc__
+        class Hydrophobic(plf.interactions.Hydrophobic):
+            __doc__ = plf.interactions.Hydrophobic.__doc__
 
     def test_error_no_detect(self):
         with pytest.raises(
@@ -358,8 +383,8 @@ class TestInteractions:
         rotz = rotateby(rotation[2], [0, 0, 1], ag=r2.atoms)
         r2.trajectory.add_transformations(tr, rotx, roty, rotz)
         return (
-            prolif.Molecule.from_mda(benzene_universe)[0],
-            prolif.Molecule.from_mda(r2)[0],
+            Molecule.from_mda(benzene_universe)[0],
+            Molecule.from_mda(r2)[0],
         )
 
     def test_edgetoface_phe331(self, ligand_mol, protein_mol):
