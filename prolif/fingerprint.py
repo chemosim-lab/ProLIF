@@ -210,6 +210,7 @@ class Fingerprint:
         self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
+        self.parameters=parameters
 
     def _set_interactions(self, interactions, parameters):
         # read interactions to compute
@@ -1076,3 +1077,51 @@ class Fingerprint:
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
         )
+
+    def run_bridged_analysis(self, traj, lig, prot, water, **kwargs):
+        # run analysis twice, once on ligand-water, then on water-prot
+        ifp_stores = []
+        for pair in [(lig, water), (water, prot)]:
+            fp = Fingerprint(
+                interactions=["HBDonor", "HBAcceptor"], parameters=self.parameters
+            )
+            fp.run(traj, *pair, **kwargs)
+            ifp_stores.append(fp.ifp)
+
+        # merge results from the 2 runs on matching water residues
+        combined = {}
+        for (frame1, ifp1), ifp2 in zip(ifp_stores[0].items(), ifp_stores[1].values()):
+            ifp = IFP()
+
+            # For each ligand-water interaction in ifp1
+            for (lig_res, water_res), interaction_data_ifp1 in ifp1.items():
+                # Find matching water-protein interactions in ifp2 based on water residue
+                matching_entries = {
+                    (lig_res, prot_res): interaction_data_ifp2
+                    for (water_res2, prot_res), interaction_data_ifp2 in ifp2.items()
+                    if water_res2 == water_res
+                }
+
+                # Merge data from ifp1 and ifp2 for each matching pair
+                for (lig_res, prot_res), interaction_data_ifp2 in matching_entries.items():
+                    # Combine keys from both ifp1 and ifp2
+                    all_keys = set(interaction_data_ifp1.keys()).union(interaction_data_ifp2.keys())
+                    combined_interaction_data = {}
+
+                    # Add merged values or single values if unique
+                    for key in all_keys:
+                        values_ifp1 = interaction_data_ifp1.get(key, "")
+                        values_ifp2 = interaction_data_ifp2.get(key, "")
+                        # Combine the values if both are present, otherwise take the single value
+                        combined_interaction_data[key] = f"{values_ifp1};{values_ifp2}" if values_ifp1 and values_ifp2 else values_ifp1 or values_ifp2
+
+                    # Store the combined interaction data
+                    ifp.update({(lig_res, prot_res): combined_interaction_data})
+
+            combined[frame1] = ifp
+
+        # Add to existing results if any
+        self.ifp = getattr(self, "ifp", {})
+        self.ifp.update(combined)
+        
+        return self
