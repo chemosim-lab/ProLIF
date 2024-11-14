@@ -1104,18 +1104,26 @@ class Fingerprint:
 
                 # Merge data from ifp1 and ifp2 for each matching pair
                 for (lig_res, prot_res), interaction_data_ifp2 in matching_entries.items():
-                    # Combine keys from both ifp1 and ifp2
-                    all_keys = set(interaction_data_ifp1.keys()).union(interaction_data_ifp2.keys())
                     combined_interaction_data = {}
 
-                    # Add merged values or single values if unique
-                    for key in all_keys:
-                        values_ifp1 = interaction_data_ifp1.get(key, "")
-                        values_ifp2 = interaction_data_ifp2.get(key, "")
-                        # Combine the values if both are present, otherwise take the single value
-                        combined_interaction_data[key] = f"{values_ifp1};{values_ifp2}" if values_ifp1 and values_ifp2 else values_ifp1 or values_ifp2
+                    # Prepare merged interaction data under a single key "WaterBridge"
+                    combined_interaction_data["WaterBridge"] = {}
 
-                    # Store the combined interaction data
+                    # Collect and merge metadata for `ifp1` (ligand-water) interactions
+                    for interaction_type, metadata_list in interaction_data_ifp1.items():
+                        for metadata in metadata_list:
+                            for key, value in metadata.items():
+                                combined_key = f"{key}_ligand_water"
+                                combined_interaction_data["WaterBridge"][combined_key] = value
+
+                    # Collect and merge metadata for `ifp2` (water-protein) interactions
+                    for interaction_type, metadata_list in interaction_data_ifp2.items():
+                        for metadata in metadata_list:
+                            for key, value in metadata.items():
+                                combined_key = f"{key}_water_protein"
+                                combined_interaction_data["WaterBridge"][combined_key] = value
+
+                    # Store the combined interaction data for the (lig_res, prot_res) pair in `ifp`
                     ifp.update({(lig_res, prot_res): combined_interaction_data})
 
             combined[frame1] = ifp
