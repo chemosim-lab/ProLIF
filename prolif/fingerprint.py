@@ -1147,6 +1147,7 @@ class Fingerprint:
 
     def run_bridged_analysis(self, traj, lig, prot, water, **kwargs):
         # run analysis twice, once on ligand-water, then on water-prot
+        self.ifp = getattr(self, "ifp", {})
         ifp_stores = []
         for pair in [(lig, water), (water, prot)]:
             fp = Fingerprint(
@@ -1193,10 +1194,11 @@ class Fingerprint:
                     # Store the combined interaction data for the (lig_res, prot_res) pair in `ifp`
                     ifp.update({(lig_res, prot_res): combined_interaction_data})
 
-            combined[frame1] = ifp
+            if frame1 not in self.ifp:
+                self.ifp[frame1] = IFP()
+            self.ifp[frame1].update(ifp)
 
         # Add to existing results if any
-        self.ifp = getattr(self, "ifp", {})
         self.ifp.update(combined)
         
         return self
