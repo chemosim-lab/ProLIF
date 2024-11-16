@@ -34,6 +34,7 @@ from typing import Literal, Optional, Tuple, Union
 import dill
 import multiprocess as mp
 import numpy as np
+from MDAnalysis.converters.RDKit import set_converter_cache_size
 from rdkit import Chem
 from tqdm.auto import tqdm
 
@@ -210,7 +211,7 @@ class Fingerprint:
         self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
-        self.parameters=parameters
+        self.parameters = parameters
 
     def _set_interactions(self, interactions, parameters):
         # read interactions to compute
@@ -1079,59 +1080,81 @@ class Fingerprint:
         )
 
     def run_bridged_analysis(self, traj, lig, prot, water, **kwargs):
+        """
+        TODO
+        """
+        kwargs.pop("n_jobs", None)
+        set_converter_cache_size(3)
+
         # run analysis twice, once on ligand-water, then on water-prot
-        self.ifp = getattr(self, "ifp", {})
-        ifp_stores = []
+        ifp_stores: list[dict[int, IFP]] = []
         for pair in [(lig, water), (water, prot)]:
             fp = Fingerprint(
                 interactions=["HBDonor", "HBAcceptor"], parameters=self.parameters
             )
-            fp.run(traj, *pair, **kwargs)
+            fp.run(traj, *pair, n_jobs=1, **kwargs)
             ifp_stores.append(fp.ifp)
 
         # merge results from the 2 runs on matching water residues
-        combined = {}
-        for (frame1, ifp1), ifp2 in zip(ifp_stores[0].items(), ifp_stores[1].values()):
-            ifp = IFP()
+        self.ifp = getattr(self, "ifp", {})
+        for (frame, ifp1), ifp2 in zip(ifp_stores[0].items(), ifp_stores[1].values()):
+            # for each ligand-water interaction in ifp1
+            for data1 in ifp1.interactions():
+                # for each water-protein interaction in ifp2 where water1 == water2
+                for data2 in [
+                    d2 for d2 in ifp2.interactions() if d2.ligand == data1.protein
+                ]:
+                    # construct merged metadata
+                    metadata = (
+                        {
+                            "indices": {
+                                "ligand": data1.metadata["indices"]["ligand"],
+                                "protein": data2.metadata["indices"]["protein"],
+                                "water": tuple(
+                                    set().union(
+                                        data1.metadata["indices"]["protein"],
+                                        data2.metadata["indices"]["ligand"],
+                                    )
+                                ),
+                            },
+                            "parent_indices": {
+                                "ligand": data1.metadata["parent_indices"]["ligand"],
+                                "protein": data2.metadata["parent_indices"]["protein"],
+                                "water": tuple(
+                                    set().union(
+                                        data1.metadata["parent_indices"]["protein"],
+                                        data2.metadata["parent_indices"]["ligand"],
+                                    )
+                                ),
+                            },
+                            "water_residue": data1.protein,
+                            "ligand_role": data1.interaction,
+                            "protein_role": (  # invert role
+                                "HBDonor"
+                                if data2.interaction == "HBAcceptor"
+                                else "HBAcceptor"
+                            ),
+                            **{
+                                f"{key}{suffix}": data.metadata[key]
+                                for suffix, data in [
+                                    ("_ligand_water", data1),
+                                    ("_water_protein", data2),
+                                ]
+                                for key in ["distance", "DHA_angle"]
+                            },
+                        },
+                    )
 
-            # For each ligand-water interaction in ifp1
-            for (lig_res, water_res), interaction_data_ifp1 in ifp1.items():
-                # Find matching water-protein interactions in ifp2 based on water residue
-                matching_entries = {
-                    (lig_res, prot_res): interaction_data_ifp2
-                    for (water_res2, prot_res), interaction_data_ifp2 in ifp2.items()
-                    if water_res2 == water_res
-                }
+                    # store metadata
+                    if frame not in self.ifp:
+                        ifp = self.ifp[frame] = IFP()
+                    ifp = self.ifp[frame]
+                    if int_data := ifp.get((data1.ligand, data2.protein)):
+                        if "WaterBridge" in int_data:
+                            int_data["WaterBridge"].append(metadata)
+                        else:
+                            int_data["WaterBridge"] = [metadata]
+                    else:
+                        ifp[data1.ligand, data2.protein] = {"WaterBridge": [metadata]}
 
-                # Merge data from ifp1 and ifp2 for each matching pair
-                for (lig_res, prot_res), interaction_data_ifp2 in matching_entries.items():
-                    combined_interaction_data = {}
-
-                    # Prepare merged interaction data under a single key "WaterBridge"
-                    combined_interaction_data["WaterBridge"] = {}
-
-                    # Collect and merge metadata for `ifp1` (ligand-water) interactions
-                    for interaction_type, metadata_list in interaction_data_ifp1.items():
-                        for metadata in metadata_list:
-                            for key, value in metadata.items():
-                                combined_key = f"{key}_ligand_water"
-                                combined_interaction_data["WaterBridge"][combined_key] = value
-
-                    # Collect and merge metadata for `ifp2` (water-protein) interactions
-                    for interaction_type, metadata_list in interaction_data_ifp2.items():
-                        for metadata in metadata_list:
-                            for key, value in metadata.items():
-                                combined_key = f"{key}_water_protein"
-                                combined_interaction_data["WaterBridge"][combined_key] = value
-
-                    # Store the combined interaction data for the (lig_res, prot_res) pair in `ifp`
-                    ifp.update({(lig_res, prot_res): combined_interaction_data})
-
-            if frame1 not in self.ifp:
-                self.ifp[frame1] = IFP()
-            self.ifp[frame1].update(ifp)
-
-        # Add to existing results if any
-        self.ifp.update(combined)
-        
         return self
