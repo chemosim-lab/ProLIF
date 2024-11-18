@@ -228,6 +228,19 @@ class Fingerprint:
         parameters = parameters or {}
         if interactions == "all":
             interactions = self.list_available()
+        # prepare water bridge interaction
+        try:
+            i = interactions.index("WaterBridge")
+        except ValueError:
+            pass
+        else:
+            interactions.pop(i)
+            if "WaterBridge" not in parameters:
+                raise ValueError(
+                    "Must specify settings for the `WaterBridge` interaction: try "
+                    '`parameters={"WaterBridge": {"water": <AtomGroup or Molecule>}}`'
+                )
+            self._water_bridge_parameters = parameters.pop("WaterBridge")
         # sanity check
         self._check_valid_interactions(interactions, "interactions")
         self._check_valid_interactions(parameters, "parameters")
@@ -523,22 +536,58 @@ class Fingerprint:
         if converter_kwargs is not None and len(converter_kwargs) != 2:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
 
+        # setup defaults
         converter_kwargs = converter_kwargs or ({}, {})
         if n_jobs is None:
             n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
         if residues == "all":
             residues = list(Molecule.from_mda(prot, **converter_kwargs[1]).residues)
-        if n_jobs != 1:
-            return self._run_parallel(
+
+        if self.interactions:
+            if n_jobs == 1:
+                ifp = self._run_serial(
+                    traj,
+                    lig,
+                    prot,
+                    residues=residues,
+                    converter_kwargs=converter_kwargs,
+                    progress=progress,
+                )
+            else:
+                ifp = self._run_parallel(
+                    traj,
+                    lig,
+                    prot,
+                    residues=residues,
+                    converter_kwargs=converter_kwargs,
+                    progress=progress,
+                    n_jobs=n_jobs,
+                )
+            self.ifp = ifp
+
+        if water_bridge_params := getattr(self, "_water_bridge_parameters", None):
+            self.run_bridged_analysis(
                 traj,
                 lig,
                 prot,
+                **water_bridge_params,
                 residues=residues,
                 converter_kwargs=converter_kwargs,
                 progress=progress,
-                n_jobs=n_jobs,
             )
+        return self
 
+    def _run_serial(
+        self,
+        traj: "Trajectory",
+        lig: "MDAObject",
+        prot: "MDAObject",
+        *,
+        residues: "ResidueSelection",
+        converter_kwargs: tuple[dict, dict],
+        progress: bool,
+    ):
+        """Serial implementation for trajectories."""
         # support single frame
         if hasattr(traj, "frame"):
             traj = (traj,)
@@ -553,8 +602,7 @@ class Fingerprint:
                 residues=residues,
                 metadata=True,
             )
-        self.ifp = ifp
-        return self
+        return ifp
 
     def _run_parallel(
         self,
@@ -603,8 +651,7 @@ class Fingerprint:
             for ifp_data_chunk in pool.process(args_iterable):
                 ifp.update(ifp_data_chunk)
 
-        self.ifp = ifp
-        return self
+        return ifp
 
     def run_from_iterable(
         self,
@@ -1151,20 +1198,23 @@ class Fingerprint:
         TODO
         """
         kwargs.pop("n_jobs", None)
+        residues = kwargs.pop("residues", None)
         set_converter_cache_size(3)
+        fp = Fingerprint(
+            interactions=["HBDonor", "HBAcceptor"], parameters=self.parameters
+        )
 
         # run analysis twice, once on ligand-water, then on water-prot
-        ifp_stores: list[dict[int, IFP]] = []
-        for pair in [(lig, water), (water, prot)]:
-            fp = Fingerprint(
-                interactions=["HBDonor", "HBAcceptor"], parameters=self.parameters
-            )
-            fp.run(traj, *pair, n_jobs=1, **kwargs)
-            ifp_stores.append(fp.ifp)
+        ifp_stores: list[dict[int, IFP]] = [
+            fp._run_serial(traj, lig, water, residues=None, **kwargs),
+            fp._run_serial(traj, water, prot, residues=residues, **kwargs),
+        ]
 
         # merge results from the 2 runs on matching water residues
         self.ifp = getattr(self, "ifp", {})
-        for (frame, ifp1), ifp2 in zip(ifp_stores[0].items(), ifp_stores[1].values()):
+        for (frame, ifp1), ifp2 in zip(
+            ifp_stores[0].items(), ifp_stores[1].values(), strict=False
+        ):
             # for each ligand-water interaction in ifp1
             for data1 in ifp1.interactions():
                 # for each water-protein interaction in ifp2 where water1 == water2
@@ -1213,15 +1263,9 @@ class Fingerprint:
                     )
 
                     # store metadata
-                    if frame not in self.ifp:
-                        ifp = self.ifp[frame] = IFP()
-                    ifp = self.ifp[frame]
-                    if int_data := ifp.get((data1.ligand, data2.protein)):
-                        if "WaterBridge" in int_data:
-                            int_data["WaterBridge"].append(metadata)
-                        else:
-                            int_data["WaterBridge"] = [metadata]
-                    else:
-                        ifp[data1.ligand, data2.protein] = {"WaterBridge": [metadata]}
+                    ifp = self.ifp.setdefault(frame, IFP())
+                    ifp.setdefault((data1.ligand, data2.protein), {}).setdefault(
+                        "WaterBridge", []
+                    ).append(metadata)
 
         return self

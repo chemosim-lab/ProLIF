@@ -437,3 +437,9 @@ class TestFingerprint:
         assert fp.hydrophobic.distance == 1.0  # type: ignore[attr-defined]
         fp = Fingerprint()
         assert fp.hydrophobic.distance == 4.5  # type: ignore[attr-defined]
+
+    def test_water_bridge_instance_without_params_raises_error(self):
+        with pytest.raises(
+            ValueError, match="Must specify settings for the `WaterBridge` interaction"
+        ):
+            Fingerprint(["WaterBridge"])
