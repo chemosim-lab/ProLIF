@@ -221,7 +221,7 @@ class Fingerprint:
         try:
             i = interactions.index("WaterBridge")
         except ValueError:
-            pass
+            self._water_bridge_parameters = None
         else:
             interactions.pop(i)
             if "WaterBridge" not in parameters:
@@ -254,7 +254,7 @@ class Fingerprint:
 
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
+        params = f"{self.n_interactions} interactions: {self._interactions_list}"
         return f"<{name}: {params} at {id(self):#x}>"
 
     @staticmethod
@@ -272,8 +272,15 @@ class Fingerprint:
         return sorted(_INTERACTIONS)
 
     @property
+    def _interactions_list(self):
+        interactions = list(self.interactions)
+        if self._water_bridge_parameters:
+            interactions.append("WaterBridge")
+        return interactions
+
+    @property
     def n_interactions(self):
-        return len(self.interactions)
+        return len(self._interactions_list)
 
     def bitvector(self, res1, res2):
         """Generates the complete bitvector for the interactions between two
@@ -516,12 +523,12 @@ class Fingerprint:
                 )
             self.ifp = ifp
 
-        if water_bridge_params := getattr(self, "_water_bridge_parameters", None):
+        if self._water_bridge_parameters:
             self.run_bridged_analysis(
                 traj,
                 lig,
                 prot,
-                **water_bridge_params,
+                **self._water_bridge_parameters,
                 residues=residues,
                 converter_kwargs=converter_kwargs,
                 progress=progress,
@@ -754,7 +761,7 @@ class Fingerprint:
         if hasattr(self, "ifp"):
             return to_dataframe(
                 self.ifp,
-                self.interactions,
+                self._interactions_list,
                 count=self.count if count is None else count,
                 dtype=dtype,
                 drop_empty=drop_empty,
