@@ -34,7 +34,7 @@ from typing import Literal, Optional, Tuple, Union
 import dill
 import multiprocess as mp
 import numpy as np
-from MDAnalysis.converters.RDKit import set_converter_cache_size
+from MDAnalysis.converters.RDKit import atomgroup_to_mol, set_converter_cache_size
 from rdkit import Chem
 from tqdm.auto import tqdm
 
@@ -496,6 +496,12 @@ class Fingerprint:
 
         # setup defaults
         converter_kwargs = converter_kwargs or ({}, {})
+        if (
+            self._water_bridge_parameters
+            and (maxsize := atomgroup_to_mol.cache_parameters()["maxsize"])
+            and maxsize <= 2
+        ):
+            set_converter_cache_size(3)
         if n_jobs is None:
             n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
         if residues == "all":
@@ -1129,7 +1135,6 @@ class Fingerprint:
         """
         kwargs.pop("n_jobs", None)
         residues = kwargs.pop("residues", None)
-        set_converter_cache_size(3)
         fp = Fingerprint(
             interactions=["HBDonor", "HBAcceptor"], parameters=self.parameters
         )
