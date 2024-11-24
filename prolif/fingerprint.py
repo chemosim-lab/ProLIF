@@ -730,7 +730,9 @@ class Fingerprint:
         kwargs.pop("n_jobs", None)
         residues = kwargs.pop("residues", None)
         fp = Fingerprint(
-            interactions=["HBDonor", "HBAcceptor"], parameters=self.parameters
+            interactions=["HBDonor", "HBAcceptor"],
+            parameters=self.parameters,
+            count=self.count,
         )
 
         # run analysis twice, once on ligand-water, then on water-prot
