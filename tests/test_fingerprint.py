@@ -487,7 +487,7 @@ class TestFingerprint:
         set_converter_cache_size(2)
         mocked = Mock(wraps=set_converter_cache_size)
         monkeypatch.setattr(
-            Fingerprint, "run_bridged_analysis", lambda *_args, **_kwargs: None
+            Fingerprint, "_run_bridged_analysis", lambda *_args, **_kwargs: None
         )
         monkeypatch.setattr("prolif.fingerprint.set_converter_cache_size", mocked)
 
