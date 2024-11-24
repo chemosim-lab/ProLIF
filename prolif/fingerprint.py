@@ -530,7 +530,7 @@ class Fingerprint:
             self.ifp = ifp
 
         if self._water_bridge_parameters:
-            self.run_bridged_analysis(
+            self._run_bridged_analysis(
                 traj,
                 lig,
                 prot,
@@ -710,6 +710,91 @@ class Fingerprint:
                 ifp[i] = ifp_data
 
         self.ifp = ifp
+        return self
+
+    def _run_bridged_analysis(self, traj, lig, prot, water, **kwargs):
+        """Implementation of the WaterBridge analysis for trajectories.
+
+        Parameters
+        ----------
+        traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced
+            Iterate over this Universe trajectory or sliced trajectory object
+            to extract the frames used for the fingerprint extraction
+        lig : MDAnalysis.core.groups.AtomGroup
+            An MDAnalysis AtomGroup for the ligand
+        prot : MDAnalysis.core.groups.AtomGroup
+            An MDAnalysis AtomGroup for the protein (with multiple residues)
+        water: MDAnalysis.core.groups.AtomGroup
+            An MDAnalysis AtomGroup for the water molecules
+        """
+        kwargs.pop("n_jobs", None)
+        residues = kwargs.pop("residues", None)
+        fp = Fingerprint(
+            interactions=["HBDonor", "HBAcceptor"], parameters=self.parameters
+        )
+
+        # run analysis twice, once on ligand-water, then on water-prot
+        ifp_stores: list[dict[int, IFP]] = [
+            fp._run_serial(traj, lig, water, residues=None, **kwargs),
+            fp._run_serial(traj, water, prot, residues=residues, **kwargs),
+        ]
+
+        # merge results from the 2 runs on matching water residues
+        self.ifp = getattr(self, "ifp", {})
+        for (frame, ifp1), ifp2 in zip(ifp_stores[0].items(), ifp_stores[1].values()):
+            # for each ligand-water interaction in ifp1
+            for data1 in ifp1.interactions():
+                # for each water-protein interaction in ifp2 where water1 == water2
+                for data2 in [
+                    d2 for d2 in ifp2.interactions() if d2.ligand == data1.protein
+                ]:
+                    # construct merged metadata
+                    metadata = (
+                        {
+                            "indices": {
+                                "ligand": data1.metadata["indices"]["ligand"],
+                                "protein": data2.metadata["indices"]["protein"],
+                                "water": tuple(
+                                    set().union(
+                                        data1.metadata["indices"]["protein"],
+                                        data2.metadata["indices"]["ligand"],
+                                    )
+                                ),
+                            },
+                            "parent_indices": {
+                                "ligand": data1.metadata["parent_indices"]["ligand"],
+                                "protein": data2.metadata["parent_indices"]["protein"],
+                                "water": tuple(
+                                    set().union(
+                                        data1.metadata["parent_indices"]["protein"],
+                                        data2.metadata["parent_indices"]["ligand"],
+                                    )
+                                ),
+                            },
+                            "water_residue": data1.protein,
+                            "ligand_role": data1.interaction,
+                            "protein_role": (  # invert role
+                                "HBDonor"
+                                if data2.interaction == "HBAcceptor"
+                                else "HBAcceptor"
+                            ),
+                            **{
+                                f"{key}{suffix}": data.metadata[key]
+                                for suffix, data in [
+                                    ("_ligand_water", data1),
+                                    ("_water_protein", data2),
+                                ]
+                                for key in ["distance", "DHA_angle"]
+                            },
+                        },
+                    )
+
+                    # store metadata
+                    ifp = self.ifp.setdefault(frame, IFP())
+                    ifp.setdefault((data1.ligand, data2.protein), {}).setdefault(
+                        "WaterBridge", []
+                    ).append(metadata)
+
         return self
 
     def to_dataframe(
@@ -1128,77 +1213,3 @@ class Fingerprint:
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
         )
-
-    def run_bridged_analysis(self, traj, lig, prot, water, **kwargs):
-        """
-        TODO
-        """
-        kwargs.pop("n_jobs", None)
-        residues = kwargs.pop("residues", None)
-        fp = Fingerprint(
-            interactions=["HBDonor", "HBAcceptor"], parameters=self.parameters
-        )
-
-        # run analysis twice, once on ligand-water, then on water-prot
-        ifp_stores: list[dict[int, IFP]] = [
-            fp._run_serial(traj, lig, water, residues=None, **kwargs),
-            fp._run_serial(traj, water, prot, residues=residues, **kwargs),
-        ]
-
-        # merge results from the 2 runs on matching water residues
-        self.ifp = getattr(self, "ifp", {})
-        for (frame, ifp1), ifp2 in zip(ifp_stores[0].items(), ifp_stores[1].values()):
-            # for each ligand-water interaction in ifp1
-            for data1 in ifp1.interactions():
-                # for each water-protein interaction in ifp2 where water1 == water2
-                for data2 in [
-                    d2 for d2 in ifp2.interactions() if d2.ligand == data1.protein
-                ]:
-                    # construct merged metadata
-                    metadata = (
-                        {
-                            "indices": {
-                                "ligand": data1.metadata["indices"]["ligand"],
-                                "protein": data2.metadata["indices"]["protein"],
-                                "water": tuple(
-                                    set().union(
-                                        data1.metadata["indices"]["protein"],
-                                        data2.metadata["indices"]["ligand"],
-                                    )
-                                ),
-                            },
-                            "parent_indices": {
-                                "ligand": data1.metadata["parent_indices"]["ligand"],
-                                "protein": data2.metadata["parent_indices"]["protein"],
-                                "water": tuple(
-                                    set().union(
-                                        data1.metadata["parent_indices"]["protein"],
-                                        data2.metadata["parent_indices"]["ligand"],
-                                    )
-                                ),
-                            },
-                            "water_residue": data1.protein,
-                            "ligand_role": data1.interaction,
-                            "protein_role": (  # invert role
-                                "HBDonor"
-                                if data2.interaction == "HBAcceptor"
-                                else "HBAcceptor"
-                            ),
-                            **{
-                                f"{key}{suffix}": data.metadata[key]
-                                for suffix, data in [
-                                    ("_ligand_water", data1),
-                                    ("_water_protein", data2),
-                                ]
-                                for key in ["distance", "DHA_angle"]
-                            },
-                        },
-                    )
-
-                    # store metadata
-                    ifp = self.ifp.setdefault(frame, IFP())
-                    ifp.setdefault((data1.ligand, data2.protein), {}).setdefault(
-                        "WaterBridge", []
-                    ).append(metadata)
-
-        return self
