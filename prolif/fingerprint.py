@@ -800,7 +800,7 @@ class Fingerprint:
             An MDAnalysis AtomGroup for the protein (with multiple residues)
         water: MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the water molecules
-        """
+        """  # noqa: E501
         kwargs.pop("n_jobs", None)
         residues = kwargs.pop("residues", None)
         fp = Fingerprint(
