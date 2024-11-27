@@ -712,7 +712,7 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
-    def _run_bridged_analysis(self, traj, lig, prot, water, **kwargs):
+    def _run_bridged_analysis(self, traj, lig, prot, water, order=1, **kwargs):
         """Implementation of the WaterBridge analysis for trajectories.
 
         Parameters
@@ -726,6 +726,8 @@ class Fingerprint:
             An MDAnalysis AtomGroup for the protein (with multiple residues)
         water: MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the water molecules
+        order: int
+            Treshold for water bridge order
         """  # noqa: E501
         kwargs.pop("n_jobs", None)
         residues = kwargs.pop("residues", None)
@@ -735,15 +737,21 @@ class Fingerprint:
             count=self.count,
         )
 
-        # run analysis twice, once on ligand-water, then on water-prot
+        # Run analysis for ligand-water interactions
         ifp_stores: list[dict[int, IFP]] = [
             fp._run_serial(traj, lig, water, residues=None, **kwargs),
-            fp._run_serial(traj, water, prot, residues=residues, **kwargs),
         ]
+
+        # Run water-water interaction analysis if order is 2 or above
+        if order >= 2:
+            ifp_stores.append(fp._run_serial(traj, water, water, residues=None, **kwargs),)
+
+        # Run water-protein analysis
+        ifp_stores.append(fp._run_serial(traj, water, prot, residues=residues, **kwargs),)
 
         # merge results from the 2 runs on matching water residues
         self.ifp = getattr(self, "ifp", {})
-        for (frame, ifp1), ifp2 in zip(ifp_stores[0].items(), ifp_stores[1].values()):
+        for (frame, ifp1), ifp2 in zip(ifp_stores[0].items(), ifp_stores[-1].values()):
             # for each ligand-water interaction in ifp1
             for data1 in ifp1.interactions():
                 # for each water-protein interaction in ifp2 where water1 == water2
@@ -774,6 +782,7 @@ class Fingerprint:
                                 ),
                             },
                             "water_residue": data1.protein,
+                            "water_bridge_order": 1,
                             "ligand_role": data1.interaction,
                             "protein_role": (  # invert role
                                 "HBDonor"
@@ -796,7 +805,68 @@ class Fingerprint:
                     ifp.setdefault((data1.ligand, data2.protein), {}).setdefault(
                         "WaterBridge", []
                     ).append(metadata)
+                    
+            # Run water 2nd Order if order 2 or more
+            if order >= 2:
+                print("Matching ligand-water → water-water → water-protein:")
+                for frame in ifp_stores[0].keys():
+                    ifp1 = ifp_stores[0][frame]  # Ligand → Water
+                    ifp2 = ifp_stores[1][frame]  # Water → Water
+                    ifp3 = ifp_stores[2][frame]  # Water → Protein
 
+                    # Chain ligand-water → water-water → water-protein
+                    for data1 in ifp1.interactions():
+                        for data2 in [d2 for d2 in ifp2.interactions() if d2.ligand == data1.protein]:
+                            for data3 in [d3 for d3 in ifp3.interactions() if d3.ligand == data2.protein]:
+                                metadata = {
+                                    "indices": {
+                                        "ligand": data1.metadata["indices"]["ligand"],
+                                        "protein": data3.metadata["indices"]["protein"],
+                                        "water_1": tuple(set().union(
+                                            data1.metadata["indices"]["protein"],
+                                            data2.metadata["indices"]["ligand"],
+                                        )),
+                                        "water_2": tuple(set().union(
+                                            data2.metadata["indices"]["protein"],
+                                            data3.metadata["indices"]["ligand"],
+                                        )),
+                                    },
+                                    "parent_indices": {
+                                        "ligand": data1.metadata["parent_indices"]["ligand"],
+                                        "protein": data3.metadata["parent_indices"]["protein"],
+                                        "water": tuple(set().union(
+                                            data1.metadata["parent_indices"]["protein"],
+                                            data2.metadata["parent_indices"]["ligand"],
+                                        )),
+                                        "water": tuple(set().union(
+                                            data2.metadata["parent_indices"]["protein"],
+                                            data3.metadata["parent_indices"]["ligand"],
+                                        )),
+                                    },
+                                    "water_residue_1": data1.protein,  # Initial water residue
+                                    "water_residue_2": data2.protein,  # Initial water residue
+                                    "ligand_role": data1.interaction,
+                                    "protein_role": ("HBDonor" if data3.interaction == "HBAcceptor" else "HBAcceptor"),
+                                    "water_bridge_order": 2,  # Set order to 2 for extended matching
+                                    **{
+                                        f"{key}_ligand_water": data1.metadata[key]
+                                        for key in ["distance", "DHA_angle"]
+                                    },
+                                    **{
+                                        f"{key}_water_water": data2.metadata[key]
+                                        for key in ["distance", "DHA_angle"]
+                                    },
+                                    **{
+                                        f"{key}_water_protein": data3.metadata[key]
+                                        for key in ["distance", "DHA_angle"]
+                                    },
+                                }
+
+                                # Store metadata
+                                ifp = self.ifp.setdefault(frame, IFP())
+                                ifp.setdefault((data1.ligand, data3.protein), {}).setdefault(
+                                    "WaterBridge", []
+                                ).append(metadata)
         return self
 
     def to_dataframe(
