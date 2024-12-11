@@ -360,7 +360,7 @@ class LigNetwork:
                             {
                                 **entry,
                                 "atoms": metadata["parent_indices"]["ligand"],
-                                "distance": metadata.get("distance", 0),
+                                "": metadata.get("distance", 0),
                             },
                         )
                 else:
@@ -580,7 +580,7 @@ class LigNetwork:
             edge = {
                 "from": origin,
                 "to": prot_res,
-                "title": f"{interaction}: {distance:.2f}Å",
+                "title": f"{interaction}: {distance:.2f}Å. Occurence: {weight * 100:.0f}%",
                 "interaction_type": self._interaction_types.get(
                     interaction,
                     interaction,
