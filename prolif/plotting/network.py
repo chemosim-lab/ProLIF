@@ -99,6 +99,10 @@ class LigNetwork:
         more control and allow them to provide their own 2D coordinates. Added support
         for displaying peptides as the "ligand". Changed the default color for
         VanDerWaals.
+
+    .. versionchanged:: 2.1.0
+        Added the ``show_interaction_data`` argument and exposed the ``fontsize`` in
+        ``display``.
     """
 
     COLORS: ClassVar = {
@@ -265,6 +269,8 @@ class LigNetwork:
         self._default_interaction_color = "#dbdbdb"
         self._non_single_bond_spacing = 0.06
         self._dash = [10]
+        self._edge_title_formatter = "{interaction}: {distance:.2f}Å"
+        self._edge_label_formatter = "{weight_pct:.0f}%"
         # regroup interactions of the same color
         temp = defaultdict(list)
         interactions = set(df.index.get_level_values("interaction").unique())
@@ -360,7 +366,7 @@ class LigNetwork:
                             {
                                 **entry,
                                 "atoms": metadata["parent_indices"]["ligand"],
-                                "": metadata.get("distance", 0),
+                                "distance": metadata.get("distance", 0),
                             },
                         )
                 else:
@@ -577,10 +583,16 @@ class LigNetwork:
             else:
                 i = self._DISPLAYED_ATOM.get(interaction, 0)
                 origin = lig_indices[i]
+            int_data = {
+                "interaction": interaction,
+                "distance": distance,
+                "weight": weight,
+                "weight_pct": weight * 100,
+            }
             edge = {
                 "from": origin,
                 "to": prot_res,
-                "title": f"{interaction}: {distance:.2f}Å. Occurence: {weight * 100:.0f}%",
+                "title": self._edge_title_formatter.format_map(int_data),
                 "interaction_type": self._interaction_types.get(
                     interaction,
                     interaction,
@@ -594,6 +606,9 @@ class LigNetwork:
                 "width": weight * self._max_interaction_width,
                 "group": "interaction",
             }
+            if self.show_interaction_data:
+                edge["label"] = self._edge_label_formatter.format_map(int_data)
+                edge["font"] = self._edge_label_font
             self.edges.append(edge)
 
     def _get_ring_centroid(self, indices):
@@ -635,10 +650,19 @@ class LigNetwork:
         self._patch_hydrogens()
         self.nodes = list(self.nodes.values())
 
-    def _get_js(self, width="100%", height="500px", div_id="mynetwork", fontsize=20):
+    def _get_js(
+        self,
+        width="100%",
+        height="500px",
+        div_id="mynetwork",
+        fontsize=20,
+        show_interaction_data=False,
+    ):
         """Returns the JavaScript code to draw the network"""
         self.width = width
         self.height = height
+        self.show_interaction_data = show_interaction_data
+        self._edge_label_font = {"size": fontsize}
         self._make_graph_data()
         options = {
             "width": width,
@@ -816,7 +840,15 @@ class LigNetwork:
 
     @requires("IPython.display")
     def display(self, **kwargs):
-        """Prepare and display the network"""
+        """Prepare and display the network.
+
+        Parameters
+        ----------
+        width: str = "100%"
+        height: str = "500px"
+        fontsize: int = 20
+        show_occurence: bool = False
+        """
         html = self._get_html(**kwargs)
         doc = escape(html)
         self._iframe = (
