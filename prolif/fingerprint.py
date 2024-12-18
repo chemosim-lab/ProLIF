@@ -475,7 +475,7 @@ class Fingerprint:
 
         converter_kwargs = converter_kwargs or ({}, {})
         if n_jobs is None:
-            n_jobs = int(os.environ.get("PROLIF_N_JOBS", 0)) or None
+            n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
         if residues == "all":
             residues = list(Molecule.from_mda(prot, **converter_kwargs[1]).residues)
         if n_jobs != 1:
@@ -869,6 +869,8 @@ class Fingerprint:
         carbon: float = 0.16,
         width: str = "100%",
         height: str = "500px",
+        fontsize: int = 20,
+        show_interaction_data: bool = False,
     ):
         """Generate and display a :class:`~prolif.plotting.network.LigNetwork` plot from
         a fingerprint object that has been used to run an analysis.
@@ -910,6 +912,10 @@ class Fingerprint:
             Width of the IFrame window.
         height : str
             Height of the IFrame window.
+        fontsize: int
+            Font size used for the atoms, residues, and edge labels.
+        show_interaction_data: bool
+            Show the occurence of each interaction on the corresponding edge.
 
         Notes
         -----
@@ -924,6 +930,9 @@ class Fingerprint:
         :class:`prolif.plotting.network.LigNetwork`
 
         .. versionadded:: 2.0.0
+
+        .. versionchanged:: 2.1.0
+            Added the ``show_interaction_data`` argument and exposed the ``fontsize``.
         """
         from prolif.plotting.network import LigNetwork
 
@@ -941,7 +950,12 @@ class Fingerprint:
             rotation=rotation,
             carbon=carbon,
         )
-        return ligplot.display(width=width, height=height)
+        return ligplot.display(
+            width=width,
+            height=height,
+            fontsize=fontsize,
+            show_interaction_data=show_interaction_data,
+        )
 
     def plot_barcode(
         self,

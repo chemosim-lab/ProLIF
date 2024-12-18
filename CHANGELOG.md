@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `VdWContact` now accepts a `preset` parameter to easily use different van der Waals radii values:
-  one of `mdanalysis` (default), `rdkit`, or `csd`.
+- `LigNetwork` now optionally displays the percentage of interaction occurence when
+  `show_interaction_data` is enabled. The type of data shown on both the label and
+  hover title can be modified.
+- `VdWContact` now accepts a `preset` parameter to easily use different van der Waals
+  radii values: one of `mdanalysis` (default), `rdkit`, or `csd`.
 - `IFP.interactions()` iterator that yields all interaction data for a given frame in
   a single flat structure. This makes iterating over the `fp.ifp` results a bit
   easier / less nested.
