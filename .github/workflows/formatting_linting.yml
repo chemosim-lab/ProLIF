@@ -19,12 +19,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Code formatting
-        uses: chartboost/ruff-action@v1
+        uses: astral-sh/ruff-action@v2
         with:
-          args: "check --preview"
+          args: "format --diff"
 
       - name: Notebook formatting
         uses: psf/black@stable
         with:
           src: "docs/notebooks/"
           jupyter: true
+
+      - name: Code linting
+        uses: astral-sh/ruff-action@v2
+        with:
+          args: "check --preview --diff"

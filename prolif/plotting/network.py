@@ -497,10 +497,10 @@ class LigNetwork:
         for perp in (p, -p):
             for point in xyz:
                 xy = point[:2] + perp * dist
-                _id = hash(xy.tobytes())
-                nodes.append(_id)
-                self.nodes[_id] = {
-                    "id": _id,
+                id_ = hash(xy.tobytes())
+                nodes.append(id_)
+                self.nodes[id_] = {
+                    "id": id_,
                     "x": xy[0],
                     "y": xy[1],
                     "shape": "text",

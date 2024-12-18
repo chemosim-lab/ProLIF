@@ -18,8 +18,9 @@ class Dummy(Interaction):
 
 def test_interaction_base(sdf_suppl):
     interaction = Dummy()
-    _repr = repr(interaction)
-    assert _repr.startswith("<") and ".Dummy at " in _repr
+    repr_ = repr(interaction)
+    assert repr_.startswith("<")
+    assert ".Dummy at " in repr_
     assert callable(interaction)
     mol = sdf_suppl[0]
     metadata = next(interaction.detect(mol, mol))
