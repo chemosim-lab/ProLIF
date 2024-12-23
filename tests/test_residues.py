@@ -124,6 +124,8 @@ class TestResidueId:
             ("ALA1.A", "ALA1.B"),
             ("ALA2.A", "ALA3.A"),
             ("ALA4.A", "ALA1.B"),
+            ("ALA1", "ALA2"),
+            ("ALA1", "ALA1.A"),
         ],
     )
     def test_lt(self, res1, res2):
