@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `LigNetwork` now optionally displays the percentage of interaction occurence when
   `show_interaction_data` is enabled. The type of data shown on both the label and
-  hover title can be modified.
+  hover title can be modified (PR #234 by @talagayev).
 - `VdWContact` now accepts a `preset` parameter to easily use different van der Waals
   radii values: one of `mdanalysis` (default), `rdkit`, or `csd`.
 - `IFP.interactions()` iterator that yields all interaction data for a given frame in
@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `display_residues` was sanitizing each residue while preparing them for display, which
   could make debugging faulty molecules difficult. This is now disabled.
 - Deprecation warnings
+
+### Changed
+
+- Strip whitespaces in `ResidueId` name and chain.
+- Improved parsing for less standard residue names in `ResidueId`.
 
 ## [2.0.3] - 2024-03-10
 

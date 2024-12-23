@@ -99,6 +99,13 @@ class TestResidueId:
             ("TIP3.A", ("TIP3", 0, "A")),
             ("TIP31", ("TIP3", 1, None)),
             ("TIP31.A", ("TIP3", 1, "A")),
+            ("T3P1", ("T3P", 1, None)),
+            ("HISE1", ("HISE", 1, None)),
+            ("H2O1", ("H2O", 1, None)),
+            ("K123.A", ("K", 123, "A")),
+            ("K  123.A", ("K", 123, "A")),
+            ("MN123.A", ("MN", 123, "A")),
+            ("MN 123.A", ("MN", 123, "A")),
         ],
     )
     def test_from_string(self, resid_str, expected):

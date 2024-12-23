@@ -12,26 +12,39 @@ from rdkit.Chem.rdmolops import FastFindRings
 
 from prolif.rdkitmol import BaseRDKitMol
 
-_RE_RESID = re.compile(r"(TIP3|[A-Z0-9]?[A-Z]{2,3})?(\d*)\.?(\w)?")
+_RE_RESID = re.compile(r"(TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?(\d*)\.?(\w)?")
 
 
 class ResidueId:
-    """A unique residue identifier
+    """Residue identifier
 
     Parameters
     ----------
-    name : str
-        3-letter residue name
-    number : int
-        residue number
-    chain : str or None, optionnal
-        1-letter protein chain
+    name : str or None, default = "UNK"
+        Residue name
+    number : int or None, default = 0
+        Residue number
+    chain : str or None, default = None
+        Protein chain
+
+    Notes
+    -----
+    Whitespaces are stripped from the name and chain.
+
+    .. versionchanged:: 2.1.0
+        Whitespaces are now stripped from the name and chain. Better support for water
+        and monatomic ion residue names.
     """
 
-    def __init__(self, name: str = "UNK", number: int = 0, chain: Optional[str] = None):
-        self.name = name or "UNK"
+    def __init__(
+        self,
+        name: Optional[str] = "UNK",
+        number: Optional[int] = 0,
+        chain: Optional[str] = None,
+    ):
+        self.name = "UNK" if not name else name.strip()
         self.number = number or 0
-        self.chain = chain or None
+        self.chain = None if not chain else chain.strip()
 
     def __repr__(self):
         return f"ResidueId({self.name}, {self.number}, {self.chain})"
@@ -39,16 +52,20 @@ class ResidueId:
     def __str__(self):
         resid = f"{self.name}{self.number}"
         if self.chain:
-            resid += f".{self.chain}"
+            return f"{resid}.{self.chain}"
         return resid
 
     def __hash__(self):
         return hash((self.name, self.number, self.chain))
 
-    def __eq__(self, other):
-        return hash(self) == hash(other)
+    def __eq__(self, other: "ResidueId"):
+        return (self.name, self.number, self.chain) == (
+            other.name,
+            other.number,
+            other.chain,
+        )
 
-    def __lt__(self, other):
+    def __lt__(self, other: "ResidueId"):
         return (self.chain, self.number) < (other.chain, other.number)
 
     @classmethod
