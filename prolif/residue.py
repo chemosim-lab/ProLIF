@@ -67,10 +67,14 @@ class ResidueId:
 
     def __lt__(self, other: "ResidueId"):
         def chain_key(chain):
-            # Handles the case where the two chains are of different types (e.g., None and str)
+            # Handles the case where the two chains are of different types
+            # e.g., None from WAT123, and str from ALA42.A
             return (chain is not None, chain)
-        
-        return (chain_key(self.chain), self.number) < (chain_key(other.chain), other.number)
+
+        return (chain_key(self.chain), self.number) < (
+            chain_key(other.chain),
+            other.number,
+        )
 
     @classmethod
     def from_atom(cls, atom):
