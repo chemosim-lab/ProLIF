@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Sorting `ResidueId` objects where a subset of residues had no chain was raising a
+  `TypeError`, it will now put cases without a chain first (PR #235 by @amorehead).
 - `display_residues` was sanitizing each residue while preparing them for display, which
   could make debugging faulty molecules difficult. This is now disabled.
 - Deprecation warnings
