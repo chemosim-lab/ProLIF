@@ -1,7 +1,7 @@
 """Module for the WaterBridge interaction implementation."""
 
 from collections import defaultdict
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterator, Optional
 
 from prolif.fingerprint import Fingerprint
 from prolif.ifp import IFP, InteractionData
@@ -27,9 +27,9 @@ class WaterBridge:
 
     def __init__(
         self,
-        parameters: dict | None = None,
+        parameters: Optional[dict] = None,
         count: bool = False,
-        ifp_store: dict[int, IFP] | None = None,
+        ifp_store: Optional[dict[int, IFP]] = None,
         **kwargs: Any,
     ):
         kwargs.pop("n_jobs", None)
@@ -69,7 +69,7 @@ class WaterBridge:
 
         # Run water-water interaction analysis if order is 2 or above
         if order >= 2:
-            water_ifp: dict[int, IFP] | None = self.water_fp._run_serial(
+            water_ifp: Optional[dict[int, IFP]] = self.water_fp._run_serial(
                 traj, water, water, residues=None, **self.kwargs
             )
         else:
@@ -87,7 +87,7 @@ class WaterBridge:
     def _merge_metadata(
         self,
         lig_water_ifp: dict[int, IFP],
-        water_ifp: dict[int, IFP] | None,
+        water_ifp: Optional[dict[int, IFP]],
         water_prot_ifp: dict[int, IFP],
     ) -> None:
         """Merge results from all fingerprints on matching water residues"""
@@ -195,9 +195,9 @@ class WaterBridge:
 
     @staticmethod
     def _filter_interactions(
-        ifp: IFP | None,
+        ifp: Optional[IFP],
         predicate: Callable[[InteractionData], bool],
-        default: InteractionData | None = None,
+        default: Optional[InteractionData] = None,
     ) -> Iterator[InteractionData]:
         """Filters interactions to those that satisfy the predicate. If ``ifp==None``,
         simply yields the ``default`` value.
