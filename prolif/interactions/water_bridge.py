@@ -110,10 +110,11 @@ class WaterBridge:
         """Generate results for any order of water-bridge interactions.
 
         Constructs a graph to represent the water network and iterates over all paths
-        up to a given length (corresponding to the ``order``).
+        up to a given length (corresponding to ``order + 1``).
         """
         # MultiGraph to allow the same pair of nodes to interact as both HBA and HBD
-        # and record it as different paths
+        # and potentially multiple groups of atoms satisfying the constraints.
+        # Each of these interaction will have its own edge in the graph.
         graph = nx.MultiGraph()
         nodes = defaultdict(set)
 
@@ -125,7 +126,6 @@ class WaterBridge:
                 nodes[role].add(getattr(data, role))
 
         # remove mirror interactions before adding water-water to the graph
-        # TODO: sort these so that it matches the order going from ligand to protein
         deduplicated = {
             frozenset((ligand_resid, protein_resid))
             for ligand_resid, protein_resid in ifp_ww
@@ -150,14 +150,34 @@ class WaterBridge:
             targets = (t for t in nodes["protein"] if nx.has_path(graph, source, t))
             paths = nx.all_simple_edge_paths(graph, source, targets, cutoff=order + 1)
             for path in paths:
-                # path is a list[tuple[node_id1, node_id2, interaction]]
-                # first element in path is LIG-WAT1, last is WATn-PROT
+                # path is a list[tuple[node_id1, node_id2, deduplication_key]]
+                # first element in path is lig-water1, last is waterN-prot
                 data_lw = graph.edges[path[0]]["int_data"]
                 data_wp = graph.edges[path[-1]]["int_data"]
                 ww_edges = [graph.edges[p] for p in path[1:-1]]
-                # only include if strictly passing through water
+                # only include if strictly passing through water (going back through
+                # ligand or protein is not a valid higher-order interaction)
                 if all(e.get("water_only") for e in ww_edges):
-                    data_ww_list = [e["int_data"] for e in ww_edges]
+                    # reorder ligand and protein in InteractionData to be contiguous
+                    # i.e. lig-w1, w1-w2, w2-prot instead of lig-w1, w2-w1, w2-prot
+                    data_ww_list = []
+                    left = data_lw.protein
+                    for e in ww_edges:
+                        d = e["int_data"]
+                        is_sorted = d.ligand == left
+                        data_ww = InteractionData(
+                            ligand=d.ligand if is_sorted else d.protein,
+                            protein=d.protein if is_sorted else d.ligand,
+                            # interaction name is not kept in final metadata
+                            # so no need to invert it
+                            interaction=d.interaction,
+                            # the indices of "ligand" water and "protein" water are
+                            # merged in the final metadata for water mols so no need to
+                            # invert the roles in indices
+                            metadata=d.metadata,
+                        )
+                        data_ww_list.append(data_ww)
+                        left = data_ww.protein
                     self._merge_metadata(frame, data_lw, data_wp, *data_ww_list)
 
     def _merge_metadata(
