@@ -23,3 +23,4 @@ from prolif.interactions.interactions import (
     XBAcceptor,
     XBDonor,
 )
+from prolif.interactions.water_bridge import WaterBridge

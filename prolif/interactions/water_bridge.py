@@ -2,30 +2,35 @@
 
 import itertools as it
 from collections import defaultdict
-from typing import Any, Iterator, Optional
+from typing import Iterator, Optional
 
 import networkx as nx
 
-from prolif.fingerprint import Fingerprint
 from prolif.ifp import IFP, InteractionData
+from prolif.interactions.base import BridgedInteraction
 
 
-class WaterBridge:
-    """Implementation of the WaterBridge analysis for trajectories.
+class WaterBridge(BridgedInteraction):
+    """Implementation of the WaterBridge analysis.
 
     Parameters
     ----------
-    parameters : dict
-        Parameters for the HBDonor and HBAcceptor interactions passed to the underlying
-        fingerprint generator. See
-        :class:`prolif.fingerprint.Fingerprint` for more details.
+    water : MDAnalysis.core.groups.AtomGroup
+        An MDAnalysis AtomGroup containing the water molecules
+    order : int
+        Maximum number of water molecules that can be involved in a water-bridged
+        interaction.
+    min_order : int
+        Minimum number of water molecules that can be involved in a water-bridged
+        interaction.
+    hbdonor : Optional[dict]
+        Parameters for the HBDonor interaction passed to the underlying fingerprint
+        generator. See :class:`~prolif.interactions.interactions.HBDonor` for more
+        details.
+    hbacceptor : Optional[dict]
+        Same as above for :class:`~prolif.interactions.interactions.HBAcceptor`.
     count : bool
         Whether to generate a count fingerprint or just a binary one.
-    ifp_store : dict
-        Container for the results.
-    kwargs : Any
-        Additional arguments passed at runtime to the fingerprint generator's ``run``
-        method.
 
     Notes
     -----
@@ -34,22 +39,37 @@ class WaterBridge:
 
     def __init__(
         self,
-        parameters: Optional[dict] = None,
+        water,
+        order: int = 1,
+        min_order: int = 1,
+        hbdonor: Optional[dict] = None,
+        hbacceptor: Optional[dict] = None,
         count: bool = False,
-        ifp_store: Optional[dict[int, IFP]] = None,
-        **kwargs: Any,
     ):
-        kwargs.pop("n_jobs", None)
-        self.residues = kwargs.pop("residues", None)
+        # circular import
+        from prolif.fingerprint import Fingerprint
+
+        super().__init__()
+        if order < 1:
+            raise ValueError("order must be greater than 0")
+        if min_order > order:
+            raise ValueError("min_order cannot be greater than order")
+        self.water = water
+        self.order = order
+        self.min_order = min_order
         self.water_fp = Fingerprint(
             interactions=["HBDonor", "HBAcceptor"],
-            parameters=parameters,
+            parameters={"HBDonor": hbdonor or {}, "HBAcceptor": hbacceptor or {}},
             count=count,
         )
-        self.kwargs = kwargs
-        self.ifp = {} if ifp_store is None else ifp_store
 
-    def run(self, traj, lig, prot, water, order=1) -> dict[int, IFP]:
+    def setup(self, ifp_store=None, **kwargs) -> None:
+        super().setup(ifp_store=ifp_store, **kwargs)
+        kwargs.pop("n_jobs", None)
+        self.residues = kwargs.pop("residues", None)
+        self.kwargs = kwargs
+
+    def run(self, traj, lig, prot) -> dict[int, IFP]:
         """Run the water bridge analysis.
 
         Parameters
@@ -61,22 +81,18 @@ class WaterBridge:
             An MDAnalysis AtomGroup for the ligand
         prot : MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the protein (with multiple residues)
-        water: MDAnalysis.core.groups.AtomGroup
-            An MDAnalysis AtomGroup for the water molecules
-        order: int
-            Treshold for water bridge order
         """  # noqa: E501
         # Run analysis for ligand-water and water-protein interactions
         lig_water_ifp: dict[int, IFP] = self.water_fp._run_serial(
-            traj, lig, water, residues=None, **self.kwargs
+            traj, lig, self.water, residues=None, **self.kwargs
         )
         water_prot_ifp: dict[int, IFP] = self.water_fp._run_serial(
-            traj, water, prot, residues=self.residues, **self.kwargs
+            traj, self.water, prot, residues=self.residues, **self.kwargs
         )
-        if order >= 2:
+        if self.order >= 2:
             # Run water-water interaction analysis
             water_ifp: dict[int, IFP] = self.water_fp._run_serial(
-                traj, water, water, residues=None, **self.kwargs
+                traj, self.water, self.water, residues=None, **self.kwargs
             )
 
         for frame in lig_water_ifp:
@@ -84,9 +100,9 @@ class WaterBridge:
             ifp_wp = water_prot_ifp[frame]  # Water → Protein
             self.ifp.setdefault(frame, IFP())
 
-            if order >= 2:
+            if self.order >= 2:
                 ifp_ww = water_ifp[frame]  # WaterX -> WaterY
-                self._any_order(frame, ifp_lw, ifp_ww, ifp_wp, order=order)
+                self._any_order(frame, ifp_lw, ifp_ww, ifp_wp)
 
             else:
                 self._first_order_only(frame, ifp_lw, ifp_wp)
@@ -104,9 +120,7 @@ class WaterBridge:
                 if data_lw.protein == data_wp.ligand:
                     self._merge_metadata(frame, data_lw, data_wp)
 
-    def _any_order(
-        self, frame: int, ifp_lw: IFP, ifp_ww: IFP, ifp_wp: IFP, order: int
-    ) -> None:
+    def _any_order(self, frame: int, ifp_lw: IFP, ifp_ww: IFP, ifp_wp: IFP) -> None:
         """Generate results for any order of water-bridge interactions.
 
         Constructs a graph to represent the water network and iterates over all paths
@@ -148,8 +162,12 @@ class WaterBridge:
         # find all edge paths of length up to `order + 1`
         for source in nodes["ligand"]:
             targets = (t for t in nodes["protein"] if nx.has_path(graph, source, t))
-            paths = nx.all_simple_edge_paths(graph, source, targets, cutoff=order + 1)
+            paths = nx.all_simple_edge_paths(
+                graph, source, targets, cutoff=self.order + 1
+            )
             for path in paths:
+                if len(path) <= self.min_order:
+                    continue
                 # path is a list[tuple[node_id1, node_id2, deduplication_key]]
                 # first element in path is lig-water1, last is waterN-prot
                 data_lw = graph.edges[path[0]]["int_data"]
