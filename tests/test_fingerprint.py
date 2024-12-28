@@ -351,7 +351,9 @@ class TestFingerprint:
             "protein and byres around 4 group ligand", ligand=ligand
         )
         water = water_u.select_atoms(
-            "resname TIP3 and byres around 4 group ligand", ligand=ligand
+            "resname TIP3 and byres around 6 (group ligand or group pocket)",
+            ligand=ligand,
+            pocket=protein,
         )
         return ligand, protein, water
 
@@ -369,6 +371,39 @@ class TestFingerprint:
 
         assert int_data.interaction == "WaterBridge"
         assert str(int_data.protein) == "TRP400.X"
+
+    def test_higher_order_water_bridge(self, water_u):
+        ligand = water_u.select_atoms("resname QNB")
+        pocket = water_u.select_atoms(
+            "protein and byres around 4 group ligand", ligand=ligand
+        )
+        wshell = water_u.select_atoms(
+            "resname TIP3 and byres around 4 (group ligand or group pocket)",
+            ligand=ligand,
+            pocket=pocket,
+        )
+        extended_pocket = water_u.select_atoms(
+            "protein and byres around 4 (group ligand or group wshell)",
+            ligand=ligand,
+            wshell=wshell,
+        )
+        water = water_u.select_atoms(
+            "resname TIP3 and byres around 4 (group ligand or group pocket)",
+            ligand=ligand,
+            pocket=extended_pocket,
+        )
+        fp = Fingerprint(
+            ["WaterBridge"], parameters={"WaterBridge": {"water": water, "order": 2}}
+        )
+        fp.run(water_u.trajectory[:1], ligand, extended_pocket)
+        all_int_data = list(fp.ifp[0].interactions())
+
+        assert len(all_int_data) == 3
+        int_data = all_int_data[2]
+        # order is not yet stable...
+        assert ("distance_TIP317.X_TIP383.X" in int_data.metadata) or (
+            "distance_TIP383.X_TIP317.X" in int_data.metadata
+        )
 
     def test_mix_water_bridge_and_other_interactions(self, water_u, water_params):
         ligand, protein, water = water_params

@@ -43,6 +43,9 @@ dependencies = [
 file = "LICENSE"
 
 [project.optional-dependencies]
+water = [
+    "networkx",
+]
 plots = [
     "py3Dmol",
     "matplotlib>=3.5",
@@ -62,7 +65,7 @@ tests = [
     "pytest>=6.1.2",
     "pytest-cov",
     "ipython",
-    "prolif[plots]"
+    "prolif[plots,water]"
 ]
 dev = [
     "prolif[build,tests]",
