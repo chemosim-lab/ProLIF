@@ -338,37 +338,12 @@ class TestFingerprint:
         fp = Fingerprint()
         assert fp.hydrophobic.distance == 4.5
 
-    @pytest.fixture(scope="class")
-    def water_u(self):
-        top_path = (datapath / "water_m2.pdb").as_posix()
-        traj_path = (datapath / "water_m2.xtc").as_posix()
-        return mda.Universe(top_path, traj_path)
-
-    @pytest.fixture(scope="class")
-    def water_params(self, water_u):
-        ligand = water_u.select_atoms("resname QNB")
-        protein = water_u.select_atoms(
-            "protein and byres around 4 group ligand", ligand=ligand
-        )
-        water = water_u.select_atoms(
-            "resname TIP3 and byres around 4 group ligand", ligand=ligand
-        )
-        return ligand, protein, water
-
     def test_water_bridge_instance_without_params_raises_error(self):
         with pytest.raises(
-            ValueError, match="Must specify settings for the `WaterBridge` interaction"
+            ValueError,
+            match="Must specify settings for bridged interaction 'WaterBridge'",
         ):
             Fingerprint(["WaterBridge"])
-
-    def test_direct_water_bridge(self, water_u, water_params):
-        ligand, protein, water = water_params
-        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
-        fp.run(water_u.trajectory[:1], ligand, protein)
-        int_data = next(fp.ifp[0].interactions())
-
-        assert int_data.interaction == "WaterBridge"
-        assert str(int_data.protein) == "TRP400.X"
 
     def test_mix_water_bridge_and_other_interactions(self, water_u, water_params):
         ligand, protein, water = water_params
