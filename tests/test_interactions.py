@@ -385,3 +385,51 @@ class TestInteractions:
         assert fingerprint.edgetoface.any(lig, phe331)  # type: ignore[attr-defined]
         assert not fingerprint.facetoface.any(lig, phe331)  # type: ignore[attr-defined]
         assert fingerprint.pistacking.any(lig, phe331)  # type: ignore[attr-defined]
+
+
+class TestBridgedInteractions:
+    @pytest.mark.parametrize(
+        ("kwargs", "match"),
+        [
+            ({"order": 0}, "order must be greater than 0"),
+            ({"order": 1, "min_order": 2}, "min_order cannot be greater than order"),
+        ],
+    )
+    def test_water_bridge_validation(self, water_params, kwargs, match):
+        *_, water = water_params
+        with pytest.raises(ValueError, match=match):
+            Fingerprint(
+                ["WaterBridge"],
+                parameters={"WaterBridge": {"water": water, **kwargs}},
+            )
+
+    def test_direct_water_bridge(self, water_u, water_params):
+        ligand, protein, water = water_params
+        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
+        fp.run(water_u.trajectory[:1], ligand, protein)
+        int_data = next(fp.ifp[0].interactions())
+
+        assert int_data.interaction == "WaterBridge"
+        assert str(int_data.protein) == "TRP400.X"
+
+    @pytest.mark.parametrize(
+        ("kwargs", "num_expected"),
+        [
+            ({}, 3),
+            ({"min_order": 2}, 2),
+        ],
+    )
+    def test_higher_order_water_bridge(self, water_u, kwargs, num_expected):
+        ligand = water_u.select_atoms("resname QNB")
+        pocket = water_u.select_atoms("protein and resid 399:403")
+        water = water_u.select_atoms("segid WAT and (resid 17 or resid 83)")
+        fp = Fingerprint(
+            ["WaterBridge"],
+            parameters={"WaterBridge": {"water": water, "order": 2, **kwargs}},
+        )
+        fp.run(water_u.trajectory[:1], ligand, pocket)
+        all_int_data = list(fp.ifp[0].interactions())
+
+        assert len(all_int_data) == num_expected
+        int_data = all_int_data[-1]
+        assert "distance_TIP383.X_TIP317.X" in int_data.metadata

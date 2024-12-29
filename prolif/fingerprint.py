@@ -28,6 +28,7 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
 import os
 import warnings
 from collections.abc import Iterable, Sequence, Sized
+from inspect import signature
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast, overload
 
 import dill
@@ -38,7 +39,11 @@ from rdkit import Chem
 from tqdm.auto import tqdm
 
 from prolif.ifp import IFP
-from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
+from prolif.interactions.base import (
+    _BASE_INTERACTIONS,
+    _BRIDGED_INTERACTIONS,
+    _INTERACTIONS,
+)
 from prolif.molecule import Molecule
 from prolif.parallel import MolIterablePool, TrajectoryPool
 from prolif.plotting.utils import IS_NOTEBOOK
@@ -228,22 +233,11 @@ class Fingerprint:
         parameters = parameters or {}
         if interactions == "all":
             interactions = self.list_available()
-        # prepare water bridge interaction
-        try:
-            i = interactions.index("WaterBridge")
-        except ValueError:
-            self._water_bridge_parameters = None
-        else:
-            interactions.pop(i)
-            if "WaterBridge" not in parameters:
-                raise ValueError(
-                    "Must specify settings for the `WaterBridge` interaction: try "
-                    '`parameters={"WaterBridge": {"water": <AtomGroup or Molecule>}}`'
-                )
-            self._water_bridge_parameters = parameters.pop("WaterBridge")
+
         # sanity check
         self._check_valid_interactions(interactions, "interactions")
         self._check_valid_interactions(parameters, "parameters")
+
         # add interaction methods
         self.interactions = {}
         self._interactions: dict[str, "Interaction"] = {}
@@ -255,12 +249,30 @@ class Fingerprint:
             self._interactions[name] = interaction
             self.interactions[name] = interaction.all if self.count else interaction.any
 
+        # add bridged interactions
+        self.bridged_interactions = {}
+        for name, interaction_cls in _BRIDGED_INTERACTIONS.items():
+            if name in interactions:
+                params = parameters.get(name, {})
+                if not params:
+                    raise ValueError(
+                        f"Must specify settings for bridged interaction {name!r}: try "
+                        f'`parameters={{"{name}": {{...}}}}`'
+                    )
+                sig = signature(interaction_cls.__init__)
+                if "count" in sig.parameters:
+                    params.setdefault("count", self.count)
+                interaction = interaction_cls(**params)
+                setattr(self, name.lower(), interaction)
+                self.bridged_interactions[name] = interaction
+
     def _check_valid_interactions(
         self, interactions_iterable: Iterable[str], varname: str
     ) -> None:
         """Raises a NameError if an unknown interaction is given."""
         unsafe = set(interactions_iterable)
-        unknown = unsafe.symmetric_difference(_INTERACTIONS) & unsafe
+        known = {*_INTERACTIONS, *_BRIDGED_INTERACTIONS}
+        unknown = unsafe.difference(known)
         if unknown:
             raise NameError(
                 f"Unknown interaction(s) in {varname!r}: {', '.join(unknown)}",
@@ -272,7 +284,9 @@ class Fingerprint:
         return f"<{name}: {params} at {id(self):#x}>"
 
     @staticmethod
-    def list_available(show_hidden: bool = False) -> list[str]:
+    def list_available(
+        show_hidden: bool = False, show_bridged: bool = False
+    ) -> list[str]:
         """List interactions available to the Fingerprint class.
 
         Parameters
@@ -280,16 +294,21 @@ class Fingerprint:
         show_hidden : bool
             Show hidden classes (base classes meant to be inherited from to create
             custom interactions).
+        show_bridged : bool
+            Show bridged interaction classes such as ``WaterBridge``.
         """
+        interactions = sorted(_INTERACTIONS)
+        if show_bridged:
+            interactions.extend(sorted(_BRIDGED_INTERACTIONS))
         if show_hidden:
-            return sorted(_BASE_INTERACTIONS) + sorted(_INTERACTIONS)
-        return sorted(_INTERACTIONS)
+            return sorted(_BASE_INTERACTIONS) + interactions
+        return interactions
 
     @property
     def _interactions_list(self) -> list[str]:
         interactions = list(self.interactions)
-        if self._water_bridge_parameters:
-            interactions.append("WaterBridge")
+        if self.bridged_interactions:
+            interactions.extend(self.bridged_interactions)
         return interactions
 
     @property
@@ -546,11 +565,11 @@ class Fingerprint:
         # setup defaults
         converter_kwargs = converter_kwargs or ({}, {})
         if (
-            self._water_bridge_parameters
+            self.bridged_interactions
             and (maxsize := atomgroup_to_mol.cache_parameters()["maxsize"])
             and maxsize <= 2
         ):
-            set_converter_cache_size(3)
+            set_converter_cache_size(2 + len(self.bridged_interactions))
         if n_jobs is None:
             n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
         if residues == "all":
@@ -578,12 +597,11 @@ class Fingerprint:
                 )
             self.ifp = ifp
 
-        if self._water_bridge_parameters:
+        if self.bridged_interactions:
             self._run_bridged_analysis(
                 traj,
                 lig,
                 prot,
-                **self._water_bridge_parameters,
                 residues=residues,
                 converter_kwargs=converter_kwargs,
                 progress=progress,
@@ -786,7 +804,7 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
-    def _run_bridged_analysis(self, traj, lig, prot, water, **kwargs):
+    def _run_bridged_analysis(self, traj, lig, prot, **kwargs):
         """Implementation of the WaterBridge analysis for trajectories.
 
         Parameters
@@ -798,81 +816,11 @@ class Fingerprint:
             An MDAnalysis AtomGroup for the ligand
         prot : MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the protein (with multiple residues)
-        water: MDAnalysis.core.groups.AtomGroup
-            An MDAnalysis AtomGroup for the water molecules
         """  # noqa: E501
-        kwargs.pop("n_jobs", None)
-        residues = kwargs.pop("residues", None)
-        fp = Fingerprint(
-            interactions=["HBDonor", "HBAcceptor"],
-            parameters=self.parameters,
-            count=self.count,
-        )
-
-        # run analysis twice, once on ligand-water, then on water-prot
-        ifp_stores: list[dict[int, IFP]] = [
-            fp._run_serial(traj, lig, water, residues=None, **kwargs),
-            fp._run_serial(traj, water, prot, residues=residues, **kwargs),
-        ]
-
-        # merge results from the 2 runs on matching water residues
         self.ifp = getattr(self, "ifp", {})
-        for (frame, ifp1), ifp2 in zip(
-            ifp_stores[0].items(), ifp_stores[1].values(), strict=False
-        ):
-            # for each ligand-water interaction in ifp1
-            for data1 in ifp1.interactions():
-                # for each water-protein interaction in ifp2 where water1 == water2
-                for data2 in [
-                    d2 for d2 in ifp2.interactions() if d2.ligand == data1.protein
-                ]:
-                    # construct merged metadata
-                    metadata = (
-                        {
-                            "indices": {
-                                "ligand": data1.metadata["indices"]["ligand"],
-                                "protein": data2.metadata["indices"]["protein"],
-                                "water": tuple(
-                                    set().union(
-                                        data1.metadata["indices"]["protein"],
-                                        data2.metadata["indices"]["ligand"],
-                                    )
-                                ),
-                            },
-                            "parent_indices": {
-                                "ligand": data1.metadata["parent_indices"]["ligand"],
-                                "protein": data2.metadata["parent_indices"]["protein"],
-                                "water": tuple(
-                                    set().union(
-                                        data1.metadata["parent_indices"]["protein"],
-                                        data2.metadata["parent_indices"]["ligand"],
-                                    )
-                                ),
-                            },
-                            "water_residue": data1.protein,
-                            "ligand_role": data1.interaction,
-                            "protein_role": (  # invert role
-                                "HBDonor"
-                                if data2.interaction == "HBAcceptor"
-                                else "HBAcceptor"
-                            ),
-                            **{
-                                f"{key}{suffix}": data.metadata[key]
-                                for suffix, data in [
-                                    ("_ligand_water", data1),
-                                    ("_water_protein", data2),
-                                ]
-                                for key in ["distance", "DHA_angle"]
-                            },
-                        },
-                    )
-
-                    # store metadata
-                    ifp = self.ifp.setdefault(frame, IFP())
-                    ifp.setdefault((data1.ligand, data2.protein), {}).setdefault(
-                        "WaterBridge", []
-                    ).append(metadata)
-
+        for interaction in self.bridged_interactions.values():
+            interaction.setup(ifp_store=self.ifp, **kwargs)
+            interaction.run(traj, lig, prot)
         return self
 
     def to_dataframe(

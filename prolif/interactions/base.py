@@ -17,6 +17,7 @@ import numpy as np
 from rdkit.Chem import MolFromSmarts
 from rdkit.Geometry import Point3D
 
+from prolif.ifp import IFP
 from prolif.interactions.utils import (
     DISTANCE_FUNCTIONS_3ARGS,
     DISTANCE_FUNCTIONS_4ARGS,
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     Self = TypeVar("Self", bound="Interaction")
 
 _INTERACTIONS: dict[str, type["Interaction"]] = {}
+_BRIDGED_INTERACTIONS: dict[str, type["BridgedInteraction"]] = {}
 _BASE_INTERACTIONS: dict[str, type["Interaction"]] = {}
 
 
@@ -198,6 +200,38 @@ class Interaction(ABC):
 
         inverted.detect = detect  # type: ignore[method-assign]
         return inverted
+
+
+class BridgedInteraction:
+    """Base class for bridged interactions."""
+
+    def __init_subclass__(cls):
+        super().__init_subclass__()
+        name = cls.__name__
+        register = _BRIDGED_INTERACTIONS
+        if name in register:
+            warnings.warn(
+                f"The {name!r} interaction has been superseded by a "
+                f"new class with id {id(cls):#x}",
+                stacklevel=2,
+            )
+        register[name] = cls
+
+    def __init__(self):
+        self.ifp = {}
+        # force empty setup to initialize args with defaults
+        self.setup()
+
+    def setup(self, ifp_store=None, **kwargs) -> None:
+        """Setup additional arguments passed at runtime to the fingerprint generator's
+        ``run`` method.
+        """
+        self.ifp = ifp_store if ifp_store is not None else {}
+        self.kwargs = kwargs
+
+    @abstractmethod
+    def run(self, traj, lig, prot) -> dict[int, IFP]:
+        raise NotImplementedError()
 
 
 class Distance(Interaction, is_abstract=True):
