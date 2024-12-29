@@ -683,21 +683,44 @@ class Fingerprint:
             raise ValueError("n_jobs must be > 0 or None")
         if residues == "all":
             residues = list(prot_mol.residues)
-        if n_jobs != 1:
-            return self._run_iter_parallel(
-                lig_iterable=lig_iterable,
-                prot_mol=prot_mol,
+        if n_jobs is None:
+            n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
+
+        if self.interactions:
+            if n_jobs == 1:
+                ifp = self._run_iter_serial(
+                    lig_iterable=lig_iterable,
+                    prot_mol=prot_mol,
+                    residues=residues,
+                    progress=progress,
+                )
+            else:
+                ifp = self._run_iter_parallel(
+                    lig_iterable=lig_iterable,
+                    prot_mol=prot_mol,
+                    residues=residues,
+                    progress=progress,
+                    n_jobs=n_jobs,
+                )
+            self.ifp = ifp
+
+        if self.bridged_interactions:
+            self._run_iter_bridged_analysis(
+                lig_iterable,
+                prot_mol,
                 residues=residues,
                 progress=progress,
                 n_jobs=n_jobs,
             )
 
+        return self
+
+    def _run_iter_serial(self, lig_iterable, prot_mol, residues, progress):
         iterator = tqdm(lig_iterable) if progress else lig_iterable
         ifp = {}
         for i, lig_mol in enumerate(iterator):
             ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
-        self.ifp = ifp
-        return self
+        return ifp
 
     def _run_iter_parallel(
         self,
@@ -725,8 +748,7 @@ class Fingerprint:
             for i, ifp_data in enumerate(pool.process(lig_iterable)):
                 ifp[i] = ifp_data
 
-        self.ifp = ifp
-        return self
+        return ifp
 
     def _run_bridged_analysis(self, traj, lig, prot, **kwargs):
         """Implementation of the WaterBridge analysis for trajectories.
@@ -745,6 +767,23 @@ class Fingerprint:
         for interaction in self.bridged_interactions.values():
             interaction.setup(ifp_store=self.ifp, **kwargs)
             interaction.run(traj, lig, prot)
+        return self
+
+    def _run_iter_bridged_analysis(self, lig_iterable, prot_mol, **kwargs):
+        """Implementation of the WaterBridge analysis for trajectories.
+
+        Parameters
+        ----------
+        lig_iterable : list or generator
+            An iterable yielding ligands as :class:`~prolif.molecule.Molecule`
+            objects
+        prot_mol : prolif.molecule.Molecule
+            The protein
+        """
+        self.ifp = getattr(self, "ifp", {})
+        for interaction in self.bridged_interactions.values():
+            interaction.setup(ifp_store=self.ifp, **kwargs)
+            interaction.run_from_iterable(lig_iterable, prot_mol)
         return self
 
     def to_dataframe(

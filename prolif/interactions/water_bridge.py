@@ -2,12 +2,18 @@
 
 import itertools as it
 from collections import defaultdict
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING, Iterable, Iterator, Optional, Union
 
 import networkx as nx
 
 from prolif.ifp import IFP, InteractionData
 from prolif.interactions.base import BridgedInteraction
+
+if TYPE_CHECKING:
+    from MDAnalysis.core.groups import AtomGroup
+
+    from prolif.molecule import Molecule
+    from prolif.typeshed import Trajectory
 
 
 class WaterBridge(BridgedInteraction):
@@ -15,8 +21,9 @@ class WaterBridge(BridgedInteraction):
 
     Parameters
     ----------
-    water : MDAnalysis.core.groups.AtomGroup
-        An MDAnalysis AtomGroup containing the water molecules
+    water : Union[MDAnalysis.core.groups.AtomGroup, Iterable[prolif.molecule.Molecule]]
+        An MDAnalysis AtomGroup or iterable of prolif Molecule objects containing the
+        water molecules
     order : int
         Maximum number of water molecules that can be involved in a water-bridged
         interaction.
@@ -39,7 +46,7 @@ class WaterBridge(BridgedInteraction):
 
     def __init__(
         self,
-        water,
+        water: Union["AtomGroup", Iterable["Molecule"]],
         order: int = 1,
         min_order: int = 1,
         hbdonor: Optional[dict] = None,
@@ -69,12 +76,17 @@ class WaterBridge(BridgedInteraction):
         self.residues = kwargs.pop("residues", None)
         self.kwargs = kwargs
 
-    def run(self, traj, lig, prot) -> dict[int, IFP]:
-        """Run the water bridge analysis.
+    def run(
+        self,
+        traj: "Trajectory",
+        lig: "AtomGroup",
+        prot: "AtomGroup",
+    ) -> dict[int, IFP]:
+        """Run the water bridge analysis for a trajectory.
 
         Parameters
         ----------
-        traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced
+        traj : Union[MDAnalysis.coordinates.base.ProtoReader, MDAnalysis.coordinates.base.FrameIteratorSliced]
             Iterate over this Universe trajectory or sliced trajectory object
             to extract the frames used for the fingerprint extraction
         lig : MDAnalysis.core.groups.AtomGroup
@@ -107,6 +119,46 @@ class WaterBridge(BridgedInteraction):
             else:
                 self._first_order_only(frame, ifp_lw, ifp_wp)
 
+        return self.ifp
+
+    def run_from_iterable(
+        self, lig_iterable: Iterable["Molecule"], prot_mol: "Molecule"
+    ) -> dict[int, IFP]:
+        """Run the water-bridge analysis for an iterable of molecules.
+
+        Parameters
+        ----------
+        lig_iterable : list or generator
+            An iterable yielding ligands as :class:`~prolif.molecule.Molecule`
+            objects
+        prot_mol : prolif.molecule.Molecule
+            The protein
+        """
+        # Run analysis for ligand-water and water-protein interactions
+        lig_water_ifp: dict[int, IFP] = self.water_fp._run_iter_serial(
+            lig_iterable, self.water, residues=None, **self.kwargs
+        )
+        water_prot_ifp: dict[int, IFP] = self.water_fp._run_iter_serial(
+            [self.water], prot_mol, residues=self.residues, **self.kwargs
+        )
+        ifp_wp = water_prot_ifp[0]  # Water → Protein
+
+        if self.order >= 2:
+            # Run water-water interaction analysis
+            water_ifp: dict[int, IFP] = self.water_fp._run_iter_serial(
+                [self.water], self.water, residues=None, **self.kwargs
+            )
+            ifp_ww = water_ifp[0]  # WaterX -> WaterY
+
+        for pose in lig_water_ifp:
+            ifp_lw = lig_water_ifp[pose]  # Ligand → Water
+            self.ifp.setdefault(pose, IFP())
+
+            if self.order >= 2:
+                self._any_order(pose, ifp_lw, ifp_ww, ifp_wp)
+
+            else:
+                self._first_order_only(pose, ifp_lw, ifp_wp)
         return self.ifp
 
     def _first_order_only(
