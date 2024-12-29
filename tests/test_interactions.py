@@ -357,16 +357,16 @@ class TestBridgedInteractions:
             ({"order": 1, "min_order": 2}, "min_order cannot be greater than order"),
         ],
     )
-    def test_water_bridge_validation(self, water_params, kwargs, match):
-        *_, water = water_params
+    def test_water_bridge_validation(self, water_atomgroups, kwargs, match):
+        *_, water = water_atomgroups
         with pytest.raises(ValueError, match=match):
             Fingerprint(
                 ["WaterBridge"],
                 parameters={"WaterBridge": {"water": water, **kwargs}},
             )
 
-    def test_direct_water_bridge(self, water_u, water_params):
-        ligand, protein, water = water_params
+    def test_direct_water_bridge(self, water_u, water_atomgroups):
+        ligand, protein, water = water_atomgroups
         fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
         fp.run(water_u.trajectory[:1], ligand, protein)
         int_data = next(fp.ifp[0].interactions())
@@ -395,3 +395,13 @@ class TestBridgedInteractions:
         assert len(all_int_data) == num_expected
         int_data = all_int_data[-1]
         assert "distance_TIP383.X_TIP317.X" in int_data.metadata
+
+    def test_run_iter_water_bridge(self, water_mols):
+        ligand, protein, water = water_mols
+        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
+        # mimick multiple poses
+        fp.run_from_iterable([ligand, ligand], protein)
+        int_data = next(fp.ifp[1].interactions())
+
+        assert int_data.interaction == "WaterBridge"
+        assert str(int_data.protein) == "TRP400.X"
