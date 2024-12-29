@@ -211,9 +211,12 @@ class WaterBridge(BridgedInteraction):
         for data, role in [
             (data_lw, "protein"),
             (data_wp, "ligand"),
-            *it.chain.from_iterable([
-                [(data_ww, "ligand"), (data_ww, "protein")] for data_ww in data_ww_args
-            ]),
+            *it.chain.from_iterable(
+                [
+                    [(data_ww, "ligand"), (data_ww, "protein")]
+                    for data_ww in data_ww_args
+                ]
+            ),
         ]:
             resid = getattr(data, role)
             water_indices[str(resid)].update(data.metadata["indices"][role])
@@ -231,13 +234,15 @@ class WaterBridge(BridgedInteraction):
                     set().union(
                         data_lw.metadata["parent_indices"]["protein"],
                         data_wp.metadata["parent_indices"]["ligand"],
-                        *it.chain.from_iterable([
+                        *it.chain.from_iterable(
                             [
-                                data_ww.metadata["parent_indices"]["ligand"],
-                                data_ww.metadata["parent_indices"]["protein"],
+                                [
+                                    data_ww.metadata["parent_indices"]["ligand"],
+                                    data_ww.metadata["parent_indices"]["protein"],
+                                ]
+                                for data_ww in data_ww_args
                             ]
-                            for data_ww in data_ww_args
-                        ]),
+                        ),
                     )
                 ),
             },
@@ -245,10 +250,12 @@ class WaterBridge(BridgedInteraction):
                 dict.fromkeys(  # uniquify but keep order
                     [
                         data_lw.protein,
-                        *it.chain.from_iterable([
-                            [data_ww.ligand, data_ww.protein]
-                            for data_ww in data_ww_args
-                        ]),
+                        *it.chain.from_iterable(
+                            [
+                                [data_ww.ligand, data_ww.protein]
+                                for data_ww in data_ww_args
+                            ]
+                        ),
                         data_wp.ligand,
                     ]
                 )
@@ -262,10 +269,12 @@ class WaterBridge(BridgedInteraction):
                 f"{key}{suffix}": data.metadata[key]
                 for suffix, data in [
                     (f"_ligand_{data_lw.protein}", data_lw),
-                    *it.chain.from_iterable([
-                        [(f"_{data_ww.ligand}_{data_ww.protein}", data_ww)]
-                        for data_ww in data_ww_args
-                    ]),
+                    *it.chain.from_iterable(
+                        [
+                            [(f"_{data_ww.ligand}_{data_ww.protein}", data_ww)]
+                            for data_ww in data_ww_args
+                        ]
+                    ),
                     (f"_{data_wp.ligand}_protein", data_wp),
                 ]
                 for key in ["distance", "DHA_angle"]
