@@ -759,21 +759,44 @@ class Fingerprint:
             raise ValueError("n_jobs must be > 0 or None")
         if residues == "all":
             residues = list(prot_mol.residues)
-        if n_jobs != 1:
-            return self._run_iter_parallel(
-                lig_iterable=lig_iterable,
-                prot_mol=prot_mol,
+        if n_jobs is None:
+            n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
+
+        if self.interactions:
+            if n_jobs == 1:
+                ifp = self._run_iter_serial(
+                    lig_iterable=lig_iterable,
+                    prot_mol=prot_mol,
+                    residues=residues,
+                    progress=progress,
+                )
+            else:
+                ifp = self._run_iter_parallel(
+                    lig_iterable=lig_iterable,
+                    prot_mol=prot_mol,
+                    residues=residues,
+                    progress=progress,
+                    n_jobs=n_jobs,
+                )
+            self.ifp = ifp
+
+        if self.bridged_interactions:
+            self._run_iter_bridged_analysis(
+                lig_iterable,
+                prot_mol,
                 residues=residues,
                 progress=progress,
                 n_jobs=n_jobs,
             )
 
+        return self
+
+    def _run_iter_serial(self, lig_iterable, prot_mol, residues, progress):
         iterator = tqdm(lig_iterable) if progress else lig_iterable
         ifp = {}
         for i, lig_mol in enumerate(iterator):
             ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
-        self.ifp = ifp
-        return self
+        return ifp
 
     def _run_iter_parallel(
         self,
@@ -801,8 +824,7 @@ class Fingerprint:
             for i, ifp_data in enumerate(pool.process(lig_iterable)):
                 ifp[i] = ifp_data
 
-        self.ifp = ifp
-        return self
+        return ifp
 
     def _run_bridged_analysis(
         self, traj: "Trajectory", lig: "MDAObject", prot: "MDAObject", **kwargs: Any
@@ -823,6 +845,23 @@ class Fingerprint:
         for interaction in self.bridged_interactions.values():
             interaction.setup(ifp_store=self.ifp, **kwargs)
             interaction.run(traj, lig, prot)
+        return self
+
+    def _run_iter_bridged_analysis(self, lig_iterable, prot_mol, **kwargs):
+        """Implementation of the WaterBridge analysis for trajectories.
+
+        Parameters
+        ----------
+        lig_iterable : list or generator
+            An iterable yielding ligands as :class:`~prolif.molecule.Molecule`
+            objects
+        prot_mol : prolif.molecule.Molecule
+            The protein
+        """
+        self.ifp = getattr(self, "ifp", {})
+        for interaction in self.bridged_interactions.values():
+            interaction.setup(ifp_store=self.ifp, **kwargs)
+            interaction.run_from_iterable(lig_iterable, prot_mol)
         return self
 
     def to_dataframe(
@@ -1101,6 +1140,7 @@ class Fingerprint:
 
         .. versionchanged:: 2.1.0
             Added the ``show_interaction_data`` argument and exposed the ``fontsize``.
+            Added support for showing WaterBridge interactions.
         """
         from prolif.plotting.network import LigNetwork
 
@@ -1186,12 +1226,13 @@ class Fingerprint:
         self,
         ligand_mol: Molecule,
         protein_mol: Molecule,
+        water_mol: Molecule | None = None,
         *,
         frame: int,
         size: tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein"] = True,
+        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
     ) -> "Complex3D":
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
@@ -1202,6 +1243,8 @@ class Fingerprint:
             The ligand molecule to display.
         protein_mol : Molecule
             The protein molecule to display.
+        water_mol : Optional[Molecule]
+            Additional molecule (e.g. waters) to display.
         frame : int
             The frame number chosen to select which interactions are going to be
             displayed.
@@ -1214,7 +1257,7 @@ class Fingerprint:
         only_interacting : bool = True
             Whether to show all protein residues in the vicinity of the ligand, or
             only the ones participating in an interaction.
-        remove_hydrogens: bool | Literal["ligand", "protein"] = True
+        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
 
@@ -1227,16 +1270,17 @@ class Fingerprint:
         .. versionchanged:: 2.1.0
             Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
             Non-polar hydrogen atoms that aren't involved in interactions are now
-            hidden.
+            hidden. Added support for waters involved in WaterBridge interactions.
 
         """
         from prolif.plotting.complex3d import Complex3D
 
         plot3d = Complex3D.from_fingerprint(
             self,
+            ligand_mol,
+            protein_mol,
+            water_mol,
             frame=frame,
-            lig_mol=ligand_mol,
-            prot_mol=protein_mol,
         )
         return plot3d.display(
             size=size,

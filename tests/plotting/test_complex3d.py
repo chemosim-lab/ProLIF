@@ -21,8 +21,7 @@ class TestComplex3D:
     def fp(self, request: pytest.FixtureRequest) -> plf.Fingerprint:
         return cast(plf.Fingerprint, request.getfixturevalue(request.param))
 
-    @pytest.fixture(scope="class")
-    def fp_mols(
+    def execute_fp(
         self, fp: plf.Fingerprint
     ) -> tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]:
         u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
@@ -32,6 +31,18 @@ class TestComplex3D:
         lig_mol = plf.Molecule.from_mda(lig)
         prot_mol = plf.Molecule.from_mda(prot)
         return fp, lig_mol, prot_mol
+
+    @pytest.fixture(scope="class")
+    def fp_mols(
+        self, fp: plf.Fingerprint
+    ) -> tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]:
+        return self.execute_fp(fp)
+
+    @pytest.fixture(scope="class")
+    def simple_fp_results(
+        self, simple_fp: plf.Fingerprint
+    ) -> tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]:
+        return self.execute_fp(simple_fp)
 
     @pytest.fixture(scope="class")
     def plot_3d(
@@ -77,3 +88,27 @@ class TestComplex3D:
         assert view._view
         html = view._view._make_html()
         assert "Hydrophobic" in html
+
+    def test_getattr_raises_error_if_not_initialized(self, simple_fp_results):
+        fp, lig_mol, prot_mol = simple_fp_results
+        plot_3d = Complex3D.from_fingerprint(fp, lig_mol, prot_mol, frame=0)
+        with pytest.raises(ValueError, match="View not initialized"):
+            plot_3d._make_html()
+
+    def test_passing_complex_to_populate_view(self, simple_fp_results):
+        """For backwards compatibility"""
+        fp, lig_mol, prot_mol = simple_fp_results
+        plot_3d = Complex3D.from_fingerprint(fp, lig_mol, prot_mol, frame=0)
+        plot_3d.display()
+        plot_3d._populate_view(plot_3d)
+
+    def test_water(self, water_mols):
+        ligand, protein, water = water_mols
+        fp = plf.Fingerprint(
+            ["HBDonor", "WaterBridge"],
+            parameters={"WaterBridge": {"water": water, "order": 2}},
+        )
+        fp.run_from_iterable([ligand], protein)
+        view = fp.plot_3d(ligand, protein, water, frame=0)
+        html = view._make_html()
+        assert "TIP383.X" in html

@@ -193,17 +193,19 @@ def water_u() -> Universe:
 
 
 @pytest.fixture(scope="session")
-def water_params(water_u: Universe) -> tuple["AtomGroup", "AtomGroup", "AtomGroup"]:
+def water_atomgroups(water_u: Universe) -> tuple["AtomGroup", "AtomGroup", "AtomGroup"]:
     ligand = water_u.select_atoms("resname QNB")
-    protein = water_u.select_atoms(
-        "protein and byres around 4 group ligand", ligand=ligand
-    )
-    water = water_u.select_atoms(
-        "resname TIP3 and byres around 6 (group ligand or group pocket)",
-        ligand=ligand,
-        pocket=protein,
-    )
+    protein = water_u.select_atoms("protein and resid 399:404")
+    water = water_u.select_atoms("segid WAT and (resid 17 or resid 83)")
     return ligand, protein, water
+
+
+@pytest.fixture(scope="session")
+def water_mols(water_atomgroups):
+    lig_mol = Molecule.from_mda(water_atomgroups[0])
+    prot_mol = Molecule.from_mda(water_atomgroups[1])
+    water_mol = Molecule.from_mda(water_atomgroups[2])
+    return lig_mol, prot_mol, water_mol
 
 
 class BaseTestMixinRDKitMol:
