@@ -64,7 +64,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           auto-update-conda: true
           use-mamba: true
-          miniforge-variant: Mambaforge
+          miniforge-variant: Miniforge3
 
       - name: Check conda and pip
         run: |

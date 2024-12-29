@@ -1,6 +1,9 @@
+from unittest.mock import Mock
+
 import MDAnalysis as mda
 import numpy as np
 import pytest
+from MDAnalysis.converters.RDKit import set_converter_cache_size
 from pandas import DataFrame
 from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
@@ -334,3 +337,33 @@ class TestFingerprint:
         assert fp.hydrophobic.distance == 1.0
         fp = Fingerprint()
         assert fp.hydrophobic.distance == 4.5
+
+    def test_water_bridge_instance_without_params_raises_error(self):
+        with pytest.raises(
+            ValueError,
+            match="Must specify settings for bridged interaction 'WaterBridge'",
+        ):
+            Fingerprint(["WaterBridge"])
+
+    def test_mix_water_bridge_and_other_interactions(self, water_u, water_params):
+        ligand, protein, water = water_params
+        fp = Fingerprint(
+            ["HBDonor", "WaterBridge"], parameters={"WaterBridge": {"water": water}}
+        )
+        fp.run(water_u.trajectory[:1], ligand, protein, n_jobs=1)
+
+        assert "WaterBridge" in fp.ifp[0]["QNB1.X", "TRP400.X"]
+        assert "HBDonor" in fp.ifp[0]["QNB1.X", "ASN404.X"]
+
+    def test_water_bridge_updates_cache_size(self, water_u, water_params, monkeypatch):
+        ligand, protein, water = water_params
+        set_converter_cache_size(2)
+        mocked = Mock(wraps=set_converter_cache_size)
+        monkeypatch.setattr(
+            Fingerprint, "_run_bridged_analysis", lambda *_args, **_kwargs: None
+        )
+        monkeypatch.setattr("prolif.fingerprint.set_converter_cache_size", mocked)
+
+        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
+        fp.run(water_u.trajectory[:1], ligand, protein)
+        mocked.assert_called_once_with(3)

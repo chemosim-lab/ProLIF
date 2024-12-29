@@ -29,16 +29,22 @@ import os
 import warnings
 from collections.abc import Sized
 from functools import wraps
+from inspect import signature
 from typing import Literal, Optional, Tuple, Union
 
 import dill
 import multiprocess as mp
 import numpy as np
+from MDAnalysis.converters.RDKit import atomgroup_to_mol, set_converter_cache_size
 from rdkit import Chem
 from tqdm.auto import tqdm
 
 from prolif.ifp import IFP
-from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
+from prolif.interactions.base import (
+    _BASE_INTERACTIONS,
+    _BRIDGED_INTERACTIONS,
+    _INTERACTIONS,
+)
 from prolif.molecule import Molecule
 from prolif.parallel import MolIterablePool, TrajectoryPool
 from prolif.plotting.utils import IS_NOTEBOOK
@@ -206,19 +212,21 @@ class Fingerprint:
                 "PiCation",
                 "VdWContact",
             ]
-        self.interactions = interactions
         self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
+        self.parameters = parameters
 
     def _set_interactions(self, interactions, parameters):
         # read interactions to compute
         parameters = parameters or {}
         if interactions == "all":
             interactions = self.list_available()
+
         # sanity check
         self._check_valid_interactions(interactions, "interactions")
         self._check_valid_interactions(parameters, "parameters")
+
         # add interaction methods
         self.interactions = {}
         wrapper = all_occurences if self.count else first_occurence
@@ -229,10 +237,28 @@ class Fingerprint:
             if name in interactions:
                 self.interactions[name] = wrapper(interaction)
 
+        # add bridged interactions
+        self.bridged_interactions = {}
+        for name, interaction_cls in _BRIDGED_INTERACTIONS.items():
+            if name in interactions:
+                params = parameters.get(name, {})
+                if not params:
+                    raise ValueError(
+                        f"Must specify settings for bridged interaction {name!r}: try "
+                        f'`parameters={{"{name}": {{...}}}}`'
+                    )
+                sig = signature(interaction_cls.__init__)
+                if "count" in sig.parameters:
+                    params.setdefault("count", self.count)
+                interaction = interaction_cls(**params)
+                setattr(self, name.lower(), interaction)
+                self.bridged_interactions[name] = interaction
+
     def _check_valid_interactions(self, interactions_iterable, varname):
         """Raises a NameError if an unknown interaction is given."""
         unsafe = set(interactions_iterable)
-        unknown = unsafe.symmetric_difference(_INTERACTIONS.keys()) & unsafe
+        known = {*_INTERACTIONS, *_BRIDGED_INTERACTIONS}
+        unknown = unsafe.difference(known)
         if unknown:
             raise NameError(
                 f"Unknown interaction(s) in {varname!r}: {', '.join(unknown)}",
@@ -240,11 +266,11 @@ class Fingerprint:
 
     def __repr__(self):  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
+        params = f"{self.n_interactions} interactions: {self._interactions_list}"
         return f"<{name}: {params} at {id(self):#x}>"
 
     @staticmethod
-    def list_available(show_hidden=False):
+    def list_available(show_hidden=False, show_bridged=False):
         """List interactions available to the Fingerprint class.
 
         Parameters
@@ -252,14 +278,26 @@ class Fingerprint:
         show_hidden : bool
             Show hidden classes (base classes meant to be inherited from to create
             custom interactions).
+        show_bridged : bool
+            Show bridged interaction classes such as ``WaterBridge``.
         """
+        interactions = sorted(_INTERACTIONS)
+        if show_bridged:
+            interactions.extend(sorted(_BRIDGED_INTERACTIONS))
         if show_hidden:
-            return sorted(_BASE_INTERACTIONS) + sorted(_INTERACTIONS)
-        return sorted(_INTERACTIONS)
+            return sorted(_BASE_INTERACTIONS) + interactions
+        return interactions
+
+    @property
+    def _interactions_list(self):
+        interactions = list(self.interactions)
+        if self.bridged_interactions:
+            interactions.extend(self.bridged_interactions)
+        return interactions
 
     @property
     def n_interactions(self):
-        return len(self.interactions)
+        return len(self._interactions_list)
 
     def bitvector(self, res1, res2):
         """Generates the complete bitvector for the interactions between two
@@ -473,22 +511,54 @@ class Fingerprint:
         if converter_kwargs is not None and len(converter_kwargs) != 2:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
 
+        # setup defaults
         converter_kwargs = converter_kwargs or ({}, {})
+        if (
+            self.bridged_interactions
+            and (maxsize := atomgroup_to_mol.cache_parameters()["maxsize"])
+            and maxsize <= 2
+        ):
+            set_converter_cache_size(2 + len(self.bridged_interactions))
         if n_jobs is None:
             n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
         if residues == "all":
             residues = list(Molecule.from_mda(prot, **converter_kwargs[1]).residues)
-        if n_jobs != 1:
-            return self._run_parallel(
+
+        if self.interactions:
+            if n_jobs == 1:
+                ifp = self._run_serial(
+                    traj,
+                    lig,
+                    prot,
+                    residues=residues,
+                    converter_kwargs=converter_kwargs,
+                    progress=progress,
+                )
+            else:
+                ifp = self._run_parallel(
+                    traj,
+                    lig,
+                    prot,
+                    residues=residues,
+                    converter_kwargs=converter_kwargs,
+                    progress=progress,
+                    n_jobs=n_jobs,
+                )
+            self.ifp = ifp
+
+        if self.bridged_interactions:
+            self._run_bridged_analysis(
                 traj,
                 lig,
                 prot,
                 residues=residues,
                 converter_kwargs=converter_kwargs,
                 progress=progress,
-                n_jobs=n_jobs,
             )
+        return self
 
+    def _run_serial(self, traj, lig, prot, *, residues, converter_kwargs, progress):
+        """Serial implementation for trajectories."""
         iterator = tqdm(traj) if progress else traj
         ifp = {}
         for ts in iterator:
@@ -500,8 +570,7 @@ class Fingerprint:
                 residues=residues,
                 metadata=True,
             )
-        self.ifp = ifp
-        return self
+        return ifp
 
     def _run_parallel(
         self,
@@ -537,8 +606,7 @@ class Fingerprint:
             for ifp_data_chunk in pool.process(args_iterable):
                 ifp.update(ifp_data_chunk)
 
-        self.ifp = ifp
-        return self
+        return ifp
 
     def run_from_iterable(
         self,
@@ -660,6 +728,25 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
+    def _run_bridged_analysis(self, traj, lig, prot, **kwargs):
+        """Implementation of the WaterBridge analysis for trajectories.
+
+        Parameters
+        ----------
+        traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced
+            Iterate over this Universe trajectory or sliced trajectory object
+            to extract the frames used for the fingerprint extraction
+        lig : MDAnalysis.core.groups.AtomGroup
+            An MDAnalysis AtomGroup for the ligand
+        prot : MDAnalysis.core.groups.AtomGroup
+            An MDAnalysis AtomGroup for the protein (with multiple residues)
+        """  # noqa: E501
+        self.ifp = getattr(self, "ifp", {})
+        for interaction in self.bridged_interactions.values():
+            interaction.setup(ifp_store=self.ifp, **kwargs)
+            interaction.run(traj, lig, prot)
+        return self
+
     def to_dataframe(
         self,
         *,
@@ -715,7 +802,7 @@ class Fingerprint:
         if hasattr(self, "ifp"):
             return to_dataframe(
                 self.ifp,
-                self.interactions,
+                self._interactions_list,
                 count=self.count if count is None else count,
                 dtype=dtype,
                 drop_empty=drop_empty,
