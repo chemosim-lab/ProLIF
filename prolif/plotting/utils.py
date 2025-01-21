@@ -18,6 +18,7 @@ separated_interaction_colors = {
     "FaceToFace": "#a22ddc",
     "MetalAcceptor": "#7da982",
     "MetalDonor": "#609267",
+    "WaterBridge": "#323aa8",
 }
 
 grouped_interaction_colors = {
@@ -36,4 +37,5 @@ grouped_interaction_colors = {
     "FaceToFace": "#b559e3",
     "MetalAcceptor": "#7da982",
     "MetalDonor": "#7da982",
+    "WaterBridge": "#323aa8",
 }

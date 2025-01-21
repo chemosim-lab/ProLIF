@@ -395,7 +395,9 @@ class Complex3D:
                     c = Point3D(*get_centroid([p1, p2]))
                     modelID = self._models[lresid]
                     model = v.getModel(modelID, viewer=position)
-                    interaction_label = f"{interaction}: {metadata['distance']:.2f}Å"
+                    interaction_label = (
+                        f"{interaction}: {metadata.get('distance', float('nan')):.2f}Å"
+                    )
                     model.addAtoms(
                         [
                             {
