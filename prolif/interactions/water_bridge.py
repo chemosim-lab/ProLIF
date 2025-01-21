@@ -331,6 +331,9 @@ class WaterBridge(BridgedInteraction):
                 ]
                 for key in ["distance", "DHA_angle"]
             },
+            "distance": sum(
+                data.metadata["distance"] for data in [data_lw, *data_ww_args, data_wp]
+            ),
         }
 
         # store metadata
