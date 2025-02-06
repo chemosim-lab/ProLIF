@@ -1059,6 +1059,7 @@ class Fingerprint:
 
         .. versionchanged:: 2.1.0
             Added the ``show_interaction_data`` argument and exposed the ``fontsize``.
+            Added support for showing WaterBridge interactions.
         """
         from prolif.plotting.network import LigNetwork
 
