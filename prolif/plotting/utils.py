@@ -39,3 +39,13 @@ grouped_interaction_colors = {
     "MetalDonor": "#7da982",
     "WaterBridge": "#323aa8",
 }
+
+
+def metadata_iterator(metadata_tuple: tuple[dict], display_all: bool):
+    if display_all:
+        yield from metadata_tuple
+    else:
+        yield min(
+            metadata_tuple,
+            key=lambda m: m.get("distance", float("nan")),
+        )

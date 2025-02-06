@@ -1144,12 +1144,13 @@ class Fingerprint:
         self,
         ligand_mol: Molecule,
         protein_mol: Molecule,
+        water_mol: Optional[Molecule] = None,
         *,
         frame: int,
         size: Tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
+        remove_hydrogens: Union[bool, Literal["ligand", "protein", "water"]] = True,
     ):
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
@@ -1160,6 +1161,8 @@ class Fingerprint:
             The ligand molecule to display.
         protein_mol : Molecule
             The protein molecule to display.
+        water_mol : Optional[Molecule]
+            Additional molecule (e.g. waters) to display.
         frame : int
             The frame number chosen to select which interactions are going to be
             displayed.
@@ -1172,7 +1175,7 @@ class Fingerprint:
         only_interacting : bool = True
             Whether to show all protein residues in the vicinity of the ligand, or
             only the ones participating in an interaction.
-        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True
+        remove_hydrogens: Union[bool, Literal["ligand", "protein", "water"]] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
 
@@ -1185,16 +1188,17 @@ class Fingerprint:
         .. versionchanged:: 2.1.0
             Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
             Non-polar hydrogen atoms that aren't involved in interactions are now
-            hidden.
+            hidden. Added support for waters involved in WaterBridge interactions.
 
         """
         from prolif.plotting.complex3d import Complex3D
 
         plot3d = Complex3D.from_fingerprint(
             self,
+            ligand_mol,
+            protein_mol,
+            water_mol,
             frame=frame,
-            lig_mol=ligand_mol,
-            prot_mol=protein_mol,
         )
         return plot3d.display(
             size=size,
