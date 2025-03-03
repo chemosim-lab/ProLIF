@@ -1,9 +1,7 @@
 [project]
 name = "prolif"
 description = "Interaction Fingerprints for protein-ligand complexes and more"
-authors = [
-  { name = "Cédric Bouysset", email = "cedric@bouysset.net" },
-]
+authors = [{ name = "Cédric Bouysset", email = "cedric@bouysset.net" }]
 readme = "README.rst"
 requires-python = ">=3.9"
 dynamic = ["version"]
@@ -31,9 +29,9 @@ keywords = [
 ]
 dependencies = [
     "pandas>=1.1.0",
-    "numpy>=1.13.3",
+    "numpy>=1.13.3,<2",
     "scipy>=1.3.0",
-    "mdanalysis>=2.2.0",
+    "mdanalysis>=2.2.0,<3",
     "tqdm",
     "multiprocess",
     "dill",
@@ -43,10 +41,7 @@ dependencies = [
 file = "LICENSE"
 
 [project.optional-dependencies]
-plots = [
-    "py3Dmol",
-    "matplotlib>=3.5",
-]
+plots = ["py3Dmol", "matplotlib>=3.5"]
 tutorials = [
     "rdkit",
     "matplotlib>=3.7",
@@ -55,17 +50,23 @@ tutorials = [
     "pyvis",
     "prolif[plots]",
 ]
-build = [
-    "build",
-]
-tests = [
-    "pytest>=6.1.2",
-    "pytest-cov",
-    "ipython",
-    "prolif[plots]"
+
+[dependency-groups]
+build = ["build"]
+tests = ["pytest>=6.1.2", "pytest-cov", "ipython", "prolif[plots]"]
+docs = [
+    "sphinx==5.3.0",
+    "sphinx-copybutton",
+    "myst-nb<1.0",
+    "ipywidgets",
+    "recommonmark",
+    "sphinx-book-theme",
+    "prolif[tutorials]",
 ]
 dev = [
-    "prolif[build,tests]",
+    { include-group = "build" },
+    { include-group = "tests" },
+    { include-group = "docs" },
 ]
 
 [project.urls]
@@ -74,6 +75,9 @@ Documentation = "https://prolif.readthedocs.io/en/stable/"
 Discussions = "https://github.com/chemosim-lab/ProLIF/discussions"
 Issues = "https://github.com/chemosim-lab/ProLIF/issues"
 Changelog = "https://github.com/chemosim-lab/ProLIF/blob/master/CHANGELOG.md"
+
+[tool.uv]
+default-groups = ["dev"]
 
 [tool.setuptools]
 zip-safe = false
@@ -118,25 +122,25 @@ select = [
     # pyupgrade
     "UP",
     # flake8
-    "B",  # bugbear
-    "SIM",  # simplify
-    "A",  # builtins
-    "COM",  # commas
+    "B",   # bugbear
+    "SIM", # simplify
+    "A",   # builtins
+    "COM", # commas
     "C4",  # comprehensions
-    "ISC",  # implicit-str-concat
-    "ICN",  # import-conventions
-    "PIE",  # pie
-    "T20",  # print
+    "ISC", # implicit-str-concat
+    "ICN", # import-conventions
+    "PIE", # pie
+    "T20", # print
     "PT",  # pytest-style
-    "Q",  # quotes
-    "RET",  # return
-    "ARG",  # unused-arguments
-    "PTH",  # use-pathlib
+    "Q",   # quotes
+    "RET", # return
+    "ARG", # unused-arguments
+    "PTH", # use-pathlib
     # pandas-vet
     "PD",
     # pylint
-    "PLR",  # refactor
-    "PLW",  # warning
+    "PLR", # refactor
+    "PLW", # warning
     # numpy
     "NPY",
     # refurb
@@ -147,11 +151,26 @@ select = [
     "I",
 ]
 ignore = [
-    "PLW1514", "PTH123", "PLR0904", "PLR0911", "PLR0913", "PLR0914", "PLR0915",
-    "PLR0916", "PLR0917", "PLR2004", "PLR6301", "PD901", "PT001", "PT018", "FURB103",
+    "PLW1514",
+    "PTH123",
+    "PLR0904",
+    "PLR0911",
+    "PLR0913",
+    "PLR0914",
+    "PLR0915",
+    "PLR0916",
+    "PLR0917",
+    "PLR2004",
+    "PLR6301",
+    "PD901",
+    "PT001",
+    "PT018",
+    "FURB103",
     "COM812",
     # typing incompatible with 3.9
-    "UP035", "UP006", "UP007",
+    "UP035",
+    "UP006",
+    "UP007",
 ]
 
 [tool.isort]

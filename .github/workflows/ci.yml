@@ -40,53 +40,44 @@ jobs:
           - label: earliest
             os: ubuntu-latest
             python-version: 3.9
-            mamba-deps: "rdkit==2022.09.1"
+            extra-deps: "rdkit==2022.09.1"
             coverage: false
           - label: baseline
             os: ubuntu-latest
             python-version: "3.10"
-            mamba-deps: "rdkit~=2023.03.1"
+            extra-deps: "rdkit~=2023.03.1"
             coverage: true
           - label: latest
             os: ubuntu-latest
             python-version: "3.12"
-            # remove numpy<2 when MDAnalysis 2.8.0 is released
-            mamba-deps: "rdkit 'numpy<2'"
+            extra-deps: "rdkit"
             coverage: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-          auto-update-conda: true
-          use-mamba: true
-          miniforge-variant: Mambaforge
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
-      - name: Check conda and pip
+      - name: Install project and dependencies
         run: |
-          which python
-          python --version
-          pip --version
-          conda --version
-          mamba --version
-
-      - name: Install conda dependencies
-        run: |
-          mamba install uv ${{ matrix.mamba-deps }}
-          mamba list
-
-      - name: Install package through pip
-        run: |
-          uv pip install .[dev]
+          uv sync --group tests 
           uv pip list
 
       - name: Run tests
         run: |
-          pytest --color=yes --disable-pytest-warnings --cov=prolif --cov-report=xml tests/
+          uv run --frozen --with '${{ matrix.extra-deps }}' \
+            pytest \
+              --color=yes \
+              --disable-pytest-warnings \
+              --cov=prolif \
+              --cov-report=xml \
+              tests/
 
       - name: Measure tests coverage
         if: matrix.coverage
