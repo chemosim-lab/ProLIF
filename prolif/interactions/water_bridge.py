@@ -2,7 +2,7 @@
 
 import itertools as it
 from collections import defaultdict
-from typing import TYPE_CHECKING, Iterable, Iterator, Optional, Union
+from typing import TYPE_CHECKING, Iterable, Optional, Union
 
 import networkx as nx
 
@@ -103,16 +103,18 @@ class WaterBridge(BridgedInteraction):
         )
         if self.order >= 2:
             # Run water-water interaction analysis
-            water_ifp: dict[int, IFP] = self.water_fp._run_serial(
+            water_ifp: Optional[dict[int, IFP]] = self.water_fp._run_serial(
                 traj, self.water, self.water, residues=None, **self.kwargs
             )
+        else:
+            water_ifp = None
 
         for frame in lig_water_ifp:
             ifp_lw = lig_water_ifp[frame]  # Ligand → Water
             ifp_wp = water_prot_ifp[frame]  # Water → Protein
             self.ifp.setdefault(frame, IFP())
 
-            if self.order >= 2:
+            if water_ifp is not None:
                 ifp_ww = water_ifp[frame]  # WaterX -> WaterY
                 self._any_order(frame, ifp_lw, ifp_ww, ifp_wp)
 
@@ -148,22 +150,22 @@ class WaterBridge(BridgedInteraction):
             water_ifp: dict[int, IFP] = self.water_fp._run_iter_serial(
                 [self.water], self.water, residues=None, **self.kwargs
             )
-            ifp_ww = water_ifp[0]  # WaterX -> WaterY
+            ifp_ww: Optional[IFP] = water_ifp[0]  # WaterX -> WaterY
+        else:
+            ifp_ww = None
 
         for pose in lig_water_ifp:
             ifp_lw = lig_water_ifp[pose]  # Ligand → Water
             self.ifp.setdefault(pose, IFP())
 
-            if self.order >= 2:
+            if ifp_ww is not None:
                 self._any_order(pose, ifp_lw, ifp_ww, ifp_wp)
 
             else:
                 self._first_order_only(pose, ifp_lw, ifp_wp)
         return self.ifp
 
-    def _first_order_only(
-        self, frame: int, ifp_lw: IFP, ifp_wp: IFP
-    ) -> Iterator[tuple[InteractionData, InteractionData]]:
+    def _first_order_only(self, frame: int, ifp_lw: IFP, ifp_wp: IFP) -> None:
         """Iterates over all relevant combinations of ligand-water-protein"""
         # for each ligand-water interaction
         for data_lw in ifp_lw.interactions():
