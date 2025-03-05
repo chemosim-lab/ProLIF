@@ -180,14 +180,8 @@ def water_u():
 @pytest.fixture(scope="session")
 def water_atomgroups(water_u):
     ligand = water_u.select_atoms("resname QNB")
-    protein = water_u.select_atoms(
-        "protein and byres around 4 group ligand", ligand=ligand
-    )
-    water = water_u.select_atoms(
-        "resname TIP3 and byres around 4 (group ligand or group pocket)",
-        ligand=ligand,
-        pocket=protein,
-    )
+    protein = water_u.select_atoms("protein and resid 399:403")
+    water = water_u.select_atoms("segid WAT and (resid 17 or resid 83)")
     return ligand, protein, water
 
 
