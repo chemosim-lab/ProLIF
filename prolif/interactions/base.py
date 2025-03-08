@@ -9,6 +9,7 @@ import warnings
 from abc import abstractmethod
 from itertools import product
 from math import degrees, radians
+from typing import TYPE_CHECKING, Any, Iterable, Optional
 
 import numpy as np
 from rdkit import Geometry
@@ -17,6 +18,12 @@ from rdkit.Chem import MolFromSmarts
 from prolif.ifp import IFP
 from prolif.interactions.utils import DISTANCE_FUNCTIONS, get_mapindex
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
+
+if TYPE_CHECKING:
+    from MDAnalysis.core.groups import AtomGroup
+
+    from prolif.molecule import Molecule
+    from prolif.typeshed import Trajectory
 
 _INTERACTIONS: dict[str, type["Interaction"]] = {}
 _BRIDGED_INTERACTIONS: dict[str, type["BridgedInteraction"]] = {}
@@ -117,7 +124,7 @@ class Interaction:
 class BridgedInteraction:
     """Base class for bridged interactions."""
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         super().__init_subclass__()
         name = cls.__name__
         register = _BRIDGED_INTERACTIONS
@@ -129,12 +136,12 @@ class BridgedInteraction:
             )
         register[name] = cls
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.ifp = {}
         # force empty setup to initialize args with defaults
         self.setup()
 
-    def setup(self, ifp_store=None, **kwargs) -> None:
+    def setup(self, ifp_store: Optional[dict[int, IFP]] = None, **kwargs: Any) -> None:
         """Setup additional arguments passed at runtime to the fingerprint generator's
         ``run`` method.
         """
@@ -142,7 +149,15 @@ class BridgedInteraction:
         self.kwargs = kwargs
 
     @abstractmethod
-    def run(self, traj, lig, prot) -> dict[int, IFP]:
+    def run(
+        self, traj: "Trajectory", lig: "AtomGroup", prot: "AtomGroup"
+    ) -> dict[int, IFP]:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def run_from_iterable(
+        self, lig_iterable: Iterable["Molecule"], prot_mol: "Molecule"
+    ) -> dict[int, IFP]:
         raise NotImplementedError()
 
 
