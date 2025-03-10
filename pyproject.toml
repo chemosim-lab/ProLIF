@@ -3,7 +3,7 @@ name = "prolif"
 description = "Interaction Fingerprints for protein-ligand complexes and more"
 authors = [{ name = "Cédric Bouysset", email = "cedric@bouysset.net" }]
 readme = "README.rst"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -11,7 +11,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -64,6 +63,7 @@ docs = [
     "prolif[tutorials]",
 ]
 dev = [
+    "ruff==0.9.10",
     { include-group = "build" },
     { include-group = "tests" },
     { include-group = "docs" },

@@ -39,12 +39,12 @@ jobs:
         include:
           - label: earliest
             os: ubuntu-latest
-            python-version: 3.9
+            python-version: 3.10
             extra-deps: "rdkit==2022.09.1"
             coverage: false
           - label: baseline
             os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
             extra-deps: "rdkit~=2023.03.1"
             coverage: true
           - label: latest
