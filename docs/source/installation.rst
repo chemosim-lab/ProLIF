@@ -1,18 +1,6 @@
 Installation
 ------------
 
-Requirements:
-
-* Python 3.8+
-* `RDKit <https://www.rdkit.org/docs/>`_ (2021.03+)
-* `MDAnalysis <https://www.mdanalysis.org/>`_ (2.2+)
-* `Pandas <https://pandas.pydata.org/>`_ (1.0+)
-* `NumPy <https://numpy.org/>`_
-* `SciPy <https://www.scipy.org/scipylib/index.html>`_
-* `tqdm <https://tqdm.github.io/>`_
-* `multiprocess <https://multiprocess.readthedocs.io/>`_
-* `dill <https://dill.readthedocs.io/>`_
-
 The recommanded way to install ProLIF is to use `conda`_.
 
 These first steps are optional and will create a separate environment for ProLIF::
