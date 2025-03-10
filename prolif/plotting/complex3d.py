@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from copy import deepcopy
-from typing import TYPE_CHECKING, ClassVar, Dict, Literal, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 import py3Dmol
 from rdkit import Chem
@@ -50,28 +50,28 @@ class Complex3D:
     ----------
     COLORS : dict
         Dictionnary of colors used in the plot for interactions.
-    LIGAND_STYLE : Dict[str, Dict] = {"stick": {"colorscheme": "cyanCarbon"}}
+    LIGAND_STYLE : dict[str, dict] = {"stick": {"colorscheme": "cyanCarbon"}}
         Style object passed to ``3Dmol.js`` for the ligand.
-    RESIDUES_STYLE : Dict[str, Dict] = {"stick": {}}
+    RESIDUES_STYLE : dict[str, dict] = {"stick": {}}
         Style object passed to ``3Dmol.js`` for the protein residues involved in
         interactions.
-    PROTEIN_STYLE : Dict[str, Dict] = {"cartoon": {"style": "edged"}}
+    PROTEIN_STYLE : dict[str, dict] = {"cartoon": {"style": "edged"}}
         Style object passed to ``3Dmol.js`` for the entire protein.
-    PEPTIDE_STYLE : Dict[str, Dict] = "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"}
+    PEPTIDE_STYLE : dict[str, dict] = "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"}
         Style object passed to ``3Dmol.js`` for the ligand as a peptide if appropriate.
     PEPTIDE_THRESHOLD : int = 2
         Ligands with this number of residues or more will be displayed using
         ``PEPTIDE_STYLE`` in addition to the ``LIGAND_STYLE``.
-    LIGAND_DISPLAYED_ATOM : Dict[str, int]
+    LIGAND_DISPLAYED_ATOM : dict[str, int]
         Which atom should be used to display an atom-to-atom interaction for the ligand.
         Refers to the order defined in the SMARTS pattern used in interaction
         definition. Interactions not specified here use ``0`` by default.
-    PROTEIN_DISPLAYED_ATOM : Dict[str, int]
+    PROTEIN_DISPLAYED_ATOM : dict[str, int]
         Same as :attr:`LIGAND_DISPLAYED_ATOM` for the protein.
-    LIGAND_RING_INTERACTIONS : Set[str]
+    LIGAND_RING_INTERACTIONS : set[str]
         Which interactions should be displayed using the centroid instead of using
         :attr:`LIGAND_DISPLAYED_ATOM` for the ligand.
-    PROTEIN_RING_INTERACTIONS : Set[str]
+    PROTEIN_RING_INTERACTIONS : set[str]
         Which interactions should be displayed using the centroid instead of using
         :attr:`PROTEIN_DISPLAYED_ATOM` for the protein.
     RESIDUE_HOVER_CALLBACK : str
@@ -82,29 +82,29 @@ class Complex3D:
         JavaScript callback executed when the hovering event is finished.
     """  # noqa: E501
 
-    COLORS: ClassVar[Dict[str, str]] = {**separated_interaction_colors}
-    LIGAND_STYLE: ClassVar[Dict] = {"stick": {"colorscheme": "cyanCarbon"}}
-    RESIDUES_STYLE: ClassVar[Dict] = {"stick": {}}
-    PROTEIN_STYLE: ClassVar[Dict] = {"cartoon": {"style": "edged"}}
-    PEPTIDE_STYLE: ClassVar[Dict] = {
+    COLORS: ClassVar[dict[str, str]] = {**separated_interaction_colors}
+    LIGAND_STYLE: ClassVar[dict] = {"stick": {"colorscheme": "cyanCarbon"}}
+    RESIDUES_STYLE: ClassVar[dict] = {"stick": {}}
+    PROTEIN_STYLE: ClassVar[dict] = {"cartoon": {"style": "edged"}}
+    PEPTIDE_STYLE: ClassVar[dict] = {
         "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"},
     }
     PEPTIDE_THRESHOLD: ClassVar[int] = 5
-    LIGAND_DISPLAYED_ATOM: ClassVar[Dict] = {
+    LIGAND_DISPLAYED_ATOM: ClassVar[dict] = {
         "HBDonor": 1,
         "XBDonor": 1,
     }
-    PROTEIN_DISPLAYED_ATOM: ClassVar[Dict] = {
+    PROTEIN_DISPLAYED_ATOM: ClassVar[dict] = {
         "HBAcceptor": 1,
         "XBAcceptor": 1,
     }
-    RING_SYSTEMS: ClassVar[Set[str]] = {
+    RING_SYSTEMS: ClassVar[set[str]] = {
         "PiStacking",
         "EdgeToFace",
         "FaceToFace",
     }
-    LIGAND_RING_INTERACTIONS: ClassVar[Set[str]] = {*RING_SYSTEMS, "PiCation"}
-    PROTEIN_RING_INTERACTIONS: ClassVar[Set[str]] = {*RING_SYSTEMS, "CationPi"}
+    LIGAND_RING_INTERACTIONS: ClassVar[set[str]] = {*RING_SYSTEMS, "PiCation"}
+    PROTEIN_RING_INTERACTIONS: ClassVar[set[str]] = {*RING_SYSTEMS, "CationPi"}
     RESIDUE_HOVER_CALLBACK: ClassVar[str] = """
     function(atom,viewer) {
         if(!atom.label) {
@@ -131,7 +131,7 @@ class Complex3D:
         self.ifp = ifp
         self.lig_mol = lig_mol
         self.prot_mol = prot_mol
-        self._view: Optional[py3Dmol.view] = None
+        self._view: py3Dmol.view | None = None
 
     @classmethod
     def from_fingerprint(
@@ -166,22 +166,22 @@ class Complex3D:
         return cls(ifp, lig_mol, prot_mol)
 
     @staticmethod
-    def get_ring_centroid(mol: Molecule, indices: Tuple[int, ...]) -> Point3D:
+    def get_ring_centroid(mol: Molecule, indices: tuple[int, ...]) -> Point3D:
         centroid = mol.xyz[list(indices)].mean(axis=0)
         return Point3D(*centroid)
 
     def display(
         self,
-        size: Tuple[int, int] = (650, 600),
+        size: tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
+        remove_hydrogens: bool | Literal["ligand", "protein"] = True,
     ) -> Complex3D:
         """Display as a py3Dmol widget view.
 
         Parameters
         ----------
-        size: Tuple[int, int] = (650, 600)
+        size: tuple[int, int] = (650, 600)
             The size of the py3Dmol widget view.
         display_all : bool = False
             Display all occurences for a given pair of residues and interaction, or only
@@ -190,7 +190,7 @@ class Complex3D:
         only_interacting : bool = True
             Whether to show all protein residues in the vicinity of the ligand, or
             only the ones participating in an interaction.
-        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True
+        remove_hydrogens: bool | Literal["ligand", "protein"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
 
@@ -216,12 +216,12 @@ class Complex3D:
         self,
         other: Complex3D,
         *,
-        size: Tuple[int, int] = (900, 600),
+        size: tuple[int, int] = (900, 600),
         display_all: bool = False,
         linked: bool = True,
-        color_unique: Optional[str] = "magentaCarbon",
+        color_unique: str | None = "magentaCarbon",
         only_interacting: bool = True,
-        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
+        remove_hydrogens: bool | Literal["ligand", "protein"] = True,
     ) -> Complex3D:
         """Displays the initial complex side-by-side with a second one for easier
         comparison.
@@ -230,7 +230,7 @@ class Complex3D:
         ----------
         other: Complex3D
             Other ``Complex3D`` object to compare to.
-        size: Tuple[int, int] = (900, 600)
+        size: tuple[int, int] = (900, 600)
             The size of the py3Dmol widget view.
         display_all : bool = False
             Display all occurences for a given pair of residues and interaction, or only
@@ -238,13 +238,13 @@ class Complex3D:
             object.
         linked: bool = True
             Link mouse interactions (pan, zoom, translate) on both views.
-        color_unique: Optional[str] = "magentaCarbon",
+        color_unique: str | None = "magentaCarbon",
             Which color to use for residues that have interactions that are found in one
             complex but not the other. Use ``None`` to disable the color override.
         only_interacting : bool = True
             Whether to show all protein residues in the vicinity of the ligand, or
             only the ones participating in an interaction.
-        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True
+        remove_hydrogens: bool | Literal["ligand", "protein"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
 
@@ -310,12 +310,12 @@ class Complex3D:
 
     def _populate_view(  # noqa: PLR0912
         self,
-        v: Union[py3Dmol.view, Complex3D],
-        position: Tuple[int, int] = (0, 0),
+        v: py3Dmol.view | Complex3D,
+        position: tuple[int, int] = (0, 0),
         display_all: bool = False,
-        colormap: Optional[Dict[ResidueId, str]] = None,
+        colormap: dict[ResidueId, str] | None = None,
         only_interacting: bool = True,
-        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
+        remove_hydrogens: bool | Literal["ligand", "protein"] = True,
     ) -> None:
         if isinstance(v, Complex3D) and v._view:
             v = v._view
@@ -472,9 +472,9 @@ class Complex3D:
     def _add_residue_to_view(
         self,
         v: py3Dmol.view,
-        position: Tuple[int, int],
+        position: tuple[int, int],
         res: Residue,
-        style: Dict,
+        style: dict,
     ) -> None:
         self._mid += 1
         resid = res.resid

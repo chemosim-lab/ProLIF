@@ -12,7 +12,7 @@ Plot interactions as a barcode --- :mod:`prolif.plotting.barcode`
 from __future__ import annotations
 
 from contextlib import suppress
-from typing import TYPE_CHECKING, ClassVar, Dict, List, Literal, Optional, Tuple
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 import numpy as np
 import pandas as pd
@@ -42,7 +42,7 @@ class Barcode:
 
     """
 
-    COLORS: ClassVar[Dict[Optional[str], str]] = {
+    COLORS: ClassVar[dict[str | None, str]] = {
         None: "white",
         **separated_interaction_colors,
     }
@@ -94,20 +94,20 @@ class Barcode:
 
     def display(
         self,
-        figsize: Tuple[int, int] = (8, 10),
+        figsize: tuple[int, int] = (8, 10),
         dpi: int = 100,
         interactive: bool = IS_NOTEBOOK,
         n_frame_ticks: int = 10,
         residues_tick_location: Literal["top", "bottom"] = "top",
         xlabel: str = "Frame",
-        subplots_kwargs: Optional[dict] = None,
-        tight_layout_kwargs: Optional[dict] = None,
+        subplots_kwargs: dict | None = None,
+        tight_layout_kwargs: dict | None = None,
     ):
         """Generate and display the barcode plot.
 
         Parameters
         ----------
-        figsize: Tuple[int, int] = (8, 10)
+        figsize: tuple[int, int] = (8, 10)
             Size of the matplotlib figure.
         dpi: int = 100
             DPI used for the matplotlib figure.
@@ -122,9 +122,9 @@ class Barcode:
             interactions of each residue.
         xlabel: str = "Frame"
             Label displayed for the X axis.
-        subplots_kwargs: Optional[dict] = None
+        subplots_kwargs: dict | None = None
             Other parameters passed to :func:`matplotlib.pyplot.subplots`.
-        tight_layout_kwargs: Optional[dict] = None
+        tight_layout_kwargs: dict | None = None
             Other parameters passed to :meth:`matplotlib.figure.Figure.tight_layout`.
         """
         if subplots_kwargs is None:
@@ -182,7 +182,7 @@ class Barcode:
         ax.yaxis.set_ticks(indices, residues[indices])
 
         # legend
-        values: List[int] = np.unique(self.df.values).tolist()
+        values: list[int] = np.unique(self.df.values).tolist()
         with suppress(ValueError):
             # 0 not in values (e.g. plotting a single frame)
             values.pop(values.index(0))  # remove None color

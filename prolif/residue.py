@@ -5,7 +5,6 @@ Residue-related classes --- :mod:`prolif.residue`
 
 import re
 from collections import UserDict
-from typing import List, Optional
 
 import numpy as np
 from rdkit.Chem.rdmolops import FastFindRings
@@ -38,9 +37,9 @@ class ResidueId:
 
     def __init__(
         self,
-        name: Optional[str] = "UNK",
-        number: Optional[int] = 0,
-        chain: Optional[str] = None,
+        name: str | None = "UNK",
+        number: int | None = 0,
+        chain: str | None = None,
     ):
         self.name = "UNK" if not name else name.strip()
         self.number = number or 0
@@ -187,7 +186,7 @@ class ResidueGroup(UserDict):
     access a subset of a ResidueGroup.
     """
 
-    def __init__(self, residues: List[Residue]):
+    def __init__(self, residues: list[Residue]):
         self._residues = np.asarray(residues, dtype=object)
         resinfo = [
             (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
