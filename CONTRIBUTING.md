@@ -93,16 +93,29 @@ an informative documentation (both in docstrings and tutorials).
 
 4. Verify that your changes pass tests and other requirements.
 
-a. Running tests
-
+We use [poethepoet](https://poethepoet.natn.io/) to define tasks to run in development environments.
+You can run all of the checks detailed below using the command
 ```
-uv run pytest tests/
+uv run poe check
 ```
 
-b. Build the documentation
-
+You can also get a list of available checks with:
 ```
-uv run sphinx-build -M html docs/ docs/_build/
+uv run poe --help
+```
+
+  a. Running tests
+
+To run the test suite, simply execute:
+```
+uv run poe test
+```
+
+  b. Building the documentation
+
+Building the HTML files for the documentation and tutorials can be done with the following command:
+```
+uv run poe docs
 ```
 You can then open the `docs/_build/html/index.html` file with your browser to navigate the docs and
 see any changes that you've made.
@@ -118,11 +131,18 @@ files with a twist for Markdown cells: you can use the
 to format the content. See the [Authoring section](https://myst-parser.readthedocs.io/en/latest/syntax/typography.html)
 for more details.
 
-c. Code formatting and linting
+  c. Code formatting and linting
+
+You can check if your code complies with our code style standards with the following command:
+```
+uv run poe style-check
+```
+
+You can automatically format your changes to match with the style used in this project, as well as
+fixing any lint errors (unused imports, type annotations...etc.) with the following command:
 
 ```
-uv run ruff format
-uv run ruff check --preview --fix
+uv run poe style-fix
 ```
 
 

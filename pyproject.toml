@@ -64,6 +64,8 @@ docs = [
 ]
 dev = [
     "ruff==0.9.10",
+    "black[jupyter]",
+    "poethepoet>=0.33.0",
     { include-group = "build" },
     { include-group = "tests" },
     { include-group = "docs" },
@@ -75,9 +77,6 @@ Documentation = "https://prolif.readthedocs.io/en/stable/"
 Discussions = "https://github.com/chemosim-lab/ProLIF/discussions"
 Issues = "https://github.com/chemosim-lab/ProLIF/issues"
 Changelog = "https://github.com/chemosim-lab/ProLIF/blob/master/CHANGELOG.md"
-
-[tool.uv]
-default-groups = ["dev"]
 
 [tool.setuptools]
 zip-safe = false
@@ -92,9 +91,52 @@ include = ["prolif*"]
 [tool.setuptools.dynamic]
 version = { attr = "prolif._version.__version__" }
 
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.poe.tasks.format-check]
+help = "Checks that the code and notebooks don't require formatting"
+sequence = [
+    { cmd = "ruff format --diff" },
+    { cmd = "black --diff docs/notebooks/" },
+]
+
+[tool.poe.tasks.lint-check]
+help = "Checks if the code requires linting"
+cmd = "ruff check --preview --diff"
+
+[tool.poe.tasks.style-check]
+help = "Runs the formatting and linting checks"
+sequence = [{ ref = "format-check" }, { ref = "lint-check" }]
+
+[tool.poe.tasks.format]
+help = "Formats the code and notebooks"
+sequence = [{ cmd = "ruff format" }, { cmd = "black docs/notebooks/" }]
+
+[tool.poe.tasks.lint]
+help = "Lints the code"
+cmd = "ruff check --preview --fix"
+
+[tool.poe.tasks.style-fix]
+help = "Fixes formatting and linting issues"
+sequence = [{ ref = "format" }, { ref = "lint" }]
+
+[tool.poe.tasks.test]
+help = "Runs the test suite"
+cmd = "pytest"
+
+[tool.poe.tasks.docs]
+help = "Builds the documentation"
+cmd = "sphinx-build -M html docs/ docs/_build/"
+
+[tool.poe.tasks.check]
+help = "Runs all of the checks"
+sequence = [{ ref = "style-check" }, { ref = "test" }, { ref = "docs" }]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff]
-line-length = 88
-target-version = "py39"
 exclude = [
     ".git",
     ".git-rewrite",
@@ -178,6 +220,7 @@ profile = "black"
 
 [tool.black]
 target-version = ["py310", "py311", "py312", "py313"]
+include = '(docs/notebooks/.+\.ipynb)$'
 
 [tool.coverage.report]
 include_namespace_packages = true
