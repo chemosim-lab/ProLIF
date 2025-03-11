@@ -100,6 +100,8 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+# ruff
+.ruff_cache/
 
 # End of https://www.gitignore.io/api/python
 
