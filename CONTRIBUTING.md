@@ -80,7 +80,7 @@ ProLIF much easier.
 - Follow their [installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
 - Navigate to the forked ProLIF repository, and create a virtual environment:
   ```
-  uv sync --python 3.11 --group dev
+  uv sync --python 3.11
   ```
 
 3. Create a working branch and start with your changes!
