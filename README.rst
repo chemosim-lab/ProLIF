@@ -42,6 +42,12 @@ If you have questions on how to use ProLIF, or if you want to give feedback or s
 ideas and new features, please head to the
 `GitHub Discussions <https://github.com/chemosim-lab/ProLIF/discussions>`_ page.
 
+Contributing
+------------
+
+If you are interested in contributing to the project, please read the
+[CONTRIBUTING.md](./CONTRIBUTING.md) document.
+
 Citing ProLIF
 -------------
 

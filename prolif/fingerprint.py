@@ -642,7 +642,7 @@ class Fingerprint:
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
         total = (
             len(lig_iterable)
-            if isinstance(lig_iterable, (Chem.SDMolSupplier, Sized))
+            if isinstance(lig_iterable, Chem.SDMolSupplier | Sized)
             else None
         )
         ifp = {}

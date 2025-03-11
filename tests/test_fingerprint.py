@@ -270,7 +270,9 @@ class TestFingerprint:
     def test_pickle(self, fp_to_pickle, fp_pkled):
         assert fp_to_pickle.interactions.keys() == fp_pkled.interactions.keys()
         assert len(fp_to_pickle.ifp) == len(fp_pkled.ifp)
-        for frame_ifp, frame_pkl_ifp in zip(fp_to_pickle.ifp, fp_pkled.ifp):
+        for frame_ifp, frame_pkl_ifp in zip(
+            fp_to_pickle.ifp, fp_pkled.ifp, strict=True
+        ):
             assert frame_ifp == frame_pkl_ifp
 
     def test_pickle_custom_interaction(self, fp_unpkl):

@@ -192,7 +192,7 @@ class ResidueGroup(UserDict):
             (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
         ]
         try:
-            name, number, chain = zip(*resinfo)
+            name, number, chain = zip(*resinfo, strict=True)
         except ValueError:
             self.name = np.array([], dtype=object)
             self.number = np.array([], dtype=np.uint8)
