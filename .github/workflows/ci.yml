@@ -49,7 +49,7 @@ jobs:
             coverage: true
           - label: latest
             os: ubuntu-latest
-            python-version: "3.12"
+            python-version: "3.13"
             extra-deps: "rdkit"
             coverage: false
 

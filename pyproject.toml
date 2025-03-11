@@ -176,6 +176,9 @@ ignore = [
 [tool.isort]
 profile = "black"
 
+[tool.black]
+target-version = ["py310", "py311", "py312", "py313"]
+
 [tool.coverage.report]
 include_namespace_packages = true
 exclude_lines = [
