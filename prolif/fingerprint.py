@@ -518,9 +518,14 @@ class Fingerprint:
         try:
             n_frames = traj.n_frames
         except AttributeError:
-            # sliced trajectory
-            frames = range(traj.start, traj.stop, traj.step)
-            traj = lig.universe.trajectory
+            if hasattr(traj, "start") and hasattr(traj, "stop") and hasattr(traj, "step"):
+                # sliced trajectory
+                frames = range(traj.start, traj.stop, traj.step)
+                traj = lig.universe.trajectory
+            elif hasattr(traj, "_frames"):
+                # trajectory indices
+                frames = traj._frames
+                traj = lig.universe.trajectory
         else:
             frames = range(n_frames)
         chunks = np.array_split(frames, n_chunks)
