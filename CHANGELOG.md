@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sanitization based on atom types.
 - `sanitize` parameter now available for the `mol2_supplier` and `sdf_supplier` classes.
 - `ruff` linter and formatter.
+- `uv` and `poethepoet` for running local and automated CI pipelines. 
 
 ### Fixed
 
