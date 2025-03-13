@@ -139,21 +139,14 @@ sequence = [{ ref = "style-check" }, { ref = "test" }, { ref = "docs" }]
 testpaths = ["tests"]
 
 [tool.ruff]
-exclude = [
-    ".git",
-    ".git-rewrite",
+extend-exclude = [
+    "*.ipynb",
     ".ipynb_checkpoints",
-    ".mypy_cache",
     ".pytest_cache",
-    ".ruff_cache",
     ".vscode",
-    "__pypackages__",
-    "_build",
     "build",
-    "dist",
     "site-packages",
 ]
-extend-exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
 select = [
