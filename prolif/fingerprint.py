@@ -526,6 +526,10 @@ class Fingerprint:
                 # trajectory indices
                 frames = traj._frames
                 traj = lig.universe.trajectory
+            elif hasattr(traj, "frame"):
+                # single trajectory frame
+                frames = (traj.frame,)
+                traj = lig.universe.trajectory
         else:
             frames = range(n_frames)
         chunks = np.array_split(frames, n_chunks)
