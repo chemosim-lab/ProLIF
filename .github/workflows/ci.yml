@@ -39,54 +39,47 @@ jobs:
         include:
           - label: earliest
             os: ubuntu-latest
-            python-version: 3.9
-            mamba-deps: "rdkit==2022.09.1"
+            python-version: "3.10"
+            uv-sync-args: ""
+            uv-run-args: "--with rdkit==2022.09.1 --with mdanalysis==2.2.0"
             coverage: false
           - label: baseline
             os: ubuntu-latest
-            python-version: "3.10"
-            mamba-deps: "rdkit~=2023.03.1"
+            python-version: "3.11"
+            uv-sync-args: "--locked"
+            uv-run-args: ""
             coverage: true
           - label: latest
             os: ubuntu-latest
-            python-version: "3.12"
-            # remove numpy<2 when MDAnalysis 2.8.0 is released
-            mamba-deps: "rdkit 'numpy<2'"
+            python-version: "3.13"
+            uv-sync-args: "--upgrade"
+            uv-run-args: ""
             coverage: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
-          auto-update-conda: true
-          use-mamba: true
-          miniforge-variant: Mambaforge
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
-      - name: Check conda and pip
+      - name: Install project and dependencies
         run: |
-          which python
-          python --version
-          pip --version
-          conda --version
-          mamba --version
+          uv sync --group tests ${{ matrix.uv-sync-args }}
 
-      - name: Install conda dependencies
+      - name: Show installed environment
         run: |
-          mamba install uv ${{ matrix.mamba-deps }}
-          mamba list
-
-      - name: Install package through pip
-        run: |
-          uv pip install .[dev]
           uv pip list
 
       - name: Run tests
         run: |
-          pytest --color=yes --disable-pytest-warnings --cov=prolif --cov-report=xml tests/
+          uv run ${{ matrix.uv-run-args }} poe test \
+              --cov=prolif \
+              --cov-report=xml
 
       - name: Measure tests coverage
         if: matrix.coverage

@@ -1,3 +1,6 @@
+from typing import Iterator
+
+import matplotlib as mpl
 import MDAnalysis as mda
 import pytest
 from matplotlib import pyplot as plt
@@ -8,6 +11,14 @@ from prolif.plotting.barcode import Barcode
 
 
 class TestBarcode:
+    @pytest.fixture(scope="class", autouse=True)
+    def backend(self) -> Iterator[None]:
+        """Set backend to Agg to avoid TCL bugs with Windows."""
+        backend = mpl.get_backend()
+        mpl.use("Agg")
+        yield
+        mpl.use(backend)
+
     @pytest.fixture(scope="class")
     def simple_fp(self) -> plf.Fingerprint:
         return plf.Fingerprint(count=False)

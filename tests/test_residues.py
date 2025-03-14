@@ -166,13 +166,13 @@ class TestResidueGroup:
 
     def test_init(self, residues):
         rg = ResidueGroup(residues)
-        for rg_res, res in zip(rg._residues, residues):
+        for rg_res, res in zip(rg._residues, residues, strict=True):
             assert rg_res is res
-        for (resid, rg_res), res in zip(rg.items(), residues):
+        for (resid, rg_res), res in zip(rg.items(), residues, strict=True):
             assert rg_res is res
             assert resid is rg_res.resid
         resinfo = [(r.resid.name, r.resid.number, r.resid.chain) for r in residues]
-        name, number, chain = zip(*resinfo)
+        name, number, chain = zip(*resinfo, strict=True)
         assert_equal(rg.name, name)
         assert_equal(rg.number, number)
         assert_equal(rg.chain, chain)

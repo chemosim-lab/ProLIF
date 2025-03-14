@@ -12,7 +12,7 @@ Note that some of the SMARTS patterns used in the interaction classes are inspir
 
 from itertools import product
 from math import degrees, radians
-from typing import Dict, Literal, Optional
+from typing import Literal
 
 from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
@@ -469,7 +469,7 @@ class VdWContact(Interaction):
     def __init__(
         self,
         tolerance: float = 0.0,
-        vdwradii: Optional[Dict[str, float]] = None,
+        vdwradii: dict[str, float] | None = None,
         preset: Literal["mdanalysis", "rdkit", "csd"] = "mdanalysis",
     ) -> None:
         if tolerance >= 0:

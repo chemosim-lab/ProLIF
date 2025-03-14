@@ -42,6 +42,12 @@ If you have questions on how to use ProLIF, or if you want to give feedback or s
 ideas and new features, please head to the
 `GitHub Discussions <https://github.com/chemosim-lab/ProLIF/discussions>`_ page.
 
+Contributing
+------------
+
+If you are interested in contributing to the project, please read the
+[CONTRIBUTING.md](./CONTRIBUTING.md) document.
+
 Citing ProLIF
 -------------
 
@@ -54,7 +60,7 @@ License
 Unless otherwise noted, all files in this directory and all subdirectories are
 distributed under the Apache License, Version 2.0 ::
 
-    Copyright 2017-2023 Cédric BOUYSSET
+    Copyright 2017-2025 Cédric BOUYSSET
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.

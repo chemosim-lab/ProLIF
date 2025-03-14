@@ -11,7 +11,6 @@ works as on other platforms.
 """
 
 import sys
-from typing import Optional
 
 from rdkit import Chem
 
@@ -31,7 +30,7 @@ class RDKitPickleHandler:
         """Get RDKit's current pickle properties option"""
         return Chem.GetDefaultPickleProperties()
 
-    def set(self, pickle_options: Optional[int] = None) -> None:
+    def set(self, pickle_options: int | None = None) -> None:
         """Set RDKit to the specified pickle options (or the one specified
         upon initializing if ``None``).
         """

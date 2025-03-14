@@ -29,7 +29,7 @@ import os
 import warnings
 from collections.abc import Sized
 from functools import wraps
-from typing import Literal, Optional, Tuple, Union
+from typing import Literal
 
 import dill
 import multiprocess as mp
@@ -642,7 +642,7 @@ class Fingerprint:
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
         total = (
             len(lig_iterable)
-            if isinstance(lig_iterable, (Chem.SDMolSupplier, Sized))
+            if isinstance(lig_iterable, Chem.SDMolSupplier | Sized)
             else None
         )
         ifp = {}
@@ -960,21 +960,21 @@ class Fingerprint:
     def plot_barcode(
         self,
         *,
-        figsize: Tuple[int, int] = (8, 10),
+        figsize: tuple[int, int] = (8, 10),
         dpi: int = 100,
         interactive: bool = IS_NOTEBOOK,
         n_frame_ticks: int = 10,
         residues_tick_location: Literal["top", "bottom"] = "top",
         xlabel: str = "Frame",
-        subplots_kwargs: Optional[dict] = None,
-        tight_layout_kwargs: Optional[dict] = None,
+        subplots_kwargs: dict | None = None,
+        tight_layout_kwargs: dict | None = None,
     ):
         """Generate and display a :class:`~prolif.plotting.barcode.Barcode` plot from
         a fingerprint object that has been used to run an analysis.
 
         Parameters
         ----------
-        figsize: Tuple[int, int] = (8, 10)
+        figsize: tuple[int, int] = (8, 10)
             Size of the matplotlib figure.
         dpi: int = 100
             DPI used for the matplotlib figure.
@@ -989,9 +989,9 @@ class Fingerprint:
             interactions of each residue.
         xlabel: str = "Frame"
             Label displayed for the X axis.
-        subplots_kwargs: Optional[dict] = None
+        subplots_kwargs: dict | None = None
             Other parameters passed to :func:`matplotlib.pyplot.subplots`.
-        tight_layout_kwargs: Optional[dict] = None
+        tight_layout_kwargs: dict | None = None
             Other parameters passed to :meth:`matplotlib.figure.Figure.tight_layout`.
 
         See Also
@@ -1020,10 +1020,10 @@ class Fingerprint:
         protein_mol: Molecule,
         *,
         frame: int,
-        size: Tuple[int, int] = (650, 600),
+        size: tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True,
+        remove_hydrogens: bool | Literal["ligand", "protein"] = True,
     ):
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
@@ -1037,7 +1037,7 @@ class Fingerprint:
         frame : int
             The frame number chosen to select which interactions are going to be
             displayed.
-        size: Tuple[int, int] = (650, 600)
+        size: tuple[int, int] = (650, 600)
             The size of the py3Dmol widget view.
         display_all : bool
             Display all occurences for a given pair of residues and interaction, or only
@@ -1046,7 +1046,7 @@ class Fingerprint:
         only_interacting : bool = True
             Whether to show all protein residues in the vicinity of the ligand, or
             only the ones participating in an interaction.
-        remove_hydrogens: Union[bool, Literal["ligand", "protein"]] = True
+        remove_hydrogens: bool | Literal["ligand", "protein"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
 

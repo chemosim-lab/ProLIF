@@ -165,7 +165,7 @@ def test_split_residues():
     )
     residues = [Residue(mol) for mol in split_mol_by_residues(prot)]
     residues.sort(key=lambda x: x.resid)
-    for molres, res in zip(residues, rg.values()):
+    for molres, res in zip(residues, rg.values(), strict=True):
         assert molres.resid == res.resid
         assert molres.HasSubstructMatch(res) and res.HasSubstructMatch(molres)
 

@@ -878,7 +878,7 @@ class LigNetwork:
             Name of the output file, or file-like object
         """
         html = self._get_html(**kwargs)
-        if isinstance(fp, (str, Path)):
+        if isinstance(fp, str | Path):
             with open(fp, "w") as f:
                 f.write(html)
         elif hasattr(fp, "write") and callable(fp.write):
@@ -907,7 +907,7 @@ class LigNetwork:
             """),
         )
 
-    def _repr_html_(self):  # noqa: PLW3201
+    def _repr_html_(self):  # noqa: PLW3201, RUF100
         if self._iframe:
             return self._iframe
         return None

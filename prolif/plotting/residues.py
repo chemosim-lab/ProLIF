@@ -8,7 +8,7 @@ Plot residues --- :mod:`prolif.plotting.residues`
 
 """
 
-from typing import Any, Optional, Tuple
+from typing import Any
 
 from rdkit import Chem
 from rdkit.Chem import Draw
@@ -18,9 +18,9 @@ from prolif.molecule import Molecule
 
 def display_residues(
     mol: Molecule,
-    residues_slice: Optional[slice] = None,
+    residues_slice: slice | None = None,
     *,
-    size: Tuple[int, int] = (200, 140),
+    size: tuple[int, int] = (200, 140),
     mols_per_row: int = 4,
     use_svg: bool = True,
     sanitize: bool = False,
@@ -32,10 +32,10 @@ def display_residues(
     ----------
     mol: prolif.Molecule
         The molecule to show residues from.
-    residues_slice: Optional[slice] = None
+    residues_slice: slice | None = None
         Optionally, a slice of residues to display, e.g. ``slice(20)`` for the first 20
         residues, or ``slice(<start>, <stop>, <step>)`` for a more complex selection.
-    size: Tuple[int, int] = (200, 140)
+    size: tuple[int, int] = (200, 140)
         Size of each residue image.
     mols_per_row: int = 4
         Number of residues displayed per row.
