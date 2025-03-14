@@ -1,4 +1,3 @@
-import os
 import MDAnalysis as mda
 import numpy as np
 import pytest
@@ -141,12 +140,23 @@ class TestFingerprint:
         int_data = ifp[key]
         assert "Hydrophobic" in int_data
 
-    @pytest.mark.parametrize("trajectory_slice", [
-        slice(0, 1),       # test for MDAnalysis.coordinates.base.FrameIteratorSliced
-        0,                 # test for MDAnalysis.coordinates.timestep.Timestep
-        np.array([0, 2]),  # test for MDAnalysis.coordinates.base.FrameIteratorIndices
-    ])
-    def test_run(self, fp_simple, u, ligand_ag, protein_ag, trajectory_slice, tmp_path):
+    @pytest.mark.parametrize(
+        "trajectory_slice",
+        [
+            slice(0, 1),  # test for MDAnalysis.coordinates.base.FrameIteratorSliced
+            0,  # test for MDAnalysis.coordinates.timestep.Timestep
+            np.array(
+                [
+                    0,
+                    2,
+                ]
+            ),  # test for MDAnalysis.coordinates.base.FrameIteratorIndices
+        ],
+    )
+    @pytest.mark.parametrize("n_jobs", [None, 1])
+    def test_run(
+        self, fp_simple, u, ligand_ag, protein_ag, trajectory_slice, n_jobs, tmp_path
+    ):
         if isinstance(trajectory_slice, np.ndarray):
             pdb_path = tmp_path / "multi_frame.pdb"
             with mda.Writer(str(pdb_path), u.atoms.n_atoms) as W:
@@ -158,11 +168,7 @@ class TestFingerprint:
             traj = u.trajectory[trajectory_slice]
 
         fp_simple.run(
-            traj,
-            ligand_ag,
-            protein_ag,
-            residues=None,
-            progress=False,
+            traj, ligand_ag, protein_ag, residues=None, progress=False, n_jobs=n_jobs
         )
 
         assert hasattr(fp_simple, "ifp")

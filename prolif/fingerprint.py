@@ -489,6 +489,9 @@ class Fingerprint:
                 n_jobs=n_jobs,
             )
 
+        # support single frame
+        if hasattr(traj, "frame"):
+            traj = (traj,)
         iterator = tqdm(traj) if progress else traj
         ifp = {}
         for ts in iterator:
@@ -518,7 +521,11 @@ class Fingerprint:
         try:
             n_frames = traj.n_frames
         except AttributeError:
-            if hasattr(traj, "start") and hasattr(traj, "stop") and hasattr(traj, "step"):
+            if (
+                hasattr(traj, "start")
+                and hasattr(traj, "stop")
+                and hasattr(traj, "step")
+            ):
                 # sliced trajectory
                 frames = range(traj.start, traj.stop, traj.step)
                 traj = lig.universe.trajectory
