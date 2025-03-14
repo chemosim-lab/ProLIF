@@ -46,7 +46,7 @@ Contributing
 ------------
 
 If you are interested in contributing to the project, please read the
-[CONTRIBUTING.md](./CONTRIBUTING.md) document.
+`Contribution Guidelines <CONTRIBUTING.md>`_.
 
 Citing ProLIF
 -------------
