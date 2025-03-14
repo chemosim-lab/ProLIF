@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for `FrameIteratorIndices` as trajectories in `fp.run` (PR #246 by @wehs7661).
 - `LigNetwork` now optionally displays the percentage of interaction occurence when
   `show_interaction_data` is enabled. The type of data shown on both the label and
   hover title can be modified (PR #234 by @talagayev).
