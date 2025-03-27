@@ -68,10 +68,12 @@ dev = [
     "ruff==0.9.10",
     "black[jupyter]",
     "poethepoet>=0.33.0",
-    "mypy>=1.0.0",
     { include-group = "build" },
     { include-group = "tests" },
     { include-group = "docs" },
+]
+type-check = [
+    "mypy >=1.0.0",
 ]
 
 [project.urls]
@@ -136,9 +138,26 @@ cmd = "sphinx-build -M html docs/ docs/_build/"
 help = "Runs all of the checks"
 sequence = [{ ref = "style-check" }, { ref = "test" }, { ref = "docs" }]
 
-[tool.poe.tasks.mypy]
+[tool.mypy]
+python_version = 3.10
+disallow_untyped_defs = true
+allow_redefinition = true
+disallow_any_unimported = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_return_any = true
+warn_unreachable = true
+show_error_context = true
+
+[[tool.mypy.overrides]]
+module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*"]
+ignore_missing_imports = true
+
+[tool.poe.tasks.type-check]
 help = "Run mypy to check type hints across the codebase"
-cmd = "mypy prolif tests"
+cmd = "mypy ${FILE_PATHS}"
+args = [{ name = "FILE_PATHS", positional = true, multiple = true, default = "." }]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

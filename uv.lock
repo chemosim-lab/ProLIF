@@ -2016,7 +2016,6 @@ dev = [
     { name = "build" },
     { name = "ipython" },
     { name = "ipywidgets" },
-    { name = "mypy" },
     { name = "myst-nb" },
     { name = "poethepoet" },
     { name = "prolif", extra = ["plots", "tutorials"] },
@@ -2042,6 +2041,9 @@ tests = [
     { name = "prolif", extra = ["plots"] },
     { name = "pytest" },
     { name = "pytest-cov" },
+]
+type-check = [
+    { name = "mypy" },
 ]
 
 [package.metadata]
@@ -2072,7 +2074,6 @@ dev = [
     { name = "build" },
     { name = "ipython" },
     { name = "ipywidgets" },
-    { name = "mypy", specifier = ">=1.0.0" },
     { name = "myst-nb", specifier = "<1.0" },
     { name = "poethepoet", specifier = ">=0.33.0" },
     { name = "prolif", extras = ["plots"] },
@@ -2100,6 +2101,7 @@ tests = [
     { name = "pytest", specifier = ">=6.1.2" },
     { name = "pytest-cov" },
 ]
+type-check = [{ name = "mypy", specifier = ">=1.0.0" }]
 
 [[package]]
 name = "prompt-toolkit"
