@@ -77,12 +77,12 @@ class Fingerprint:
     ----------
     interactions : list
         List of names (str) of interaction classes as found in the
-        :mod:`prolif.interactions` module. Defaults to Hydrophobic, HBDonor, HBAcceptor,
+        :mod:`~prolif.interactions.interactions` module. Defaults to Hydrophobic, HBDonor, HBAcceptor,
         PiStacking, Anionic, Cationic, CationPi, PiCation, VdWContact.
     parameters : dict, optional
         New parameters for the interactions. Mapping between an interaction name and a
         dict of parameters as they appear in the interaction class (see the
-        :mod:`prolif.interactions` module's documentation for all classes parameters)::
+        :mod:`~prolif.interactions.interactions` module's documentation for all classes parameters)::
 
             >>> fp = plf.Fingerprint(parameters={"Hydrophobic": {"distance": 3.8}})
 
