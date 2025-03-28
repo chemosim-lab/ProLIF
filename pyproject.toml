@@ -66,6 +66,9 @@ docs = [
 ]
 type-check = [
     "mypy>=1.0.0",
+    "rdkit>=2024.03.2",
+    "pandas-stubs",
+    "types-tqdm",
 ]
 dev = [
     "ruff==0.9.10",
