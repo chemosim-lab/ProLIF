@@ -1,5 +1,4 @@
 version = 1
-revision = 1
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -2016,6 +2015,7 @@ dev = [
     { name = "build" },
     { name = "ipython" },
     { name = "ipywidgets" },
+    { name = "mypy" },
     { name = "myst-nb" },
     { name = "poethepoet" },
     { name = "prolif", extra = ["plots", "tutorials"] },
@@ -2074,6 +2074,7 @@ dev = [
     { name = "build" },
     { name = "ipython" },
     { name = "ipywidgets" },
+    { name = "mypy", specifier = ">=1.0.0" },
     { name = "myst-nb", specifier = "<1.0" },
     { name = "poethepoet", specifier = ">=0.33.0" },
     { name = "prolif", extras = ["plots"] },

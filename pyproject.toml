@@ -64,6 +64,9 @@ docs = [
     "sphinx-book-theme",
     "prolif[tutorials]",
 ]
+type-check = [
+    "mypy>=1.0.0",
+]
 dev = [
     "ruff==0.9.10",
     "black[jupyter]",
@@ -71,9 +74,7 @@ dev = [
     { include-group = "build" },
     { include-group = "tests" },
     { include-group = "docs" },
-]
-type-check = [
-    "mypy >=1.0.0",
+    { include-group = "type-check" },
 ]
 
 [project.urls]
@@ -139,7 +140,7 @@ help = "Runs all of the checks"
 sequence = [{ ref = "style-check" }, { ref = "test" }, { ref = "docs" }]
 
 [tool.mypy]
-python_version = 3.10
+python_version = "3.10"
 disallow_untyped_defs = true
 allow_redefinition = true
 disallow_any_unimported = true
@@ -149,6 +150,7 @@ warn_no_return = true
 warn_return_any = true
 warn_unreachable = true
 show_error_context = true
+exclude = "docs/conf.py"
 
 [[tool.mypy.overrides]]
 module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*"]
