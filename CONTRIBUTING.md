@@ -144,7 +144,20 @@ fixing any lint errors (unused imports, type annotations...etc.) with the follow
 ```
 uv run poe style-fix
 ```
+  d. Running type checks
 
+You can verify that your changes meet the project's type-checking requirements (currently we use `mypy` for type checking) by running the following command:
+
+```
+uv run poe type-check
+```
+
+By default, this will check the entire codebase. You can also specify optional file paths to limit the scope of the check:
+
+```
+uv run poe type-check prolif/fingerprint.py
+```
+This will run the type-check for the specific file mentioned, you can also mention a specific directory.
 
 ### Commit your update
 

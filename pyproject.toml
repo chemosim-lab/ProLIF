@@ -69,6 +69,8 @@ type-check = [
     "rdkit>=2024.03.2",
     "pandas-stubs",
     "types-tqdm",
+    "types-setuptools",
+    "scipy-stubs",
 ]
 dev = [
     "ruff==0.9.10",
