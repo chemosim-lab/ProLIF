@@ -1,5 +1,5 @@
 """
-Type hints checker using mypy.
+Prints a tree with the current status of files with respect to type checking.
 """
 
 import json
@@ -17,69 +17,59 @@ logger = logging.getLogger(__name__)
 
 def main():
     # Setup
-    script_dir = Path(__file__).resolve().parent
-    dirs = sys.argv[1:] or [
-        script_dir.parent / "prolif",
-        script_dir.parent / "tests",
+    script_path = Path(__file__).resolve().parent
+    paths = sys.argv[1:] or [
+        script_path.parent / "prolif",
+        script_path.parent / "tests",
     ]
-    dirs = [d for d in dirs if Path(d).exists()]
-    if not dirs:
-        logger.error("Error: No valid directories found")
-        return
-
+    paths = [p for p in paths if Path(p).exists()]
+    if not paths:
+        raise ValueError("Error: No valid paths found")
     # Find Python files
-    files = [
-        (d, Path(root) / f, str(Path(root) / f))
-        for d in dirs
-        for root, _, fs in subprocess.os.walk(d)
-        for f in fs
-        if f.endswith(".py")
-    ]
+    files = []
+    for p in paths:
+        if (path := Path(p)).is_file():
+            if path.suffix == ".py":
+                files.append(path)
+        else:
+            files.extend(path.glob("**/*.py"))
 
+   # Check that there's at least one file to run the type checking on (and log how many files in total) else raise an error
     logger.info(f"Found {len(files)} Python files")
+    if not files:
+        raise ValueError("No Python files found to run type checking on")
 
-    # Run mypy once
+   # Run mypy once
     logger.info("Running mypy...")
     with tempfile.NamedTemporaryFile(suffix=".json") as tmp:
-        # Try JSON output
+        #Use JSON output
         subprocess.run(
-            ["mypy", "--disallow-untyped-defs", "--json-report", tmp.name, *dirs],
-            check=False,
+            ["mypy", "--disallow-untyped-defs", "--json-report", tmp.name, *paths],
+            check=True, #Check the return code of the process
             capture_output=True,
         )
-        try:
-            with open(tmp.name) as f:
-                mypy_data = json.load(f)
-            error_files = {error["file"] for error in mypy_data.get("errors", [])}
-        except (json.JSONDecodeError, FileNotFoundError):
-            # Fall back to text parsing
-            result = subprocess.run(
-                ["mypy", "--disallow-untyped-defs", *dirs],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            error_files = {
-                line.split(":", 1)[0]
-                for line in result.stdout.splitlines() + result.stderr.splitlines()
-                if ": error:" in line and line.split(":", 1)[0].endswith(".py")
-            }
-
+    
+        with open(tmp.name) as f:
+            mypy_data = json.load(f)
+    
+    error_files = {error["file"] for error in mypy_data.get("errors", [])}
     # Build tree
     tree = defaultdict(lambda: defaultdict(list))
-    for base_dir, rel_path, abs_path in sorted(files):
-        parts = Path(rel_path).parts
+    for path in sorted(files):
+        base_dir = paths[0]  
+        rel_path = path.relative_to(base_dir) if path.is_relative_to(base_dir) else path
+        parts = rel_path.parts
         subdir = str(Path(*parts[:-1])) if len(parts) > 1 else ""
-        tree[base_dir][subdir].append((parts[-1], abs_path not in error_files))
+        tree[base_dir][subdir].append((parts[-1], str(path) not in error_files))
 
     # Print tree
-    logger.info("\nType Hints Status:")
-    logger.info(".")
+    print("\nType Hints Status:")
+    print(".")
     for base_dir in sorted(tree):
-        logger.info(f"├── {Path(base_dir).name}")
-        for _i, (subdir, files_in_dir) in enumerate(sorted(tree[base_dir].items())):
+        print(f"├── {Path(base_dir).name}")
+        for i, (subdir, files_in_dir) in enumerate(sorted(tree[base_dir].items())):
             if subdir:
-                logger.info(f"│   ├── {subdir}")
+                print(f"│   ├── {subdir}")
                 prefix = "│   │   "
             else:
                 prefix = "│   "
@@ -87,15 +77,15 @@ def main():
             for j, (filename, has_types) in enumerate(sorted(files_in_dir)):
                 is_last = j == len(files_in_dir) - 1
                 checkbox = "[x]" if has_types else "[ ]"
-                logger.info(
+                print(
                     f"{prefix}{'└── ' if is_last else '├── '}{checkbox} {filename}"
                 )
 
     # Print summary
-    typed = sum(1 for _, _, path in files if path not in error_files)
+    typed = sum(1 for path in files if str(path) not in error_files)
     total = len(files)
     percentage = (typed / total * 100) if total else 0
-    logger.info(
+    print(
         f"\nSummary: {typed}/{total} files have complete type hints ({percentage:.1f}%)"
     )
 
