@@ -64,6 +64,14 @@ docs = [
     "sphinx-book-theme",
     "prolif[tutorials]",
 ]
+type-check = [
+    "mypy>=1.0.0",
+    "rdkit>=2024.03.2",
+    "pandas-stubs",
+    "types-tqdm",
+    "types-setuptools",
+    "scipy-stubs",
+]
 dev = [
     "ruff==0.9.10",
     "black[jupyter]",
@@ -71,6 +79,7 @@ dev = [
     { include-group = "build" },
     { include-group = "tests" },
     { include-group = "docs" },
+    { include-group = "type-check" },
 ]
 
 [project.urls]
@@ -134,6 +143,28 @@ cmd = "sphinx-build -M html docs/ docs/_build/"
 [tool.poe.tasks.check]
 help = "Runs all of the checks"
 sequence = [{ ref = "style-check" }, { ref = "test" }, { ref = "docs" }]
+
+[tool.mypy]
+python_version = "3.10"
+disallow_untyped_defs = true
+allow_redefinition = true
+disallow_any_unimported = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_return_any = true
+warn_unreachable = true
+show_error_context = true
+exclude = "docs/conf.py"
+
+[[tool.mypy.overrides]]
+module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*"]
+ignore_missing_imports = true
+
+[tool.poe.tasks.type-check]
+help = "Run mypy to check type hints across the codebase"
+cmd = "mypy ${FILE_PATHS}"
+args = [{ name = "FILE_PATHS", positional = true, multiple = true, default = "." }]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
