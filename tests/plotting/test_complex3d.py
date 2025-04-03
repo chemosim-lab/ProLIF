@@ -68,3 +68,13 @@ class TestComplex3D:
         view = fp.plot_3d(lig_mol, prot_mol, frame=0, display_all=fp.count)
         html = view._view._make_html()
         assert "Hydrophobic" in html
+
+    def test_water(self, water_mols):
+        ligand, protein, water = water_mols
+        fp = plf.Fingerprint(
+            ["HBDonor", "WaterBridge"], parameters={"WaterBridge": {"water": water}}
+        )
+        fp.run_from_iterable([ligand], protein)
+        view = fp.plot_3d(ligand, protein, water, frame=0)
+        html = view._view._make_html()
+        assert "TIP383.X" in html
