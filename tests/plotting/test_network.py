@@ -1,5 +1,5 @@
 from functools import partial
-from io import StringIO
+from html import escape
 
 import MDAnalysis as mda
 import pytest
@@ -45,21 +45,18 @@ class TestLigNetwork:
             frame=0,
             display_all=fp.count,
         )
-        with StringIO() as buffer:
-            net.save(buffer)
-            buffer.seek(0)
-            html = buffer.read()
-        assert '"from": 18, "to": "PHE351.B", "title": "Hydrophobic' in html
+        view = net.display()
+        assert view._iframe
+        html = view._iframe
+        assert escape('"from": 18, "to": "PHE351.B", "title": "Hydrophobic') in html
         if fp.count:
-            assert '"from": 19, "to": "PHE351.B", "title": "Hydrophobic' in html
+            assert escape('"from": 19, "to": "PHE351.B", "title": "Hydrophobic') in html
 
     def test_integration_agg(self, get_ligplot):
         net = get_ligplot(kind="aggregate", threshold=0)
-        with StringIO() as buffer:
-            net.save(buffer)
-            buffer.seek(0)
-            html = buffer.read()
-        assert "PHE331.B" in html
+        view = net.display()
+        assert view._iframe
+        assert "PHE331.B" in view._iframe
 
     def test_kwargs(self, get_ligplot):
         net = get_ligplot(
@@ -69,11 +66,9 @@ class TestLigNetwork:
             rotation=42,
             carbon=0,
         )
-        with StringIO() as buffer:
-            net.save(buffer)
-            buffer.seek(0)
-            html = buffer.read()
-        assert "PHE331.B" in html
+        view = net.display()
+        assert view._iframe
+        assert "PHE331.B" in view._iframe
 
     def test_save_file(self, get_ligplot, tmp_path):
         net = get_ligplot()
@@ -94,7 +89,24 @@ class TestLigNetwork:
         ):
             LigNetwork.from_fingerprint(fp, ligand_mol)
 
+    def test_show_interaction_data(self, fp_mol):
+        fp, lig_mol = fp_mol
+        view = fp.plot_lignetwork(lig_mol, show_interaction_data=True)
+        assert view._iframe
+        assert "50%" in view._iframe
+
     def test_fp_plot_lignetwork(self, fp_mol):
         fp, lig_mol = fp_mol
         view = fp.plot_lignetwork(lig_mol, kind="frame", frame=0, display_all=fp.count)
+        assert view._iframe
         assert "<iframe" in view._iframe
+
+    def test_water(self, water_mols):
+        ligand, protein, water = water_mols
+        fp = plf.Fingerprint(
+            ["HBDonor", "WaterBridge"], parameters={"WaterBridge": {"water": water}}
+        )
+        fp.run_from_iterable([ligand], protein)
+        view = fp.plot_lignetwork(ligand, kind="frame", frame=0)
+        assert view._iframe
+        assert "TIP383.X" in view._iframe
