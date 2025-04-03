@@ -5,17 +5,15 @@ Residue-related classes --- :mod:`prolif.residue`
 
 import re
 from collections import UserDict
-from typing import TYPE_CHECKING, cast
-
-from numpy.typing import NDArray
-
-if TYPE_CHECKING:
-    from rdkit import Chem
+from typing import TYPE_CHECKING, Any, Iterable, Sequence, cast
 
 import numpy as np
 from rdkit.Chem.rdmolops import FastFindRings
 
 from prolif.rdkitmol import BaseRDKitMol
+
+if TYPE_CHECKING:
+    from rdkit import Chem
 
 _RE_RESID = re.compile(r"(TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?(\d*)\.?(\w)?")
 
@@ -175,7 +173,7 @@ class Residue(BaseRDKitMol):
         return str(self.resid)
 
 
-class ResidueGroup(UserDict["ResidueId", "Residue"]):
+class ResidueGroup(UserDict[ResidueId, Residue]):
     """A container to store and retrieve Residue instances easily
 
     Parameters
@@ -196,8 +194,8 @@ class ResidueGroup(UserDict["ResidueId", "Residue"]):
     access a subset of a ResidueGroup.
     """
 
-    def __init__(self, residues: list["Residue"]):
-        self._residues = np.asarray(residues, dtype=object)
+    def __init__(self, residues: Iterable[Residue]):
+        self._residues = cast(Sequence[Residue], np.asarray(residues, dtype=object))
         resinfo = [
             (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
         ]
@@ -213,7 +211,7 @@ class ResidueGroup(UserDict["ResidueId", "Residue"]):
             self.chain = np.asarray(chain, dtype=object)
         super().__init__([(r.resid, r) for r in self._residues])
 
-    def __getitem__(self, key: ResidueId | int | str) -> "Residue":
+    def __getitem__(self, key: ResidueId | int | str) -> Residue:
         # bool is a subclass of int but shouldn't be used here
         if isinstance(key, bool):
             raise KeyError(
@@ -221,7 +219,7 @@ class ResidueGroup(UserDict["ResidueId", "Residue"]):
                 " instead",
             )
         if isinstance(key, int):
-            return cast("Residue", self._residues[key])
+            return self._residues[key]
         if isinstance(key, str):
             key = ResidueId.from_string(key)
             return self.data[key]
@@ -231,7 +229,7 @@ class ResidueGroup(UserDict["ResidueId", "Residue"]):
             f"Expected a ResidueId, int, or str, got {type(key).__name__!r} instead",
         )
 
-    def select(self, mask: NDArray[np.bool_]) -> "ResidueGroup":
+    def select(self, mask: Any) -> Any:
         """Locate a subset of a ResidueGroup based on a boolean mask
 
         Parameters
@@ -271,7 +269,7 @@ class ResidueGroup(UserDict["ResidueId", "Residue"]):
             * NOT --> ``~``
 
         """
-        return ResidueGroup(self._residues[mask].tolist())
+        return ResidueGroup(self._residues[mask])
 
     def __repr__(self) -> str:  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
