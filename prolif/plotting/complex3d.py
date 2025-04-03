@@ -341,6 +341,7 @@ class Complex3D:
         remove_hydrogens: Union[bool, Literal["ligand", "protein", "water"]] = True,
     ) -> None:
         if isinstance(v, Complex3D) and v._view:
+            # backwards compatibility for when display/compare used to return the view
             v = v._view
         self._colormap = {} if colormap is None else colormap
         self._models = {}
@@ -613,7 +614,7 @@ class Complex3D:
             )
         return getattr(self._view, name)
 
-    def _repr_html_(self):  # noqa: PLW3201
+    def _repr_html_(self):  # pragma: no cover # noqa: PLW3201
         if self._view:
             return self._view._repr_html_()
         return None
