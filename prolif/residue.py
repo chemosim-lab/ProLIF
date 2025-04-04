@@ -133,9 +133,7 @@ class ResidueId:
         +-----------+----------------------------------+
 
         """
-        matches = _RE_RESID.search(resid_str)
-        if matches is None:
-            return cls()
+        matches = cast(re.Match, _RE_RESID.search(resid_str))
         name, number, chain = matches.groups()
         number = int(number) if number else 0
         return cls(name, number, chain)
@@ -229,7 +227,7 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
             f"Expected a ResidueId, int, or str, got {type(key).__name__!r} instead",
         )
 
-    def select(self, mask: Any) -> Any:
+    def select(self, mask: Any) -> "ResidueGroup":
         """Locate a subset of a ResidueGroup based on a boolean mask
 
         Parameters
