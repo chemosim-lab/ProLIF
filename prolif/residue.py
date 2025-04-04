@@ -5,11 +5,15 @@ Residue-related classes --- :mod:`prolif.residue`
 
 import re
 from collections import UserDict
+from typing import TYPE_CHECKING, Any, Iterable, Sequence, cast
 
 import numpy as np
 from rdkit.Chem.rdmolops import FastFindRings
 
 from prolif.rdkitmol import BaseRDKitMol
+
+if TYPE_CHECKING:
+    from rdkit import Chem
 
 _RE_RESID = re.compile(r"(TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?(\d*)\.?(\w)?")
 
@@ -45,27 +49,29 @@ class ResidueId:
         self.number = number or 0
         self.chain = None if not chain else chain.strip()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ResidueId({self.name}, {self.number}, {self.chain})"
 
-    def __str__(self):
+    def __str__(self) -> str:
         resid = f"{self.name}{self.number}"
         if self.chain:
             return f"{resid}.{self.chain}"
         return resid
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.name, self.number, self.chain))
 
-    def __eq__(self, other: "ResidueId"):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ResidueId):
+            return NotImplemented
         return (self.name, self.number, self.chain) == (
             other.name,
             other.number,
             other.chain,
         )
 
-    def __lt__(self, other: "ResidueId"):
-        def chain_key(chain):
+    def __lt__(self, other: "ResidueId") -> bool:
+        def chain_key(chain: str | None) -> tuple[bool, str | None]:
             # Handles the case where the two chains are of different types
             # e.g., None from WAT123, and str from ALA42.A
             return (chain is not None, chain)
@@ -76,7 +82,7 @@ class ResidueId:
         )
 
     @classmethod
-    def from_atom(cls, atom):
+    def from_atom(cls, atom: "Chem.Atom") -> "ResidueId":
         """Creates a ResidueId from an RDKit atom
 
         Parameters
@@ -93,7 +99,7 @@ class ResidueId:
         return cls()
 
     @classmethod
-    def from_string(cls, resid_str):
+    def from_string(cls, resid_str: str) -> "ResidueId":
         """Creates a ResidueId from a string
 
         Parameters
@@ -127,7 +133,7 @@ class ResidueId:
         +-----------+----------------------------------+
 
         """
-        matches = _RE_RESID.search(resid_str)
+        matches = cast(re.Match, _RE_RESID.search(resid_str))
         name, number, chain = matches.groups()
         number = int(number) if number else 0
         return cls(name, number, chain)
@@ -152,20 +158,20 @@ class Residue(BaseRDKitMol):
     ``str(Residue)``
     """
 
-    def __init__(self, mol):
+    def __init__(self, mol: "Chem.Mol"):
         super().__init__(mol)
         FastFindRings(self)
         self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0))
 
-    def __repr__(self):  # pragma: no cover
+    def __repr__(self) -> str:  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         return f"<{name} {self.resid} at {id(self):#x}>"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.resid)
 
 
-class ResidueGroup(UserDict):
+class ResidueGroup(UserDict[ResidueId, Residue]):
     """A container to store and retrieve Residue instances easily
 
     Parameters
@@ -186,8 +192,8 @@ class ResidueGroup(UserDict):
     access a subset of a ResidueGroup.
     """
 
-    def __init__(self, residues: list[Residue]):
-        self._residues = np.asarray(residues, dtype=object)
+    def __init__(self, residues: Iterable[Residue]):
+        self._residues = cast(Sequence[Residue], np.asarray(residues, dtype=object))
         resinfo = [
             (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
         ]
@@ -203,7 +209,7 @@ class ResidueGroup(UserDict):
             self.chain = np.asarray(chain, dtype=object)
         super().__init__([(r.resid, r) for r in self._residues])
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: ResidueId | int | str) -> Residue:
         # bool is a subclass of int but shouldn't be used here
         if isinstance(key, bool):
             raise KeyError(
@@ -221,7 +227,7 @@ class ResidueGroup(UserDict):
             f"Expected a ResidueId, int, or str, got {type(key).__name__!r} instead",
         )
 
-    def select(self, mask):
+    def select(self, mask: Any) -> "ResidueGroup":
         """Locate a subset of a ResidueGroup based on a boolean mask
 
         Parameters
@@ -263,10 +269,10 @@ class ResidueGroup(UserDict):
         """
         return ResidueGroup(self._residues[mask])
 
-    def __repr__(self):  # pragma: no cover
+    def __repr__(self) -> str:  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
         return f"<{name} with {self.n_residues} residues at {id(self):#x}>"
 
     @property
-    def n_residues(self):
+    def n_residues(self) -> int:
         return len(self)
