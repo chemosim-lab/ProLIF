@@ -117,6 +117,7 @@ class TestResidueId:
         res1 = ResidueId(name, number, chain)
         res2 = ResidueId(name, number, chain)
         assert res1 == res2
+        assert res1.__eq__(42) is NotImplemented
 
     @pytest.mark.parametrize(
         ("res1", "res2"),
