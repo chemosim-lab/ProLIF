@@ -7,15 +7,16 @@ import json
 import logging
 import subprocess
 import sys
-from collections import defaultdict
+from collections import Counter
 from pathlib import Path
+from typing import Any, Iterable, Sequence
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
-def get_files(paths):
+def get_files(paths: Iterable[str]) -> list[Path]:
     """Find all Python files in the given paths."""
     files = []
     for p in paths:
@@ -27,7 +28,7 @@ def get_files(paths):
     return files
 
 
-def process_mypy_output(result):
+def process_mypy_output(result: subprocess.CompletedProcess[str]) -> Counter[str]:
     """Process mypy JSON output and extract error files."""
     if result.stdout.strip():
         json_dump = "[" + result.stdout.replace("\n", ",\n")[:-2] + "]"
@@ -36,57 +37,52 @@ def process_mypy_output(result):
         mypy_data = []
 
     # Extract error files
-    return {error["file"] for error in mypy_data}
+    return Counter(error["file"] for error in mypy_data)
 
 
-def build_file_tree(files, error_files):
+def set_nested_value(d: dict, keys: Sequence, value: Any) -> None:
+    """Set value in nested dict."""
+    for key in keys[:-1]:
+        d = d.setdefault(key, {})
+    d[keys[-1]] = value
+
+
+def build_file_tree(
+    files: list[Path], error_files: Counter[str]
+) -> tuple[dict[str, dict | int], int]:
     """Build a tree structure of files for display and count typed files."""
-    tree = defaultdict(list)
+    tree: dict[str, dict | int] = {}
     typed_count = 0
 
     for path in sorted(files):
-        # Get path as string
-        path_str = str(path)
-
-        # Get parts for display
-        parts = path.parts
-
-        # Create subdir string (everything except filename)
-        subdir = str(Path(*parts[:-1])) if len(parts) > 1 else ""
-
         # Check if file has type errors
-        has_types = path_str not in error_files
-        if has_types:
+        error_count = error_files.get(str(path), 0)
+        if error_count == 0:
             typed_count += 1
-
-        # Just use the filename for display
-        display_name = parts[-1]
-
-        tree[subdir].append((display_name, has_types))
+        set_nested_value(tree, path.parts, error_count)
     return tree, typed_count
 
 
-def print_tree(tree):
+def print_tree(tree: dict[str, dict | int], prefix: str = "") -> None:
     """Print the tree of files with type hint status."""
-    # Using logger for the header
-    logger.info("\nType Hints Status:")
     # Intentionally using print for the tree itself to output to stdout
-    print(".")
+    if not prefix:
+        print(".")
 
-    for subdir, files_in_dir in sorted(tree.items()):
-        if subdir:
-            print(f"├── {subdir}")
-            prefix = "│   "
+    for i, (name, value) in enumerate(sorted(tree.items())):
+        is_last = i == len(tree) - 1
+        branch = "└" if is_last else "├"
+        if isinstance(value, dict):
+            print(f"{prefix}{branch}── {name}")
+            branch = " " if is_last else "│"
+            print_tree(value, f"{prefix}{branch}   ")
         else:
-            prefix = ""
-
-        for j, (filename, has_types) in enumerate(sorted(files_in_dir)):
-            is_last = j == len(files_in_dir) - 1
-            checkbox = "[x]" if has_types else "[ ]"
-            print(f"{prefix}{'└── ' if is_last else '├── '}{checkbox} {filename}")
+            checkbox = "[ ]" if value else "[x]"
+            suffix = f": {value}" if value else ""
+            print(f"{prefix}{branch}── {checkbox} {name}{suffix}")
 
 
-def print_summary(typed, total):
+def print_summary(typed: int, total: int) -> None:
     """Print summary statistics."""
     percentage = (typed / total * 100) if total > 0 else 0
     print(
@@ -94,16 +90,7 @@ def print_summary(typed, total):
     )
 
 
-def main():
-    # Setup - use current working directory
-    base_dir = Path()
-
-    # Use command line arguments or default paths
-    paths = sys.argv[1:] or [
-        base_dir / "prolif",
-        base_dir / "tests",
-    ]
-
+def main(paths: Sequence[str]) -> None:
     # Filter to only existing paths
     paths = [p for p in paths if Path(p).exists()]
     if not paths:
@@ -133,6 +120,7 @@ def main():
     tree, typed_count = build_file_tree(files, error_files)
 
     # Print tree
+    logger.info("Type Hints Status:")
     print_tree(tree)
 
     # Print summary
@@ -141,4 +129,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # Use command line arguments or default paths
+    paths = sys.argv[1:] or ["prolif", "scripts", "tests"]
+    main(paths)
