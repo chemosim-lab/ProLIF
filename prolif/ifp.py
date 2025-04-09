@@ -4,7 +4,7 @@ Storing interactions --- :mod:`prolif.ifp`
 """
 
 from collections import UserDict
-from typing import Iterator, NamedTuple, overload
+from typing import Iterator, NamedTuple, Union, overload
 
 from prolif.residue import ResidueId
 
@@ -60,7 +60,7 @@ class IFP(UserDict[tuple[ResidueId, ResidueId], dict[str, tuple[dict, ...]]]):
 
     def __getitem__(
         self, key: tuple[ResidueId, ResidueId] | tuple[str, str] | ResidueId | str
-    ) -> dict[str, tuple[dict, ...]] | "IFP":
+    ) -> Union[dict[str, tuple[dict, ...]], "IFP"]:
         try:
             return self.data[key]  # type: ignore[index]
         except KeyError as exc:
