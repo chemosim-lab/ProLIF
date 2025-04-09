@@ -1,0 +1,83 @@
+name: "Type-check"
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+jobs:
+  typing:
+    name: Type checking
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+
+    outputs:
+      diff: ${{ steps.typecheck-diff.outputs.diff }}
+      output: ${{ steps.typecheck-output.outputs.output }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install project and dependencies
+        run: |
+          uv sync --group type-check --locked
+
+      - name: Setup
+        run: |
+          mkdir -p tmp_data
+          sudo apt install -y colordiff
+
+      - name: Run typing tree on target branch
+        run: |
+          uv run python scripts/check_types.py > tmp_data/target.txt
+
+      - name: Checkout PR branch
+        run: |
+          git fetch git@github.com:${{ github.event.pull_request.head.user.name }}/${{ github.event.pull_request.head.repo.name }}.git ${{ github.event.pull_request.head.ref }}:diff-head
+          git checkout diff-head
+
+      - name: Run typing tree on PR branch
+        run: |
+          uv run python scripts/check_types.py > tmp_data/branch.txt
+
+      - name: Run type checking on PR branch
+        id: typecheck-output
+        run: |
+          echo "output=\"$(uv run poe type-check)\"" >> "$GITHUB_OUTPUT"
+
+      - name: Generate diff
+        id: typecheck-diff
+        run: |
+          echo "diff=\"$(colordiff -u tmp_data/target.txt tmp_data/branch.txt)\"" >> "$GITHUB_OUTPUT"
+
+      - name: Find Comment
+        uses: peter-evans/find-comment@v3
+        id: fc-typecheck
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'Type-checking diff:'
+
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.fc-typecheck.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            Type-checking diff:
+            ${{ steps.typecheck-diff.outputs.diff }}
+
+            <details>
+              <summary>Remaining errors:</summary>
+              ${{ steps.typecheck-output.outputs.output }}
+            </details>
+          edit-mode: replace
