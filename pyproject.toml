@@ -96,6 +96,7 @@ zip-safe = false
 include = ["prolif*"]
 
 [tool.setuptools.package-data]
+"prolif" = ["py.typed"]
 "prolif.data" = ["*"]
 "prolif.data.vina" = ["*"]
 
