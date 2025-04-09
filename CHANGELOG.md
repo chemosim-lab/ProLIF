@@ -8,12 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Type-checking and related pipelines:
+  - `poe` pipeline using preconfigured `mypy` (PR #254 by @nilay-v3rma).
+  - script for viewing current the progress on type hints (PR #257 by H-EKE).
+  - type hints (PR #259 by @VAKozyrev).
 - Support for `FrameIteratorIndices` as trajectories in `fp.run` (PR #246 by @wehs7661).
 - `LigNetwork` now optionally displays the percentage of interaction occurence when
   `show_interaction_data` is enabled. The type of data shown on both the label and
   hover title can be modified (PR #234 by @talagayev).
 - `VdWContact` now accepts a `preset` parameter to easily use different van der Waals
-  radii values: one of `mdanalysis` (default), `rdkit`, or `csd`.
+  radii values: one of `mdanalysis` (default), `rdkit`, or `csd`. Documented in PR #253
+  by @yuyuan871111.
 - `IFP.interactions()` iterator that yields all interaction data for a given frame in
   a single flat structure. This makes iterating over the `fp.ifp` results a bit
   easier / less nested.
