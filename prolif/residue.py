@@ -5,7 +5,8 @@ Residue-related classes --- :mod:`prolif.residue`
 
 import re
 from collections import UserDict
-from typing import TYPE_CHECKING, Any, Iterable, Sequence, cast
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from rdkit.Chem.rdmolops import FastFindRings

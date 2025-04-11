@@ -4,7 +4,8 @@ Storing interactions --- :mod:`prolif.ifp`
 """
 
 from collections import UserDict
-from typing import Iterator, NamedTuple, Union, overload
+from collections.abc import Iterator
+from typing import NamedTuple, Union, overload
 
 from prolif.residue import ResidueId
 

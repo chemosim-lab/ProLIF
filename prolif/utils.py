@@ -5,20 +5,13 @@ Helper functions --- :mod:`prolif.utils`
 
 import warnings
 from collections import defaultdict
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from functools import wraps
 from importlib.util import find_spec
 from math import pi
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Iterator,
-    ParamSpec,
-    Sequence,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, Union
 
 import numpy as np
 import pandas as pd
@@ -33,8 +26,8 @@ from prolif.residue import ResidueId
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from prolif.ifp import IFP
     from prolif.rdkitmol import BaseRDKitMol
+    from prolif.typeshed import IFPResults
 
 _90_deg_to_rad = pi / 2
 
@@ -82,7 +75,7 @@ def catch_warning(**kwargs: Any) -> Iterator[None]:
 
 
 def get_centroid(
-    coordinates: Sequence[Point3D] | "NDArray[np.float64]",
+    coordinates: Union[Sequence[Point3D], "NDArray[np.float64]"],
 ) -> "NDArray[np.float64]":
     """Centroid for an array of XYZ coordinates"""
     return np.mean(coordinates, axis=0)  # type: ignore[no-any-return]
@@ -216,7 +209,7 @@ def is_peptide_bond(bond: Chem.Bond, resids: dict[int, ResidueId]) -> bool:
 
 
 def to_dataframe(
-    ifp: dict[int, "IFP"],
+    ifp: "IFPResults",
     interactions: Sequence[str],
     count: bool = False,
     dtype: type | None = None,
