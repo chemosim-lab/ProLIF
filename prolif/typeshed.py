@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 ResidueKey: TypeAlias = Union["ResidueId", int, str]
 ResidueSelection: TypeAlias = Literal["all"] | Sequence[ResidueKey] | None
 IFPResults: TypeAlias = dict[int, "IFP"]
-Trajectory: TypeAlias = Union[
+Trajectory: TypeAlias = Union[  # type: ignore[no-any-unimported]
     "ProtoReader", "FrameIteratorSliced", "FrameIteratorIndices", "Timestep"
 ]
-MDAObject: TypeAlias = Union["Universe", "AtomGroup"]
+MDAObject: TypeAlias = Union["Universe", "AtomGroup"]  # type: ignore[no-any-unimported]

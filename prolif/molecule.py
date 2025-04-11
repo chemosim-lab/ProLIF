@@ -91,7 +91,7 @@ class Molecule(BaseRDKitMol):
         self.residues = ResidueGroup(residues)
 
     @classmethod
-    def from_mda(  # type: ignore[no-any-unimported]
+    def from_mda(
         cls: type["Self"],
         obj: "MDAObject",
         selection: str | None = None,
