@@ -10,10 +10,19 @@ from copy import deepcopy
 from functools import wraps
 from importlib.util import find_spec
 from math import pi
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Iterator,
+    ParamSpec,
+    Sequence,
+    TypeVar,
+)
 
 import numpy as np
 import pandas as pd
-from rdkit import rdBase
+from rdkit import Chem, rdBase
 from rdkit.Chem import FragmentOnBonds, GetMolFrags, SplitMolByPDBResidues
 from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 from rdkit.Geometry import Point3D
@@ -21,13 +30,24 @@ from scipy.spatial import cKDTree
 
 from prolif.residue import ResidueId
 
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from prolif.ifp import IFP
+    from prolif.rdkitmol import BaseRDKitMol
+
 _90_deg_to_rad = pi / 2
 
+P = ParamSpec("P")
+R = TypeVar("R")
 
-def requires(module):  # pragma: no cover
-    def inner(func):
+
+def requires(
+    module: str,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def inner(func: Callable[P, R]) -> Callable[P, R]:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             if find_spec(module):
                 return func(*args, **kwargs)
             raise ModuleNotFoundError(
@@ -41,7 +61,7 @@ def requires(module):  # pragma: no cover
 
 
 @contextmanager
-def catch_rdkit_logs():
+def catch_rdkit_logs() -> Iterator[None]:
     log_status = rdBase.LogStatus()
     rdBase.DisableLog("rdApp.*")
     yield
@@ -55,18 +75,22 @@ def catch_rdkit_logs():
 
 
 @contextmanager
-def catch_warning(**kwargs):
+def catch_warning(**kwargs: Any) -> Iterator[None]:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", **kwargs)
         yield
 
 
-def get_centroid(coordinates):
+def get_centroid(
+    coordinates: Sequence[Point3D] | "NDArray[np.float64]",
+) -> "NDArray[np.float64]":
     """Centroid for an array of XYZ coordinates"""
-    return np.mean(coordinates, axis=0)
+    return np.mean(coordinates, axis=0)  # type: ignore[no-any-return]
 
 
-def get_ring_normal_vector(centroid, coordinates):
+def get_ring_normal_vector(
+    centroid: Point3D, coordinates: "NDArray[np.float64]"
+) -> Point3D:
     """Returns a vector that is normal to the ring plane"""
     # A & B are two edges of the ring
     a = Point3D(*coordinates[0])
@@ -79,7 +103,9 @@ def get_ring_normal_vector(centroid, coordinates):
     return ca.CrossProduct(cb)
 
 
-def angle_between_limits(angle, min_angle, max_angle, ring=False):
+def angle_between_limits(
+    angle: float, min_angle: float, max_angle: float, ring: bool = False
+) -> bool:
     """Checks if an angle value is between min and max angles in radian
 
     Parameters
@@ -107,7 +133,9 @@ def angle_between_limits(angle, min_angle, max_angle, ring=False):
     return min_angle <= angle <= max_angle
 
 
-def get_residues_near_ligand(lig, prot, cutoff=6.0):
+def get_residues_near_ligand(
+    lig: "BaseRDKitMol", prot: "BaseRDKitMol", cutoff: float = 6.0
+) -> list[ResidueId]:
     """Detects residues close to a reference ligand
 
     Parameters
@@ -127,13 +155,15 @@ def get_residues_near_ligand(lig, prot, cutoff=6.0):
         the ligand
     """
     tree = cKDTree(prot.xyz)
-    ix = tree.query_ball_point(lig.xyz, cutoff)
+    ix: Sequence[list[int]] = tree.query_ball_point(  # type: ignore[assignment]
+        lig.xyz, cutoff
+    )
     ix = {i for lst in ix for i in lst}
     resids = [ResidueId.from_atom(prot.GetAtomWithIdx(i)) for i in ix]
     return list(set(resids))
 
 
-def split_mol_by_residues(mol):
+def split_mol_by_residues(mol: Chem.Mol) -> list[Chem.Mol]:
     """Splits a molecule in multiple fragments based on residues
 
     Parameters
@@ -150,11 +180,13 @@ def split_mol_by_residues(mol):
     -----
     Code adapted from Maciek Wójcikowski on the RDKit discussion list
     """
-    residues = []
+    residues: list[Chem.Mol] = []
     for res in SplitMolByPDBResidues(mol).values():
         for frag in GetMolFrags(res, asMols=True, sanitizeFrags=False):
             # count number of unique residues in the fragment
-            resids = {a.GetIdx(): ResidueId.from_atom(a) for a in frag.GetAtoms()}
+            resids: dict[int, ResidueId] = {
+                a.GetIdx(): ResidueId.from_atom(a) for a in frag.GetAtoms()
+            }
             if len(set(resids.values())) > 1:
                 # split on peptide bonds
                 bonds = [
@@ -168,7 +200,7 @@ def split_mol_by_residues(mol):
     return residues
 
 
-def is_peptide_bond(bond, resids):
+def is_peptide_bond(bond: Chem.Bond, resids: dict[int, ResidueId]) -> bool:
     """Checks if a bond is a peptide bond based on the ResidueId of the atoms
     on each part of the bond. Also works for disulfide bridges or any bond that
     links two residues in biopolymers.
@@ -184,13 +216,13 @@ def is_peptide_bond(bond, resids):
 
 
 def to_dataframe(
-    ifp,
-    interactions,
-    count=False,
-    dtype=None,
-    drop_empty=True,
-    index_col="Frame",
-):
+    ifp: dict[int, "IFP"],
+    interactions: Sequence[str],
+    count: bool = False,
+    dtype: type | None = None,
+    drop_empty: bool = True,
+    index_col: str = "Frame",
+) -> pd.DataFrame:
     """Converts IFPs to a pandas DataFrame
 
     Parameters
@@ -246,7 +278,9 @@ def to_dataframe(
     empty_value = dtype(0)
     # create empty array for each residue pair interaction that doesn't exist
     # in a particular frame
-    empty_arr = np.array([empty_value for _ in range(n_interactions)], dtype=dtype)
+    empty_arr: NDArray = np.array(
+        [empty_value for _ in range(n_interactions)], dtype=dtype
+    )
     # residue pairs
     residue_pairs = sorted(
         {residue_tuple for frame_ifp in ifp.values() for residue_tuple in frame_ifp},
@@ -263,7 +297,7 @@ def to_dataframe(
                 data[residue_tuple].append(empty_arr[:])
             else:
                 if count:
-                    bitvector = np.array(
+                    bitvector: NDArray = np.array(
                         [len(ifp_dict.get(i, ())) for i in interactions],
                         dtype=dtype,
                     )
@@ -300,14 +334,14 @@ def to_dataframe(
     return df
 
 
-def pandas_series_to_bv(s):
+def pandas_series_to_bv(s: pd.Series) -> ExplicitBitVect:
     bv = ExplicitBitVect(len(s))
     on_bits = np.where(s >= True)[0].tolist()
     bv.SetBitsFromList(on_bits)
     return bv
 
 
-def to_bitvectors(df):
+def to_bitvectors(df: pd.DataFrame) -> list[ExplicitBitVect]:
     """Converts an interaction DataFrame to a list of RDKit ExplicitBitVector
 
     Parameters
@@ -332,10 +366,10 @@ def to_bitvectors(df):
         0.42
 
     """
-    return df.apply(pandas_series_to_bv, axis=1).tolist()
+    return df.apply(pandas_series_to_bv, axis=1).tolist()  # type: ignore[no-any-return]
 
 
-def pandas_series_to_countvector(s):
+def pandas_series_to_countvector(s: pd.Series) -> UIntSparseIntVect:
     size = len(s)
     cv = UIntSparseIntVect(size)
     for i in range(size):
@@ -343,7 +377,7 @@ def pandas_series_to_countvector(s):
     return cv
 
 
-def to_countvectors(df):
+def to_countvectors(df: pd.DataFrame) -> list[UIntSparseIntVect]:
     """Converts an interaction DataFrame to a list of RDKit UIntSparseIntVect
 
     Parameters
@@ -358,4 +392,6 @@ def to_countvectors(df):
         A list of :class:`~rdkit.DataStructs.cDataStructs.UIntSparseIntVect`
         for each frame
     """
-    return df.apply(pandas_series_to_countvector, axis=1).tolist()
+    return df.apply(  # type: ignore[no-any-return]
+        pandas_series_to_countvector, axis=1
+    ).tolist()

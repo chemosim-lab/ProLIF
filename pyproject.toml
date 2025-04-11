@@ -236,10 +236,7 @@ ignore = [
     "PT018",
     "FURB103",
     "COM812",
-    # typing incompatible with 3.9
-    "UP035",
-    "UP006",
-    "UP007",
+    "UP037",
 ]
 
 [tool.isort]
