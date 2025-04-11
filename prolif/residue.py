@@ -5,7 +5,8 @@ Residue-related classes --- :mod:`prolif.residue`
 
 import re
 from collections import UserDict
-from typing import TYPE_CHECKING, Any, Iterable, Sequence, cast
+from collections.abc import Iterable, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from rdkit.Chem.rdmolops import FastFindRings
@@ -14,6 +15,8 @@ from prolif.rdkitmol import BaseRDKitMol
 
 if TYPE_CHECKING:
     from rdkit import Chem
+
+    from prolif.typeshed import ResidueKey
 
 _RE_RESID = re.compile(r"(TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?(\d*)\.?(\w)?")
 
@@ -209,7 +212,7 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
             self.chain = np.asarray(chain, dtype=object)
         super().__init__([(r.resid, r) for r in self._residues])
 
-    def __getitem__(self, key: ResidueId | int | str) -> Residue:
+    def __getitem__(self, key: "ResidueKey") -> Residue:
         # bool is a subclass of int but shouldn't be used here
         if isinstance(key, bool):
             raise KeyError(

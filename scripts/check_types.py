@@ -8,8 +8,9 @@ import logging
 import subprocess
 import sys
 from collections import Counter
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
