@@ -3,8 +3,15 @@ Reading RDKit molecules --- :mod:`prolif.rdkitmol`
 ==================================================
 """
 
+from typing import TYPE_CHECKING
+
 from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
+
+if TYPE_CHECKING:
+    import numpy as np
+    from numpy.typing import NDArray
+    from rdkit.Geometry import Point3D
 
 
 class BaseRDKitMol(Chem.Mol):
@@ -21,16 +28,16 @@ class BaseRDKitMol(Chem.Mol):
 
     Attributes
     ----------
-    centroid : numpy.ndarray
+    centroid : rdkit.Geometry.rdGeometry.Point3D
         XYZ coordinates of the centroid of the molecule
     xyz : numpy.ndarray
         XYZ coordinates of all atoms in the molecule
     """
 
     @property
-    def centroid(self):
-        return ComputeCentroid(self.GetConformer())
+    def centroid(self) -> "Point3D":
+        return ComputeCentroid(self.GetConformer())  # type: ignore[no-any-return]
 
     @property
-    def xyz(self):
-        return self.GetConformer().GetPositions()
+    def xyz(self) -> "NDArray[np.float64]":
+        return self.GetConformer().GetPositions()  # type: ignore[no-any-return]

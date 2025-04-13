@@ -13,6 +13,7 @@ from prolif.utils import (
     get_residues_near_ligand,
     is_peptide_bond,
     pandas_series_to_bv,
+    requires,
     split_mol_by_residues,
     to_bitvectors,
     to_dataframe,
@@ -64,6 +65,15 @@ def ifp_count():
 @pytest.fixture(params=["ifp_single", "ifp_count"])
 def ifp(request):
     return request.getfixturevalue(request.param)
+
+
+def test_requires():
+    @requires("this_module_does_not_exist")
+    def dummy():
+        pass
+
+    with pytest.raises(ModuleNotFoundError, match=r"The module '.+' is required"):
+        dummy()
 
 
 def test_centroid():

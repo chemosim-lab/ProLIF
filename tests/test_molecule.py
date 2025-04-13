@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 import pytest
 from MDAnalysis import SelectionError
 from numpy.testing import assert_array_equal
@@ -59,6 +61,7 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):
 
 class SupplierBase:
     resid = ResidueId("UNL", 1, "")
+    slice_behavior = nullcontext()
 
     def test_len(self, suppl):
         assert len(suppl) == 9
@@ -77,6 +80,15 @@ class SupplierBase:
         for index in [0, 2, 8, -1]:
             mol_i = suppl[index]
             assert_array_equal(mols[index].xyz, mol_i.xyz)
+
+    def test_slice(self, suppl):
+        mols = list(suppl)
+        s = slice(1, 5, 2)
+        indices = range(*s.indices(len(mols)))
+        with self.slice_behavior:
+            sliced_suppl = suppl[s]
+            for index, mol in zip(indices, sliced_suppl, strict=True):
+                assert_array_equal(mols[index].xyz, mol.xyz)
 
 
 class TestPDBQTSupplier(SupplierBase):
@@ -135,6 +147,8 @@ class TestSDFSupplier(SupplierBase):
 
 
 class TestMOL2Supplier(SupplierBase):
+    slice_behavior = pytest.raises(NotImplementedError)
+
     @pytest.fixture()
     def suppl(self):
         path = str(datapath / "vina" / "vina_output.mol2")
