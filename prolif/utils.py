@@ -5,7 +5,7 @@ Helper functions --- :mod:`prolif.utils`
 
 import warnings
 from collections import defaultdict
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from functools import wraps
@@ -210,7 +210,7 @@ def is_peptide_bond(bond: Chem.Bond, resids: dict[int, ResidueId]) -> bool:
 
 def to_dataframe(
     ifp: "IFPResults",
-    interactions: Sequence[str],
+    interactions: Collection[str],
     count: bool = False,
     dtype: type | None = None,
     drop_empty: bool = True,
