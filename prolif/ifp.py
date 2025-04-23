@@ -5,9 +5,12 @@ Storing interactions --- :mod:`prolif.ifp`
 
 from collections import UserDict
 from collections.abc import Iterator
-from typing import NamedTuple, Union, overload
+from typing import TYPE_CHECKING, NamedTuple, Union, overload
 
 from prolif.residue import ResidueId
+
+if TYPE_CHECKING:
+    from prolif.typeshed import IFPData
 
 
 class InteractionData(NamedTuple):
@@ -17,7 +20,7 @@ class InteractionData(NamedTuple):
     metadata: dict
 
 
-class IFP(UserDict[tuple[ResidueId, ResidueId], dict[str, tuple[dict, ...]]]):
+class IFP(UserDict[tuple[ResidueId, ResidueId], "IFPData"]):
     """Mapping between residue pairs and interaction fingerprint.
 
     Notes
@@ -54,14 +57,14 @@ class IFP(UserDict[tuple[ResidueId, ResidueId], dict[str, tuple[dict, ...]]]):
     @overload
     def __getitem__(
         self, key: tuple[ResidueId, ResidueId] | tuple[str, str]
-    ) -> dict[str, tuple[dict, ...]]: ...
+    ) -> "IFPData": ...
 
     @overload
     def __getitem__(self, key: ResidueId | str) -> "IFP": ...
 
     def __getitem__(
         self, key: tuple[ResidueId, ResidueId] | tuple[str, str] | ResidueId | str
-    ) -> Union[dict[str, tuple[dict, ...]], "IFP"]:
+    ) -> Union["IFPData", "IFP"]:
         try:
             return self.data[key]  # type: ignore[index]
         except KeyError as exc:

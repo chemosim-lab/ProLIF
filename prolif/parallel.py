@@ -95,7 +95,7 @@ class TrajectoryPool:
 
     Parameters
     ----------
-    n_processes : int
+    n_processes : int | None
         Max number of processes
     fingerprint : prolif.fingerprint.Fingerprint
         Fingerprint instance used to generate the IFP
@@ -123,7 +123,7 @@ class TrajectoryPool:
 
     def __init__(
         self,
-        n_processes: int,
+        n_processes: int | None,
         fingerprint: "Fingerprint",
         residues: "ResidueSelection",
         tqdm_kwargs: dict,
@@ -227,7 +227,7 @@ class MolIterablePool:
 
     Parameters
     ----------
-    n_processes : int
+    n_processes : int | None
         Max number of processes
     fingerprint : prolif.fingerprint.Fingerprint
         Fingerprint instance used to generate the IFP
@@ -250,7 +250,7 @@ class MolIterablePool:
 
     def __init__(
         self,
-        n_processes: int,
+        n_processes: int | None,
         fingerprint: "Fingerprint",
         prot_mol: Molecule,
         residues: "ResidueSelection",
@@ -290,9 +290,7 @@ class MolIterablePool:
             A dictionary indexed by ``(ligand, protein)`` residue pairs, and each value
             is a sparse dictionary of metadata indexed by interaction name.
         """
-        return cls.fp.generate(  # type: ignore[no-any-return]
-            mol, cls.pmol, residues=cls.residues, metadata=True
-        )
+        return cls.fp.generate(mol, cls.pmol, residues=cls.residues, metadata=True)
 
     def process(self, args_iterable: Iterable[Molecule]) -> Iterable["IFP"]:
         """Maps the input iterable of molecules to the executor function.

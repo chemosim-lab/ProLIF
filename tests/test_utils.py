@@ -103,7 +103,7 @@ def test_angle_limits(angle, mina, maxa, ring, expected):
     angle = radians(angle)
     mina = radians(mina)
     maxa = radians(maxa)
-    assert angle_between_limits(angle, mina, maxa, ring) is expected
+    assert angle_between_limits(angle, mina, maxa, ring=ring) is expected
 
 
 def test_pocket_residues(ligand_mol, protein_mol):

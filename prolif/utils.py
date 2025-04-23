@@ -5,7 +5,7 @@ Helper functions --- :mod:`prolif.utils`
 
 import warnings
 from collections import defaultdict
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from functools import wraps
@@ -97,7 +97,7 @@ def get_ring_normal_vector(
 
 
 def angle_between_limits(
-    angle: float, min_angle: float, max_angle: float, ring: bool = False
+    angle: float, min_angle: float, max_angle: float, *, ring: bool = False
 ) -> bool:
     """Checks if an angle value is between min and max angles in radian
 
@@ -210,7 +210,7 @@ def is_peptide_bond(bond: Chem.Bond, resids: dict[int, ResidueId]) -> bool:
 
 def to_dataframe(
     ifp: "IFPResults",
-    interactions: Sequence[str],
+    interactions: Collection[str],
     count: bool = False,
     dtype: type | None = None,
     drop_empty: bool = True,

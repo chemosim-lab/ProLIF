@@ -7,8 +7,9 @@ from rdkit import Chem, RDLogger
 import prolif
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import VdWContact
-from prolif.interactions.base import _INTERACTIONS, Interaction, get_mapindex
+from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.interactions.constants import VDW_PRESETS
+from prolif.interactions.utils import get_mapindex
 
 # disable rdkit warnings
 lg = RDLogger.logger()
@@ -53,7 +54,7 @@ def interaction_qmol(request, interaction_instances):
 class TestInteractions:
     @pytest.fixture(scope="class")
     def fingerprint(self):
-        return Fingerprint()
+        return Fingerprint("all")
 
     @pytest.mark.parametrize(
         ("func_name", "any_mol", "any_other_mol", "expected"),
@@ -128,29 +129,29 @@ class TestInteractions:
         interaction = getattr(fingerprint, func_name)
         assert next(interaction(any_mol[0], any_other_mol[0]), False) is expected
 
+    @pytest.mark.usefixtures("cleanup_dummy")
     def test_warning_supersede(self):
-        old = id(_INTERACTIONS["Hydrophobic"])
+        class Dummy(Interaction):
+            def detect(self):
+                pass
+
+        old = id(_INTERACTIONS["Dummy"])
         with pytest.warns(UserWarning, match="interaction has been superseded"):
 
-            class Hydrophobic(Interaction):
+            class Dummy(Interaction):
                 def detect(self):
                     pass
 
-        new = id(_INTERACTIONS["Hydrophobic"])
+        new = id(_INTERACTIONS["Dummy"])
         assert old != new
-        # fix dummy Hydrophobic class being reused in later unrelated tests
 
-        class Hydrophobic(prolif.interactions.Hydrophobic):
-            __doc__ = prolif.interactions.Hydrophobic.__doc__
-
+    @pytest.mark.usefixtures("cleanup_dummy")
     def test_error_no_detect(self):
-        with pytest.raises(
-            TypeError,
-            match="Can't instantiate interaction class _Dummy",
-        ):
+        class Dummy(Interaction):
+            pass
 
-            class _Dummy(Interaction):
-                pass
+        with pytest.raises(TypeError, match="Can't instantiate abstract class Dummy"):
+            Fingerprint(["Dummy"])
 
     @pytest.mark.parametrize("index", [0, 1, 3, 42, 78])
     def test_get_mapindex(self, index, ligand_mol):
@@ -320,7 +321,7 @@ class TestInteractions:
         r1, r2 = self.create_rings(benzene_universe, xyz, rotation)
 
         def evaluate(pistacking_type, r1, r2):
-            return next(getattr(fingerprint, pistacking_type)(r1, r2), False)
+            return getattr(fingerprint, pistacking_type).any(r1, r2) or False
 
         assert evaluate(pi_type, r1, r2) is expected
         if expected is True:
@@ -342,8 +343,8 @@ class TestInteractions:
             prolif.Molecule.from_mda(r2)[0],
         )
 
-    def test_edgetoface_phe331(self, ligand_mol, protein_mol):
-        fp = Fingerprint()
+    def test_edgetoface_phe331(self, ligand_mol, protein_mol, fingerprint):
         lig, phe331 = ligand_mol[0], protein_mol["PHE331.B"]
-        assert next(fp.edgetoface(lig, phe331)) is True
-        assert next(fp.pistacking(lig, phe331)) is True
+        assert fingerprint.edgetoface.any(lig, phe331)
+        assert not fingerprint.facetoface.any(lig, phe331)
+        assert fingerprint.pistacking.any(lig, phe331)

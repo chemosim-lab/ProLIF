@@ -7,6 +7,7 @@ from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
 
 from prolif.datafiles import TOP, TRAJ, datapath
+from prolif.interactions.base import _INTERACTIONS
 from prolif.molecule import Molecule, sdf_supplier
 
 
@@ -168,6 +169,12 @@ def metal():
 @pytest.fixture(scope="session")
 def metal_false():
     return from_mol2("metal_false.mol2")
+
+
+@pytest.fixture
+def cleanup_dummy():
+    yield
+    _INTERACTIONS.pop("Dummy", None)
 
 
 class BaseTestMixinRDKitMol:

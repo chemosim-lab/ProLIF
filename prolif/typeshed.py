@@ -1,7 +1,9 @@
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Literal, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias, Union
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from MDAnalysis.coordinates.base import (
         FrameIteratorIndices,
         FrameIteratorSliced,
@@ -14,10 +16,23 @@ if TYPE_CHECKING:
     from prolif.ifp import IFP
     from prolif.residue import ResidueId
 
+# utils
+PathLike: TypeAlias = Union[str, "Path"]
+
+# residues
 ResidueKey: TypeAlias = Union["ResidueId", int, str]
 ResidueSelection: TypeAlias = Literal["all"] | Sequence[ResidueKey] | None
+
+# IFP
 IFPResults: TypeAlias = dict[int, "IFP"]
+InteractionMetadata: TypeAlias = dict[str, Any]
+IFPData: TypeAlias = dict[str, tuple[InteractionMetadata, ...]]
+
+# MDAnalysis
 Trajectory: TypeAlias = Union[  # type: ignore[no-any-unimported]
     "ProtoReader", "FrameIteratorSliced", "FrameIteratorIndices", "Timestep"
 ]
 MDAObject: TypeAlias = Union["Universe", "AtomGroup"]  # type: ignore[no-any-unimported]
+
+# Interaction parameters
+Angles: TypeAlias = tuple[float, float]

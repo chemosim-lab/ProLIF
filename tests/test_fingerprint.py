@@ -5,19 +5,23 @@ from pandas import DataFrame
 from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
 from prolif.datafiles import datapath
-from prolif.fingerprint import Fingerprint
+from prolif.fingerprint import DEFAULT_INTERACTIONS, Fingerprint
 from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.molecule import sdf_supplier
 from prolif.residue import ResidueId
 
 
-class Dummy(Interaction):
-    def detect(self, res1, res2):
-        yield self.metadata(res1, res2, (2,), (4,), distance=4.2)
+@pytest.fixture
+def dummy_cls(cleanup_dummy):
+    class Dummy(Interaction):
+        def detect(self, res1, res2):
+            yield self.metadata(res1, res2, (2,), (4,), distance=4.2)
+
+    return Dummy
 
 
-def test_interaction_base(sdf_suppl):
-    interaction = Dummy()
+def test_interaction_base(sdf_suppl, dummy_cls):
+    interaction = dummy_cls()
     repr_ = repr(interaction)
     assert repr_.startswith("<")
     assert ".Dummy at " in repr_
@@ -27,7 +31,7 @@ def test_interaction_base(sdf_suppl):
     assert metadata["indices"] == {"ligand": (2,), "protein": (4,)}
     assert metadata["parent_indices"] == {"ligand": (2,), "protein": (4,)}
     # invert
-    inverted = Dummy.invert_role("Dummy", "inverted")
+    inverted = dummy_cls.invert_role("Dummy", "inverted")
     inverted_interaction = inverted()
     metadata = next(inverted_interaction.detect(mol, mol))
     assert metadata["indices"] == {"ligand": (4,), "protein": (2,)}
@@ -37,13 +41,11 @@ def test_interaction_base(sdf_suppl):
 class TestFingerprint:
     @pytest.fixture(scope="class")
     def fp(self):
-        yield Fingerprint()
-        _INTERACTIONS.pop("Dummy", None)
+        return Fingerprint()
 
     @pytest.fixture(scope="class")
     def fp_count(self):
-        yield Fingerprint(count=True)
-        _INTERACTIONS.pop("Dummy", None)
+        return Fingerprint(count=True)
 
     @pytest.fixture(scope="class", params=["fp", "fp_count"])
     def any_fp(self, request):
@@ -51,23 +53,18 @@ class TestFingerprint:
 
     @pytest.fixture(scope="class")
     def fp_simple(self):
-        yield Fingerprint(["Hydrophobic"])
-        _INTERACTIONS.pop("Dummy", None)
+        return Fingerprint(["Hydrophobic"])
 
     def test_init(self, fp_simple):
         assert "Hydrophobic" in fp_simple.interactions
         assert hasattr(fp_simple, "hydrophobic") and callable(fp_simple.hydrophobic)
         assert "Dummy" not in fp_simple.interactions
-        assert hasattr(fp_simple, "dummy") and callable(fp_simple.dummy)
-        assert "_BaseHBond" not in fp_simple.interactions
-        assert not hasattr(fp_simple, "_basehbond")
         assert "Interaction" not in fp_simple.interactions
         assert not hasattr(fp_simple, "interaction")
 
     def test_init_all(self):
         fp = Fingerprint("all")
-        for name, func in fp.interactions.items():
-            assert getattr(fp, name.lower()) is func.__wrapped__
+        assert set(fp.interactions) == set(_INTERACTIONS)
 
     def test_n_interactions(self, fp):
         assert fp.n_interactions == len(fp.interactions)
@@ -269,7 +266,8 @@ class TestFingerprint:
             Fingerprint(["Cationic"], parameters={"bar": {}})
 
     @pytest.fixture()
-    def fp_to_pickle(self, fp, protein_mol):
+    def fp_to_pickle(self, protein_mol, dummy_cls):
+        fp = Fingerprint([*DEFAULT_INTERACTIONS, "Dummy"])
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
