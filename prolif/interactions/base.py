@@ -14,10 +14,14 @@ from operator import itemgetter
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, overload
 
 import numpy as np
-from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
+from rdkit.Geometry import Point3D
 
-from prolif.interactions.utils import DISTANCE_FUNCTIONS, get_mapindex
+from prolif.interactions.utils import (
+    DISTANCE_FUNCTIONS_3ARGS,
+    DISTANCE_FUNCTIONS_4ARGS,
+    get_mapindex,
+)
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 if TYPE_CHECKING:
@@ -221,8 +225,8 @@ class Distance(Interaction, is_abstract=True):
         prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
         if lig_matches and prot_matches:
             for lig_match, prot_match in product(lig_matches, prot_matches):
-                alig = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
-                aprot = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
+                alig = Point3D(*lig_res.xyz[lig_match[0]])
+                aprot = Point3D(*prot_res.xyz[prot_match[0]])
                 dist = alig.Distance(aprot)
                 if dist <= self.distance:
                     yield self.metadata(
@@ -274,7 +278,7 @@ class SingleAngle(Interaction, is_abstract=True):
         self.prot_pattern = MolFromSmarts(prot_pattern)
         self.distance = distance
         self.angle = tuple(radians(i) for i in angle)
-        self._measure_distance = DISTANCE_FUNCTIONS[distance_atom]
+        self._measure_distance = DISTANCE_FUNCTIONS_3ARGS[distance_atom]
         self._metadata_mapping = metadata_mapping
 
     def detect(
@@ -284,9 +288,9 @@ class SingleAngle(Interaction, is_abstract=True):
         prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
         if lig_matches and prot_matches:
             for lig_match, prot_match in product(lig_matches, prot_matches):
-                l1 = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
-                p1 = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
-                p2 = Geometry.Point3D(*prot_res.xyz[prot_match[1]])
+                l1 = Point3D(*lig_res.xyz[lig_match[0]])
+                p1 = Point3D(*prot_res.xyz[prot_match[0]])
+                p2 = Point3D(*prot_res.xyz[prot_match[1]])
                 dist = self._measure_distance(l1, p1, p2)
                 if dist <= self.distance:
                     # P1-P2 ... L1
@@ -344,7 +348,7 @@ class DoubleAngle(Interaction, is_abstract=True):
         self.distance = distance
         self.L1P2P1_angle = tuple(radians(i) for i in L1P2P1_angle)
         self.L2L1P2_angle = tuple(radians(i) for i in L2L1P2_angle)
-        self._measure_distance = DISTANCE_FUNCTIONS[distance_atoms]
+        self._measure_distance = DISTANCE_FUNCTIONS_4ARGS[distance_atoms]
         self._metadata_mapping = metadata_mapping
 
     def detect(
@@ -354,10 +358,10 @@ class DoubleAngle(Interaction, is_abstract=True):
         prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
         if lig_matches and prot_matches:
             for lig_match, prot_match in product(lig_matches, prot_matches):
-                l1 = Geometry.Point3D(*lig_res.xyz[lig_match[0]])
-                l2 = Geometry.Point3D(*lig_res.xyz[lig_match[1]])
-                p1 = Geometry.Point3D(*prot_res.xyz[prot_match[0]])
-                p2 = Geometry.Point3D(*prot_res.xyz[prot_match[1]])
+                l1 = Point3D(*lig_res.xyz[lig_match[0]])
+                l2 = Point3D(*lig_res.xyz[lig_match[1]])
+                p1 = Point3D(*prot_res.xyz[prot_match[0]])
+                p2 = Point3D(*prot_res.xyz[prot_match[1]])
                 dist = self._measure_distance(l1, l2, p1, p2)
                 if dist <= self.distance:
                     p2p1 = p2.DirectionVector(p1)
@@ -443,9 +447,9 @@ class BasePiStacking(Interaction, is_abstract=True):
                 continue
             for lig_match, res_match in product(lig_matches, res_matches):
                 lig_pi_coords = lig_res.xyz[list(lig_match)]
-                lig_centroid = Geometry.Point3D(*get_centroid(lig_pi_coords))
+                lig_centroid = Point3D(*get_centroid(lig_pi_coords))
                 res_pi_coords = prot_res.xyz[list(res_match)]
-                res_centroid = Geometry.Point3D(*get_centroid(res_pi_coords))
+                res_centroid = Point3D(*get_centroid(res_pi_coords))
                 centroid_dist = lig_centroid.Distance(res_centroid)
                 if centroid_dist > self.distance:
                     continue
@@ -514,11 +518,11 @@ class BasePiStacking(Interaction, is_abstract=True):
 
     @staticmethod
     def _get_intersect_point(
-        plane_normal: Geometry.Point3D,
-        plane_centroid: Geometry.Point3D,
-        tilted_normal: Geometry.Point3D,
-        tilted_centroid: Geometry.Point3D,
-    ) -> Geometry.Point3D | None:
+        plane_normal: Point3D,
+        plane_centroid: Point3D,
+        tilted_normal: Point3D,
+        tilted_centroid: Point3D,
+    ) -> Point3D | None:
         # intersect line is orthogonal to both planes normal vectors
         intersect_direction = plane_normal.CrossProduct(tilted_normal)
         # setup system of linear equations to solve
@@ -527,12 +531,12 @@ class BasePiStacking(Interaction, is_abstract=True):
         )
         if np.linalg.det(A) == 0:
             return None
-        tilted_offset = tilted_normal.DotProduct(Geometry.Point3D(*tilted_centroid))
-        plane_offset = plane_normal.DotProduct(Geometry.Point3D(*plane_centroid))
+        tilted_offset = tilted_normal.DotProduct(Point3D(*tilted_centroid))
+        plane_offset = plane_normal.DotProduct(Point3D(*plane_centroid))
         d = np.array([[plane_offset], [tilted_offset], [0.0]])
         # point on intersect line
         point = np.linalg.solve(A, d).T[0]
-        point = Geometry.Point3D(*point)
+        point = Point3D(*point)
         # find projection of centroid on intersect line using vector projection
         vec = plane_centroid - point
         intersect_direction.Normalize()
