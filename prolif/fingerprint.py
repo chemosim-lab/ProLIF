@@ -1014,7 +1014,7 @@ class Fingerprint:
             rotation=rotation,
             carbon=carbon,
         )
-        return ligplot.display(  # type: ignore[no-any-return]
+        return ligplot.display(
             width=width,
             height=height,
             fontsize=fontsize,
@@ -1067,7 +1067,7 @@ class Fingerprint:
         from prolif.plotting.barcode import Barcode
 
         barcode = Barcode.from_fingerprint(self)
-        return barcode.display(  # type: ignore[no-any-return]
+        return barcode.display(
             figsize=figsize,
             dpi=dpi,
             interactive=interactive,

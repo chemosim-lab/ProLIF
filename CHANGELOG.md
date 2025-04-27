@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type-checking and related pipelines:
   - `poe` pipeline using preconfigured `mypy` (PR #254 by @nilay-v3rma).
   - script for viewing current the progress on type hints (PR #257 by H-EKE).
-  - type hints (PR #259 by @VAKozyrev).
+  - type hints (PR #259 by @VAKozyrev, PR #263).
 - Support for `FrameIteratorIndices` as trajectories in `fp.run` (PR #246 by @wehs7661).
 - `LigNetwork` now optionally displays the percentage of interaction occurence when
   `show_interaction_data` is enabled. The type of data shown on both the label and
