@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from contextlib import suppress
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 import py3Dmol
 from rdkit import Chem
@@ -528,7 +528,7 @@ class Complex3D:
             """),
         )
 
-    def _repr_html_(self) -> Any:  # noqa: PLW3201
+    def _repr_html_(self) -> str | None:  # noqa: PLW3201
         if self._view:
-            return self._view._repr_html_()
+            return self._view._repr_html_()  # type: ignore[no-any-return]
         return None

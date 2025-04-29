@@ -24,7 +24,10 @@ from prolif.exceptions import RunRequiredError
 from prolif.plotting.utils import IS_NOTEBOOK, separated_interaction_colors
 
 if TYPE_CHECKING:
+    from matplotlib.axes import Axes
     from matplotlib.backend_bases import LocationEvent
+    from matplotlib.figure import Figure
+    from matplotlib.image import AxesImage
 
     from prolif.fingerprint import Fingerprint
 
@@ -104,7 +107,7 @@ class Barcode:
         xlabel: str = "Frame",
         subplots_kwargs: dict | None = None,
         tight_layout_kwargs: dict | None = None,
-    ) -> plt.Axes:
+    ) -> "Axes":
         """Generate and display the barcode plot.
 
         Parameters
@@ -140,7 +143,7 @@ class Barcode:
 
         # Plot as image
         fig, ax = plt.subplots(**subplots_kwargs)
-        ax: plt.Axes
+        ax: "Axes"
         im = ax.imshow(
             self.df.values,
             aspect="auto",
@@ -213,10 +216,10 @@ class Barcode:
 
     def _add_interaction_callback(
         self,
-        fig: plt.Figure,
-        ax: plt.Axes,
+        fig: "Figure",
+        ax: "Axes",
         *,
-        im: plt.AxesImage,
+        im: "AxesImage",
         frames: pd.Index,
         residues: pd.Index,
         interactions: pd.Index[str],

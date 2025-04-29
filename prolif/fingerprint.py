@@ -49,7 +49,7 @@ from prolif.utils import (
 )
 
 if TYPE_CHECKING:
-    from matplotlib.pyplot import Axes
+    from matplotlib.axes import Axes
     from numpy.typing import NDArray
     from pandas import DataFrame
     from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
@@ -298,7 +298,10 @@ class Fingerprint:
         ]
         if self.count:
             return np.array(
-                [sum(bits) for bits in cast(list[tuple[Literal[True]]], bitvector)],
+                [
+                    sum(bits)
+                    for bits in cast(list[tuple[Literal[True], ...]], bitvector)
+                ],
                 dtype=np.uint8,
             )
         return np.array(cast(list[Literal[True] | None], bitvector), dtype=bool)
