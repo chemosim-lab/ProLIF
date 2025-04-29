@@ -133,6 +133,11 @@ cmd = "ruff check --preview --fix"
 help = "Fixes formatting and linting issues"
 sequence = [{ ref = "format" }, { ref = "lint" }]
 
+[tool.poe.tasks.type-check]
+help = "Run mypy to check type hints across the codebase"
+cmd = "mypy ${FILE_PATHS}"
+args = [{ name = "FILE_PATHS", positional = true, multiple = true, default = "." }]
+
 [tool.poe.tasks.test]
 help = "Runs the test suite"
 cmd = "pytest"
@@ -161,11 +166,6 @@ exclude = "docs/conf.py"
 [[tool.mypy.overrides]]
 module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*"]
 ignore_missing_imports = true
-
-[tool.poe.tasks.type-check]
-help = "Run mypy to check type hints across the codebase"
-cmd = "mypy ${FILE_PATHS}"
-args = [{ name = "FILE_PATHS", positional = true, multiple = true, default = "." }]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
