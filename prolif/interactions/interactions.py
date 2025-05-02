@@ -10,9 +10,10 @@ Note that some of the SMARTS patterns used in the interaction classes are inspir
 
 """
 
+from collections.abc import Iterator
 from itertools import product
 from math import degrees, radians
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
@@ -26,6 +27,10 @@ from prolif.interactions.base import (
 )
 from prolif.interactions.constants import VDW_PRESETS, VDWRADII  # noqa
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
+
+if TYPE_CHECKING:
+    from prolif.residue import Residue
+    from prolif.typeshed import Angles, InteractionMetadata
 
 __all__ = [
     "Anionic",
@@ -64,9 +69,11 @@ class Hydrophobic(Distance):
 
     def __init__(
         self,
-        hydrophobic="[c,s,Br,I,S&H0&v2,$([D3,D4;#6])&!$([#6]~[#7,#8,#9])&!$([#6X4H0]);+0]",
-        distance=4.5,
-    ):
+        hydrophobic: str = (
+            "[c,s,Br,I,S&H0&v2,$([D3,D4;#6])&!$([#6]~[#7,#8,#9])&!$([#6X4H0]);+0]"
+        ),
+        distance: float = 4.5,
+    ) -> None:
         super().__init__(
             lig_pattern=hydrophobic,
             prot_pattern=hydrophobic,
@@ -99,11 +106,15 @@ class HBAcceptor(SingleAngle):
 
     def __init__(
         self,
-        acceptor="[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]",
-        donor="[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
-        distance=3.5,
-        DHA_angle=(130, 180),
-    ):
+        acceptor: str = (
+            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
+            "O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,"
+            "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
+        ),
+        donor: str = "[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
+        distance: float = 3.5,
+        DHA_angle: "Angles" = (130, 180),
+    ) -> None:
         super().__init__(
             lig_pattern=acceptor,
             prot_pattern=donor,
@@ -153,12 +164,12 @@ class XBAcceptor(DoubleAngle):
 
     def __init__(
         self,
-        acceptor="[#7,#8,P,S,Se,Te,a;!+{1-}]!#[*]",
-        donor="[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
-        distance=3.5,
-        AXD_angle=(130, 180),
-        XAR_angle=(80, 140),
-    ):
+        acceptor: str = "[#7,#8,P,S,Se,Te,a;!+{1-}]!#[*]",
+        donor: str = "[#6,#7,Si,F,Cl,Br,I]-[Cl,Br,I,At]",
+        distance: float = 3.5,
+        AXD_angle: "Angles" = (130, 180),
+        XAR_angle: "Angles" = (80, 140),
+    ) -> None:
         super().__init__(
             lig_pattern=acceptor,
             prot_pattern=donor,
@@ -189,10 +200,10 @@ class Cationic(Distance):
 
     def __init__(
         self,
-        cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
-        anion="[-{1-},$(O=[C,S,P]-[O-])]",
-        distance=4.5,
-    ):
+        cation: str = "[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
+        anion: str = "[-{1-},$(O=[C,S,P]-[O-])]",
+        distance: float = 4.5,
+    ) -> None:
         super().__init__(lig_pattern=cation, prot_pattern=anion, distance=distance)
 
 
@@ -228,20 +239,22 @@ class CationPi(Interaction):
 
     def __init__(
         self,
-        cation="[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
-        pi_ring=(
+        cation: str = "[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
+        pi_ring: tuple[str, ...] = (
             "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
             "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
         ),
-        distance=4.5,
-        angle=(0, 30),
-    ):
+        distance: float = 4.5,
+        angle: "Angles" = (0, 30),
+    ) -> None:
         self.cation = MolFromSmarts(cation)
         self.pi_ring = [MolFromSmarts(s) for s in pi_ring]
         self.distance = distance
         self.angle = tuple(radians(i) for i in angle)
 
-    def detect(self, cation, pi):
+    def detect(
+        self, cation: "Residue", pi: "Residue"
+    ) -> Iterator["InteractionMetadata"]:
         cation_matches = cation.GetSubstructMatches(self.cation)
         for pi_ring in self.pi_ring:
             pi_matches = pi.GetSubstructMatches(pi_ring)
@@ -304,14 +317,14 @@ class FaceToFace(BasePiStacking):
 
     def __init__(
         self,
-        distance=5.5,
-        plane_angle=(0, 35),
-        normal_to_centroid_angle=(0, 33),
-        pi_ring=(
+        distance: float = 5.5,
+        plane_angle: "Angles" = (0, 35),
+        normal_to_centroid_angle: "Angles" = (0, 33),
+        pi_ring: tuple[str, ...] = (
             "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
             "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
         ),
-    ):
+    ) -> None:
         super().__init__(
             distance=distance,
             plane_angle=plane_angle,
@@ -351,15 +364,15 @@ class EdgeToFace(BasePiStacking):
 
     def __init__(
         self,
-        distance=6.5,
-        plane_angle=(50, 90),
-        normal_to_centroid_angle=(0, 30),
-        pi_ring=(
+        distance: float = 6.5,
+        plane_angle: "Angles" = (50, 90),
+        normal_to_centroid_angle: "Angles" = (0, 30),
+        pi_ring: tuple[str, ...] = (
             "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
             "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
         ),
-        intersect_radius=1.5,
-    ):
+        intersect_radius: float = 1.5,
+    ) -> None:
         super().__init__(
             distance=distance,
             plane_angle=plane_angle,
@@ -391,11 +404,15 @@ class PiStacking(Interaction):
 
     """
 
-    def __init__(self, ftf_kwargs=None, etf_kwargs=None):
+    def __init__(
+        self, ftf_kwargs: dict | None = None, etf_kwargs: dict | None = None
+    ) -> None:
         self.ftf = FaceToFace(**ftf_kwargs or {})
         self.etf = EdgeToFace(**etf_kwargs or {})
 
-    def detect(self, ligand, residue):
+    def detect(
+        self, ligand: "Residue", residue: "Residue"
+    ) -> Iterator["InteractionMetadata"]:
         yield from self.ftf.detect(ligand, residue)
         yield from self.etf.detect(ligand, residue)
 
@@ -420,10 +437,12 @@ class MetalDonor(Distance):
 
     def __init__(
         self,
-        metal="[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
-        ligand="[O,#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),-{1-};!+{1-}]",
-        distance=2.8,
-    ):
+        metal: str = "[Ca,Cd,Co,Cu,Fe,Mg,Mn,Ni,Zn]",
+        ligand: str = (
+            "[O,#7&!$([nX3])&!$([NX3]-*=[!#6])&!$([NX3]-[a])&!$([NX4]),-{1-};!+{1-}]"
+        ),
+        distance: float = 2.8,
+    ) -> None:
         super().__init__(lig_pattern=metal, prot_pattern=ligand, distance=distance)
 
 
@@ -476,7 +495,7 @@ class VdWContact(Interaction):
             self.tolerance = tolerance
         else:
             raise ValueError("`tolerance` must be 0 or positive")
-        self._vdw_cache = {}
+        self._vdw_cache: dict[frozenset[str], float] = {}
         self.preset = preset.lower()
         preset_vdw = VDW_PRESETS[self.preset]
         self.vdwradii = {**preset_vdw, **vdwradii} if vdwradii else preset_vdw
@@ -497,7 +516,9 @@ class VdWContact(Interaction):
                 f" {self.preset!r}."
             ) from None
 
-    def detect(self, ligand, residue):
+    def detect(
+        self, ligand: "Residue", residue: "Residue"
+    ) -> Iterator["InteractionMetadata"]:
         lxyz = ligand.GetConformer()
         rxyz = residue.GetConformer()
         for la, ra in product(ligand.GetAtoms(), residue.GetAtoms()):

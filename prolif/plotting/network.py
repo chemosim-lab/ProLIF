@@ -18,10 +18,11 @@ import operator
 import re
 import warnings
 from collections import defaultdict
+from collections.abc import Iterable
 from copy import deepcopy
 from html import escape
 from pathlib import Path
-from typing import ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, TextIO, Union, cast
 from uuid import uuid4
 
 import numpy as np
@@ -43,6 +44,12 @@ else:
         "ignore",
         "Consider using IPython.display.IFrame instead",  # pragma: no cover
     )
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from prolif.fingerprint import Fingerprint
+    from prolif.ifp import IFP
 
 
 class LigNetwork:
@@ -66,7 +73,7 @@ class LigNetwork:
     molsize : int
         Multiply the coordinates by this number to create a bigger and
         more readable depiction
-    rotation : int
+    rotation : float
         Rotate the structure on the XY plane
     carbon : float
         Size of the carbon atom dots on the depiction. Use `0` to hide the
@@ -217,17 +224,17 @@ class LigNetwork:
 
     def __init__(
         self,
-        df,
-        lig_mol,
-        use_coordinates=False,
-        flatten_coordinates=True,
-        kekulize=False,
-        molsize=35,
-        rotation=0,
-        carbon=0.16,
-    ):
+        df: pd.DataFrame,
+        lig_mol: Chem.Mol,
+        use_coordinates: bool = False,
+        flatten_coordinates: bool = True,
+        kekulize: bool = False,
+        molsize: int = 35,
+        rotation: float = 0,
+        carbon: float = 0.16,
+    ) -> None:
         self.df = df
-        self._interacting_atoms = {
+        self._interacting_atoms: set[int] = {
             atom for atoms in df.index.get_level_values("atoms") for atom in atoms
         }
         mol = deepcopy(lig_mol)
@@ -238,7 +245,7 @@ class LigNetwork:
                 rdDepictor.GenerateDepictionMatching3DStructure(mol, lig_mol)
         else:
             rdDepictor.Compute2DCoords(mol, clearConfs=True)
-        xyz = mol.GetConformer().GetPositions()
+        xyz: "NDArray[np.float64]" = mol.GetConformer().GetPositions()
         if rotation:
             theta = np.radians(rotation)
             c, s = np.cos(theta), np.sin(theta)
@@ -248,7 +255,7 @@ class LigNetwork:
             xy = ((xy - center) @ R.T) + center
             xyz = np.concatenate([xy, z], axis=1)
         if carbon:
-            self._carbon = {
+            self._carbon: dict[str, Any] = {
                 "label": " ",
                 "shape": "dot",
                 "color": self.COLORS["atoms"]["C"],
@@ -259,7 +266,7 @@ class LigNetwork:
         self.xyz = molsize * xyz
         self.mol = mol
         self._multiplier = molsize
-        self.options = {}
+        self.options: dict[str, Any] = {}
         self._max_interaction_width = 6
         self._avoidOverlap = 0.8
         self._springConstant = 0.1
@@ -287,19 +294,19 @@ class LigNetwork:
         }
         # ID for saving to PNG with JS
         self.uuid = uuid4().hex
-        self._iframe = None
+        self._iframe: str | None = None
 
     @classmethod
     def from_fingerprint(
         cls,
-        fp,
-        ligand_mol,
-        kind="aggregate",
-        frame=0,
-        display_all=False,
-        threshold=0.3,
-        **kwargs,
-    ):
+        fp: "Fingerprint",
+        ligand_mol: Chem.Mol,
+        kind: Literal["aggregate", "frame"] = "aggregate",
+        frame: int = 0,
+        display_all: bool = False,
+        threshold: float = 0.3,
+        **kwargs: Any,
+    ) -> "LigNetwork":
         """Helper method to create a ligand interaction diagram from a
         :class:`~prolif.fingerprint.Fingerprint` object.
 
@@ -351,7 +358,7 @@ class LigNetwork:
         raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
 
     @staticmethod
-    def _get_records(ifp, all_metadata):
+    def _get_records(ifp: "IFP", all_metadata: bool) -> list[dict[str, Any]]:
         records = []
         for (lig_resid, prot_resid), int_data in ifp.items():
             for int_name, metadata_tuple in int_data.items():
@@ -381,7 +388,9 @@ class LigNetwork:
         return records
 
     @classmethod
-    def _make_agg_df_from_fp(cls, fp, threshold=0.3):
+    def _make_agg_df_from_fp(
+        cls, fp: "Fingerprint", threshold: float = 0.3
+    ) -> pd.DataFrame:
         data = []
         for ifp in fp.ifp.values():
             data.extend(cls._get_records(ifp, all_metadata=False))
@@ -411,7 +420,9 @@ class LigNetwork:
         )
 
     @classmethod
-    def _make_frame_df_from_fp(cls, fp, frame=0, display_all=False):
+    def _make_frame_df_from_fp(
+        cls, fp: "Fingerprint", frame: int = 0, display_all: bool = False
+    ) -> pd.DataFrame:
         ifp = fp.ifp[frame]
         data = cls._get_records(ifp, all_metadata=display_all)
         df = pd.DataFrame(data)
@@ -420,10 +431,10 @@ class LigNetwork:
             columns=["weight", "distance"],
         )
 
-    def _make_carbon(self):
+    def _make_carbon(self) -> dict[str, Any]:
         return deepcopy(self._carbon)
 
-    def _make_lig_node(self, atom):
+    def _make_lig_node(self, atom: Chem.Atom) -> None:
         """Prepare ligand atoms"""
         idx = atom.GetIdx()
         elem = atom.GetSymbol()
@@ -432,11 +443,11 @@ class LigNetwork:
             return
         charge = atom.GetFormalCharge()
         if charge != 0:
-            charge = "{}{}".format(
+            displayed_charge = "{}{}".format(
                 "" if abs(charge) == 1 else str(charge),
                 "+" if charge > 0 else "-",
             )
-            label = f"{elem}{charge}"
+            label = f"{elem}{displayed_charge}"
             shape = "ellipse"
         else:
             label = elem
@@ -462,9 +473,9 @@ class LigNetwork:
                 "borderWidth": 0,
             },
         )
-        self.nodes[idx] = node
+        self._nodes[idx] = node
 
-    def _make_lig_edge(self, bond):
+    def _make_lig_edge(self, bond: Chem.Bond) -> None:
         """Prepare ligand bonds"""
         idx = [bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()]
         if any(i in self.exclude for i in idx):
@@ -484,7 +495,7 @@ class LigNetwork:
         else:
             self._make_non_single_bond(idx, btype)
 
-    def _make_non_single_bond(self, ids, btype):
+    def _make_non_single_bond(self, ids: list[int], btype: float) -> None:
         """Prepare double, triple and aromatic bonds"""
         xyz = self.xyz[ids]
         d = xyz[1, :2] - xyz[0, :2]
@@ -499,7 +510,7 @@ class LigNetwork:
                 xy = point[:2] + perp * dist
                 id_ = hash(xy.tobytes())
                 nodes.append(id_)
-                self.nodes[id_] = {
+                self._nodes[id_] = {
                     "id": id_,
                     "x": xy[0],
                     "y": xy[1],
@@ -543,7 +554,7 @@ class LigNetwork:
                 },
             )
 
-    def _make_interactions(self, mass=2):
+    def _make_interactions(self, mass: int = 2) -> None:
         """Prepare lig-prot interactions"""
         restypes = {}
         for prot_res in self.df.index.get_level_values("protein").unique():
@@ -562,15 +573,18 @@ class LigNetwork:
                 "group": "protein",
                 "residue_type": restype,
             }
-            self.nodes[prot_res] = node
+            self._nodes[prot_res] = node
         for (lig_res, prot_res, interaction, lig_indices), (
             weight,
             distance,
-        ) in self.df.iterrows():
+        ) in cast(
+            Iterable[tuple[tuple[str, str, str, tuple[int, ...]], tuple[float, float]]],
+            self.df.iterrows(),
+        ):
             if interaction in self._LIG_PI_INTERACTIONS:
                 centroid = self._get_ring_centroid(lig_indices)
                 origin = f"centroid({lig_res}, {prot_res}, {interaction})"
-                self.nodes[origin] = {
+                self._nodes[origin] = {
                     "id": origin,
                     "x": centroid[0],
                     "y": centroid[1],
@@ -611,35 +625,35 @@ class LigNetwork:
                 edge["font"] = self._edge_label_font
             self.edges.append(edge)
 
-    def _get_ring_centroid(self, indices):
+    def _get_ring_centroid(self, indices: tuple[int, ...]) -> "NDArray[np.float64]":
         """Find ring centroid coordinates using the indices of the ring atoms"""
-        return self.xyz[list(indices)].mean(axis=0)
+        return self.xyz[list(indices)].mean(axis=0)  # type: ignore[no-any-return]
 
-    def _patch_hydrogens(self):
+    def _patch_hydrogens(self) -> None:
         """Patch hydrogens on heteroatoms
 
         Hydrogen atoms that aren't part of any interaction have been hidden at
         this stage, but they should be added to the label of the heteroatom for
         clarity
         """
-        to_patch = defaultdict(int)
+        to_patch: defaultdict[int, int] = defaultdict(int)
         for idx in self.exclude:
             h = self.mol.GetAtomWithIdx(idx)
-            atom = h.GetNeighbors()[0]
+            atom: Chem.Atom = h.GetNeighbors()[0]
             if atom.GetSymbol() != "C":
                 to_patch[atom.GetIdx()] += 1
         for idx, nH in to_patch.items():
-            node = self.nodes[idx]
+            node = self._nodes[idx]
             h_str = "H" if nH == 1 else f"H{nH}"
             label = re.sub(r"(\w+)(.*)", rf"\1{h_str}\2", node["label"])
             node["label"] = label
             node["shape"] = "ellipse"
 
-    def _make_graph_data(self):
+    def _make_graph_data(self) -> None:
         """Prepares the nodes and edges"""
-        self.exclude = []
-        self.nodes = {}
-        self.edges = []
+        self.exclude: list[int] = []
+        self._nodes: dict[int | str, dict[str, Any]] = {}
+        self.edges: list[dict[str, Any]] = []
         # show residues
         self._make_interactions()
         # show ligand
@@ -648,16 +662,16 @@ class LigNetwork:
         for bond in self.mol.GetBonds():
             self._make_lig_edge(bond)
         self._patch_hydrogens()
-        self.nodes = list(self.nodes.values())
+        self.nodes = list(self._nodes.values())
 
     def _get_js(
         self,
-        width="100%",
-        height="500px",
-        div_id="mynetwork",
-        fontsize=20,
-        show_interaction_data=False,
-    ):
+        width: str = "100%",
+        height: str = "500px",
+        div_id: str = "mynetwork",
+        fontsize: int = 20,
+        show_interaction_data: bool = False,
+    ) -> str:
         """Returns the JavaScript code to draw the network"""
         self.width = width
         self.height = height
@@ -687,11 +701,11 @@ class LigNetwork:
         js += self._get_legend()
         return js
 
-    def _get_html(self, **kwargs):
+    def _get_html(self, **kwargs: Any) -> str:
         """Returns the HTML code to draw the network"""
         return self._HTML_TEMPLATE % {"js": self._get_js(**kwargs)}
 
-    def _get_legend(self, height="90px"):
+    def _get_legend(self, height: str = "90px") -> str:
         available = {}
         buttons = []
         map_color_restype = {c: t for t, c in self.COLORS["residues"].items()}
@@ -839,7 +853,7 @@ class LigNetwork:
         )
 
     @requires("IPython.display")
-    def display(self, **kwargs):
+    def display(self, **kwargs: Any) -> "LigNetwork":
         """Prepare and display the network.
 
         Parameters
@@ -858,7 +872,7 @@ class LigNetwork:
         return self
 
     @requires("IPython.display")
-    def show(self, filename, **kwargs):
+    def show(self, filename: str, **kwargs: Any) -> "LigNetwork":
         """Save the network as HTML and display the resulting file"""
         html = self._get_html(**kwargs)
         with open(filename, "w") as f:
@@ -869,7 +883,7 @@ class LigNetwork:
         )
         return self
 
-    def save(self, fp, **kwargs):
+    def save(self, fp: Union[str, Path, "TextIO"], **kwargs: Any) -> None:
         """Save the network to an HTML file
 
         Parameters
@@ -885,7 +899,7 @@ class LigNetwork:
             fp.write(html)
 
     @requires("IPython.display")
-    def save_png(self):
+    def save_png(self) -> Any:
         """Saves the current state of the ligplot to a PNG. Not available outside of a
         notebook.
 
@@ -907,7 +921,7 @@ class LigNetwork:
             """),
         )
 
-    def _repr_html_(self):  # noqa: PLW3201, RUF100
+    def _repr_html_(self) -> str | None:  # noqa: PLW3201
         if self._iframe:
             return self._iframe
         return None

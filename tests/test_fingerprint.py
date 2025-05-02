@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import MDAnalysis as mda
 import numpy as np
 import pytest
@@ -5,19 +7,36 @@ from pandas import DataFrame
 from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
 from prolif.datafiles import datapath
-from prolif.fingerprint import Fingerprint
+from prolif.fingerprint import DEFAULT_INTERACTIONS, Fingerprint
 from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.molecule import sdf_supplier
 from prolif.residue import ResidueId
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+    from pathlib import Path
 
-class Dummy(Interaction):
-    def detect(self, res1, res2):
-        yield self.metadata(res1, res2, (2,), (4,), distance=4.2)
+    from MDAnalysis.core.groups import AtomGroup
+
+    from prolif.molecule import Molecule, sdf_supplier
+    from prolif.typeshed import InteractionMetadata
 
 
-def test_interaction_base(sdf_suppl):
-    interaction = Dummy()
+@pytest.fixture
+def dummy_cls(cleanup_dummy: "Iterator[None]") -> type[Interaction]:  # noqa: ARG001
+    class Dummy(Interaction):
+        def detect(
+            self, res1: "Molecule", res2: "Molecule"
+        ) -> "Iterator[InteractionMetadata]":
+            yield self.metadata(res1, res2, (2,), (4,), distance=4.2)
+
+    return Dummy
+
+
+def test_interaction_base(
+    sdf_suppl: "sdf_supplier", dummy_cls: type[Interaction]
+) -> None:
+    interaction = dummy_cls()
     repr_ = repr(interaction)
     assert repr_.startswith("<")
     assert ".Dummy at " in repr_
@@ -27,7 +46,7 @@ def test_interaction_base(sdf_suppl):
     assert metadata["indices"] == {"ligand": (2,), "protein": (4,)}
     assert metadata["parent_indices"] == {"ligand": (2,), "protein": (4,)}
     # invert
-    inverted = Dummy.invert_role("Dummy", "inverted")
+    inverted = dummy_cls.invert_role("Dummy", "inverted")
     inverted_interaction = inverted()
     metadata = next(inverted_interaction.detect(mol, mol))
     assert metadata["indices"] == {"ligand": (4,), "protein": (2,)}
@@ -36,43 +55,38 @@ def test_interaction_base(sdf_suppl):
 
 class TestFingerprint:
     @pytest.fixture(scope="class")
-    def fp(self):
-        yield Fingerprint()
-        _INTERACTIONS.pop("Dummy", None)
+    def fp(self) -> Fingerprint:
+        return Fingerprint()
 
     @pytest.fixture(scope="class")
-    def fp_count(self):
-        yield Fingerprint(count=True)
-        _INTERACTIONS.pop("Dummy", None)
+    def fp_count(self) -> Fingerprint:
+        return Fingerprint(count=True)
 
     @pytest.fixture(scope="class", params=["fp", "fp_count"])
-    def any_fp(self, request):
-        return request.getfixturevalue(request.param)
+    def any_fp(self, request: pytest.FixtureRequest) -> Fingerprint:
+        return request.getfixturevalue(request.param)  # type: ignore[no-any-return]
 
     @pytest.fixture(scope="class")
-    def fp_simple(self):
-        yield Fingerprint(["Hydrophobic"])
-        _INTERACTIONS.pop("Dummy", None)
+    def fp_simple(self) -> Fingerprint:
+        return Fingerprint(["Hydrophobic"])
 
-    def test_init(self, fp_simple):
+    def test_init(self, fp_simple: Fingerprint) -> None:
         assert "Hydrophobic" in fp_simple.interactions
         assert hasattr(fp_simple, "hydrophobic") and callable(fp_simple.hydrophobic)
         assert "Dummy" not in fp_simple.interactions
-        assert hasattr(fp_simple, "dummy") and callable(fp_simple.dummy)
-        assert "_BaseHBond" not in fp_simple.interactions
-        assert not hasattr(fp_simple, "_basehbond")
         assert "Interaction" not in fp_simple.interactions
         assert not hasattr(fp_simple, "interaction")
 
-    def test_init_all(self):
+    def test_init_all(self) -> None:
         fp = Fingerprint("all")
-        for name, func in fp.interactions.items():
-            assert getattr(fp, name.lower()) is func.__wrapped__
+        assert set(fp.interactions) == set(_INTERACTIONS)
 
-    def test_n_interactions(self, fp):
+    def test_n_interactions(self, fp: Fingerprint) -> None:
         assert fp.n_interactions == len(fp.interactions)
 
-    def test_bitvector(self, any_fp, ligand_mol, protein_mol):
+    def test_bitvector(
+        self, any_fp: Fingerprint, ligand_mol: "Molecule", protein_mol: "Molecule"
+    ) -> None:
         bv = any_fp.bitvector(ligand_mol[0], protein_mol["ASP129.A"])
         assert len(bv) == any_fp.n_interactions
         assert (bv == 0).any()
@@ -80,7 +94,9 @@ class TestFingerprint:
         if any_fp.count:
             assert (bv > 1).any()
 
-    def test_metadata(self, any_fp, ligand_mol, protein_mol):
+    def test_metadata(
+        self, any_fp: Fingerprint, ligand_mol: "Molecule", protein_mol: "Molecule"
+    ) -> None:
         metadata = any_fp.metadata(ligand_mol[0], protein_mol["ASP129.A"])
         assert metadata
         assert "HBAcceptor" not in metadata
@@ -89,7 +105,13 @@ class TestFingerprint:
             for cationic in metadata["Cationic"]
         )
 
-    def test_run_residues(self, fp_simple, u, ligand_ag, protein_ag):
+    def test_run_residues(
+        self,
+        fp_simple: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+    ) -> None:
         fp_simple.run(
             u.trajectory[0:1],
             ligand_ag,
@@ -127,14 +149,18 @@ class TestFingerprint:
         assert (lig_id, res) in fp_simple.ifp[0]
         u.trajectory[0]
 
-    def test_generate(self, fp_simple, ligand_mol, protein_mol):
+    def test_generate(
+        self, fp_simple: Fingerprint, ligand_mol: "Molecule", protein_mol: "Molecule"
+    ) -> None:
         ifp = fp_simple.generate(ligand_mol, protein_mol)
         key = (ResidueId("LIG", 1, "G"), ResidueId("VAL", 201, "A"))
         bv = ifp[key]
         assert isinstance(bv, np.ndarray)
         assert bv[0] is np.True_
 
-    def test_generate_metadata(self, fp_simple, ligand_mol, protein_mol):
+    def test_generate_metadata(
+        self, fp_simple: Fingerprint, ligand_mol: "Molecule", protein_mol: "Molecule"
+    ) -> None:
         ifp = fp_simple.generate(ligand_mol, protein_mol, metadata=True)
         key = (ResidueId("LIG", 1, "G"), ResidueId("VAL", 201, "A"))
         int_data = ifp[key]
@@ -155,8 +181,15 @@ class TestFingerprint:
     )
     @pytest.mark.parametrize("n_jobs", [None, 1])
     def test_run(
-        self, fp_simple, u, ligand_ag, protein_ag, trajectory_slice, n_jobs, tmp_path
-    ):
+        self,
+        fp_simple: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+        trajectory_slice: slice | int | np.ndarray,
+        n_jobs: int | None,
+        tmp_path: "Path",
+    ) -> None:
         if isinstance(trajectory_slice, np.ndarray):
             pdb_path = tmp_path / "multi_frame.pdb"
             with mda.Writer(str(pdb_path), u.atoms.n_atoms) as W:
@@ -181,13 +214,21 @@ class TestFingerprint:
             for key in ["indices", "parent_indices", "distance"]
         )
 
-    def test_run_from_iterable(self, fp_simple, protein_mol):
+    def test_run_from_iterable(
+        self, fp_simple: Fingerprint, protein_mol: "Molecule"
+    ) -> None:
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
         fp_simple.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
         assert len(fp_simple.ifp) == 2
 
-    def test_to_df(self, fp_simple, u, ligand_ag, protein_ag):
+    def test_to_df(
+        self,
+        fp_simple: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+    ) -> None:
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_dataframe()
         fp_simple.run(
@@ -201,7 +242,13 @@ class TestFingerprint:
         assert isinstance(df, DataFrame)
         assert len(df) == 3
 
-    def test_to_df_kwargs(self, fp_simple, u, ligand_ag, protein_ag):
+    def test_to_df_kwargs(
+        self,
+        fp_simple: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+    ) -> None:
         fp_simple.run(
             u.trajectory[:3],
             ligand_ag,
@@ -215,7 +262,13 @@ class TestFingerprint:
         resids = {key for d in fp_simple.ifp.values() for key in d}
         assert df.shape == (3, len(resids))
 
-    def test_to_bitvector(self, fp_simple, u, ligand_ag, protein_ag):
+    def test_to_bitvector(
+        self,
+        fp_simple: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+    ) -> None:
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_bitvectors()
         fp_simple.run(
@@ -229,7 +282,13 @@ class TestFingerprint:
         assert isinstance(bvs[0], ExplicitBitVect)
         assert len(bvs) == 3
 
-    def test_to_countvectors(self, fp_count, u, ligand_ag, protein_ag):
+    def test_to_countvectors(
+        self,
+        fp_count: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+    ) -> None:
         with pytest.raises(AttributeError, match="use the `run` method"):
             Fingerprint().to_countvectors()
         fp_count.run(
@@ -244,7 +303,7 @@ class TestFingerprint:
         assert cvs[0][0] == 4
         assert len(cvs) == 3
 
-    def test_list_avail(self):
+    def test_list_avail(self) -> None:
         available = Fingerprint.list_available()
         assert "Hydrophobic" in available
         assert "HBDonor" in available
@@ -256,7 +315,7 @@ class TestFingerprint:
         assert "Distance" in available
         assert "Interaction" not in available
 
-    def test_unknown_interaction(self):
+    def test_unknown_interaction(self) -> None:
         with pytest.raises(
             NameError,
             match=r"Unknown interaction\(s\) in 'interactions': foo",
@@ -269,28 +328,33 @@ class TestFingerprint:
             Fingerprint(["Cationic"], parameters={"bar": {}})
 
     @pytest.fixture()
-    def fp_to_pickle(self, fp, protein_mol):
+    def fp_to_pickle(
+        self,
+        protein_mol: "Molecule",
+        dummy_cls: type[Interaction],  # noqa: ARG002
+    ) -> Fingerprint:
+        fp = Fingerprint([*DEFAULT_INTERACTIONS, "Dummy"])
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = list(sdf_supplier(path))
         fp.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
         return fp
 
     @pytest.fixture()
-    def fp_unpkl(self, fp_to_pickle):
+    def fp_unpkl(self, fp_to_pickle: Fingerprint) -> Fingerprint:
         pkl = fp_to_pickle.to_pickle()
         return Fingerprint.from_pickle(pkl)
 
     @pytest.fixture()
-    def fp_unpkl_file(self, fp_to_pickle, tmp_path):
+    def fp_unpkl_file(self, fp_to_pickle: Fingerprint, tmp_path: "Path") -> Fingerprint:
         pkl_path = tmp_path / "fp.pkl"
         fp_to_pickle.to_pickle(pkl_path)
         return Fingerprint.from_pickle(pkl_path)
 
     @pytest.fixture(params=["fp_unpkl", "fp_unpkl_file"])
-    def fp_pkled(self, request):
-        return request.getfixturevalue(request.param)
+    def fp_pkled(self, request: pytest.FixtureRequest) -> Fingerprint:
+        return request.getfixturevalue(request.param)  # type: ignore[no-any-return]
 
-    def test_pickle(self, fp_to_pickle, fp_pkled):
+    def test_pickle(self, fp_to_pickle: Fingerprint, fp_pkled: Fingerprint) -> None:
         assert fp_to_pickle.interactions.keys() == fp_pkled.interactions.keys()
         assert len(fp_to_pickle.ifp) == len(fp_pkled.ifp)
         for frame_ifp, frame_pkl_ifp in zip(
@@ -298,11 +362,17 @@ class TestFingerprint:
         ):
             assert frame_ifp == frame_pkl_ifp
 
-    def test_pickle_custom_interaction(self, fp_unpkl):
+    def test_pickle_custom_interaction(self, fp_unpkl: Fingerprint) -> None:
         assert hasattr(fp_unpkl, "dummy")
         assert callable(fp_unpkl.dummy)
 
-    def test_run_multiproc_serial_same(self, fp, u, ligand_ag, protein_ag):
+    def test_run_multiproc_serial_same(
+        self,
+        fp: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+    ) -> None:
         fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag, n_jobs=1, progress=False)
         serial = fp.to_dataframe()
         fp.run(
@@ -315,7 +385,9 @@ class TestFingerprint:
         multi = fp.to_dataframe()
         assert serial.equals(multi)
 
-    def test_run_iter_multiproc_serial_same(self, fp, protein_mol):
+    def test_run_iter_multiproc_serial_same(
+        self, fp: Fingerprint, protein_mol: "Molecule"
+    ) -> None:
         run = fp.run_from_iterable
         path = str(datapath / "vina" / "vina_output.sdf")
         lig_suppl = sdf_supplier(path)
@@ -325,7 +397,13 @@ class TestFingerprint:
         multi = fp.to_dataframe()
         assert serial.equals(multi)
 
-    def test_converter_kwargs_raises_error(self, fp, u, ligand_ag, protein_ag):
+    def test_converter_kwargs_raises_error(
+        self,
+        fp: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+    ) -> None:
         with pytest.raises(
             ValueError,
             match="converter_kwargs must be a list of 2 dicts",
@@ -336,11 +414,11 @@ class TestFingerprint:
                 protein_ag,
                 n_jobs=1,
                 progress=False,
-                converter_kwargs=[{"force": True}],
+                converter_kwargs=({"force": True},),  # type: ignore[arg-type]
             )
 
     @pytest.mark.parametrize("n_jobs", [1, 2])
-    def test_converter_kwargs(self, fp, n_jobs):
+    def test_converter_kwargs(self, fp: Fingerprint, n_jobs: int) -> None:
         u = mda.Universe.from_smiles("O=C=O.O=C=O")
         lig, prot = u.atoms.fragments
         fp.run(
@@ -348,14 +426,14 @@ class TestFingerprint:
             lig,
             prot,
             n_jobs=n_jobs,
-            converter_kwargs=[{"force": True}, {"force": True}],
+            converter_kwargs=({"force": True}, {"force": True}),
         )
         assert fp.ifp
 
-    def test_interaction_params(self):
+    def test_interaction_params(self) -> None:
         fp = Fingerprint()
-        assert fp.hydrophobic.distance == 4.5
+        assert fp.hydrophobic.distance == 4.5  # type: ignore[attr-defined]
         fp = Fingerprint(parameters={"Hydrophobic": {"distance": 1.0}})
-        assert fp.hydrophobic.distance == 1.0
+        assert fp.hydrophobic.distance == 1.0  # type: ignore[attr-defined]
         fp = Fingerprint()
-        assert fp.hydrophobic.distance == 4.5
+        assert fp.hydrophobic.distance == 4.5  # type: ignore[attr-defined]

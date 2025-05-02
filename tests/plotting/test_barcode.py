@@ -1,13 +1,17 @@
-from typing import Iterator
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, cast
 
 import matplotlib as mpl
-import MDAnalysis as mda
 import pytest
 from matplotlib import pyplot as plt
 
 import prolif as plf
 from prolif.exceptions import RunRequiredError
 from prolif.plotting.barcode import Barcode
+
+if TYPE_CHECKING:
+    from MDAnalysis.core.groups import AtomGroup
+    from MDAnalysis.core.universe import Universe
 
 
 class TestBarcode:
@@ -29,14 +33,14 @@ class TestBarcode:
 
     @pytest.fixture(scope="class", params=["simple_fp", "count_fp"])
     def fp(self, request: pytest.FixtureRequest) -> plf.Fingerprint:
-        return request.getfixturevalue(request.param)
+        return cast(plf.Fingerprint, request.getfixturevalue(request.param))
 
     @pytest.fixture(scope="class")
     def fp_run(
         self,
-        u: mda.Universe,
-        ligand_ag,
-        protein_ag,
+        u: "Universe",
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
         fp: plf.Fingerprint,
     ) -> plf.Fingerprint:
         fp.run(u.trajectory[0:2], ligand_ag, protein_ag)

@@ -1,3 +1,6 @@
+from abc import abstractmethod
+from typing import TYPE_CHECKING, Literal, cast
+
 import MDAnalysis as mda
 import numpy as np
 import pytest
@@ -7,16 +10,26 @@ from rdkit import Chem, RDLogger
 import prolif
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import VdWContact
-from prolif.interactions.base import _INTERACTIONS, Interaction, get_mapindex
+from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.interactions.constants import VDW_PRESETS
+from prolif.interactions.utils import get_mapindex
 
-# disable rdkit warnings
+# Disable RDKit warnings
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.ERROR)
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from MDAnalysis.core.universe import Universe
+
+    from prolif.molecule import Molecule
+    from prolif.residue import Residue
+    from prolif.typeshed import InteractionMetadata
+
 
 @pytest.fixture(scope="module")
-def benzene_universe():
+def benzene_universe() -> "Universe":
     benzene = mda.Universe(prolif.datafiles.datapath / "benzene.mol2")
     elements = mda.topology.guessers.guess_types(benzene.atoms.names)
     benzene.add_TopologyAttr("elements", elements)
@@ -26,7 +39,7 @@ def benzene_universe():
 
 
 @pytest.fixture(scope="module")
-def interaction_instances():
+def interaction_instances() -> dict[str, Interaction]:
     return {
         name: cls()
         for name, cls in _INTERACTIONS.items()
@@ -35,25 +48,29 @@ def interaction_instances():
 
 
 @pytest.fixture(scope="session")
-def any_mol(request):
-    return request.getfixturevalue(request.param)
+def any_mol(request: pytest.FixtureRequest) -> "Molecule":
+    return cast("Molecule", request.getfixturevalue(request.param))
 
 
 @pytest.fixture(scope="session")
-def any_other_mol(request):
-    return request.getfixturevalue(request.param)
+def any_other_mol(request: pytest.FixtureRequest) -> "Molecule":
+    return cast("Molecule", request.getfixturevalue(request.param))
 
 
 @pytest.fixture(scope="module")
-def interaction_qmol(request, interaction_instances):
-    int_name, parameter = request.param.split(".")
-    return getattr(interaction_instances[int_name], parameter)
+def interaction_qmol(
+    request: pytest.FixtureRequest, interaction_instances: dict[str, Interaction]
+) -> Chem.Mol | list[Chem.Mol]:
+    int_name, parameter = cast(str, request.param).split(".")
+    return cast(
+        Chem.Mol | list[Chem.Mol], getattr(interaction_instances[int_name], parameter)
+    )
 
 
 class TestInteractions:
     @pytest.fixture(scope="class")
-    def fingerprint(self):
-        return Fingerprint()
+    def fingerprint(self) -> Fingerprint:
+        return Fingerprint("all")
 
     @pytest.mark.parametrize(
         ("func_name", "any_mol", "any_other_mol", "expected"),
@@ -119,45 +136,51 @@ class TestInteractions:
     )
     def test_interaction(
         self,
-        fingerprint,
-        func_name,
-        any_mol,
-        any_other_mol,
-        expected,
-    ):
+        fingerprint: Fingerprint,
+        func_name: str,
+        any_mol: "Molecule",
+        any_other_mol: "Molecule",
+        expected: bool,
+    ) -> None:
         interaction = getattr(fingerprint, func_name)
         assert next(interaction(any_mol[0], any_other_mol[0]), False) is expected
 
-    def test_warning_supersede(self):
-        old = id(_INTERACTIONS["Hydrophobic"])
-        with pytest.warns(UserWarning, match="interaction has been superseded"):
-
-            class Hydrophobic(Interaction):
-                def detect(self):
-                    pass
-
-        new = id(_INTERACTIONS["Hydrophobic"])
-        assert old != new
-        # fix dummy Hydrophobic class being reused in later unrelated tests
-
-        class Hydrophobic(prolif.interactions.Hydrophobic):
-            __doc__ = prolif.interactions.Hydrophobic.__doc__
-
-    def test_error_no_detect(self):
-        with pytest.raises(
-            TypeError,
-            match="Can't instantiate interaction class _Dummy",
-        ):
-
-            class _Dummy(Interaction):
+    @pytest.mark.usefixtures("cleanup_dummy")
+    def test_warning_supersede(self) -> None:
+        class Dummy(Interaction):
+            @abstractmethod
+            def detect(
+                self, lig_res: "Residue", prot_res: "Residue"
+            ) -> "Iterator[InteractionMetadata]":
                 pass
 
+        old = id(_INTERACTIONS["Dummy"])
+        with pytest.warns(UserWarning, match="interaction has been superseded"):
+
+            class Dummy(Interaction):  # type: ignore[no-redef]
+                @abstractmethod
+                def detect(
+                    self, lig_res: "Residue", prot_res: "Residue"
+                ) -> "Iterator[InteractionMetadata]":
+                    pass
+
+        new = id(_INTERACTIONS["Dummy"])
+        assert old != new
+
+    @pytest.mark.usefixtures("cleanup_dummy")
+    def test_error_no_detect(self) -> None:
+        class Dummy(Interaction):
+            pass
+
+        with pytest.raises(TypeError, match="Can't instantiate abstract class Dummy"):
+            Fingerprint(["Dummy"])
+
     @pytest.mark.parametrize("index", [0, 1, 3, 42, 78])
-    def test_get_mapindex(self, index, ligand_mol):
+    def test_get_mapindex(self, index: int, ligand_mol: "Molecule") -> None:
         parent_index = get_mapindex(ligand_mol[0], index)
         assert parent_index == index
 
-    def test_vdwcontact_tolerance_error(self):
+    def test_vdwcontact_tolerance_error(self) -> None:
         with pytest.raises(ValueError, match="`tolerance` must be 0 or positive"):
             VdWContact(tolerance=-1)
 
@@ -166,7 +189,9 @@ class TestInteractions:
         [("benzene", "cation")],
         indirect=["any_mol", "any_other_mol"],
     )
-    def test_vdwcontact_cache(self, any_mol, any_other_mol):
+    def test_vdwcontact_cache(
+        self, any_mol: "Molecule", any_other_mol: "Molecule"
+    ) -> None:
         vdw = VdWContact()
         assert vdw._vdw_cache == {}
         vdw.detect(any_mol[0], any_other_mol[0])
@@ -179,7 +204,9 @@ class TestInteractions:
         [("benzene", "cation")],
         indirect=["any_mol", "any_other_mol"],
     )
-    def test_vdwcontact_vdwradii_update(self, any_mol, any_other_mol):
+    def test_vdwcontact_vdwradii_update(
+        self, any_mol: "Molecule", any_other_mol: "Molecule"
+    ) -> None:
         vdw = VdWContact(vdwradii={"Na": 0})
         metadata = vdw.detect(any_mol[0], any_other_mol[0])
         assert next(metadata, None) is None
@@ -190,13 +217,18 @@ class TestInteractions:
         indirect=["any_mol", "any_other_mol"],
     )
     @pytest.mark.parametrize("preset", ["mdanalysis", "rdkit", "csd"])
-    def test_vdwcontact_preset(self, any_mol, any_other_mol, preset):
+    def test_vdwcontact_preset(
+        self,
+        any_mol: "Molecule",
+        any_other_mol: "Molecule",
+        preset: 'Literal["mdanalysis", "rdkit", "csd"]',
+    ) -> None:
         vdw = VdWContact(preset=preset)
         metadata = vdw.detect(any_mol[0], any_other_mol[0])
         assert next(metadata, None) is not None
         assert vdw.vdwradii == VDW_PRESETS[preset]
 
-    def test_vdwcontact_radii_missing(self):
+    def test_vdwcontact_radii_missing(self) -> None:
         vdw = VdWContact(preset="mdanalysis")
         with pytest.raises(
             ValueError, match=r"van der Waals radius for atom .+ not found"
@@ -276,7 +308,9 @@ class TestInteractions:
         ],
         indirect=["interaction_qmol"],
     )
-    def test_smarts_matches(self, interaction_qmol, smiles, expected):
+    def test_smarts_matches(
+        self, interaction_qmol: Chem.Mol | list[Chem.Mol], smiles: str, expected: int
+    ) -> None:
         mol = Chem.MolFromSmiles(smiles)
         mol = Chem.AddHs(mol)
         if isinstance(interaction_qmol, list):
@@ -310,17 +344,17 @@ class TestInteractions:
     )
     def test_pi_stacking(
         self,
-        benzene_universe,
-        xyz,
-        rotation,
-        pi_type,
-        expected,
-        fingerprint,
-    ):
+        benzene_universe: "Universe",
+        xyz: list[float],
+        rotation: list[float],
+        pi_type: str,
+        expected: bool,
+        fingerprint: Fingerprint,
+    ) -> None:
         r1, r2 = self.create_rings(benzene_universe, xyz, rotation)
 
-        def evaluate(pistacking_type, r1, r2):
-            return next(getattr(fingerprint, pistacking_type)(r1, r2), False)
+        def evaluate(pistacking_type: str, r1: "Molecule", r2: "Molecule") -> bool:
+            return getattr(fingerprint, pistacking_type).any(r1, r2) or False
 
         assert evaluate(pi_type, r1, r2) is expected
         if expected is True:
@@ -329,7 +363,9 @@ class TestInteractions:
             assert evaluate("pistacking", r1, r2) is expected
 
     @staticmethod
-    def create_rings(benzene_universe, xyz, rotation):
+    def create_rings(
+        benzene_universe: "Universe", xyz: list[float], rotation: list[float]
+    ) -> tuple["Molecule", "Molecule"]:
         r2 = benzene_universe.copy()
         r2.segments.segids = np.array(["U2"], dtype=object)
         tr = translate(xyz)
@@ -342,8 +378,10 @@ class TestInteractions:
             prolif.Molecule.from_mda(r2)[0],
         )
 
-    def test_edgetoface_phe331(self, ligand_mol, protein_mol):
-        fp = Fingerprint()
+    def test_edgetoface_phe331(
+        self, ligand_mol: "Molecule", protein_mol: "Molecule", fingerprint: Fingerprint
+    ) -> None:
         lig, phe331 = ligand_mol[0], protein_mol["PHE331.B"]
-        assert next(fp.edgetoface(lig, phe331)) is True
-        assert next(fp.pistacking(lig, phe331)) is True
+        assert fingerprint.edgetoface.any(lig, phe331)  # type: ignore[attr-defined]
+        assert not fingerprint.facetoface.any(lig, phe331)  # type: ignore[attr-defined]
+        assert fingerprint.pistacking.any(lig, phe331)  # type: ignore[attr-defined]

@@ -1,3 +1,6 @@
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pytest
 from MDAnalysis import Universe
@@ -7,10 +10,16 @@ from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
 
 from prolif.datafiles import TOP, TRAJ, datapath
+from prolif.interactions.base import _INTERACTIONS
 from prolif.molecule import Molecule, sdf_supplier
 
+if TYPE_CHECKING:
+    from MDAnalysis.core.groups import AtomGroup
 
-def pytest_sessionstart(session):  # noqa: ARG001
+    from prolif.molecule import BaseRDKitMol
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: ARG001
     if not datapath.exists():
         pytest.exit(
             f"Example data files are not accessible: {datapath!s} does not exist",
@@ -22,57 +31,57 @@ def pytest_sessionstart(session):  # noqa: ARG001
         )
     # ugly patch to add Mixin class as attribute to pytest so that we don't have to
     # worry about relative imports in the test codebase
-    pytest.BaseTestMixinRDKitMol = BaseTestMixinRDKitMol
+    pytest.BaseTestMixinRDKitMol = BaseTestMixinRDKitMol  # type: ignore[attr-defined]
 
 
 @pytest.fixture(scope="session")
-def u():
+def u() -> Universe:
     return Universe(TOP, TRAJ)
 
 
 @pytest.fixture(scope="session")
-def rdkit_mol():
+def rdkit_mol() -> Chem.Mol:
     return Chem.MolFromPDBFile(TOP, removeHs=False)
 
 
 @pytest.fixture(scope="session")
-def ligand_ag(u):
+def ligand_ag(u: Universe) -> "AtomGroup":
     return u.select_atoms("resname LIG")
 
 
 @pytest.fixture(scope="session")
-def ligand_rdkit(ligand_ag):
-    return ligand_ag.convert_to.rdkit()
+def ligand_rdkit(ligand_ag: "AtomGroup") -> Chem.Mol:
+    return ligand_ag.convert_to.rdkit()  # type: ignore[no-any-return]
 
 
 @pytest.fixture(scope="session")
-def ligand_mol(ligand_ag):
+def ligand_mol(ligand_ag: "AtomGroup") -> Molecule:
     return Molecule.from_mda(ligand_ag)
 
 
 @pytest.fixture(scope="session")
-def protein_ag(u, ligand_ag):
+def protein_ag(u: Universe, ligand_ag: "AtomGroup") -> "AtomGroup":
     return u.select_atoms("protein and byres around 6.5 group ligand", ligand=ligand_ag)
 
 
 @pytest.fixture(scope="session")
-def protein_rdkit(protein_ag):
-    return protein_ag.convert_to.rdkit()
+def protein_rdkit(protein_ag: "AtomGroup") -> Chem.Mol:
+    return protein_ag.convert_to.rdkit()  # type: ignore[no-any-return]
 
 
 @pytest.fixture(scope="session")
-def protein_mol(protein_ag):
+def protein_mol(protein_ag: "AtomGroup") -> Molecule:
     return Molecule.from_mda(protein_ag)
 
 
 @pytest.fixture(scope="session")
-def sdf_suppl():
+def sdf_suppl() -> sdf_supplier:
     path = str(datapath / "vina" / "vina_output.sdf")
     return sdf_supplier(path)
 
 
-def from_mol2(f):
-    path = str(datapath / f)
+def from_mol2(filename: str) -> Molecule:
+    path = str(datapath / filename)
     u = Universe(path)
     elements = [guess_atom_element(n) for n in u.atoms.names]
     u.add_TopologyAttr("elements", np.array(elements, dtype=object))
@@ -81,103 +90,109 @@ def from_mol2(f):
 
 
 @pytest.fixture(scope="session")
-def benzene():
+def benzene() -> Molecule:
     return from_mol2("benzene.mol2")
 
 
 @pytest.fixture(scope="session")
-def cation():
+def cation() -> Molecule:
     return from_mol2("cation.mol2")
 
 
 @pytest.fixture(scope="session")
-def cation_false():
+def cation_false() -> Molecule:
     return from_mol2("cation_false.mol2")
 
 
 @pytest.fixture(scope="session")
-def anion():
+def anion() -> Molecule:
     return from_mol2("anion.mol2")
 
 
 @pytest.fixture(scope="session")
-def ftf():
+def ftf() -> Molecule:
     return from_mol2("facetoface.mol2")
 
 
 @pytest.fixture(scope="session")
-def etf():
+def etf() -> Molecule:
     return from_mol2("edgetoface.mol2")
 
 
 @pytest.fixture(scope="session")
-def chlorine():
+def chlorine() -> Molecule:
     return from_mol2("chlorine.mol2")
 
 
 @pytest.fixture(scope="session")
-def bromine():
+def bromine() -> Molecule:
     return from_mol2("bromine.mol2")
 
 
 @pytest.fixture(scope="session")
-def hb_donor():
+def hb_donor() -> Molecule:
     return from_mol2("donor.mol2")
 
 
 @pytest.fixture(scope="session")
-def hb_acceptor():
+def hb_acceptor() -> Molecule:
     return from_mol2("acceptor.mol2")
 
 
 @pytest.fixture(scope="session")
-def hb_acceptor_false():
+def hb_acceptor_false() -> Molecule:
     return from_mol2("acceptor_false.mol2")
 
 
 @pytest.fixture(scope="session")
-def xb_donor():
+def xb_donor() -> Molecule:
     return from_mol2("xbond_donor.mol2")
 
 
 @pytest.fixture(scope="session")
-def xb_acceptor():
+def xb_acceptor() -> Molecule:
     return from_mol2("xbond_acceptor.mol2")
 
 
 @pytest.fixture(scope="session")
-def xb_acceptor_false_xar():
+def xb_acceptor_false_xar() -> Molecule:
     return from_mol2("xbond_acceptor_false_xar.mol2")
 
 
 @pytest.fixture(scope="session")
-def xb_acceptor_false_axd():
+def xb_acceptor_false_axd() -> Molecule:
     return from_mol2("xbond_acceptor_false_axd.mol2")
 
 
 @pytest.fixture(scope="session")
-def ligand():
+def ligand() -> Molecule:
     return from_mol2("ligand.mol2")
 
 
 @pytest.fixture(scope="session")
-def metal():
+def metal() -> Molecule:
     return from_mol2("metal.mol2")
 
 
 @pytest.fixture(scope="session")
-def metal_false():
+def metal_false() -> Molecule:
     return from_mol2("metal_false.mol2")
 
 
+@pytest.fixture
+def cleanup_dummy() -> Iterator[None]:
+    yield
+    _INTERACTIONS.pop("Dummy", None)
+
+
 class BaseTestMixinRDKitMol:
-    def test_init(self, mol):
+    def test_init(self, mol: "BaseRDKitMol") -> None:
         assert isinstance(mol, Chem.Mol)
 
-    def test_centroid(self, mol):
+    def test_centroid(self, mol: "BaseRDKitMol") -> None:
         expected = ComputeCentroid(mol.GetConformer())
         assert_array_almost_equal(mol.centroid, expected)
 
-    def test_xyz(self, mol):
+    def test_xyz(self, mol: "BaseRDKitMol") -> None:
         expected = mol.GetConformer().GetPositions()
         assert_array_almost_equal(mol.xyz, expected)

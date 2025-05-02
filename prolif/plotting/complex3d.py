@@ -131,7 +131,7 @@ class Complex3D:
         self.ifp = ifp
         self.lig_mol = lig_mol
         self.prot_mol = prot_mol
-        self._view: py3Dmol.view | None = None
+        self._view: py3Dmol.view | None = None  # type: ignore[no-any-unimported]
 
     @classmethod
     def from_fingerprint(
@@ -308,21 +308,30 @@ class Complex3D:
         self._view = v
         return self
 
-    def _populate_view(  # noqa: PLR0912
+    def _populate_view(  # type: ignore[no-any-unimported]  # noqa: PLR0912
         self,
-        v: py3Dmol.view | Complex3D,
+        view: py3Dmol.view | Complex3D,
         position: tuple[int, int] = (0, 0),
         display_all: bool = False,
         colormap: dict[ResidueId, str] | None = None,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein"] = True,
     ) -> None:
-        if isinstance(v, Complex3D) and v._view:
-            v = v._view
+        if isinstance(view, Complex3D):
+            if view._view is None:
+                raise ValueError(
+                    "View not initialized, did you call `display`/`compare` first?",
+                )
+            v = view._view
+        else:
+            v = view
         self._colormap = {} if colormap is None else colormap
-        self._models = {}
+        self._models: dict[ResidueId, int] = {}
         self._mid = -1
-        self._interacting_atoms = {"ligand": set(), "protein": set()}
+        self._interacting_atoms: dict[str, set[int]] = {
+            "ligand": set(),
+            "protein": set(),
+        }
 
         # show all interacting residues
         for (lresid, presid), interactions in self.ifp.items():
@@ -469,7 +478,7 @@ class Complex3D:
 
         v.zoomTo({"model": list(self._models.values())}, viewer=position)
 
-    def _add_residue_to_view(
+    def _add_residue_to_view(  # type: ignore[no-any-unimported]
         self,
         v: py3Dmol.view,
         position: tuple[int, int],
@@ -519,7 +528,7 @@ class Complex3D:
             """),
         )
 
-    def _repr_html_(self):  # noqa: PLW3201
+    def _repr_html_(self) -> str | None:  # noqa: PLW3201
         if self._view:
-            return self._view._repr_html_()
+            return self._view._repr_html_()  # type: ignore[no-any-return]
         return None

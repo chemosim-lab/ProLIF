@@ -73,7 +73,7 @@ type-check = [
     "scipy-stubs",
 ]
 dev = [
-    "ruff==0.9.10",
+    "ruff==0.11.2",
     "black[jupyter]",
     "poethepoet>=0.33.0",
     { include-group = "build" },
@@ -133,6 +133,11 @@ cmd = "ruff check --preview --fix"
 help = "Fixes formatting and linting issues"
 sequence = [{ ref = "format" }, { ref = "lint" }]
 
+[tool.poe.tasks.type-check]
+help = "Run mypy to check type hints across the codebase"
+cmd = "mypy ${FILE_PATHS}"
+args = [{ name = "FILE_PATHS", positional = true, multiple = true, default = "." }]
+
 [tool.poe.tasks.test]
 help = "Runs the test suite"
 cmd = "pytest"
@@ -162,10 +167,9 @@ exclude = "docs/conf.py"
 module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*"]
 ignore_missing_imports = true
 
-[tool.poe.tasks.type-check]
-help = "Run mypy to check type hints across the codebase"
-cmd = "mypy ${FILE_PATHS}"
-args = [{ name = "FILE_PATHS", positional = true, multiple = true, default = "." }]
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_any_unimported = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -236,10 +240,7 @@ ignore = [
     "PT018",
     "FURB103",
     "COM812",
-    # typing incompatible with 3.9
-    "UP035",
-    "UP006",
-    "UP007",
+    "UP037",
 ]
 
 [tool.isort]

@@ -1,11 +1,14 @@
 from copy import deepcopy
 from math import radians
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
+import pandas as pd
 import pytest
 from numpy.testing import assert_equal
 from rdkit import Chem
 
+from prolif.ifp import IFP
 from prolif.residue import Residue, ResidueGroup, ResidueId
 from prolif.utils import (
     angle_between_limits,
@@ -13,63 +16,94 @@ from prolif.utils import (
     get_residues_near_ligand,
     is_peptide_bond,
     pandas_series_to_bv,
+    requires,
     split_mol_by_residues,
     to_bitvectors,
     to_dataframe,
 )
 
+if TYPE_CHECKING:
+    from prolif.typeshed import IFPResults
+
 
 @pytest.fixture()
-def ifp_single():
+def ifp_single() -> "IFPResults":
     return {
-        0: {
-            ("LIG", "ALA1"): {"A": ({"indices": {"ligand": (0,), "protein": (1,)}},)},
-            ("LIG", "GLU2"): {"B": ({"indices": {"ligand": (1,), "protein": (3,)}},)},
-        },
-        1: {
-            ("LIG", "ALA1"): {
-                "A": ({"indices": {"ligand": (2,), "protein": (4,)}},),
-                "B": ({"indices": {"ligand": (2,), "protein": (5,)}},),
-            },
-            ("LIG", "ASP3"): {"B": ({"indices": {"ligand": (8,), "protein": (10,)}},)},
-        },
+        0: IFP(
+            {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ALA1")): {
+                    "A": ({"indices": {"ligand": (0,), "protein": (1,)}},)
+                },
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("GLU2")): {
+                    "B": ({"indices": {"ligand": (1,), "protein": (3,)}},)
+                },
+            }
+        ),
+        1: IFP(
+            {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ALA1")): {
+                    "A": ({"indices": {"ligand": (2,), "protein": (4,)}},),
+                    "B": ({"indices": {"ligand": (2,), "protein": (5,)}},),
+                },
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ASP3")): {
+                    "B": ({"indices": {"ligand": (8,), "protein": (10,)}},)
+                },
+            }
+        ),
     }
 
 
 @pytest.fixture()
-def ifp_count():
+def ifp_count() -> "IFPResults":
     return {
-        0: {
-            ("LIG", "ALA1"): {
-                "A": (
-                    {"indices": {"ligand": (0,), "protein": (1,)}},
-                    {"indices": {"ligand": (1,), "protein": (1,)}},
-                ),
-            },
-            ("LIG", "GLU2"): {"B": ({"indices": {"ligand": (1,), "protein": (3,)}},)},
-        },
-        1: {
-            ("LIG", "ALA1"): {
-                "A": (
-                    {"indices": {"ligand": (2,), "protein": (4,)}},
-                    {"indices": {"ligand": (2,), "protein": (1,)}},
-                ),
-                "B": ({"indices": {"ligand": (2,), "protein": (5,)}},),
-            },
-            ("LIG", "ASP3"): {"B": ({"indices": {"ligand": (8,), "protein": (10,)}},)},
-        },
+        0: IFP(
+            {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ALA1")): {
+                    "A": (
+                        {"indices": {"ligand": (0,), "protein": (1,)}},
+                        {"indices": {"ligand": (1,), "protein": (1,)}},
+                    ),
+                },
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("GLU2")): {
+                    "B": ({"indices": {"ligand": (1,), "protein": (3,)}},)
+                },
+            }
+        ),
+        1: IFP(
+            {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ALA1")): {
+                    "A": (
+                        {"indices": {"ligand": (2,), "protein": (4,)}},
+                        {"indices": {"ligand": (2,), "protein": (1,)}},
+                    ),
+                    "B": ({"indices": {"ligand": (2,), "protein": (5,)}},),
+                },
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ASP3")): {
+                    "B": ({"indices": {"ligand": (8,), "protein": (10,)}},)
+                },
+            }
+        ),
     }
 
 
 @pytest.fixture(params=["ifp_single", "ifp_count"])
-def ifp(request):
-    return request.getfixturevalue(request.param)
+def ifp(request: pytest.FixtureRequest) -> "IFPResults":
+    return cast("IFPResults", request.getfixturevalue(request.param))
 
 
-def test_centroid():
+def test_requires() -> None:
+    @requires("this_module_does_not_exist")
+    def dummy() -> None:
+        pass
+
+    with pytest.raises(ModuleNotFoundError, match=r"The module '.+' is required"):
+        dummy()
+
+
+def test_centroid() -> None:
     xyz = np.array(
         [(0, 0, 0), (0, 0, 0), (0, 0, 0), (2, 2, 2), (2, 2, 2), (2, 2, 2)],
-        dtype=np.float32,
+        dtype=np.float64,
     )
     ctd = get_centroid(xyz)
     assert ctd.shape == (3,)
@@ -89,14 +123,16 @@ def test_centroid():
         (120, 0, 30, True, False),
     ],
 )
-def test_angle_limits(angle, mina, maxa, ring, expected):
+def test_angle_limits(
+    angle: float, mina: float, maxa: float, ring: bool, expected: bool
+) -> None:
     angle = radians(angle)
     mina = radians(mina)
     maxa = radians(maxa)
-    assert angle_between_limits(angle, mina, maxa, ring) is expected
+    assert angle_between_limits(angle, mina, maxa, ring=ring) is expected
 
 
-def test_pocket_residues(ligand_mol, protein_mol):
+def test_pocket_residues(ligand_mol: "Chem.Mol", protein_mol: "Chem.Mol") -> None:
     resids = get_residues_near_ligand(ligand_mol, protein_mol)
     residues = [
         "TYR38.A",
@@ -157,7 +193,7 @@ def test_pocket_residues(ligand_mol, protein_mol):
         assert r in resids
 
 
-def test_split_residues():
+def test_split_residues() -> None:
     sequence = "ARNDCQEGHILKMFPSTWYV"
     prot = Chem.MolFromSequence(sequence)
     rg = ResidueGroup(
@@ -170,7 +206,7 @@ def test_split_residues():
         assert molres.HasSubstructMatch(res) and res.HasSubstructMatch(molres)
 
 
-def test_is_peptide_bond():
+def test_is_peptide_bond() -> None:
     mol = Chem.RWMol()
     for _ in range(3):
         a = Chem.Atom(6)
@@ -178,34 +214,34 @@ def test_is_peptide_bond():
     mol.AddBond(0, 1)
     mol.AddBond(1, 2)
     resids = {
-        0: "ALA1.A",
-        1: "ALA1.A",
-        2: "GLU2.A",
+        0: ResidueId.from_string("ALA1.A"),
+        1: ResidueId.from_string("ALA1.A"),
+        2: ResidueId.from_string("GLU2.A"),
     }
     assert is_peptide_bond(mol.GetBondWithIdx(0), resids) is False
     assert is_peptide_bond(mol.GetBondWithIdx(1), resids) is True
 
 
-def test_series_to_bv():
-    v = np.array([0, 1, 1, 0, 1])
+def test_series_to_bv() -> None:
+    v = pd.Series([0, 1, 1, 0, 1])
     bv = pandas_series_to_bv(v)
     assert bv.GetNumBits() == len(v)
     assert bv.GetNumOnBits() == 3
 
 
-def test_to_df(ifp):
+def test_to_df(ifp: "IFPResults") -> None:
     df = to_dataframe(ifp, ["A", "B", "C"])
     assert df.shape == (2, 4)
     assert df.dtypes.iloc[0].type is np.bool_
     assert df.index.name == "Frame"
-    assert ("LIG", "ALA1", "A") in df.columns
-    assert df["LIG", "ALA1", "A"][0] is np.bool_(True)
-    assert ("LIG", "ALA1", "B") in df.columns
-    assert df["LIG", "ALA1", "B"][0] is np.bool_(False)
-    assert ("LIG", "ALA1", "C") not in df.columns
-    assert ("LIG", "GLU2", "A") not in df.columns
-    assert ("LIG", "ASP3", "B") in df.columns
-    assert df["LIG", "ASP3", "B"][0] is np.bool_(False)
+    assert ("LIG1", "ALA1", "A") in df.columns
+    assert df["LIG1", "ALA1", "A"][0] is np.bool_(True)
+    assert ("LIG1", "ALA1", "B") in df.columns
+    assert df["LIG1", "ALA1", "B"][0] is np.bool_(False)
+    assert ("LIG1", "ALA1", "C") not in df.columns
+    assert ("LIG1", "GLU2", "A") not in df.columns
+    assert ("LIG1", "ASP3", "B") in df.columns
+    assert df["LIG1", "ASP3", "B"][0] is np.bool_(False)
 
 
 @pytest.mark.parametrize(
@@ -216,40 +252,42 @@ def test_to_df(ifp):
         np.bool_,
     ],
 )
-def test_to_df_dtype(dtype, ifp):
+def test_to_df_dtype(dtype: type, ifp: "IFPResults") -> None:
     df = to_dataframe(ifp, ["A", "B", "C"], dtype=dtype)
     assert df.dtypes.iloc[0].type is dtype
-    assert df["LIG", "ALA1", "A"][0] == dtype(True)
-    assert df["LIG", "ALA1", "B"][0] == dtype(False)
-    assert df["LIG", "ASP3", "B"][0] == dtype(False)
+    assert df["LIG1", "ALA1", "A"][0] == dtype(True)
+    assert df["LIG1", "ALA1", "B"][0] == dtype(False)
+    assert df["LIG1", "ASP3", "B"][0] == dtype(False)
 
 
-def test_to_df_drop_empty(ifp):
+def test_to_df_drop_empty(ifp: "IFPResults") -> None:
     df = to_dataframe(ifp, ["A", "B", "C"], drop_empty=False)
     assert df.shape == (2, 9)
 
 
-def test_to_df_no_interaction_in_first_frame(ifp_single):
+def test_to_df_no_interaction_in_first_frame(
+    ifp_single: "IFPResults",
+) -> None:
     fp = deepcopy(ifp_single)
-    fp[0] = {}
+    fp[0] = IFP()
     to_dataframe(fp, ["A", "B", "C"])
 
 
-def test_to_df_count(ifp_count):
+def test_to_df_count(ifp_count: "IFPResults") -> None:
     df = to_dataframe(ifp_count, ["A", "B", "C"], count=True)
     assert df[df > 1].any().any()
-    value = df["LIG", "ALA1", "A"][0]
+    value = df["LIG1", "ALA1", "A"][0]
     assert value.dtype == np.uint8
     assert value == 2
 
 
-def test_to_df_empty_ifp():
-    ifp = {0: {}, 1: {}}
+def test_to_df_empty_ifp() -> None:
+    ifp = {0: IFP(), 1: IFP()}
     df = to_dataframe(ifp, ["A"])
     assert df.to_numpy().shape == (2, 0)
 
 
-def test_to_bv(ifp):
+def test_to_bv(ifp: "IFPResults") -> None:
     df = to_dataframe(ifp, ["A", "B", "C"])
     bvs = to_bitvectors(df)
     assert len(bvs) == 2

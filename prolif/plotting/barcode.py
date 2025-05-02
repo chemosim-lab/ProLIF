@@ -24,6 +24,11 @@ from prolif.exceptions import RunRequiredError
 from prolif.plotting.utils import IS_NOTEBOOK, separated_interaction_colors
 
 if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.backend_bases import LocationEvent
+    from matplotlib.figure import Figure
+    from matplotlib.image import AxesImage
+
     from prolif.fingerprint import Fingerprint
 
 
@@ -44,7 +49,7 @@ class Barcode:
 
     COLORS: ClassVar[dict[str | None, str]] = {
         None: "white",
-        **separated_interaction_colors,
+        **separated_interaction_colors,  # type: ignore[dict-item]
     }
 
     def __init__(self, df: pd.DataFrame) -> None:
@@ -73,7 +78,7 @@ class Barcode:
 
         def _bit_to_color_value(s: pd.Series) -> pd.Series:
             """Replaces a bit value with it's corresponding color value"""
-            interaction = s.name[-1]
+            interaction = s.name[-1]  # type: ignore[index]
             return s.apply(
                 lambda v: (
                     self.color_mapper[interaction] if v else self.color_mapper[None]
@@ -102,7 +107,7 @@ class Barcode:
         xlabel: str = "Frame",
         subplots_kwargs: dict | None = None,
         tight_layout_kwargs: dict | None = None,
-    ):
+    ) -> "Axes":
         """Generate and display the barcode plot.
 
         Parameters
@@ -138,7 +143,7 @@ class Barcode:
 
         # Plot as image
         fig, ax = plt.subplots(**subplots_kwargs)
-        ax: plt.Axes
+        ax: "Axes"
         im = ax.imshow(
             self.df.values,
             aspect="auto",
@@ -209,7 +214,16 @@ class Barcode:
         fig.tight_layout(**tight_layout_kwargs)
         return ax
 
-    def _add_interaction_callback(self, fig, ax, *, im, frames, residues, interactions):
+    def _add_interaction_callback(
+        self,
+        fig: "Figure",
+        ax: "Axes",
+        *,
+        im: "AxesImage",
+        frames: pd.Index,
+        residues: pd.Index,
+        interactions: pd.Index[str],
+    ) -> None:
         annot = ax.annotate(
             "",
             xy=(0, 0),
@@ -221,7 +235,7 @@ class Barcode:
         )
         annot.set_visible(False)
 
-        def hover_callback(event):
+        def hover_callback(event: "LocationEvent") -> None:
             if (
                 event.inaxes is ax
                 and event.xdata is not None
@@ -235,7 +249,8 @@ class Barcode:
                     residue = residues[y]
                     annot.set_text(f"Frame {frame}: {residue}")
                     color = im.cmap(self.color_mapper[interaction])
-                    annot.get_bbox_patch().set_facecolor(color)
+                    if bbox := annot.get_bbox_patch():
+                        bbox.set_facecolor(color)
                     annot.set_visible(True)
                     fig.canvas.draw_idle()
                     return
@@ -243,6 +258,6 @@ class Barcode:
                 annot.set_visible(False)
                 fig.canvas.draw_idle()
 
-        fig.canvas.mpl_connect("motion_notify_event", hover_callback)
-        fig.canvas.header_visible = False
-        fig.canvas.footer_visible = False
+        fig.canvas.mpl_connect("motion_notify_event", hover_callback)  # type: ignore[arg-type]
+        fig.canvas.header_visible = False  # type: ignore[attr-defined]
+        fig.canvas.footer_visible = False  # type: ignore[attr-defined]

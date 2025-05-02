@@ -4,9 +4,13 @@ Storing interactions --- :mod:`prolif.ifp`
 """
 
 from collections import UserDict
-from typing import Iterator, NamedTuple
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, NamedTuple, Union, overload
 
 from prolif.residue import ResidueId
+
+if TYPE_CHECKING:
+    from prolif.typeshed import IFPData
 
 
 class InteractionData(NamedTuple):
@@ -16,7 +20,7 @@ class InteractionData(NamedTuple):
     metadata: dict
 
 
-class IFP(UserDict):
+class IFP(UserDict[tuple[ResidueId, ResidueId], "IFPData"]):
     """Mapping between residue pairs and interaction fingerprint.
 
     Notes
@@ -50,15 +54,28 @@ class IFP(UserDict):
     contains interactions with the specified residue, e.g. ``ifp["ASP129.A"]``.
     """
 
-    def __getitem__(self, key):
+    @overload
+    def __getitem__(
+        self, key: tuple[ResidueId, ResidueId] | tuple[str, str]
+    ) -> "IFPData": ...
+
+    @overload
+    def __getitem__(self, key: ResidueId | str) -> "IFP": ...
+
+    def __getitem__(
+        self, key: tuple[ResidueId, ResidueId] | tuple[str, str] | ResidueId | str
+    ) -> Union["IFPData", "IFP"]:
         try:
-            return self.data[key]
+            return self.data[key]  # type: ignore[index]
         except KeyError as exc:
             if isinstance(key, tuple) and len(key) == 2:
                 lig_res, prot_res = key
-                if isinstance(lig_res, ResidueId):
+                if isinstance(lig_res, ResidueId) and isinstance(prot_res, ResidueId):
                     raise exc from None
-                key = ResidueId.from_string(lig_res), ResidueId.from_string(prot_res)
+                key = (
+                    ResidueId.from_string(lig_res),  # type: ignore[arg-type]
+                    ResidueId.from_string(prot_res),  # type: ignore[arg-type]
+                )
                 return self.data[key]
             if isinstance(key, str):
                 key = ResidueId.from_string(key)

@@ -27,9 +27,8 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
 
 import os
 import warnings
-from collections.abc import Sized
-from functools import wraps
-from typing import Literal
+from collections.abc import Iterable, Sequence, Sized
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast, overload
 
 import dill
 import multiprocess as mp
@@ -49,21 +48,37 @@ from prolif.utils import (
     to_dataframe,
 )
 
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from numpy.typing import NDArray
+    from pandas import DataFrame
+    from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
-def first_occurence(interaction):
-    @wraps(interaction)
-    def wrapped(*args, **kwargs):
-        return next(interaction(*args, **kwargs), None)
+    from prolif.interactions.base import Interaction
+    from prolif.plotting.complex3d import Complex3D
+    from prolif.plotting.network import LigNetwork
+    from prolif.residue import Residue, ResidueId
+    from prolif.typeshed import (
+        IFPData,
+        InteractionMetadata,
+        MDAObject,
+        PathLike,
+        ResidueSelection,
+        Trajectory,
+    )
 
-    return wrapped
 
-
-def all_occurences(interaction):
-    @wraps(interaction)
-    def wrapped(*args, **kwargs):
-        return tuple(interaction(*args, **kwargs))
-
-    return wrapped
+DEFAULT_INTERACTIONS = (
+    "Hydrophobic",
+    "HBDonor",
+    "HBAcceptor",
+    "PiStacking",
+    "Anionic",
+    "Cationic",
+    "CationPi",
+    "PiCation",
+    "VdWContact",
+)
 
 
 class Fingerprint:
@@ -191,29 +206,22 @@ class Fingerprint:
 
     def __init__(
         self,
-        interactions=None,
-        parameters=None,
-        count=False,
-        vicinity_cutoff=6.0,
-    ):
+        interactions: Literal["all"] | Sequence[str] | None = None,
+        parameters: dict[str, dict[str, Any]] | None = None,
+        count: bool = False,
+        vicinity_cutoff: float = 6.0,
+    ) -> None:
         if interactions is None:
-            interactions = [
-                "Hydrophobic",
-                "HBDonor",
-                "HBAcceptor",
-                "PiStacking",
-                "Anionic",
-                "Cationic",
-                "CationPi",
-                "PiCation",
-                "VdWContact",
-            ]
-        self.interactions = interactions
+            interactions = DEFAULT_INTERACTIONS
         self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
 
-    def _set_interactions(self, interactions, parameters):
+    def _set_interactions(
+        self,
+        interactions: Literal["all"] | Sequence[str],
+        parameters: dict[str, dict[str, Any]] | None,
+    ) -> None:
         # read interactions to compute
         parameters = parameters or {}
         if interactions == "all":
@@ -223,30 +231,33 @@ class Fingerprint:
         self._check_valid_interactions(parameters, "parameters")
         # add interaction methods
         self.interactions = {}
-        wrapper = all_occurences if self.count else first_occurence
-        for name, interaction_cls in _INTERACTIONS.items():
+        self._interactions: dict[str, "Interaction"] = {}
+        for name in interactions:
             # create instance with custom parameters if available
+            interaction_cls = _INTERACTIONS[name]
             interaction = interaction_cls(**parameters.get(name, {}))
             setattr(self, name.lower(), interaction)
-            if name in interactions:
-                self.interactions[name] = wrapper(interaction)
+            self._interactions[name] = interaction
+            self.interactions[name] = interaction.all if self.count else interaction.any
 
-    def _check_valid_interactions(self, interactions_iterable, varname):
+    def _check_valid_interactions(
+        self, interactions_iterable: Iterable[str], varname: str
+    ) -> None:
         """Raises a NameError if an unknown interaction is given."""
         unsafe = set(interactions_iterable)
-        unknown = unsafe.symmetric_difference(_INTERACTIONS.keys()) & unsafe
+        unknown = unsafe.symmetric_difference(_INTERACTIONS) & unsafe
         if unknown:
             raise NameError(
                 f"Unknown interaction(s) in {varname!r}: {', '.join(unknown)}",
             )
 
-    def __repr__(self):  # pragma: no cover
+    def __repr__(self) -> str:  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{self.n_interactions} interactions: {list(self.interactions.keys())}"
+        params = f"{self.n_interactions} interactions: {list(self.interactions)}"
         return f"<{name}: {params} at {id(self):#x}>"
 
     @staticmethod
-    def list_available(show_hidden=False):
+    def list_available(show_hidden: bool = False) -> list[str]:
         """List interactions available to the Fingerprint class.
 
         Parameters
@@ -260,10 +271,10 @@ class Fingerprint:
         return sorted(_INTERACTIONS)
 
     @property
-    def n_interactions(self):
+    def n_interactions(self) -> int:
         return len(self.interactions)
 
-    def bitvector(self, res1, res2):
+    def bitvector(self, res1: "Residue", res2: "Residue") -> "NDArray":
         """Generates the complete bitvector for the interactions between two
         residues. To access metadata for each interaction, see
         :meth:`~Fingerprint.metadata`.
@@ -282,13 +293,20 @@ class Fingerprint:
             on :attr:`Fingerprint.count`, the dtype of the array will be bool or uint8.
         """
         bitvector = [
-            interaction(res1, res2) for interaction in self.interactions.values()
+            interaction(res1, res2, metadata=False)
+            for interaction in self.interactions.values()
         ]
         if self.count:
-            return np.array([sum(bits) for bits in bitvector], dtype=np.uint8)
-        return np.array(bitvector, dtype=bool)
+            return np.array(
+                [
+                    sum(bits)
+                    for bits in cast(list[tuple[Literal[True], ...]], bitvector)
+                ],
+                dtype=np.uint8,
+            )
+        return np.array(cast(list[Literal[True] | None], bitvector), dtype=bool)
 
-    def metadata(self, res1, res2):
+    def metadata(self, res1: "Residue", res2: "Residue") -> "IFPData":
         """Generates a metadata dictionary for the interactions between two residues.
 
         Parameters
@@ -316,12 +334,37 @@ class Fingerprint:
 
         """
         return {
-            name: metadata if self.count else (metadata,)
+            name: cast(
+                tuple["InteractionMetadata", ...],
+                metadata if self.count else (metadata,),
+            )
             for name, interaction in self.interactions.items()
             if (metadata := interaction(res1, res2, metadata=True))
         }
 
-    def generate(self, lig, prot, residues=None, metadata=False):
+    @overload
+    def generate(
+        self,
+        lig: Molecule,
+        prot: Molecule,
+        residues: "ResidueSelection" = None,
+        metadata: Literal[False] = False,
+    ) -> dict[tuple["ResidueId", "ResidueId"], "NDArray"]: ...
+    @overload
+    def generate(
+        self,
+        lig: Molecule,
+        prot: Molecule,
+        residues: "ResidueSelection" = None,
+        metadata: Literal[True] = True,
+    ) -> IFP: ...
+    def generate(
+        self,
+        lig: Molecule,
+        prot: Molecule,
+        residues: "ResidueSelection" = None,
+        metadata: bool = False,
+    ) -> IFP | dict[tuple["ResidueId", "ResidueId"], "NDArray"]:
         """Generates the interaction fingerprint between 2 molecules
 
         Parameters
@@ -369,7 +412,9 @@ class Fingerprint:
             dictionary of metadata tuples indexed by interaction name instead of a
             tuple of arrays.
         """
-        ifp = IFP()
+        ifp: IFP | dict[tuple["ResidueId", "ResidueId"], "NDArray"] = (
+            IFP() if metadata else {}
+        )
         prot_residues = prot.residues if residues == "all" else residues
         get_interactions = self.metadata if metadata else self.bitvector
         for lresid, lres in lig.residues.items():
@@ -379,30 +424,30 @@ class Fingerprint:
                     prot,
                     self.vicinity_cutoff,
                 )
-            for prot_key in prot_residues:
+            for prot_key in prot_residues:  # type:ignore[union-attr]
                 pres = prot[prot_key]
                 key = (lresid, pres.resid)
                 interactions = get_interactions(lres, pres)
                 if any(interactions):
-                    ifp[key] = interactions
+                    ifp[key] = interactions  # type: ignore[assignment]
         return ifp
 
     def run(
         self,
-        traj,
-        lig,
-        prot,
+        traj: "Trajectory",
+        lig: "MDAObject",
+        prot: "MDAObject",
         *,
-        residues=None,
-        converter_kwargs=None,
-        progress=True,
-        n_jobs=None,
-    ):
+        residues: "ResidueSelection" = None,
+        converter_kwargs: tuple[dict, dict] | None = None,
+        progress: bool = True,
+        n_jobs: int | None = None,
+    ) -> "Fingerprint":
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
         Parameters
         ----------
-        traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced
+        traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced or MDAnalysis.coordinates.base.FrameIteratorIndices or MDAnalysis.coordinates.timestep.Timestep
             Iterate over this Universe trajectory or sliced trajectory object
             to extract the frames used for the fingerprint extraction
         lig : MDAnalysis.core.groups.AtomGroup
@@ -418,8 +463,9 @@ class Fingerprint:
             automatically use protein residues that are distant of 6.0 Å or
             less from each ligand residue.
         converter_kwargs : tuple[dict, dict], optional
-            Tuple of kwargs passed to the underlying :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
-            from MDAnalysis: the first for the ligand, and the second for the protein
+            Tuple of kwargs passed to the underlying
+            :class:`~MDAnalysis.converters.RDKit.RDKitConverter` from MDAnalysis: the
+            first for the ligand, and the second for the protein
         progress : bool
             Display a :class:`~tqdm.std.tqdm` progressbar while running the calculation
         n_jobs : int or None
@@ -510,16 +556,16 @@ class Fingerprint:
 
     def _run_parallel(
         self,
-        traj,
-        lig,
-        prot,
-        residues=None,
-        converter_kwargs=None,
-        progress=True,
-        n_jobs=None,
-    ):
+        traj: "Trajectory",
+        lig: "MDAObject",
+        prot: "MDAObject",
+        residues: "ResidueSelection",
+        converter_kwargs: tuple[dict, dict],
+        progress: bool,
+        n_jobs: int | None,
+    ) -> "Fingerprint":
         """Parallel implementation of :meth:`~Fingerprint.run`"""
-        n_chunks = n_jobs or mp.cpu_count()
+        n_chunks = n_jobs or cast(int, mp.cpu_count())
         try:
             n_frames = traj.n_frames
         except AttributeError:
@@ -529,7 +575,7 @@ class Fingerprint:
                 and hasattr(traj, "step")
             ):
                 # sliced trajectory
-                frames = range(traj.start, traj.stop, traj.step)
+                frames: Sequence[int] = range(traj.start, traj.stop, traj.step)
                 traj = lig.universe.trajectory
             elif hasattr(traj, "_frames"):
                 # trajectory indices
@@ -560,13 +606,13 @@ class Fingerprint:
 
     def run_from_iterable(
         self,
-        lig_iterable,
-        prot_mol,
+        lig_iterable: Iterable[Molecule],
+        prot_mol: Molecule,
         *,
-        residues=None,
-        progress=True,
-        n_jobs=None,
-    ):
+        residues: "ResidueSelection" = None,
+        progress: bool = True,
+        n_jobs: int | None = None,
+    ) -> "Fingerprint":
         """Generates the fingerprint between a list of ligands and a protein
 
         Parameters
@@ -651,12 +697,12 @@ class Fingerprint:
 
     def _run_iter_parallel(
         self,
-        lig_iterable,
-        prot_mol,
-        residues=None,
-        progress=True,
-        n_jobs=None,
-    ):
+        lig_iterable: Iterable[Molecule],
+        prot_mol: Molecule,
+        residues: "ResidueSelection" = None,
+        progress: bool = True,
+        n_jobs: int | None = None,
+    ) -> "Fingerprint":
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
         total = (
             len(lig_iterable)
@@ -681,11 +727,11 @@ class Fingerprint:
     def to_dataframe(
         self,
         *,
-        count=None,
-        dtype=None,
-        drop_empty=True,
-        index_col="Frame",
-    ):
+        count: bool | None = None,
+        dtype: type | None = None,
+        drop_empty: bool = True,
+        index_col: str = "Frame",
+    ) -> "DataFrame":
         """Converts fingerprints to a pandas DataFrame
 
         Parameters
@@ -741,7 +787,7 @@ class Fingerprint:
             )
         raise AttributeError("Please use the `run` method before")
 
-    def to_bitvectors(self):
+    def to_bitvectors(self) -> list["ExplicitBitVect"]:
         """Converts fingerprints to a list of RDKit ExplicitBitVector
 
         Returns
@@ -770,7 +816,7 @@ class Fingerprint:
             return to_bitvectors(df)
         raise AttributeError("Please use the `run` method before")
 
-    def to_countvectors(self):
+    def to_countvectors(self) -> list["UIntSparseIntVect"]:
         """Converts fingerprints to a list of RDKit UIntSparseIntVect
 
         Returns
@@ -801,7 +847,11 @@ class Fingerprint:
             return to_countvectors(df)
         raise AttributeError("Please use the `run` method before")
 
-    def to_pickle(self, path=None):
+    @overload
+    def to_pickle(self, path: None = None) -> bytes: ...
+    @overload
+    def to_pickle(self, path: "PathLike") -> None: ...
+    def to_pickle(self, path: Optional["PathLike"] = None) -> bytes | None:
         """Dumps the fingerprint object as a pickle.
 
         Parameters
@@ -836,12 +886,11 @@ class Fingerprint:
         """
         if path:
             with open(path, "wb") as f:
-                dill.dump(self, f)
-            return None
-        return dill.dumps(self)
+                return dill.dump(self, f)  # type: ignore[no-any-return]
+        return dill.dumps(self)  # type: ignore[no-any-return]
 
     @classmethod
-    def from_pickle(cls, path_or_bytes):
+    def from_pickle(cls, path_or_bytes: Union["PathLike", bytes]) -> "Fingerprint":
         """Creates a fingerprint object from a pickle dump.
 
         Parameters
@@ -867,13 +916,13 @@ class Fingerprint:
                 r"The .+ interaction has been superseded by a new class",  # pragma: no cover  # noqa: E501
             )
             if isinstance(path_or_bytes, bytes):
-                return dill.loads(path_or_bytes)
+                return dill.loads(path_or_bytes)  # type: ignore[no-any-return]
             with open(path_or_bytes, "rb") as f:
-                return dill.load(f)
+                return dill.load(f)  # type: ignore[no-any-return]
 
     def plot_lignetwork(
         self,
-        ligand_mol,
+        ligand_mol: "Chem.Mol",
         *,
         kind: Literal["aggregate", "frame"] = "aggregate",
         frame: int = 0,
@@ -889,7 +938,7 @@ class Fingerprint:
         height: str = "500px",
         fontsize: int = 20,
         show_interaction_data: bool = False,
-    ):
+    ) -> "LigNetwork":
         """Generate and display a :class:`~prolif.plotting.network.LigNetwork` plot from
         a fingerprint object that has been used to run an analysis.
 
@@ -986,7 +1035,7 @@ class Fingerprint:
         xlabel: str = "Frame",
         subplots_kwargs: dict | None = None,
         tight_layout_kwargs: dict | None = None,
-    ):
+    ) -> "Axes":
         """Generate and display a :class:`~prolif.plotting.barcode.Barcode` plot from
         a fingerprint object that has been used to run an analysis.
 
@@ -1042,7 +1091,7 @@ class Fingerprint:
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein"] = True,
-    ):
+    ) -> "Complex3D":
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
 
