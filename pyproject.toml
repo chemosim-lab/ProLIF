@@ -167,6 +167,10 @@ exclude = "docs/conf.py"
 module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_any_unimported = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

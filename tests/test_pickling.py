@@ -1,4 +1,5 @@
 import pickle
+from collections.abc import Iterator
 
 import pytest
 from rdkit import Chem
@@ -7,13 +8,13 @@ from prolif.pickling import PROLIF_PICKLE_OPTIONS, RDKitPickleHandler
 
 
 @pytest.fixture(autouse=True)
-def _reset_default_pickle_properties():
+def _reset_default_pickle_properties() -> Iterator[None]:
     default = Chem.GetDefaultPickleProperties()
     yield
     Chem.SetDefaultPickleProperties(default)
 
 
-def test_default():
+def test_default() -> None:
     assert (
         RDKitPickleHandler(0).default_pickle
         == RDKitPickleHandler.get()
@@ -21,7 +22,7 @@ def test_default():
     )
 
 
-def test_pickling():
+def test_pickling() -> None:
     mol = Chem.MolFromSmiles("CCO")
     mol.SetProp("foo", "bar")
     atom = mol.GetAtomWithIdx(0)
