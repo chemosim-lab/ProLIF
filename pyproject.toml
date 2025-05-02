@@ -73,7 +73,7 @@ type-check = [
     "scipy-stubs",
 ]
 dev = [
-    "ruff==0.9.10",
+    "ruff==0.11.2",
     "black[jupyter]",
     "poethepoet>=0.33.0",
     { include-group = "build" },
