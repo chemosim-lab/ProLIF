@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, cast
 
 import MDAnalysis as mda
 import numpy as np
@@ -20,7 +20,6 @@ lg.setLevel(RDLogger.ERROR)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from typing import Literal, cast
 
     from MDAnalysis.core.universe import Universe
 
@@ -152,7 +151,7 @@ class TestInteractions:
             @abstractmethod
             def detect(
                 self, lig_res: "Residue", prot_res: "Residue"
-            ) -> Iterator["InteractionMetadata"]:
+            ) -> "Iterator[InteractionMetadata]":
                 pass
 
         old = id(_INTERACTIONS["Dummy"])
@@ -162,7 +161,7 @@ class TestInteractions:
                 @abstractmethod
                 def detect(
                     self, lig_res: "Residue", prot_res: "Residue"
-                ) -> Iterator["InteractionMetadata"]:
+                ) -> "Iterator[InteractionMetadata]":
                     pass
 
         new = id(_INTERACTIONS["Dummy"])

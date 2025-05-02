@@ -83,7 +83,9 @@ class TestLigNetwork:
             html = buffer.read()
         assert "PHE331.B" in html
 
-    def test_save_file(self, get_ligplot: partial[LigNetwork], tmp_path: Path) -> None:
+    def test_save_file(
+        self, get_ligplot: partial[LigNetwork], tmp_path: "Path"
+    ) -> None:
         net = get_ligplot()
         output = tmp_path / "lignetwork.html"
         net.save(output)

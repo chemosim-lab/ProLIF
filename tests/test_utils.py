@@ -31,21 +31,21 @@ def ifp_single() -> "IFPResults":
     return {
         0: IFP(
             {
-                (ResidueId.from_string("LIG"), ResidueId.from_string("ALA1")): {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ALA1")): {
                     "A": ({"indices": {"ligand": (0,), "protein": (1,)}},)
                 },
-                (ResidueId.from_string("LIG"), ResidueId.from_string("GLU2")): {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("GLU2")): {
                     "B": ({"indices": {"ligand": (1,), "protein": (3,)}},)
                 },
             }
         ),
         1: IFP(
             {
-                (ResidueId.from_string("LIG"), ResidueId.from_string("ALA1")): {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ALA1")): {
                     "A": ({"indices": {"ligand": (2,), "protein": (4,)}},),
                     "B": ({"indices": {"ligand": (2,), "protein": (5,)}},),
                 },
-                (ResidueId.from_string("LIG"), ResidueId.from_string("ASP3")): {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ASP3")): {
                     "B": ({"indices": {"ligand": (8,), "protein": (10,)}},)
                 },
             }
@@ -58,27 +58,27 @@ def ifp_count() -> "IFPResults":
     return {
         0: IFP(
             {
-                (ResidueId.from_string("LIG"), ResidueId.from_string("ALA1")): {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ALA1")): {
                     "A": (
                         {"indices": {"ligand": (0,), "protein": (1,)}},
                         {"indices": {"ligand": (1,), "protein": (1,)}},
                     ),
                 },
-                (ResidueId.from_string("LIG"), ResidueId.from_string("GLU2")): {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("GLU2")): {
                     "B": ({"indices": {"ligand": (1,), "protein": (3,)}},)
                 },
             }
         ),
         1: IFP(
             {
-                (ResidueId.from_string("LIG"), ResidueId.from_string("ALA1")): {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ALA1")): {
                     "A": (
                         {"indices": {"ligand": (2,), "protein": (4,)}},
                         {"indices": {"ligand": (2,), "protein": (1,)}},
                     ),
                     "B": ({"indices": {"ligand": (2,), "protein": (5,)}},),
                 },
-                (ResidueId.from_string("LIG"), ResidueId.from_string("ASP3")): {
+                (ResidueId.from_string("LIG1"), ResidueId.from_string("ASP3")): {
                     "B": ({"indices": {"ligand": (8,), "protein": (10,)}},)
                 },
             }
@@ -234,14 +234,14 @@ def test_to_df(ifp: "IFPResults") -> None:
     assert df.shape == (2, 4)
     assert df.dtypes.iloc[0].type is np.bool_
     assert df.index.name == "Frame"
-    assert ("LIG", "ALA1", "A") in df.columns
-    assert df["LIG", "ALA1", "A"][0] is np.bool_(True)
-    assert ("LIG", "ALA1", "B") in df.columns
-    assert df["LIG", "ALA1", "B"][0] is np.bool_(False)
-    assert ("LIG", "ALA1", "C") not in df.columns
-    assert ("LIG", "GLU2", "A") not in df.columns
-    assert ("LIG", "ASP3", "B") in df.columns
-    assert df["LIG", "ASP3", "B"][0] is np.bool_(False)
+    assert ("LIG1", "ALA1", "A") in df.columns
+    assert df["LIG1", "ALA1", "A"][0] is np.bool_(True)
+    assert ("LIG1", "ALA1", "B") in df.columns
+    assert df["LIG1", "ALA1", "B"][0] is np.bool_(False)
+    assert ("LIG1", "ALA1", "C") not in df.columns
+    assert ("LIG1", "GLU2", "A") not in df.columns
+    assert ("LIG1", "ASP3", "B") in df.columns
+    assert df["LIG1", "ASP3", "B"][0] is np.bool_(False)
 
 
 @pytest.mark.parametrize(
@@ -255,9 +255,9 @@ def test_to_df(ifp: "IFPResults") -> None:
 def test_to_df_dtype(dtype: type, ifp: "IFPResults") -> None:
     df = to_dataframe(ifp, ["A", "B", "C"], dtype=dtype)
     assert df.dtypes.iloc[0].type is dtype
-    assert df["LIG", "ALA1", "A"][0] == dtype(True)
-    assert df["LIG", "ALA1", "B"][0] == dtype(False)
-    assert df["LIG", "ASP3", "B"][0] == dtype(False)
+    assert df["LIG1", "ALA1", "A"][0] == dtype(True)
+    assert df["LIG1", "ALA1", "B"][0] == dtype(False)
+    assert df["LIG1", "ASP3", "B"][0] == dtype(False)
 
 
 def test_to_df_drop_empty(ifp: "IFPResults") -> None:
@@ -276,7 +276,7 @@ def test_to_df_no_interaction_in_first_frame(
 def test_to_df_count(ifp_count: "IFPResults") -> None:
     df = to_dataframe(ifp_count, ["A", "B", "C"], count=True)
     assert df[df > 1].any().any()
-    value = df["LIG", "ALA1", "A"][0]
+    value = df["LIG1", "ALA1", "A"][0]
     assert value.dtype == np.uint8
     assert value == 2
 
