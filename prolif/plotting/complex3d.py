@@ -532,7 +532,7 @@ class Complex3D:
 
         v.zoomTo({"model": list(self._models.values())}, viewer=position)
 
-    def _add_hover_interaction(
+    def _add_hover_interaction(  # type: ignore[no-any-unimported]
         self,
         v: py3Dmol.view,
         position: tuple[int, int],
@@ -571,7 +571,7 @@ class Complex3D:
             self.DISABLE_HOVER_CALLBACK,
         )
 
-    def _add_residue_to_view(
+    def _add_residue_to_view(  # type: ignore[no-any-unimported]
         self,
         v: py3Dmol.view,
         position: tuple[int, int],

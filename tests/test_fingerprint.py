@@ -461,7 +461,9 @@ class TestFingerprint:
         assert "WaterBridge" in fp.ifp[0]["QNB1.X", "TRP400.X"]
         assert "HBDonor" in fp.ifp[0]["QNB1.X", "ASN404.X"]
 
-    def test_water_bridge_run_iter(self, water_mols):
+    def test_water_bridge_run_iter(
+        self, water_mols: tuple["Molecule", "Molecule", "Molecule"]
+    ) -> None:
         ligand, protein, water = water_mols
         fp = Fingerprint(
             ["HBDonor", "WaterBridge"], parameters={"WaterBridge": {"water": water}}

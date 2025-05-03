@@ -94,17 +94,18 @@ class WaterBridge(BridgedInteraction):
         prot : MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the protein (with multiple residues)
         """  # noqa: E501
+        water_obj = cast("MDAObject", self.water)
         # Run analysis for ligand-water and water-protein interactions
         lig_water_ifp: dict[int, IFP] = self.water_fp._run_serial(
-            traj, lig, self.water, residues=None, **self.kwargs
+            traj, lig, water_obj, residues=None, **self.kwargs
         )
         water_prot_ifp: dict[int, IFP] = self.water_fp._run_serial(
-            traj, self.water, prot, residues=self.residues, **self.kwargs
+            traj, water_obj, prot, residues=self.residues, **self.kwargs
         )
         if self.order >= 2:
             # Run water-water interaction analysis
             water_ifp: dict[int, IFP] | None = self.water_fp._run_serial(
-                traj, self.water, self.water, residues=None, **self.kwargs
+                traj, water_obj, water_obj, residues=None, **self.kwargs
             )
         else:
             water_ifp = None
@@ -136,19 +137,20 @@ class WaterBridge(BridgedInteraction):
         prot_mol : prolif.molecule.Molecule
             The protein
         """
+        water_obj = cast("Molecule", self.water)
         # Run analysis for ligand-water and water-protein interactions
         lig_water_ifp: "IFPResults" = self.water_fp._run_iter_serial(
-            lig_iterable, self.water, residues=None, **self.kwargs
+            lig_iterable, water_obj, residues=None, **self.kwargs
         )
         water_prot_ifp: "IFPResults" = self.water_fp._run_iter_serial(
-            [self.water], prot_mol, residues=self.residues, **self.kwargs
+            [water_obj], prot_mol, residues=self.residues, **self.kwargs
         )
         ifp_wp = water_prot_ifp[0]  # Water → Protein
 
         if self.order >= 2:
             # Run water-water interaction analysis
             water_ifp: "IFPResults" = self.water_fp._run_iter_serial(
-                [self.water], self.water, residues=None, **self.kwargs
+                [water_obj], water_obj, residues=None, **self.kwargs
             )
             ifp_ww: IFP | None = water_ifp[0]  # WaterX -> WaterY
         else:

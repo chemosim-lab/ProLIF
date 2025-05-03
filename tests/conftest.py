@@ -201,7 +201,9 @@ def water_atomgroups(water_u: Universe) -> tuple["AtomGroup", "AtomGroup", "Atom
 
 
 @pytest.fixture(scope="session")
-def water_mols(water_atomgroups):
+def water_mols(
+    water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+) -> tuple[Molecule, Molecule, Molecule]:
     lig_mol = Molecule.from_mda(water_atomgroups[0])
     prot_mol = Molecule.from_mda(water_atomgroups[1])
     water_mol = Molecule.from_mda(water_atomgroups[2])

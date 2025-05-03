@@ -119,7 +119,9 @@ class TestLigNetwork:
         assert view._iframe
         assert "<iframe" in view._iframe
 
-    def test_water(self, water_mols):
+    def test_water(
+        self, water_mols: tuple[plf.Molecule, plf.Molecule, plf.Molecule]
+    ) -> None:
         ligand, protein, water = water_mols
         fp = plf.Fingerprint(
             ["HBDonor", "WaterBridge"], parameters={"WaterBridge": {"water": water}}

@@ -791,9 +791,15 @@ class Fingerprint:
 
         return self
 
-    def _run_iter_serial(self, lig_iterable, prot_mol, residues, progress):
+    def _run_iter_serial(
+        self,
+        lig_iterable: Iterable[Molecule],
+        prot_mol: Molecule,
+        residues: "ResidueSelection" = None,
+        progress: bool = True,
+    ) -> "IFPResults":
         iterator = tqdm(lig_iterable) if progress else lig_iterable
-        ifp = {}
+        ifp: "IFPResults" = {}
         for i, lig_mol in enumerate(iterator):
             ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
         return ifp
@@ -805,14 +811,14 @@ class Fingerprint:
         residues: "ResidueSelection" = None,
         progress: bool = True,
         n_jobs: int | None = None,
-    ) -> "Fingerprint":
+    ) -> "IFPResults":
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
         total = (
             len(lig_iterable)
             if isinstance(lig_iterable, Chem.SDMolSupplier | Sized)
             else None
         )
-        ifp = {}
+        ifp: "IFPResults" = {}
 
         with MolIterablePool(
             n_jobs,
@@ -847,7 +853,9 @@ class Fingerprint:
             interaction.run(traj, lig, prot)
         return self
 
-    def _run_iter_bridged_analysis(self, lig_iterable, prot_mol, **kwargs):
+    def _run_iter_bridged_analysis(
+        self, lig_iterable: Iterable["Molecule"], prot_mol: "Molecule", **kwargs: Any
+    ) -> "Fingerprint":
         """Implementation of the WaterBridge analysis for trajectories.
 
         Parameters
