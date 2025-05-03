@@ -398,11 +398,11 @@ class TestBridgedInteractions:
     )
     def test_water_bridge_validation(
         self,
-        water_params: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+        water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
         kwargs: dict,
         match: str,
     ) -> None:
-        *_, water = water_params
+        *_, water = water_atomgroups
         with pytest.raises(ValueError, match=match):
             Fingerprint(
                 ["WaterBridge"],
@@ -412,9 +412,9 @@ class TestBridgedInteractions:
     def test_direct_water_bridge(
         self,
         water_u: "Universe",
-        water_params: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+        water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
     ) -> None:
-        ligand, protein, water = water_params
+        ligand, protein, water = water_atomgroups
         fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
         fp.run(water_u.trajectory[:1], ligand, protein)
         int_data = next(fp.ifp[0].interactions())
@@ -430,18 +430,47 @@ class TestBridgedInteractions:
         ],
     )
     def test_higher_order_water_bridge(
-        self, water_u: "Universe", kwargs: dict, num_expected: int
+        self,
+        water_u: "Universe",
+        water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+        kwargs: dict,
+        num_expected: int,
     ) -> None:
-        ligand = water_u.select_atoms("resname QNB")
-        pocket = water_u.select_atoms("protein and resid 399:403")
-        water = water_u.select_atoms("segid WAT and (resid 17 or resid 83)")
+        ligand, protein, water = water_atomgroups
         fp = Fingerprint(
             ["WaterBridge"],
             parameters={"WaterBridge": {"water": water, "order": 2, **kwargs}},
         )
-        fp.run(water_u.trajectory[:1], ligand, pocket)
+        fp.run(water_u.trajectory[:1], ligand, protein)
         all_int_data = list(fp.ifp[0].interactions())
 
         assert len(all_int_data) == num_expected
+        int_data = all_int_data[-1]
+        assert "distance_TIP383.X_TIP317.X" in int_data.metadata
+
+    def test_run_iter_water_bridge(
+        self, water_mols: tuple["Molecule", "Molecule", "Molecule"]
+    ) -> None:
+        ligand, protein, water = water_mols
+        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
+        # mimick multiple poses
+        fp.run_from_iterable([ligand, ligand], protein)
+        int_data = next(fp.ifp[1].interactions())
+
+        assert int_data.interaction == "WaterBridge"
+        assert str(int_data.protein) == "TRP400.X"
+
+    def test_higher_order_run_iter_water_bridge(
+        self, water_mols: tuple["Molecule", "Molecule", "Molecule"]
+    ) -> None:
+        ligand, protein, water = water_mols
+        fp = Fingerprint(
+            ["WaterBridge"], parameters={"WaterBridge": {"water": water, "order": 2}}
+        )
+        # mimick multiple poses
+        fp.run_from_iterable([ligand, ligand], protein)
+        all_int_data = list(fp.ifp[0].interactions())
+
+        assert len(all_int_data) == 3
         int_data = all_int_data[-1]
         assert "distance_TIP383.X_TIP317.X" in int_data.metadata

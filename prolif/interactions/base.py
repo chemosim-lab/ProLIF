@@ -27,6 +27,7 @@ from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vec
 if TYPE_CHECKING:
     from typing import TypeVar
 
+    from prolif.molecule import Molecule
     from prolif.residue import Residue
     from prolif.typeshed import (
         Angles,
@@ -236,6 +237,12 @@ class BridgedInteraction:
     @abstractmethod
     def run(
         self, traj: "Trajectory", lig: "MDAObject", prot: "MDAObject"
+    ) -> "IFPResults":
+        raise NotImplementedError()
+
+    @abstractmethod
+    def run_from_iterable(
+        self, lig_iterable: Iterable["Molecule"], prot_mol: "Molecule"
     ) -> "IFPResults":
         raise NotImplementedError()
 

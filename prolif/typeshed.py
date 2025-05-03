@@ -1,3 +1,5 @@
+"""Helper module containing type aliases."""
+
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias, Union
 

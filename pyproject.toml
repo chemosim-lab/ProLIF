@@ -234,6 +234,7 @@ ignore = [
     "PLR0915",
     "PLR0916",
     "PLR0917",
+    "PLR1702",
     "PLR2004",
     "PLR6301",
     "PD901",
@@ -253,12 +254,14 @@ include = '(docs/notebooks/.+\.ipynb)$'
 
 [tool.coverage.report]
 include_namespace_packages = true
-exclude_lines = [
-    "pragma: no cover",
+exclude_also = [
     "def __repr__",
     "if __name__ == .__main__.:",
     "if .*TYPE_CHECKING:",
     "@.*abstractmethod",
+]
+omit = [
+    "prolif/typeshed.py",
 ]
 
 [build-system]
