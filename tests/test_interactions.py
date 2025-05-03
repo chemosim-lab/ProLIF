@@ -21,6 +21,7 @@ lg.setLevel(RDLogger.ERROR)
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from MDAnalysis.core.groups import AtomGroup
     from MDAnalysis.core.universe import Universe
 
     from prolif.molecule import Molecule
@@ -395,7 +396,12 @@ class TestBridgedInteractions:
             ({"order": 1, "min_order": 2}, "min_order cannot be greater than order"),
         ],
     )
-    def test_water_bridge_validation(self, water_params, kwargs, match):
+    def test_water_bridge_validation(
+        self,
+        water_params: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+        kwargs: dict,
+        match: str,
+    ) -> None:
         *_, water = water_params
         with pytest.raises(ValueError, match=match):
             Fingerprint(
@@ -403,7 +409,11 @@ class TestBridgedInteractions:
                 parameters={"WaterBridge": {"water": water, **kwargs}},
             )
 
-    def test_direct_water_bridge(self, water_u, water_params):
+    def test_direct_water_bridge(
+        self,
+        water_u: "Universe",
+        water_params: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+    ) -> None:
         ligand, protein, water = water_params
         fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
         fp.run(water_u.trajectory[:1], ligand, protein)
@@ -419,7 +429,9 @@ class TestBridgedInteractions:
             ({"min_order": 2}, 2),
         ],
     )
-    def test_higher_order_water_bridge(self, water_u, kwargs, num_expected):
+    def test_higher_order_water_bridge(
+        self, water_u: "Universe", kwargs: dict, num_expected: int
+    ) -> None:
         ligand = water_u.select_atoms("resname QNB")
         pocket = water_u.select_atoms("protein and resid 399:403")
         water = water_u.select_atoms("segid WAT and (resid 17 or resid 83)")

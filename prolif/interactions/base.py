@@ -17,7 +17,6 @@ import numpy as np
 from rdkit.Chem import MolFromSmarts
 from rdkit.Geometry import Point3D
 
-from prolif.ifp import IFP
 from prolif.interactions.utils import (
     DISTANCE_FUNCTIONS_3ARGS,
     DISTANCE_FUNCTIONS_4ARGS,
@@ -29,7 +28,13 @@ if TYPE_CHECKING:
     from typing import TypeVar
 
     from prolif.residue import Residue
-    from prolif.typeshed import Angles, InteractionMetadata
+    from prolif.typeshed import (
+        Angles,
+        IFPResults,
+        InteractionMetadata,
+        MDAObject,
+        Trajectory,
+    )
 
     Self = TypeVar("Self", bound="Interaction")
 
@@ -122,8 +127,7 @@ class Interaction(ABC):
         )
 
     def __repr__(self) -> str:  # pragma: no cover
-        cls = self.__class__
-        return f"<{cls.__module__}.{cls.__name__} at {id(self):#x}>"
+        return f"<prolif.{self.__class__.__name__} at {id(self):#x}>"
 
     def metadata(
         self,
@@ -205,7 +209,7 @@ class Interaction(ABC):
 class BridgedInteraction:
     """Base class for bridged interactions."""
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls) -> None:
         super().__init_subclass__()
         name = cls.__name__
         register = _BRIDGED_INTERACTIONS
@@ -217,12 +221,12 @@ class BridgedInteraction:
             )
         register[name] = cls
 
-    def __init__(self):
-        self.ifp = {}
+    def __init__(self) -> None:
+        self.ifp: "IFPResults" = {}
         # force empty setup to initialize args with defaults
         self.setup()
 
-    def setup(self, ifp_store=None, **kwargs) -> None:
+    def setup(self, ifp_store: Optional["IFPResults"] = None, **kwargs: Any) -> None:
         """Setup additional arguments passed at runtime to the fingerprint generator's
         ``run`` method.
         """
@@ -230,7 +234,9 @@ class BridgedInteraction:
         self.kwargs = kwargs
 
     @abstractmethod
-    def run(self, traj, lig, prot) -> dict[int, IFP]:
+    def run(
+        self, traj: "Trajectory", lig: "MDAObject", prot: "MDAObject"
+    ) -> "IFPResults":
         raise NotImplementedError()
 
 

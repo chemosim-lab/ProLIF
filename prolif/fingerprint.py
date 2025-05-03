@@ -60,12 +60,12 @@ if TYPE_CHECKING:
     from pandas import DataFrame
     from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
-    from prolif.interactions.base import Interaction
     from prolif.plotting.complex3d import Complex3D
     from prolif.plotting.network import LigNetwork
     from prolif.residue import Residue, ResidueId
     from prolif.typeshed import (
         IFPData,
+        IFPResults,
         InteractionMetadata,
         MDAObject,
         PathLike,
@@ -240,31 +240,31 @@ class Fingerprint:
 
         # add interaction methods
         self.interactions = {}
-        self._interactions: dict[str, "Interaction"] = {}
-        for name in interactions:
-            # create instance with custom parameters if available
-            interaction_cls = _INTERACTIONS[name]
-            interaction = interaction_cls(**parameters.get(name, {}))
-            setattr(self, name.lower(), interaction)
-            self._interactions[name] = interaction
-            self.interactions[name] = interaction.all if self.count else interaction.any
-
-        # add bridged interactions
         self.bridged_interactions = {}
-        for name, interaction_cls in _BRIDGED_INTERACTIONS.items():
-            if name in interactions:
+        for name in interactions:
+            # add bridged interaction
+            if name in _BRIDGED_INTERACTIONS:
                 params = parameters.get(name, {})
                 if not params:
                     raise ValueError(
                         f"Must specify settings for bridged interaction {name!r}: try "
                         f'`parameters={{"{name}": {{...}}}}`'
                     )
-                sig = signature(interaction_cls.__init__)
+                bridged_interaction_cls = _BRIDGED_INTERACTIONS[name]
+                sig = signature(bridged_interaction_cls.__init__)
                 if "count" in sig.parameters:
                     params.setdefault("count", self.count)
-                interaction = interaction_cls(**params)
+                bridged_interaction = bridged_interaction_cls(**params)
+                setattr(self, name.lower(), bridged_interaction)
+                self.bridged_interactions[name] = bridged_interaction
+            else:
+                # create instance with custom parameters if available
+                interaction_cls = _INTERACTIONS[name]
+                interaction = interaction_cls(**parameters.get(name, {}))
                 setattr(self, name.lower(), interaction)
-                self.bridged_interactions[name] = interaction
+                self.interactions[name] = (
+                    interaction.all if self.count else interaction.any
+                )
 
     def _check_valid_interactions(
         self, interactions_iterable: Iterable[str], varname: str
@@ -617,13 +617,13 @@ class Fingerprint:
         residues: "ResidueSelection",
         converter_kwargs: tuple[dict, dict],
         progress: bool,
-    ):
+    ) -> "IFPResults":
         """Serial implementation for trajectories."""
         # support single frame
         if hasattr(traj, "frame"):
             traj = (traj,)
         iterator = tqdm(traj) if progress else traj
-        ifp = {}
+        ifp: "IFPResults" = {}
         for ts in iterator:
             lig_mol = Molecule.from_mda(lig, **converter_kwargs[0])
             prot_mol = Molecule.from_mda(prot, **converter_kwargs[1])
@@ -644,7 +644,7 @@ class Fingerprint:
         converter_kwargs: tuple[dict, dict],
         progress: bool,
         n_jobs: int | None,
-    ) -> "Fingerprint":
+    ) -> "IFPResults":
         """Parallel implementation of :meth:`~Fingerprint.run`"""
         n_chunks = n_jobs or cast(int, mp.cpu_count())
         try:
@@ -670,7 +670,7 @@ class Fingerprint:
             frames = range(n_frames)
         chunks = np.array_split(frames, n_chunks)
         args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
-        ifp = {}
+        ifp: "IFPResults" = {}
 
         with TrajectoryPool(
             n_jobs,
@@ -804,7 +804,9 @@ class Fingerprint:
         self.ifp = ifp
         return self
 
-    def _run_bridged_analysis(self, traj, lig, prot, **kwargs):
+    def _run_bridged_analysis(
+        self, traj: "Trajectory", lig: "MDAObject", prot: "MDAObject", **kwargs: Any
+    ) -> "Fingerprint":
         """Implementation of the WaterBridge analysis for trajectories.
 
         Parameters
@@ -817,7 +819,7 @@ class Fingerprint:
         prot : MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the protein (with multiple residues)
         """  # noqa: E501
-        self.ifp = getattr(self, "ifp", {})
+        self.ifp = cast("IFPResults", getattr(self, "ifp", {}))
         for interaction in self.bridged_interactions.values():
             interaction.setup(ifp_store=self.ifp, **kwargs)
             interaction.run(traj, lig, prot)
@@ -1242,79 +1244,3 @@ class Fingerprint:
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
         )
-
-    def run_bridged_analysis(self, traj, lig, prot, water, **kwargs):
-        """
-        TODO
-        """
-        kwargs.pop("n_jobs", None)
-        residues = kwargs.pop("residues", None)
-        fp = Fingerprint(
-            interactions=["HBDonor", "HBAcceptor"], parameters=self.parameters
-        )
-
-        # run analysis twice, once on ligand-water, then on water-prot
-        ifp_stores: list[dict[int, IFP]] = [
-            fp._run_serial(traj, lig, water, residues=None, **kwargs),
-            fp._run_serial(traj, water, prot, residues=residues, **kwargs),
-        ]
-
-        # merge results from the 2 runs on matching water residues
-        self.ifp = getattr(self, "ifp", {})
-        for (frame, ifp1), ifp2 in zip(
-            ifp_stores[0].items(), ifp_stores[1].values(), strict=False
-        ):
-            # for each ligand-water interaction in ifp1
-            for data1 in ifp1.interactions():
-                # for each water-protein interaction in ifp2 where water1 == water2
-                for data2 in [
-                    d2 for d2 in ifp2.interactions() if d2.ligand == data1.protein
-                ]:
-                    # construct merged metadata
-                    metadata = (
-                        {
-                            "indices": {
-                                "ligand": data1.metadata["indices"]["ligand"],
-                                "protein": data2.metadata["indices"]["protein"],
-                                "water": tuple(
-                                    set().union(
-                                        data1.metadata["indices"]["protein"],
-                                        data2.metadata["indices"]["ligand"],
-                                    )
-                                ),
-                            },
-                            "parent_indices": {
-                                "ligand": data1.metadata["parent_indices"]["ligand"],
-                                "protein": data2.metadata["parent_indices"]["protein"],
-                                "water": tuple(
-                                    set().union(
-                                        data1.metadata["parent_indices"]["protein"],
-                                        data2.metadata["parent_indices"]["ligand"],
-                                    )
-                                ),
-                            },
-                            "water_residue": data1.protein,
-                            "ligand_role": data1.interaction,
-                            "protein_role": (  # invert role
-                                "HBDonor"
-                                if data2.interaction == "HBAcceptor"
-                                else "HBAcceptor"
-                            ),
-                            **{
-                                f"{key}{suffix}": data.metadata[key]
-                                for suffix, data in [
-                                    ("_ligand_water", data1),
-                                    ("_water_protein", data2),
-                                ]
-                                for key in ["distance", "DHA_angle"]
-                            },
-                        },
-                    )
-
-                    # store metadata
-                    ifp = self.ifp.setdefault(frame, IFP())
-                    ifp.setdefault((data1.ligand, data2.protein), {}).setdefault(
-                        "WaterBridge", []
-                    ).append(metadata)
-
-        return self

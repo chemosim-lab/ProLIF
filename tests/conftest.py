@@ -186,14 +186,14 @@ def cleanup_dummy() -> Iterator[None]:
 
 
 @pytest.fixture(scope="session")
-def water_u():
+def water_u() -> Universe:
     top_path = (datapath / "water_m2.pdb").as_posix()
     traj_path = (datapath / "water_m2.xtc").as_posix()
     return Universe(top_path, traj_path)
 
 
 @pytest.fixture(scope="session")
-def water_params(water_u):
+def water_params(water_u: Universe) -> tuple["AtomGroup", "AtomGroup", "AtomGroup"]:
     ligand = water_u.select_atoms("resname QNB")
     protein = water_u.select_atoms(
         "protein and byres around 4 group ligand", ligand=ligand

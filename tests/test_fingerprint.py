@@ -440,14 +440,18 @@ class TestFingerprint:
         fp = Fingerprint()
         assert fp.hydrophobic.distance == 4.5  # type: ignore[attr-defined]
 
-    def test_water_bridge_instance_without_params_raises_error(self):
+    def test_water_bridge_instance_without_params_raises_error(self) -> None:
         with pytest.raises(
             ValueError,
             match="Must specify settings for bridged interaction 'WaterBridge'",
         ):
             Fingerprint(["WaterBridge"])
 
-    def test_mix_water_bridge_and_other_interactions(self, water_u, water_params):
+    def test_mix_water_bridge_and_other_interactions(
+        self,
+        water_u: mda.Universe,
+        water_params: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+    ) -> None:
         ligand, protein, water = water_params
         fp = Fingerprint(
             ["HBDonor", "WaterBridge"], parameters={"WaterBridge": {"water": water}}
@@ -457,7 +461,12 @@ class TestFingerprint:
         assert "WaterBridge" in fp.ifp[0]["QNB1.X", "TRP400.X"]
         assert "HBDonor" in fp.ifp[0]["QNB1.X", "ASN404.X"]
 
-    def test_water_bridge_updates_cache_size(self, water_u, water_params, monkeypatch):
+    def test_water_bridge_updates_cache_size(
+        self,
+        water_u: mda.Universe,
+        water_params: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         ligand, protein, water = water_params
         set_converter_cache_size(2)
         mocked = Mock(wraps=set_converter_cache_size)

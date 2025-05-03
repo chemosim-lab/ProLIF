@@ -26,7 +26,7 @@ ResidueSelection: TypeAlias = Literal["all"] | Sequence[ResidueKey] | None
 # IFP
 IFPResults: TypeAlias = dict[int, "IFP"]
 InteractionMetadata: TypeAlias = dict[str, Any]
-IFPData: TypeAlias = dict[str, tuple[InteractionMetadata, ...]]
+IFPData: TypeAlias = dict[str, Sequence[InteractionMetadata]]
 
 # MDAnalysis
 Trajectory: TypeAlias = Union[  # type: ignore[no-any-unimported]

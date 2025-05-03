@@ -48,14 +48,13 @@ tutorials = [
     "rdkit",
     "matplotlib>=3.7",
     "seaborn<1.0",
-    "networkx",
     "pyvis",
     "prolif[plots]",
 ]
 
 [dependency-groups]
 build = ["build"]
-tests = ["pytest>=6.1.2", "pytest-cov", "ipython", "prolif[plots,water]"]
+tests = ["pytest>=6.1.2", "pytest-cov", "ipython", "prolif[plots]"]
 docs = [
     "sphinx==5.3.0",
     "sphinx-copybutton",
@@ -72,6 +71,7 @@ type-check = [
     "types-tqdm",
     "types-setuptools",
     "scipy-stubs",
+    "types-networkx",
 ]
 dev = [
     "ruff==0.11.2",

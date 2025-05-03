@@ -2,12 +2,17 @@
 
 import itertools as it
 from collections import defaultdict
-from typing import Iterator, Optional
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import networkx as nx
 
 from prolif.ifp import IFP, InteractionData
 from prolif.interactions.base import BridgedInteraction
+
+if TYPE_CHECKING:
+    from prolif.residue import ResidueId
+    from prolif.typeshed import IFPResults, MDAObject, Trajectory
 
 
 class WaterBridge(BridgedInteraction):
@@ -39,13 +44,13 @@ class WaterBridge(BridgedInteraction):
 
     def __init__(
         self,
-        water,
+        water: "MDAObject",
         order: int = 1,
         min_order: int = 1,
-        hbdonor: Optional[dict] = None,
-        hbacceptor: Optional[dict] = None,
+        hbdonor: dict | None = None,
+        hbacceptor: dict | None = None,
         count: bool = False,
-    ):
+    ) -> None:
         # circular import
         from prolif.fingerprint import Fingerprint
 
@@ -63,13 +68,15 @@ class WaterBridge(BridgedInteraction):
             count=count,
         )
 
-    def setup(self, ifp_store=None, **kwargs) -> None:
+    def setup(self, ifp_store: Optional["IFPResults"] = None, **kwargs: Any) -> None:
         super().setup(ifp_store=ifp_store, **kwargs)
         kwargs.pop("n_jobs", None)
         self.residues = kwargs.pop("residues", None)
         self.kwargs = kwargs
 
-    def run(self, traj, lig, prot) -> dict[int, IFP]:
+    def run(
+        self, traj: "Trajectory", lig: "MDAObject", prot: "MDAObject"
+    ) -> "IFPResults":
         """Run the water bridge analysis.
 
         Parameters
@@ -109,9 +116,7 @@ class WaterBridge(BridgedInteraction):
 
         return self.ifp
 
-    def _first_order_only(
-        self, frame: int, ifp_lw: IFP, ifp_wp: IFP
-    ) -> Iterator[tuple[InteractionData, InteractionData]]:
+    def _first_order_only(self, frame: int, ifp_lw: IFP, ifp_wp: IFP) -> None:
         """Iterates over all relevant combinations of ligand-water-protein"""
         # for each ligand-water interaction
         for data_lw in ifp_lw.interactions():
@@ -129,8 +134,8 @@ class WaterBridge(BridgedInteraction):
         # MultiGraph to allow the same pair of nodes to interact as both HBA and HBD
         # and potentially multiple groups of atoms satisfying the constraints.
         # Each of these interaction will have its own edge in the graph.
-        graph = nx.MultiGraph()
-        nodes = defaultdict(set)
+        graph: nx.MultiGraph["ResidueId"] = nx.MultiGraph()
+        nodes: defaultdict[str, set[ResidueId]] = defaultdict(set)
 
         # construct graph of water interactions
         for ifp, role in [(ifp_lw, "ligand"), (ifp_wp, "protein")]:
@@ -162,16 +167,17 @@ class WaterBridge(BridgedInteraction):
         # find all edge paths of length up to `order + 1`
         for source in nodes["ligand"]:
             targets = (t for t in nodes["protein"] if nx.has_path(graph, source, t))
-            paths = nx.all_simple_edge_paths(
-                graph, source, targets, cutoff=self.order + 1
+            paths = cast(
+                Iterator[list[tuple["ResidueId", "ResidueId", str]]],
+                nx.all_simple_edge_paths(graph, source, targets, cutoff=self.order + 1),
             )
             for path in paths:
                 if len(path) <= self.min_order:
                     continue
                 # path is a list[tuple[node_id1, node_id2, deduplication_key]]
                 # first element in path is lig-water1, last is waterN-prot
-                data_lw = graph.edges[path[0]]["int_data"]
-                data_wp = graph.edges[path[-1]]["int_data"]
+                data_lw = cast(InteractionData, graph.edges[path[0]]["int_data"])
+                data_wp = cast(InteractionData, graph.edges[path[-1]]["int_data"])
                 ww_edges = [graph.edges[p] for p in path[1:-1]]
                 # only include if strictly passing through water (going back through
                 # ligand or protein is not a valid higher-order interaction)
@@ -181,7 +187,7 @@ class WaterBridge(BridgedInteraction):
                     data_ww_list = []
                     left = data_lw.protein
                     for e in ww_edges:
-                        d = e["int_data"]
+                        d = cast(InteractionData, e["int_data"])
                         is_sorted = d.ligand == left
                         data_ww = InteractionData(
                             ligand=d.ligand if is_sorted else d.protein,
@@ -284,4 +290,4 @@ class WaterBridge(BridgedInteraction):
         # store metadata
         self.ifp[frame].setdefault((data_lw.ligand, data_wp.protein), {}).setdefault(
             "WaterBridge", []
-        ).append(metadata)
+        ).append(metadata)  # type: ignore[attr-defined]
