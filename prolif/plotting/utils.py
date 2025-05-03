@@ -1,4 +1,9 @@
 import builtins
+from collections.abc import Iterator, Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prolif.typeshed import InteractionMetadata
 
 IS_NOTEBOOK = hasattr(builtins, "__IPYTHON__")
 
@@ -18,6 +23,7 @@ separated_interaction_colors = {
     "FaceToFace": "#a22ddc",
     "MetalAcceptor": "#7da982",
     "MetalDonor": "#609267",
+    "WaterBridge": "#323aa8",
 }
 
 grouped_interaction_colors = {
@@ -36,4 +42,17 @@ grouped_interaction_colors = {
     "FaceToFace": "#b559e3",
     "MetalAcceptor": "#7da982",
     "MetalDonor": "#7da982",
+    "WaterBridge": "#323aa8",
 }
+
+
+def metadata_iterator(
+    metadata_tuple: Sequence["InteractionMetadata"], display_all: bool
+) -> Iterator["InteractionMetadata"]:
+    if display_all:
+        yield from metadata_tuple
+    else:
+        yield min(
+            metadata_tuple,
+            key=lambda m: m.get("distance", float("nan")),
+        )

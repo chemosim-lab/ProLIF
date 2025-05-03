@@ -185,6 +185,31 @@ def cleanup_dummy() -> Iterator[None]:
     _INTERACTIONS.pop("Dummy", None)
 
 
+@pytest.fixture(scope="session")
+def water_u() -> Universe:
+    top_path = (datapath / "water_m2.pdb").as_posix()
+    traj_path = (datapath / "water_m2.xtc").as_posix()
+    return Universe(top_path, traj_path)
+
+
+@pytest.fixture(scope="session")
+def water_atomgroups(water_u: Universe) -> tuple["AtomGroup", "AtomGroup", "AtomGroup"]:
+    ligand = water_u.select_atoms("resname QNB")
+    protein = water_u.select_atoms("protein and resid 399:404")
+    water = water_u.select_atoms("segid WAT and (resid 17 or resid 83)")
+    return ligand, protein, water
+
+
+@pytest.fixture(scope="session")
+def water_mols(
+    water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+) -> tuple[Molecule, Molecule, Molecule]:
+    lig_mol = Molecule.from_mda(water_atomgroups[0])
+    prot_mol = Molecule.from_mda(water_atomgroups[1])
+    water_mol = Molecule.from_mda(water_atomgroups[2])
+    return lig_mol, prot_mol, water_mol
+
+
 class BaseTestMixinRDKitMol:
     def test_init(self, mol: "BaseRDKitMol") -> None:
         assert isinstance(mol, Chem.Mol)
