@@ -49,6 +49,9 @@ grouped_interaction_colors = {
 def metadata_iterator(
     metadata_tuple: Sequence["InteractionMetadata"], display_all: bool
 ) -> Iterator["InteractionMetadata"]:
+    """Iterate over the metadata tuple, yielding either all or the one with the
+    shortest distance.
+    """
     if display_all:
         yield from metadata_tuple
     else:

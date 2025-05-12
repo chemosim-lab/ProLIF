@@ -9,7 +9,7 @@ from numpy.testing import assert_array_almost_equal
 from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
 
-from prolif.datafiles import TOP, TRAJ, datapath
+from prolif.datafiles import TOP, TRAJ, WATER_TOP, WATER_TRAJ, datapath
 from prolif.interactions.base import _INTERACTIONS
 from prolif.molecule import Molecule, sdf_supplier
 
@@ -187,9 +187,7 @@ def cleanup_dummy() -> Iterator[None]:
 
 @pytest.fixture(scope="session")
 def water_u() -> Universe:
-    top_path = (datapath / "water_m2.pdb").as_posix()
-    traj_path = (datapath / "water_m2.xtc").as_posix()
-    return Universe(top_path, traj_path)
+    return Universe(WATER_TOP, WATER_TRAJ)
 
 
 @pytest.fixture(scope="session")

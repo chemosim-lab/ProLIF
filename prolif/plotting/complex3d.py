@@ -81,12 +81,24 @@ class Complex3D:
     PROTEIN_RING_INTERACTIONS : set[str]
         Which interactions should be displayed using the centroid instead of using
         :attr:`PROTEIN_DISPLAYED_ATOM` for the protein.
+    BRIDGED_INTERACTIONS : dict[str, str]
+        For bridged-interactions such as WaterBridge. The key is the interaction name,
+        and the value is the name of the molecule in the metadata indices dictionary.
     RESIDUE_HOVER_CALLBACK : str
         JavaScript callback executed when hovering a residue involved in an interaction.
     INTERACTION_HOVER_CALLBACK : str
         JavaScript callback executed when hovering an interaction line.
     DISABLE_HOVER_CALLBACK : str
         JavaScript callback executed when the hovering event is finished.
+
+    .. versionchanged:: 2.1.0
+        Added ``water_mol`` parameter to the constructor to display waters
+        involved in WaterBridge interactions. Added ``save_png`` method to save the
+        current state of the 3D viewer to a PNG. Added ``remove_hydrogens`` parameter
+        to the ``display`` and ``compare`` methods to remove non-polar hydrogens that
+        aren't involved in an interaction. Added ``only_interacting`` parameter to the
+        ``display`` and ``compare`` methods to show all protein residues in the
+        vicinity of the ligand, or only the ones participating in an interaction.
     """  # noqa: E501
 
     COLORS: ClassVar[dict[str, str]] = {**separated_interaction_colors}
@@ -185,6 +197,7 @@ class Complex3D:
 
     @staticmethod
     def get_ring_centroid(mol: Molecule, indices: tuple[int, ...]) -> Point3D:
+        """Get the centroid of a ring system."""
         centroid = mol.xyz[list(indices)].mean(axis=0)
         return Point3D(*centroid)
 
@@ -416,19 +429,7 @@ class Complex3D:
                                     .GetAtomPosition(metadata["indices"][dest][0])
                                 )
 
-                            v.addCylinder(
-                                {
-                                    "start": {"x": p1.x, "y": p1.y, "z": p1.z},
-                                    "end": {"x": p2.x, "y": p2.y, "z": p2.z},
-                                    "color": self.COLORS.get(interaction, "grey"),
-                                    "radius": 0.15,
-                                    "dashed": True,
-                                    "fromCap": 1,
-                                    "toCap": 1,
-                                },
-                                viewer=position,
-                            )
-                            self._add_hover_interaction(
+                            self._add_interaction(
                                 v,
                                 position,
                                 lresid,
@@ -462,20 +463,8 @@ class Complex3D:
                                 ],
                             )
                         # add interaction line
-                        v.addCylinder(
-                            {
-                                "start": {"x": p1.x, "y": p1.y, "z": p1.z},
-                                "end": {"x": p2.x, "y": p2.y, "z": p2.z},
-                                "color": self.COLORS.get(interaction, "grey"),
-                                "radius": 0.15,
-                                "dashed": True,
-                                "fromCap": 1,
-                                "toCap": 1,
-                            },
-                            viewer=position,
-                        )
                         dist = metadata.get("distance", float("nan"))
-                        self._add_hover_interaction(
+                        self._add_interaction(
                             v, position, lresid, interaction, dist, p1, p2
                         )
 
@@ -532,7 +521,7 @@ class Complex3D:
 
         v.zoomTo({"model": list(self._models.values())}, viewer=position)
 
-    def _add_hover_interaction(  # type: ignore[no-any-unimported]
+    def _add_interaction(  # type: ignore[no-any-unimported]
         self,
         v: py3Dmol.view,
         position: tuple[int, int],
@@ -542,9 +531,20 @@ class Complex3D:
         p1: Point3D,
         p2: Point3D,
     ) -> None:
-        """
-        Add label when hovering the middle of the dashed line by adding a dummy atom.
-        """
+        """Add an interaction line (and hover label) to the view."""
+        v.addCylinder(
+            {
+                "start": {"x": p1.x, "y": p1.y, "z": p1.z},
+                "end": {"x": p2.x, "y": p2.y, "z": p2.z},
+                "color": self.COLORS.get(interaction, "grey"),
+                "radius": 0.15,
+                "dashed": True,
+                "fromCap": 1,
+                "toCap": 1,
+            },
+            viewer=position,
+        )
+        # add label when hovering the middle of the dashed line by adding a dummy atom
         c = Point3D(*get_centroid([p1, p2]))
         modelID = self._models[resid]
         model = v.getModel(modelID, viewer=position)
@@ -578,6 +578,7 @@ class Complex3D:
         res: Residue,
         style: dict,
     ) -> None:
+        """Add a residue to the view."""
         self._mid += 1
         resid = res.resid
         v.addModel(Chem.MolToMolBlock(res), "sdf", viewer=position)
@@ -622,6 +623,7 @@ class Complex3D:
         )
 
     def __getattr__(self, name: str) -> Any:
+        """Get an attribute from the py3Dmol view."""
         if self._view is None:
             raise ValueError(
                 "View not initialized, did you call `display`/`compare` first?",

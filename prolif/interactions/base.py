@@ -52,6 +52,11 @@ class Interaction(ABC):
     .. versionchanged:: 2.0.0
         Changed the return type of interactions. Added some helper methods to easily
         update/derive interaction classes.
+
+    .. versionchanged:: 2.1.0
+        Added the ``all``, ``any`` and ``best`` methods to the base class. These methods
+        are used to get all interactions, any interaction or the best interaction
+        (closest to the ligand) respectively.
     """
 
     _metadata_mapping: dict | None
@@ -103,6 +108,10 @@ class Interaction(ABC):
     def all(
         self, lig_res: "Residue", prot_res: "Residue", metadata: bool = False
     ) -> tuple[Union["InteractionMetadata", Literal[True]], ...]:
+        """Returns all interactions found between the ligand and protein.
+
+        .. versionadded:: 2.1.0
+        """
         return tuple(self(lig_res, prot_res, metadata=metadata))
 
     @overload
@@ -116,11 +125,21 @@ class Interaction(ABC):
     def any(
         self, lig_res: "Residue", prot_res: "Residue", metadata: bool = False
     ) -> Union["InteractionMetadata", Literal[True], None]:
+        """Returns the first interaction found between the ligand and protein.
+
+        .. versionadded:: 2.1.0
+        """
         return next(self(lig_res, prot_res, metadata=metadata), None)
 
     def best(
         self, lig_res: "Residue", prot_res: "Residue"
     ) -> Optional["InteractionMetadata"]:
+        """Returns the best interaction found between the ligand and protein.
+        The best interaction is defined as the one with the smallest distance as defined
+        by each interaction type.
+
+        .. versionadded:: 2.1.0
+        """
         return min(
             self(lig_res, prot_res, metadata=True),
             key=itemgetter("distance"),  # type: ignore[arg-type]
@@ -208,7 +227,10 @@ class Interaction(ABC):
 
 
 class BridgedInteraction:
-    """Base class for bridged interactions."""
+    """Base class for bridged interactions.
+
+    .. versionadded:: 2.1.0
+    """
 
     def __init_subclass__(cls) -> None:
         super().__init_subclass__()

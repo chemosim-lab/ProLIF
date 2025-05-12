@@ -172,18 +172,33 @@ class Fingerprint:
 
     .. ipython:: python
 
-        # ligand-protein
-        next(fp.hbdonor(lig, prot["ASP129.A"]))
-        # protein-protein
-        next(fp.hbacceptor(prot["ASP129.A"], prot["CYS133.A"]))
+        # any HBDonor between ligand and ASP129
+        fp.hbdonor.any(lig, prot["ASP129.A"])
+        # all HBAcceptor between ASP129 and CYS133
+        fp.hbacceptor.all(prot["ASP129.A"], prot["CYS133.A"])
 
     You can also obtain the indices of atoms responsible for the interaction:
 
     .. ipython:: python
 
         fp.metadata(lig, prot["ASP129.A"])
-        next(fp.hbdonor(lig, prot["ASP129.A"], metadata=True), None)
+        fp.hbdonor.any(lig, prot["ASP129.A"], metadata=True)
+        fp.hbdonor.best(lig, prot["ASP129.A"])
 
+    Since version ``2.1.0``, you can also use bridged interactions such as
+    ``WaterBridge``:
+
+    .. ipython:: python
+
+        u = mda.Universe(prolif.datafiles.WATER_TOP, prolif.datafiles.WATER_TRAJ)
+        ligand_selection = u.select_atoms("resname QNB")
+        protein_selection = u.select_atoms("protein and resid 399:404")
+        water_selection = u.select_atoms("segid WAT and (resid 17 or resid 83)")
+        fp = prolif.Fingerprint(
+            ["WaterBridge"], parameters={"WaterBridge": {"water": water_selection}}
+        )
+        fp.run(u.trajectory[0], ligand_selection, protein_selection)
+        fp.to_dataframe().T
 
     .. versionchanged:: 1.0.0
         Added pickle support
@@ -208,6 +223,8 @@ class Fingerprint:
         Added the ``count`` argument to control for a given pair of residues whether to
         return all occurences of an interaction or only the first one.
 
+    .. versionchanged:: 2.1.0
+        Added support for bridged interactions (e.g. ``WaterBridge``).
     """
 
     def __init__(
@@ -296,6 +313,10 @@ class Fingerprint:
             custom interactions).
         show_bridged : bool
             Show bridged interaction classes such as ``WaterBridge``.
+
+        .. versionchanged:: 2.1.0
+            Added the ``show_bridged`` parameter to show bridged interactions
+            such as ``WaterBridge``.
         """
         interactions = sorted(_INTERACTIONS)
         if show_bridged:
@@ -313,6 +334,9 @@ class Fingerprint:
 
     @property
     def n_interactions(self) -> int:
+        """Number of interaction types that are configured to be detected by the
+        fingerprint.
+        """
         return len(self._interactions_list)
 
     def bitvector(self, res1: "Residue", res2: "Residue") -> "NDArray":
@@ -835,7 +859,7 @@ class Fingerprint:
     def _run_bridged_analysis(
         self, traj: "Trajectory", lig: "MDAObject", prot: "MDAObject", **kwargs: Any
     ) -> "Fingerprint":
-        """Implementation of the WaterBridge analysis for trajectories.
+        """Implementation of bridged-interaction analysis for trajectories.
 
         Parameters
         ----------
@@ -846,6 +870,8 @@ class Fingerprint:
             An MDAnalysis AtomGroup for the ligand
         prot : MDAnalysis.core.groups.AtomGroup
             An MDAnalysis AtomGroup for the protein (with multiple residues)
+
+        .. versionadded:: 2.1.0
         """  # noqa: E501
         self.ifp = cast("IFPResults", getattr(self, "ifp", {}))
         for interaction in self.bridged_interactions.values():
@@ -856,7 +882,7 @@ class Fingerprint:
     def _run_iter_bridged_analysis(
         self, lig_iterable: Iterable["Molecule"], prot_mol: "Molecule", **kwargs: Any
     ) -> "Fingerprint":
-        """Implementation of the WaterBridge analysis for trajectories.
+        """Implementation of bridged-interaction analysis for iterables.
 
         Parameters
         ----------

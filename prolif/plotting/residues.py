@@ -23,7 +23,7 @@ def display_residues(
     size: tuple[int, int] = (200, 140),
     mols_per_row: int = 4,
     use_svg: bool = True,
-    sanitize: bool = False,
+    sanitize: bool = True,
 ) -> Any:
     """Display a grid image of the residues in the molecule. The hydrogens are stripped
     and the 3D coordinates removed for a clearer visualisation.
@@ -41,7 +41,7 @@ def display_residues(
         Number of residues displayed per row.
     use_svg: bool = True
         Generate an SVG or PNG image.
-    sanitize: bool = False
+    sanitize: bool = True
         Sanitize the residues before displaying.
 
     .. versionchanged:: 2.1.0

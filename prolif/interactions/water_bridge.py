@@ -1,4 +1,15 @@
-"""Module for the WaterBridge interaction implementation."""
+"""
+Water-mediated interactions --- :mod:`prolif.interactions.water_bridge`
+=======================================================================
+
+This module contains the :class:`~prolif.interactions.water_bridge.WaterBridge` class
+for analyzing water-mediated interactions. It does so by generating fingerprints for
+ligand-water, water-protein, and water-water interactions. The results are then
+combined to identify water-bridged interactions using a graph-based approach.
+
+.. versionadded:: 2.1.0
+
+"""
 
 import itertools as it
 from collections import defaultdict
@@ -17,7 +28,7 @@ if TYPE_CHECKING:
 
 
 class WaterBridge(BridgedInteraction):
-    """Implementation of the WaterBridge analysis.
+    """Implementation of the water-bridge analysis.
 
     Parameters
     ----------
@@ -42,6 +53,8 @@ class WaterBridge(BridgedInteraction):
     Notes
     -----
     This analysis currently only runs in serial.
+
+    .. versionadded:: 2.1.0
     """
 
     def __init__(
