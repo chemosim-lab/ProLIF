@@ -174,49 +174,31 @@ class LigNetwork:
         "HBDonor": 1,
         "XBDonor": 1,
     }
-    _JS_TEMPLATE = """
-        var ifp, legend, nodes, edges, legend_buttons;
-        function drawGraph(_id, nodes, edges, options) {
-            var container = document.getElementById(_id);
-            nodes = new vis.DataSet(nodes);
-            edges = new vis.DataSet(edges);
-            var data = {nodes: nodes, edges: edges};
-            var network = new vis.Network(container, data, options);
-            network.on("stabilizationIterationsDone", function () {
-                network.setOptions( { physics: false } );
-            });
-            return network;
-        }
-        nodes = %(nodes)s;
-        edges = %(edges)s;
-        ifp = drawGraph('%(div_id)s', nodes, edges, %(options)s);
-    """
+    # file path for the js components for this file
+    _JS_FILE = Path(__file__).parent / "network.js"
     _HTML_TEMPLATE = """
         <html>
         <head>
         <script type="text/javascript" src="https://unpkg.com/vis-network@9.0.4/dist/vis-network.min.js"></script>
         <link href="https://unpkg.com/vis-network@9.0.4/dist/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
-        <style type="text/css">
-            body {
-                padding: 0;
-                margin: 0;
-                background: #fff;
-            }
-            .legend-btn.residues.disabled {
-                background: #b4b4b4 !important;
-                color: #555 !important;
-            }
-            .legend-btn.interactions.disabled {
-                border-color: #b4b4b4 !important;
-                color: #555 !important;
-            }
+        <style rel="stylesheet" type="text/css">
+            %(styles)s
         </style>
         </head>
         <body>
         <div id="mynetwork"></div>
         <div id="networklegend"></div>
         <script type="text/javascript">
-            %(js)s
+            %(js_file_content)s
+
+            // Initialize the network
+            var ifp, legend, nodes, edges, legend_buttons;
+            nodes = %(nodes)s;
+            edges = %(edges)s;
+            ifp = drawGraph('%(div_id)s', nodes, edges, %(options)s);
+            
+            // Create the legend
+            createLegend('networklegend', %(buttons)s);
         </script>
         </body>
         </html>
@@ -671,7 +653,7 @@ class LigNetwork:
         div_id: str = "mynetwork",
         fontsize: int = 20,
         show_interaction_data: bool = False,
-    ) -> str:
+    ) -> dict[str, Any]:
         """Returns the JavaScript code to draw the network"""
         self.width = width
         self.height = height
@@ -692,20 +674,35 @@ class LigNetwork:
             },
         }
         options.update(self.options)
-        js = self._JS_TEMPLATE % {
+
+        # Read the JS file
+        with open(self._JS_FILE) as f:
+            js_file_content = f.read()
+
+        # Extract the CSS styles from the JS file
+        styles_match = re.search(r"const networkStyles = `([\s\S]*?)`", js_file_content)
+        styles = styles_match.group(1) if styles_match else ""
+
+        # get the legend buttons
+        buttons = self._get_legend_buttons()
+
+        return {
             "div_id": div_id,
             "nodes": json.dumps(self.nodes),
             "edges": json.dumps(self.edges),
             "options": json.dumps(options),
+            "js_file_content": js_file_content,
+            "styles": styles,
+            "buttons": json.dumps(buttons),
         }
-        js += self._get_legend()
-        return js
 
     def _get_html(self, **kwargs: Any) -> str:
-        """Returns the HTML code to draw the network"""
-        return self._HTML_TEMPLATE % {"js": self._get_js(**kwargs)}
+        # returns the HTML code to draw the network
+        js_data = self._get_js(**kwargs)
+        return self._HTML_TEMPLATE % js_data
 
-    def _get_legend(self, height: str = "90px") -> str:
+    def _get_legend_buttons(self, height: str = "90px") -> list[dict[str, Any]]:
+        """Prepare the legend buttons data"""
         available = {}
         buttons = []
         map_color_restype = {c: t for t, c in self.COLORS["residues"].items()}
@@ -739,118 +736,14 @@ class LigNetwork:
                     "group": "interactions",
                 },
             )
-        # JS code
+
+        # update height for legend
         if all("px" in h for h in [self.height, height]):
             h1 = int(re.findall(r"(\d+)\w+", self.height)[0])
             h2 = int(re.findall(r"(\d+)\w+", height)[0])
             self.height = f"{h1 + h2}px"
-        return (
-            """
-            legend_buttons = %(buttons)s;
-            legend = document.getElementById('%(div_id)s');
-            var div_residues = document.createElement('div');
-            var div_interactions = document.createElement('div');
-            var disabled = [];
-            var legend_callback = function() {
-                this.classList.toggle("disabled");
-                var hide = this.classList.contains("disabled");
-                var show = !hide;
-                var btn_label = this.innerHTML;
-                if (hide) {
-                    disabled.push(btn_label);
-                } else {
-                    disabled = disabled.filter(x => x !== btn_label);
-                }
-                var node_update = [],
-                    edge_update = [];
-                // click on residue type
-                if (this.classList.contains("residues")) {
-                    nodes.forEach((node) => {
-                        // find nodes corresponding to this type
-                        if (node.residue_type === btn_label) {
-                            // if hiding this type and residue isn't already hidden
-                            if (hide && !node.hidden) {
-                                node.hidden = true;
-                                node_update.push(node);
-                            // if showing this type and residue isn't already visible
-                            } else if (show && node.hidden) {
-                                // display if there's at least one of its edge that isn't hidden
-                                num_edges_active = edges.filter(x => x.to === node.id)
-                                                        .map(x => Boolean(x.hidden))
-                                                        .filter(x => !x)
-                                                        .length;
-                                if (num_edges_active > 0) {
-                                    node.hidden = false;
-                                    node_update.push(node);
-                                }
-                            }
-                        }
-                    });
-                    ifp.body.data.nodes.update(node_update);
-                // click on interaction type
-                } else {
-                    edges.forEach((edge) => {
-                        // find edges corresponding to this type
-                        if (edge.interaction_type === btn_label) {
-                            edge.hidden = !edge.hidden;
-                            edge_update.push(edge);
-                            // number of active edges for the corresponding residue
-                            var num_edges_active = edges.filter(x => x.to === edge.to)
-                                                .map(x => Boolean(x.hidden))
-                                                .filter(x => !x)
-                                                .length;
-                            // find corresponding residue
-                            var ix = nodes.findIndex(x => x.id === edge.to);
-                            // only change visibility if residue_type not being hidden
-                            if (!(disabled.includes(nodes[ix].residue_type))) {
-                                // hide if no edge being shown for this residue
-                                if (hide && (num_edges_active === 0)) {
-                                    nodes[ix].hidden = true;
-                                    node_update.push(nodes[ix]);
-                                // show if edges are being shown
-                                } else if (show && (num_edges_active > 0)) {
-                                    nodes[ix].hidden = false;
-                                    node_update.push(nodes[ix]);
-                                }
-                            }
-                        }
-                    });
-                    ifp.body.data.nodes.update(node_update);
-                    ifp.body.data.edges.update(edge_update);
-                }
-            };
-            legend_buttons.forEach(function(v,i) {
-                if (v.group === "residues") {
-                    var div = div_residues;
-                    var border = "none";
-                    var color = v.color;
-                } else {
-                    var div = div_interactions;
-                    var border = "3px dashed " + v.color;
-                    var color = "white";
-                }
-                var button = div.appendChild(document.createElement('button'));
-                button.classList.add("legend-btn", v.group);
-                button.innerHTML = v.label;
-                Object.assign(button.style, {
-                    "cursor": "pointer",
-                    "background-color": color,
-                    "border": border,
-                    "border-radius": "5px",
-                    "padding": "5px",
-                    "margin": "5px",
-                    "font": "14px 'Arial', sans-serif",
-                });
-                button.onclick = legend_callback;
-            });
-            legend.appendChild(div_residues);
-            legend.appendChild(div_interactions);
-            """  # noqa: E501, UP031
-            % {
-                "div_id": "networklegend",
-                "buttons": json.dumps(buttons),
-            }
-        )
+
+        return buttons
 
     @requires("IPython.display")
     def display(self, **kwargs: Any) -> "LigNetwork":
@@ -910,15 +803,7 @@ class LigNetwork:
         .. versionadded:: 2.1.0
         """
         return display(
-            Javascript(f"""
-            var iframe = document.getElementById("{self.uuid}");
-            var iframe_doc = iframe.contentWindow.document;
-            var canvas = iframe_doc.getElementsByTagName("canvas")[0];
-            var link = document.createElement("a");
-            link.href = canvas.toDataURL();
-            link.download = "prolif-lignetwork.png"
-            link.click();
-            """),
+            Javascript(f"saveAsPNG('{self.uuid}')"),
         )
 
     def _repr_html_(self) -> str | None:  # noqa: PLW3201
