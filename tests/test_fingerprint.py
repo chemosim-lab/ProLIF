@@ -387,6 +387,25 @@ class TestFingerprint:
         multi = fp.to_dataframe()
         assert serial.equals(multi)
 
+    def test_run_multiproc_on_single_frame_runs_serial(
+        self,
+        fp: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        mocked = Mock(wraps=fp._run_serial)
+        monkeypatch.setattr(fp, "_run_serial", mocked)
+        fp.run(
+            u.trajectory[1],
+            ligand_ag,
+            protein_ag,
+            n_jobs=2,
+            progress=False,
+        )
+        mocked.assert_called_once()
+
     def test_run_serial_on_xtc_runs_whole_trajectory(
         self, u: mda.Universe, ligand_ag: "AtomGroup"
     ) -> None:

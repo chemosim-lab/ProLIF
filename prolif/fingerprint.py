@@ -688,9 +688,15 @@ class Fingerprint:
                 frames = traj._frames
                 traj = lig.universe.trajectory
             elif hasattr(traj, "frame"):
-                # single trajectory frame
-                frames = (traj.frame,)
-                traj = lig.universe.trajectory
+                # single trajectory frame, no need to run in parallel
+                return self._run_serial(
+                    traj,
+                    lig,
+                    prot,
+                    residues=residues,
+                    converter_kwargs=converter_kwargs,
+                    progress=progress,
+                )
         else:
             frames = range(n_frames)
         chunks = np.array_split(frames, n_chunks)
