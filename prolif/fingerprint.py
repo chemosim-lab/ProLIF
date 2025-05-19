@@ -35,6 +35,7 @@ import dill
 import multiprocess as mp
 import numpy as np
 from MDAnalysis.converters.RDKit import atomgroup_to_mol, set_converter_cache_size
+from MDAnalysis.coordinates.timestep import Timestep
 from rdkit import Chem
 from tqdm.auto import tqdm
 
@@ -644,7 +645,7 @@ class Fingerprint:
     ) -> "IFPResults":
         """Serial implementation for trajectories."""
         # support single frame
-        if hasattr(traj, "frame"):
+        if isinstance(traj, Timestep):
             traj = (traj,)
         iterator = tqdm(traj) if progress else traj
         ifp: "IFPResults" = {}

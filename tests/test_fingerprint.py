@@ -387,6 +387,25 @@ class TestFingerprint:
         multi = fp.to_dataframe()
         assert serial.equals(multi)
 
+    def test_run_serial_on_xtc_runs_whole_trajectory(
+        self, u: mda.Universe, ligand_ag: "AtomGroup"
+    ) -> None:
+        """When checking wether a single timestep was passed or a trajectory,
+        :meth:`Fingerprint._run_serial` was only checking if the object had a
+        `frame` attribute, without checking for `n_frames` first. This would lead to
+        only running the analysis on the first frame if an XTC was passed."""
+        assert hasattr(u.trajectory, "frame")
+        assert hasattr(u.trajectory, "n_frames")
+        fp = Fingerprint(["VdWContact"])
+        fp.run(
+            u.trajectory,
+            ligand_ag,
+            ligand_ag,
+            n_jobs=1,
+            progress=False,
+        )
+        assert len(fp.ifp) == u.trajectory.n_frames
+
     def test_run_iter_multiproc_serial_same(
         self, fp: Fingerprint, protein_mol: "Molecule"
     ) -> None:
