@@ -148,32 +148,3 @@ function createLegend(legendId, buttons) {
     legend.appendChild(div_residues);
     legend.appendChild(div_interactions);
 }
-
-// Function to save the rendered network as a PNG file
-// iframeId: ID of the iframe containing the network canvas
-function saveAsPNG(iframeId) {
-    var iframe = document.getElementById(iframeId);
-    var iframe_doc = iframe.contentWindow.document;
-    var canvas = iframe_doc.getElementsByTagName("canvas")[0];
-    var link = document.createElement("a");
-    link.href = canvas.toDataURL();
-    link.download = "prolif-lignetwork.png";
-    link.click();
-}
-
-// CSS styles for the network
-const networkStyles = `
-    body {
-        padding: 0;
-        margin: 0;
-        background: #fff;
-    }
-    .legend-btn.residues.disabled {
-        background: #b4b4b4 !important;
-        color: #555 !important;
-    }
-    .legend-btn.interactions.disabled {
-        border-color: #b4b4b4 !important;
-        color: #555 !important;
-    }
-`;

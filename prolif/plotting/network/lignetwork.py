@@ -174,35 +174,12 @@ class LigNetwork:
         "HBDonor": 1,
         "XBDonor": 1,
     }
-    # file path for the js components for this file
-    _JS_FILE = Path(__file__).parent / "network.js"
-    _HTML_TEMPLATE = """
-        <html>
-        <head>
-        <script type="text/javascript" src="https://unpkg.com/vis-network@9.0.4/dist/vis-network.min.js"></script>
-        <link href="https://unpkg.com/vis-network@9.0.4/dist/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
-        <style rel="stylesheet" type="text/css">
-            %(styles)s
-        </style>
-        </head>
-        <body>
-        <div id="mynetwork"></div>
-        <div id="networklegend"></div>
-        <script type="text/javascript">
-            %(js_file_content)s
 
-            // Initialize the network
-            var ifp, legend, nodes, edges, legend_buttons;
-            nodes = %(nodes)s;
-            edges = %(edges)s;
-            ifp = drawGraph('%(div_id)s', nodes, edges, %(options)s);
-            
-            // Create the legend
-            createLegend('networklegend', %(buttons)s);
-        </script>
-        </body>
-        </html>
-    """  # noqa: E501
+    _JS_FILE = Path(__file__).parent / "network.js"
+    _HTML_FILE = Path(__file__).parent / "network.html"
+
+    _html_template = _HTML_FILE.read_text()
+    _js_file_content = _JS_FILE.read_text()
 
     def __init__(
         self,
@@ -675,14 +652,6 @@ class LigNetwork:
         }
         options.update(self.options)
 
-        # Read the JS file
-        with open(self._JS_FILE) as f:
-            js_file_content = f.read()
-
-        # Extract the CSS styles from the JS file
-        styles_match = re.search(r"const networkStyles = `([\s\S]*?)`", js_file_content)
-        styles = styles_match.group(1) if styles_match else ""
-
         # get the legend buttons
         buttons = self._get_legend_buttons()
 
@@ -691,15 +660,14 @@ class LigNetwork:
             "nodes": json.dumps(self.nodes),
             "edges": json.dumps(self.edges),
             "options": json.dumps(options),
-            "js_file_content": js_file_content,
-            "styles": styles,
+            "js_file_content": self._js_file_content,
             "buttons": json.dumps(buttons),
         }
 
     def _get_html(self, **kwargs: Any) -> str:
-        # returns the HTML code to draw the network
+        """Returns the HTML code to draw the network"""
         js_data = self._get_js(**kwargs)
-        return self._HTML_TEMPLATE % js_data
+        return self._html_template % js_data
 
     def _get_legend_buttons(self, height: str = "90px") -> list[dict[str, Any]]:
         """Prepare the legend buttons data"""
@@ -803,7 +771,15 @@ class LigNetwork:
         .. versionadded:: 2.1.0
         """
         return display(
-            Javascript(f"saveAsPNG('{self.uuid}')"),
+            Javascript(f"""
+            var iframe = document.getElementById("{self.uuid}");
+            var iframe_doc = iframe.contentWindow.document;
+            var canvas = iframe_doc.getElementsByTagName("canvas")[0];
+            var link = document.createElement("a");
+            link.href = canvas.toDataURL();
+            link.download = "prolif-lignetwork.png"
+            link.click();
+            """),
         )
 
     def _repr_html_(self) -> str | None:  # noqa: PLW3201
