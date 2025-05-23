@@ -177,9 +177,11 @@ class LigNetwork:
 
     _JS_FILE = Path(__file__).parent / "network.js"
     _HTML_FILE = Path(__file__).parent / "network.html"
-
-    _html_template = _HTML_FILE.read_text()
-    _js_file_content = _JS_FILE.read_text()
+    _CSS_FILE = Path(__file__).parent / "network.css"
+    
+    _HTML_TEMPLATE = _HTML_FILE.read_text()
+    _JS_TEMPLATE = _JS_FILE.read_text()
+    _CSS_TEMPLATE = _CSS_FILE.read_text()
 
     def __init__(
         self,
@@ -660,14 +662,15 @@ class LigNetwork:
             "nodes": json.dumps(self.nodes),
             "edges": json.dumps(self.edges),
             "options": json.dumps(options),
-            "js_file_content": self._js_file_content,
+            "js_file_content": self._JS_TEMPLATE,
+            "css_file_content": self._CSS_TEMPLATE,
             "buttons": json.dumps(buttons),
         }
 
     def _get_html(self, **kwargs: Any) -> str:
         """Returns the HTML code to draw the network"""
         js_data = self._get_js(**kwargs)
-        return self._html_template % js_data
+        return self._HTML_TEMPLATE % js_data
 
     def _get_legend_buttons(self, height: str = "90px") -> list[dict[str, Any]]:
         """Prepare the legend buttons data"""
