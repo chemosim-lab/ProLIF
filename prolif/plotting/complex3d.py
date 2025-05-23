@@ -402,7 +402,10 @@ class Complex3D:
                     )
                     # add label when hovering the middle of the dashed line by adding a
                     # dummy atom
-                    c = Point3D(*get_centroid(np.asarray([p1, p2])))
+                    arr = np.asarray(
+                        [[p1.x, p1.y, p1.z], [p2.x, p2.y, p2.z]], dtype=float
+                    )
+                    c = Point3D(*get_centroid(arr))
                     modelID = self._models[lresid]
                     model = v.getModel(modelID, viewer=position)
                     interaction_label = f"{interaction}: {metadata['distance']:.2f}Å"
