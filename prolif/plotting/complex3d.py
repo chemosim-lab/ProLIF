@@ -402,7 +402,7 @@ class Complex3D:
                     )
                     # add label when hovering the middle of the dashed line by adding a
                     # dummy atom
-                    arr = np.array([p1, p2], dtype=float)
+                    arr = np.array([list(p1), list(p2)], dtype=float)
                     c = Point3D(*get_centroid(arr))
                     modelID = self._models[lresid]
                     model = v.getModel(modelID, viewer=position)
