@@ -11,7 +11,7 @@ from copy import deepcopy
 from functools import wraps
 from importlib.util import find_spec
 from math import pi
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, Union
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -75,7 +75,7 @@ def catch_warning(**kwargs: Any) -> Iterator[None]:
 
 
 def get_centroid(
-    coordinates: Union[Sequence[Point3D], "NDArray[np.float64]"],
+    coordinates: "NDArray[np.float64]",
 ) -> "NDArray[np.float64]":
     """Centroid for an array of XYZ coordinates"""
     return np.mean(coordinates, axis=0)  # type: ignore[no-any-return]
