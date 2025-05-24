@@ -178,7 +178,7 @@ class LigNetwork:
     _JS_FILE = Path(__file__).parent / "network.js"
     _HTML_FILE = Path(__file__).parent / "network.html"
     _CSS_FILE = Path(__file__).parent / "network.css"
-    
+
     _HTML_TEMPLATE = _HTML_FILE.read_text()
     _JS_TEMPLATE = _JS_FILE.read_text()
     _CSS_TEMPLATE = _CSS_FILE.read_text()
