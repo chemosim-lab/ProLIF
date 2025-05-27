@@ -88,6 +88,9 @@ jobs:
         tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/tests/plotting/.+' || exit 1
         tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/data/.+' || exit 1
         tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/data/vina/.+' || exit 1
+        tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/prolif/plotting/network/network.html' || exit 1
+        tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/prolif/plotting/network/network.css' || exit 1
+        tar -ztvf dist/prolif-*.tar.gz | grep -E 'prolif-.+/prolif/plotting/network/network.js' || exit 1
 
     - name: Cache package
       if: inputs.cache-package
