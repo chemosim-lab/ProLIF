@@ -20,6 +20,7 @@ from typing import (
     Literal,
 )
 
+import numpy as np
 import py3Dmol
 from rdkit import Chem
 from rdkit.Geometry import Point3D
@@ -545,7 +546,8 @@ class Complex3D:
             viewer=position,
         )
         # add label when hovering the middle of the dashed line by adding a dummy atom
-        c = Point3D(*get_centroid([p1, p2]))
+        arr = np.array([list(p1), list(p2)], dtype=float)
+        c = Point3D(*get_centroid(arr))
         modelID = self._models[resid]
         model = v.getModel(modelID, viewer=position)
         interaction_label = f"{interaction}: {distance:.2f}Å"

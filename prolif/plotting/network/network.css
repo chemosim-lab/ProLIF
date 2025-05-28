@@ -1,0 +1,13 @@
+body {
+    padding: 0;
+    margin: 0;
+    background: #fff;
+}
+.legend-btn.residues.disabled {
+    background: #b4b4b4 !important;
+    color: #555 !important;
+}
+.legend-btn.interactions.disabled {
+    border-color: #b4b4b4 !important;
+    color: #555 !important;
+}

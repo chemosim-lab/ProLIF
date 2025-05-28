@@ -100,6 +100,7 @@ include = ["prolif*"]
 "prolif" = ["py.typed"]
 "prolif.data" = ["*"]
 "prolif.data.vina" = ["*"]
+"prolif.plotting.network" = ["*"]
 
 [tool.setuptools.dynamic]
 version = { attr = "prolif._version.__version__" }
