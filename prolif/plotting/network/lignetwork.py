@@ -31,7 +31,8 @@ from rdkit import Chem
 from rdkit.Chem import rdDepictor
 
 from prolif.exceptions import RunRequiredError
-from prolif.plotting.utils import grouped_interaction_colors
+from prolif.ifp import IFP
+from prolif.plotting.utils import grouped_interaction_colors, metadata_iterator
 from prolif.residue import ResidueId
 from prolif.utils import requires
 
@@ -132,6 +133,7 @@ class LigNetwork:
             "Basic": "#5979e3",
             "Polar": "#59bee3",
             "Sulfur": "#e3ce59",
+            "Water": "#323aa8",
         },
     }
     RESIDUE_TYPES: ClassVar = {
@@ -163,6 +165,23 @@ class LigNetwork:
         "CYM": "Sulfur",
         "CYX": "Sulfur",
         "MET": "Sulfur",
+        "WAT": "Water",
+        "SOL": "Water",
+        "H2O": "Water",
+        "HOH": "Water",
+        "OH2": "Water",
+        "HHO": "Water",
+        "OHH": "Water",
+        "TIP": "Water",
+        "T3P": "Water",
+        "T4P": "Water",
+        "T5P": "Water",
+        "TIP2": "Water",
+        "TIP3": "Water",
+        "TIP4": "Water",
+    }
+    _FONTCOLORS: ClassVar = {
+        "Water": "white",
     }
     _LIG_PI_INTERACTIONS: ClassVar = [
         "EdgeToFace",
@@ -170,6 +189,7 @@ class LigNetwork:
         "PiStacking",
         "PiCation",
     ]
+    _BRIDGED_INTERACTIONS: ClassVar[dict[str, str]] = {"WaterBridge": "water_residues"}
     _DISPLAYED_ATOM: ClassVar = {  # index 0 in indices tuple by default
         "HBDonor": 1,
         "XBDonor": 1,
@@ -318,34 +338,49 @@ class LigNetwork:
             return cls(df, ligand_mol, **kwargs)
         raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
 
-    @staticmethod
-    def _get_records(ifp: "IFP", all_metadata: bool) -> list[dict[str, Any]]:
+    @classmethod
+    def _get_records(cls, ifp: "IFP", all_metadata: bool) -> list[dict[str, Any]]:
         records = []
         for (lig_resid, prot_resid), int_data in ifp.items():
             for int_name, metadata_tuple in int_data.items():
-                entry = {
-                    "ligand": str(lig_resid),
-                    "protein": str(prot_resid),
-                    "interaction": int_name,
-                }
-                if all_metadata:
-                    for metadata in metadata_tuple:
+                is_bridged_interaction = cls._BRIDGED_INTERACTIONS.get(int_name, None)
+                for metadata in metadata_iterator(metadata_tuple, all_metadata):
+                    if is_bridged_interaction:
+                        distances = [d for d in metadata if d.startswith("distance_")]
+                        for distlabel in distances:
+                            _, src, dest = distlabel.split("_")
+                            if src == "ligand":
+                                components = "ligand_water"
+                                src = str(lig_resid)
+                                atoms = metadata["parent_indices"]["ligand"]
+                            elif dest == "protein":
+                                components = "water_protein"
+                                dest = str(prot_resid)
+                                atoms = ()
+                            else:
+                                components = "water_water"
+                                atoms = ()
+                            records.append(
+                                {
+                                    "ligand": src,
+                                    "protein": dest,
+                                    "interaction": int_name,
+                                    "components": components,
+                                    "atoms": atoms,
+                                    "distance": metadata[distlabel],
+                                }
+                            )
+                    else:
                         records.append(
                             {
-                                **entry,
+                                "ligand": str(lig_resid),
+                                "protein": str(prot_resid),
+                                "interaction": int_name,
+                                "components": "ligand_protein",
                                 "atoms": metadata["parent_indices"]["ligand"],
                                 "distance": metadata.get("distance", 0),
-                            },
+                            }
                         )
-                else:
-                    # extract interaction with shortest distance
-                    metadata = min(
-                        metadata_tuple,
-                        key=lambda m: m.get("distance", np.nan),
-                    )
-                    entry["atoms"] = metadata["parent_indices"]["ligand"]
-                    entry["distance"] = metadata.get("distance", 0)
-                    records.append(entry)
         return records
 
     @classmethod
@@ -361,6 +396,7 @@ class LigNetwork:
         df = df.groupby(["ligand", "protein", "interaction", "atoms"]).agg(
             weight=("weight", "sum"),
             distance=("distance", "mean"),
+            components=("components", "first"),
         )
         df["weight"] /= len(fp.ifp)
         # merge different ligand atoms of the same residue/interaction group before
@@ -372,7 +408,7 @@ class LigNetwork:
         )
         # threshold and keep most occuring ligand atom
         return (
-            df.loc[df["weight_total"] >= threshold]
+            df[df["weight_total"] >= threshold]
             .drop(columns="weight_total")
             .sort_values("weight", ascending=False)
             .groupby(level=["ligand", "protein", "interaction"])
@@ -389,7 +425,7 @@ class LigNetwork:
         df = pd.DataFrame(data)
         df["weight"] = 1
         return df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
-            columns=["weight", "distance"],
+            columns=["weight", "distance", "components"],
         )
 
     def _make_carbon(self) -> dict[str, Any]:
@@ -517,8 +553,14 @@ class LigNetwork:
 
     def _make_interactions(self, mass: int = 2) -> None:
         """Prepare lig-prot interactions"""
-        restypes = {}
-        for prot_res in self.df.index.get_level_values("protein").unique():
+        restypes: dict[str, str | None] = {}
+        lig_prot_df = self.df[self.df["components"] == "ligand_protein"]
+        prot_and_waters: set[str] = (
+            set(self.df.index.get_level_values("protein"))
+            .union(self.df.index.get_level_values("ligand"))
+            .difference(lig_prot_df.index.get_level_values("ligand"))
+        )
+        for prot_res in prot_and_waters:
             resname = ResidueId.from_string(prot_res).name
             restype = self.RESIDUE_TYPES.get(resname)
             restypes[prot_res] = restype
@@ -527,6 +569,7 @@ class LigNetwork:
                 "id": prot_res,
                 "label": prot_res,
                 "color": color,
+                "font": {"color": self._FONTCOLORS.get(restype, "black")},
                 "shape": "box",
                 "borderWidth": 0,
                 "physics": True,
@@ -538,26 +581,33 @@ class LigNetwork:
         for (lig_res, prot_res, interaction, lig_indices), (
             weight,
             distance,
+            components,
         ) in cast(
-            Iterable[tuple[tuple[str, str, str, tuple[int, ...]], tuple[float, float]]],
+            Iterable[
+                tuple[tuple[str, str, str, tuple[int, ...]], tuple[float, float, str]]
+            ],
             self.df.iterrows(),
         ):
-            if interaction in self._LIG_PI_INTERACTIONS:
-                centroid = self._get_ring_centroid(lig_indices)
-                origin = f"centroid({lig_res}, {prot_res}, {interaction})"
-                self._nodes[origin] = {
-                    "id": origin,
-                    "x": centroid[0],
-                    "y": centroid[1],
-                    "shape": "text",
-                    "label": " ",
-                    "fixed": True,
-                    "physics": False,
-                    "group": "ligand",
-                }
+            if components.startswith("ligand"):
+                if interaction in self._LIG_PI_INTERACTIONS:
+                    centroid = self._get_ring_centroid(lig_indices)
+                    origin = f"centroid({lig_res}, {prot_res}, {interaction})"
+                    self._nodes[origin] = {
+                        "id": origin,
+                        "x": centroid[0],
+                        "y": centroid[1],
+                        "shape": "text",
+                        "label": " ",
+                        "fixed": True,
+                        "physics": False,
+                        "group": "ligand",
+                    }
+                else:
+                    i = self._DISPLAYED_ATOM.get(interaction, 0)
+                    origin = lig_indices[i]
             else:
-                i = self._DISPLAYED_ATOM.get(interaction, 0)
-                origin = lig_indices[i]
+                # water-water or water-protein
+                origin = lig_res
             int_data = {
                 "interaction": interaction,
                 "distance": distance,
@@ -580,6 +630,7 @@ class LigNetwork:
                 "dashes": [10],
                 "width": weight * self._max_interaction_width,
                 "group": "interaction",
+                "components": components,
             }
             if self.show_interaction_data:
                 edge["label"] = self._edge_label_formatter.format_map(int_data)
@@ -689,7 +740,13 @@ class LigNetwork:
         available = dict(sorted(available.items(), key=operator.itemgetter(1)))
         for i, (color, restype) in enumerate(available.items()):
             buttons.append(
-                {"index": i, "label": restype, "color": color, "group": "residues"},
+                {
+                    "index": i,
+                    "label": restype,
+                    "color": color,
+                    "fontcolor": self._FONTCOLORS.get(restype, "black"),
+                    "group": "residues",
+                },
             )
         # interactions
         available.clear()
@@ -704,6 +761,7 @@ class LigNetwork:
                     "index": i,
                     "label": interaction,
                     "color": color,
+                    "fontcolor": "black",
                     "group": "interactions",
                 },
             )
@@ -725,7 +783,7 @@ class LigNetwork:
         width: str = "100%"
         height: str = "500px"
         fontsize: int = 20
-        show_occurence: bool = False
+        show_interaction_data: bool = False
         """
         html = self._get_html(**kwargs)
         doc = escape(html)
@@ -785,7 +843,7 @@ class LigNetwork:
             """),
         )
 
-    def _repr_html_(self) -> str | None:  # noqa: PLW3201
+    def _repr_html_(self) -> str | None:
         if self._iframe:
             return self._iframe
         return None

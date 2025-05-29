@@ -33,6 +33,7 @@ dependencies = [
     "scipy>=1.3.0",
     "mdanalysis>=2.2.0,<3; python_version<'3.13'",
     "mdanalysis>=2.7.0,<3; python_version>='3.13'",
+    "networkx>=2.5.0",
     "tqdm",
     "multiprocess",
     "dill",
@@ -47,7 +48,6 @@ tutorials = [
     "rdkit",
     "matplotlib>=3.7",
     "seaborn<1.0",
-    "networkx",
     "pyvis",
     "prolif[plots]",
 ]
@@ -71,6 +71,7 @@ type-check = [
     "types-tqdm",
     "types-setuptools",
     "scipy-stubs",
+    "types-networkx",
 ]
 dev = [
     "ruff==0.11.2",
@@ -234,6 +235,7 @@ ignore = [
     "PLR0915",
     "PLR0916",
     "PLR0917",
+    "PLR1702",
     "PLR2004",
     "PLR6301",
     "PD901",
@@ -253,12 +255,14 @@ include = '(docs/notebooks/.+\.ipynb)$'
 
 [tool.coverage.report]
 include_namespace_packages = true
-exclude_lines = [
-    "pragma: no cover",
+exclude_also = [
     "def __repr__",
     "if __name__ == .__main__.:",
     "if .*TYPE_CHECKING:",
     "@.*abstractmethod",
+]
+omit = [
+    "prolif/typeshed.py",
 ]
 
 [build-system]

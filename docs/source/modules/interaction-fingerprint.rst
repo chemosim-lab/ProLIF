@@ -11,6 +11,10 @@ Interaction fingerprint
     :members:
     :show-inheritance:
 
+.. automodule:: prolif.interactions.water_bridge
+    :members:
+    :show-inheritance:
+
 .. automodule:: prolif.interactions.base
     :members:
     :show-inheritance:

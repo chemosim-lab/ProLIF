@@ -9,7 +9,7 @@ from numpy.testing import assert_array_almost_equal
 from rdkit import Chem
 from rdkit.Chem.rdMolTransforms import ComputeCentroid
 
-from prolif.datafiles import TOP, TRAJ, datapath
+from prolif.datafiles import TOP, TRAJ, WATER_TOP, WATER_TRAJ, datapath
 from prolif.interactions.base import _INTERACTIONS
 from prolif.molecule import Molecule, sdf_supplier
 
@@ -183,6 +183,29 @@ def metal_false() -> Molecule:
 def cleanup_dummy() -> Iterator[None]:
     yield
     _INTERACTIONS.pop("Dummy", None)
+
+
+@pytest.fixture(scope="session")
+def water_u() -> Universe:
+    return Universe(WATER_TOP, WATER_TRAJ)
+
+
+@pytest.fixture(scope="session")
+def water_atomgroups(water_u: Universe) -> tuple["AtomGroup", "AtomGroup", "AtomGroup"]:
+    ligand = water_u.select_atoms("resname QNB")
+    protein = water_u.select_atoms("protein and resid 399:404")
+    water = water_u.select_atoms("segid WAT and (resid 17 or resid 83)")
+    return ligand, protein, water
+
+
+@pytest.fixture(scope="session")
+def water_mols(
+    water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+) -> tuple[Molecule, Molecule, Molecule]:
+    lig_mol = Molecule.from_mda(water_atomgroups[0])
+    prot_mol = Molecule.from_mda(water_atomgroups[1])
+    water_mol = Molecule.from_mda(water_atomgroups[2])
+    return lig_mol, prot_mol, water_mol
 
 
 class BaseTestMixinRDKitMol:

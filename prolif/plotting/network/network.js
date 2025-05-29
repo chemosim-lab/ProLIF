@@ -80,11 +80,25 @@ function createLegend(legendId, buttons) {
                             node_update.push(node);
                         }
                     }
+                } else if (btn_label === "Water") {
+                    // hide residues only shown for water bridge
+                    res_edges = edges.filter(x => x.to === node.id);
+                    water_res_edges = res_edges.filter(
+                        x => x.components === "water_protein"
+                    );
+                    if (
+                        (water_res_edges.length)
+                        && (water_res_edges.length == res_edges.length)
+                    ) {
+                        node.hidden = hide;
+                        water_res_edges.forEach((edge) => {
+                            edge.hidden = hide;
+                            edge_update.push(edge);
+                        });
+                        node_update.push(node);
+                    }
                 }
             });
-            // apply batch node updates
-            ifp.body.data.nodes.update(node_update);
-
         } else {
             // button belongs to interaction types
             edges.forEach((edge) => {
@@ -115,10 +129,10 @@ function createLegend(legendId, buttons) {
                     }
                 }
             });
-            // apply batch updates for both nodes and edges
-            ifp.body.data.nodes.update(node_update);
-            ifp.body.data.edges.update(edge_update);
         }
+        // apply batch updates for both nodes and edges
+        ifp.body.data.nodes.update(node_update);
+        ifp.body.data.edges.update(edge_update);
     };
     
     // build and style buttons for the legend
@@ -134,6 +148,7 @@ function createLegend(legendId, buttons) {
         Object.assign(button.style, {
             cursor: "pointer",
             backgroundColor: bg,
+            color: v.fontcolor,
             border: border,
             borderRadius: "5px",
             padding: "5px",

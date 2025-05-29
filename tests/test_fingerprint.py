@@ -1,8 +1,10 @@
 from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 import MDAnalysis as mda
 import numpy as np
 import pytest
+from MDAnalysis.converters.RDKit import set_converter_cache_size
 from pandas import DataFrame
 from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
@@ -385,6 +387,44 @@ class TestFingerprint:
         multi = fp.to_dataframe()
         assert serial.equals(multi)
 
+    def test_run_multiproc_on_single_frame_runs_serial(
+        self,
+        fp: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        mocked = Mock(wraps=fp._run_serial)
+        monkeypatch.setattr(fp, "_run_serial", mocked)
+        fp.run(
+            u.trajectory[1],
+            ligand_ag,
+            protein_ag,
+            n_jobs=2,
+            progress=False,
+        )
+        mocked.assert_called_once()
+
+    def test_run_serial_on_xtc_runs_whole_trajectory(
+        self, u: mda.Universe, ligand_ag: "AtomGroup"
+    ) -> None:
+        """When checking wether a single timestep was passed or a trajectory,
+        :meth:`Fingerprint._run_serial` was only checking if the object had a
+        `frame` attribute, without checking for `n_frames` first. This would lead to
+        only running the analysis on the first frame if an XTC was passed."""
+        assert hasattr(u.trajectory, "frame")
+        assert hasattr(u.trajectory, "n_frames")
+        fp = Fingerprint(["VdWContact"])
+        fp.run(
+            u.trajectory,
+            ligand_ag,
+            ligand_ag,
+            n_jobs=1,
+            progress=False,
+        )
+        assert len(fp.ifp) == u.trajectory.n_frames
+
     def test_run_iter_multiproc_serial_same(
         self, fp: Fingerprint, protein_mol: "Molecule"
     ) -> None:
@@ -437,3 +477,54 @@ class TestFingerprint:
         assert fp.hydrophobic.distance == 1.0  # type: ignore[attr-defined]
         fp = Fingerprint()
         assert fp.hydrophobic.distance == 4.5  # type: ignore[attr-defined]
+
+    def test_water_bridge_instance_without_params_raises_error(self) -> None:
+        with pytest.raises(
+            ValueError,
+            match="Must specify settings for bridged interaction 'WaterBridge'",
+        ):
+            Fingerprint(["WaterBridge"])
+
+    def test_mix_water_bridge_and_other_interactions(
+        self,
+        water_u: mda.Universe,
+        water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+    ) -> None:
+        ligand, protein, water = water_atomgroups
+        fp = Fingerprint(
+            ["HBDonor", "WaterBridge"], parameters={"WaterBridge": {"water": water}}
+        )
+        fp.run(water_u.trajectory[:1], ligand, protein, n_jobs=1)
+
+        assert "WaterBridge" in fp.ifp[0]["QNB1.X", "TRP400.X"]
+        assert "HBDonor" in fp.ifp[0]["QNB1.X", "ASN404.X"]
+
+    def test_water_bridge_run_iter(
+        self, water_mols: tuple["Molecule", "Molecule", "Molecule"]
+    ) -> None:
+        ligand, protein, water = water_mols
+        fp = Fingerprint(
+            ["HBDonor", "WaterBridge"], parameters={"WaterBridge": {"water": water}}
+        )
+        fp.run_from_iterable([ligand], protein)
+
+        assert "WaterBridge" in fp.ifp[0]["QNB1.X", "TRP400.X"]
+        assert "HBDonor" in fp.ifp[0]["QNB1.X", "ASN404.X"]
+
+    def test_water_bridge_updates_cache_size(
+        self,
+        water_u: mda.Universe,
+        water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        ligand, protein, water = water_atomgroups
+        set_converter_cache_size(2)
+        mocked = Mock(wraps=set_converter_cache_size)
+        monkeypatch.setattr(
+            Fingerprint, "_run_bridged_analysis", lambda *_args, **_kwargs: None
+        )
+        monkeypatch.setattr("prolif.fingerprint.set_converter_cache_size", mocked)
+
+        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
+        fp.run(water_u.trajectory[:1], ligand, protein)
+        mocked.assert_called_once_with(3)

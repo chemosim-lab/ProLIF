@@ -28,16 +28,23 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
 import os
 import warnings
 from collections.abc import Iterable, Sequence, Sized
+from inspect import signature
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast, overload
 
 import dill
 import multiprocess as mp
 import numpy as np
+from MDAnalysis.converters.RDKit import atomgroup_to_mol, set_converter_cache_size
+from MDAnalysis.coordinates.timestep import Timestep
 from rdkit import Chem
 from tqdm.auto import tqdm
 
 from prolif.ifp import IFP
-from prolif.interactions.base import _BASE_INTERACTIONS, _INTERACTIONS
+from prolif.interactions.base import (
+    _BASE_INTERACTIONS,
+    _BRIDGED_INTERACTIONS,
+    _INTERACTIONS,
+)
 from prolif.molecule import Molecule
 from prolif.parallel import MolIterablePool, TrajectoryPool
 from prolif.plotting.utils import IS_NOTEBOOK
@@ -54,12 +61,12 @@ if TYPE_CHECKING:
     from pandas import DataFrame
     from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
-    from prolif.interactions.base import Interaction
     from prolif.plotting.complex3d import Complex3D
     from prolif.plotting.network import LigNetwork
     from prolif.residue import Residue, ResidueId
     from prolif.typeshed import (
         IFPData,
+        IFPResults,
         InteractionMetadata,
         MDAObject,
         PathLike,
@@ -166,18 +173,33 @@ class Fingerprint:
 
     .. ipython:: python
 
-        # ligand-protein
-        next(fp.hbdonor(lig, prot["ASP129.A"]))
-        # protein-protein
-        next(fp.hbacceptor(prot["ASP129.A"], prot["CYS133.A"]))
+        # any HBDonor between ligand and ASP129
+        fp.hbdonor.any(lig, prot["ASP129.A"])
+        # all HBAcceptor between ASP129 and CYS133
+        fp.hbacceptor.all(prot["ASP129.A"], prot["CYS133.A"])
 
     You can also obtain the indices of atoms responsible for the interaction:
 
     .. ipython:: python
 
         fp.metadata(lig, prot["ASP129.A"])
-        next(fp.hbdonor(lig, prot["ASP129.A"], metadata=True), None)
+        fp.hbdonor.any(lig, prot["ASP129.A"], metadata=True)
+        fp.hbdonor.best(lig, prot["ASP129.A"])
 
+    Since version ``2.1.0``, you can also use bridged interactions such as
+    ``WaterBridge``:
+
+    .. ipython:: python
+
+        u = mda.Universe(prolif.datafiles.WATER_TOP, prolif.datafiles.WATER_TRAJ)
+        ligand_selection = u.select_atoms("resname QNB")
+        protein_selection = u.select_atoms("protein and resid 399:404")
+        water_selection = u.select_atoms("segid WAT and (resid 17 or resid 83)")
+        fp = prolif.Fingerprint(
+            ["WaterBridge"], parameters={"WaterBridge": {"water": water_selection}}
+        )
+        fp.run(u.trajectory[0], ligand_selection, protein_selection)
+        fp.to_dataframe().T
 
     .. versionchanged:: 1.0.0
         Added pickle support
@@ -202,6 +224,8 @@ class Fingerprint:
         Added the ``count`` argument to control for a given pair of residues whether to
         return all occurences of an interaction or only the first one.
 
+    .. versionchanged:: 2.1.0
+        Added support for bridged interactions (e.g. ``WaterBridge``).
     """
 
     def __init__(
@@ -216,6 +240,7 @@ class Fingerprint:
         self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
+        self.parameters = parameters
 
     def _set_interactions(
         self,
@@ -226,26 +251,46 @@ class Fingerprint:
         parameters = parameters or {}
         if interactions == "all":
             interactions = self.list_available()
+
         # sanity check
         self._check_valid_interactions(interactions, "interactions")
         self._check_valid_interactions(parameters, "parameters")
+
         # add interaction methods
         self.interactions = {}
-        self._interactions: dict[str, "Interaction"] = {}
+        self.bridged_interactions = {}
         for name in interactions:
-            # create instance with custom parameters if available
-            interaction_cls = _INTERACTIONS[name]
-            interaction = interaction_cls(**parameters.get(name, {}))
-            setattr(self, name.lower(), interaction)
-            self._interactions[name] = interaction
-            self.interactions[name] = interaction.all if self.count else interaction.any
+            # add bridged interaction
+            if name in _BRIDGED_INTERACTIONS:
+                params = parameters.get(name, {})
+                if not params:
+                    raise ValueError(
+                        f"Must specify settings for bridged interaction {name!r}: try "
+                        f'`parameters={{"{name}": {{...}}}}`'
+                    )
+                bridged_interaction_cls = _BRIDGED_INTERACTIONS[name]
+                sig = signature(bridged_interaction_cls.__init__)
+                if "count" in sig.parameters:
+                    params.setdefault("count", self.count)
+                bridged_interaction = bridged_interaction_cls(**params)
+                setattr(self, name.lower(), bridged_interaction)
+                self.bridged_interactions[name] = bridged_interaction
+            else:
+                # create instance with custom parameters if available
+                interaction_cls = _INTERACTIONS[name]
+                interaction = interaction_cls(**parameters.get(name, {}))
+                setattr(self, name.lower(), interaction)
+                self.interactions[name] = (
+                    interaction.all if self.count else interaction.any
+                )
 
     def _check_valid_interactions(
         self, interactions_iterable: Iterable[str], varname: str
     ) -> None:
         """Raises a NameError if an unknown interaction is given."""
         unsafe = set(interactions_iterable)
-        unknown = unsafe.symmetric_difference(_INTERACTIONS) & unsafe
+        known = {*_INTERACTIONS, *_BRIDGED_INTERACTIONS}
+        unknown = unsafe.difference(known)
         if unknown:
             raise NameError(
                 f"Unknown interaction(s) in {varname!r}: {', '.join(unknown)}",
@@ -253,11 +298,13 @@ class Fingerprint:
 
     def __repr__(self) -> str:  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
-        params = f"{self.n_interactions} interactions: {list(self.interactions)}"
+        params = f"{self.n_interactions} interactions: {self._interactions_list}"
         return f"<{name}: {params} at {id(self):#x}>"
 
     @staticmethod
-    def list_available(show_hidden: bool = False) -> list[str]:
+    def list_available(
+        show_hidden: bool = False, show_bridged: bool = False
+    ) -> list[str]:
         """List interactions available to the Fingerprint class.
 
         Parameters
@@ -265,14 +312,33 @@ class Fingerprint:
         show_hidden : bool
             Show hidden classes (base classes meant to be inherited from to create
             custom interactions).
+        show_bridged : bool
+            Show bridged interaction classes such as ``WaterBridge``.
+
+        .. versionchanged:: 2.1.0
+            Added the ``show_bridged`` parameter to show bridged interactions
+            such as ``WaterBridge``.
         """
+        interactions = sorted(_INTERACTIONS)
+        if show_bridged:
+            interactions.extend(sorted(_BRIDGED_INTERACTIONS))
         if show_hidden:
-            return sorted(_BASE_INTERACTIONS) + sorted(_INTERACTIONS)
-        return sorted(_INTERACTIONS)
+            return sorted(_BASE_INTERACTIONS) + interactions
+        return interactions
+
+    @property
+    def _interactions_list(self) -> list[str]:
+        interactions = list(self.interactions)
+        if self.bridged_interactions:
+            interactions.extend(self.bridged_interactions)
+        return interactions
 
     @property
     def n_interactions(self) -> int:
-        return len(self.interactions)
+        """Number of interaction types that are configured to be detected by the
+        fingerprint.
+        """
+        return len(self._interactions_list)
 
     def bitvector(self, res1: "Residue", res2: "Residue") -> "NDArray":
         """Generates the complete bitvector for the interactions between two
@@ -521,27 +587,68 @@ class Fingerprint:
         if converter_kwargs is not None and len(converter_kwargs) != 2:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
 
+        # setup defaults
         converter_kwargs = converter_kwargs or ({}, {})
+        if (
+            self.bridged_interactions
+            and (maxsize := atomgroup_to_mol.cache_parameters()["maxsize"])
+            and maxsize <= 2
+        ):
+            set_converter_cache_size(2 + len(self.bridged_interactions))
         if n_jobs is None:
             n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
         if residues == "all":
             residues = list(Molecule.from_mda(prot, **converter_kwargs[1]).residues)
-        if n_jobs != 1:
-            return self._run_parallel(
+
+        if self.interactions:
+            if n_jobs == 1:
+                ifp = self._run_serial(
+                    traj,
+                    lig,
+                    prot,
+                    residues=residues,
+                    converter_kwargs=converter_kwargs,
+                    progress=progress,
+                )
+            else:
+                ifp = self._run_parallel(
+                    traj,
+                    lig,
+                    prot,
+                    residues=residues,
+                    converter_kwargs=converter_kwargs,
+                    progress=progress,
+                    n_jobs=n_jobs,
+                )
+            self.ifp = ifp
+
+        if self.bridged_interactions:
+            self._run_bridged_analysis(
                 traj,
                 lig,
                 prot,
                 residues=residues,
                 converter_kwargs=converter_kwargs,
                 progress=progress,
-                n_jobs=n_jobs,
             )
+        return self
 
+    def _run_serial(
+        self,
+        traj: "Trajectory",
+        lig: "MDAObject",
+        prot: "MDAObject",
+        *,
+        residues: "ResidueSelection",
+        converter_kwargs: tuple[dict, dict],
+        progress: bool,
+    ) -> "IFPResults":
+        """Serial implementation for trajectories."""
         # support single frame
-        if hasattr(traj, "frame"):
+        if isinstance(traj, Timestep):
             traj = (traj,)
         iterator = tqdm(traj) if progress else traj
-        ifp = {}
+        ifp: "IFPResults" = {}
         for ts in iterator:
             lig_mol = Molecule.from_mda(lig, **converter_kwargs[0])
             prot_mol = Molecule.from_mda(prot, **converter_kwargs[1])
@@ -551,8 +658,7 @@ class Fingerprint:
                 residues=residues,
                 metadata=True,
             )
-        self.ifp = ifp
-        return self
+        return ifp
 
     def _run_parallel(
         self,
@@ -563,7 +669,7 @@ class Fingerprint:
         converter_kwargs: tuple[dict, dict],
         progress: bool,
         n_jobs: int | None,
-    ) -> "Fingerprint":
+    ) -> "IFPResults":
         """Parallel implementation of :meth:`~Fingerprint.run`"""
         n_chunks = n_jobs or cast(int, mp.cpu_count())
         try:
@@ -582,14 +688,20 @@ class Fingerprint:
                 frames = traj._frames
                 traj = lig.universe.trajectory
             elif hasattr(traj, "frame"):
-                # single trajectory frame
-                frames = (traj.frame,)
-                traj = lig.universe.trajectory
+                # single trajectory frame, no need to run in parallel
+                return self._run_serial(
+                    traj,
+                    lig,
+                    prot,
+                    residues=residues,
+                    converter_kwargs=converter_kwargs,
+                    progress=progress,
+                )
         else:
             frames = range(n_frames)
         chunks = np.array_split(frames, n_chunks)
         args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
-        ifp = {}
+        ifp: "IFPResults" = {}
 
         with TrajectoryPool(
             n_jobs,
@@ -601,8 +713,7 @@ class Fingerprint:
             for ifp_data_chunk in pool.process(args_iterable):
                 ifp.update(ifp_data_chunk)
 
-        self.ifp = ifp
-        return self
+        return ifp
 
     def run_from_iterable(
         self,
@@ -679,21 +790,50 @@ class Fingerprint:
             raise ValueError("n_jobs must be > 0 or None")
         if residues == "all":
             residues = list(prot_mol.residues)
-        if n_jobs != 1:
-            return self._run_iter_parallel(
-                lig_iterable=lig_iterable,
-                prot_mol=prot_mol,
+        if n_jobs is None:
+            n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
+
+        if self.interactions:
+            if n_jobs == 1:
+                ifp = self._run_iter_serial(
+                    lig_iterable=lig_iterable,
+                    prot_mol=prot_mol,
+                    residues=residues,
+                    progress=progress,
+                )
+            else:
+                ifp = self._run_iter_parallel(
+                    lig_iterable=lig_iterable,
+                    prot_mol=prot_mol,
+                    residues=residues,
+                    progress=progress,
+                    n_jobs=n_jobs,
+                )
+            self.ifp = ifp
+
+        if self.bridged_interactions:
+            self._run_iter_bridged_analysis(
+                lig_iterable,
+                prot_mol,
                 residues=residues,
                 progress=progress,
                 n_jobs=n_jobs,
             )
 
+        return self
+
+    def _run_iter_serial(
+        self,
+        lig_iterable: Iterable[Molecule],
+        prot_mol: Molecule,
+        residues: "ResidueSelection" = None,
+        progress: bool = True,
+    ) -> "IFPResults":
         iterator = tqdm(lig_iterable) if progress else lig_iterable
-        ifp = {}
+        ifp: "IFPResults" = {}
         for i, lig_mol in enumerate(iterator):
             ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
-        self.ifp = ifp
-        return self
+        return ifp
 
     def _run_iter_parallel(
         self,
@@ -702,14 +842,14 @@ class Fingerprint:
         residues: "ResidueSelection" = None,
         progress: bool = True,
         n_jobs: int | None = None,
-    ) -> "Fingerprint":
+    ) -> "IFPResults":
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
         total = (
             len(lig_iterable)
             if isinstance(lig_iterable, Chem.SDMolSupplier | Sized)
             else None
         )
-        ifp = {}
+        ifp: "IFPResults" = {}
 
         with MolIterablePool(
             n_jobs,
@@ -721,7 +861,48 @@ class Fingerprint:
             for i, ifp_data in enumerate(pool.process(lig_iterable)):
                 ifp[i] = ifp_data
 
-        self.ifp = ifp
+        return ifp
+
+    def _run_bridged_analysis(
+        self, traj: "Trajectory", lig: "MDAObject", prot: "MDAObject", **kwargs: Any
+    ) -> "Fingerprint":
+        """Implementation of bridged-interaction analysis for trajectories.
+
+        Parameters
+        ----------
+        traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced
+            Iterate over this Universe trajectory or sliced trajectory object
+            to extract the frames used for the fingerprint extraction
+        lig : MDAnalysis.core.groups.AtomGroup
+            An MDAnalysis AtomGroup for the ligand
+        prot : MDAnalysis.core.groups.AtomGroup
+            An MDAnalysis AtomGroup for the protein (with multiple residues)
+
+        .. versionadded:: 2.1.0
+        """  # noqa: E501
+        self.ifp = cast("IFPResults", getattr(self, "ifp", {}))
+        for interaction in self.bridged_interactions.values():
+            interaction.setup(ifp_store=self.ifp, **kwargs)
+            interaction.run(traj, lig, prot)
+        return self
+
+    def _run_iter_bridged_analysis(
+        self, lig_iterable: Iterable["Molecule"], prot_mol: "Molecule", **kwargs: Any
+    ) -> "Fingerprint":
+        """Implementation of bridged-interaction analysis for iterables.
+
+        Parameters
+        ----------
+        lig_iterable : list or generator
+            An iterable yielding ligands as :class:`~prolif.molecule.Molecule`
+            objects
+        prot_mol : prolif.molecule.Molecule
+            The protein
+        """
+        self.ifp = getattr(self, "ifp", {})
+        for interaction in self.bridged_interactions.values():
+            interaction.setup(ifp_store=self.ifp, **kwargs)
+            interaction.run_from_iterable(lig_iterable, prot_mol)
         return self
 
     def to_dataframe(
@@ -779,7 +960,7 @@ class Fingerprint:
         if hasattr(self, "ifp"):
             return to_dataframe(
                 self.ifp,
-                self.interactions,
+                self._interactions_list,
                 count=self.count if count is None else count,
                 dtype=dtype,
                 drop_empty=drop_empty,
@@ -1000,6 +1181,7 @@ class Fingerprint:
 
         .. versionchanged:: 2.1.0
             Added the ``show_interaction_data`` argument and exposed the ``fontsize``.
+            Added support for showing WaterBridge interactions.
         """
         from prolif.plotting.network import LigNetwork
 
@@ -1085,12 +1267,13 @@ class Fingerprint:
         self,
         ligand_mol: Molecule,
         protein_mol: Molecule,
+        water_mol: Molecule | None = None,
         *,
         frame: int,
         size: tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein"] = True,
+        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
     ) -> "Complex3D":
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
@@ -1101,6 +1284,8 @@ class Fingerprint:
             The ligand molecule to display.
         protein_mol : Molecule
             The protein molecule to display.
+        water_mol : Optional[Molecule]
+            Additional molecule (e.g. waters) to display.
         frame : int
             The frame number chosen to select which interactions are going to be
             displayed.
@@ -1113,7 +1298,7 @@ class Fingerprint:
         only_interacting : bool = True
             Whether to show all protein residues in the vicinity of the ligand, or
             only the ones participating in an interaction.
-        remove_hydrogens: bool | Literal["ligand", "protein"] = True
+        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
 
@@ -1126,16 +1311,17 @@ class Fingerprint:
         .. versionchanged:: 2.1.0
             Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
             Non-polar hydrogen atoms that aren't involved in interactions are now
-            hidden.
+            hidden. Added support for waters involved in WaterBridge interactions.
 
         """
         from prolif.plotting.complex3d import Complex3D
 
         plot3d = Complex3D.from_fingerprint(
             self,
+            ligand_mol,
+            protein_mol,
+            water_mol,
             frame=frame,
-            lig_mol=ligand_mol,
-            prot_mol=protein_mol,
         )
         return plot3d.display(
             size=size,

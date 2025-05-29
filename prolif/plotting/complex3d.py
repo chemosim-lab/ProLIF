@@ -13,7 +13,12 @@ from __future__ import annotations
 
 from contextlib import suppress
 from copy import deepcopy
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Literal,
+)
 
 import numpy as np
 import py3Dmol
@@ -21,7 +26,7 @@ from rdkit import Chem
 from rdkit.Geometry import Point3D
 
 from prolif.exceptions import RunRequiredError
-from prolif.plotting.utils import separated_interaction_colors
+from prolif.plotting.utils import metadata_iterator, separated_interaction_colors
 from prolif.utils import get_centroid, get_residues_near_ligand, requires
 
 with suppress(ModuleNotFoundError):
@@ -46,6 +51,8 @@ class Complex3D:
         The ligand molecule to display.
     prot_mol : Molecule
         The protein molecule to display.
+    water_mol : Optional[Molecule]
+        Additional molecule (e.g. waters) to display.
 
     Attributes
     ----------
@@ -75,12 +82,24 @@ class Complex3D:
     PROTEIN_RING_INTERACTIONS : set[str]
         Which interactions should be displayed using the centroid instead of using
         :attr:`PROTEIN_DISPLAYED_ATOM` for the protein.
+    BRIDGED_INTERACTIONS : dict[str, str]
+        For bridged-interactions such as WaterBridge. The key is the interaction name,
+        and the value is the name of the molecule in the metadata indices dictionary.
     RESIDUE_HOVER_CALLBACK : str
         JavaScript callback executed when hovering a residue involved in an interaction.
     INTERACTION_HOVER_CALLBACK : str
         JavaScript callback executed when hovering an interaction line.
     DISABLE_HOVER_CALLBACK : str
         JavaScript callback executed when the hovering event is finished.
+
+    .. versionchanged:: 2.1.0
+        Added ``water_mol`` parameter to the constructor to display waters
+        involved in WaterBridge interactions. Added ``save_png`` method to save the
+        current state of the 3D viewer to a PNG. Added ``remove_hydrogens`` parameter
+        to the ``display`` and ``compare`` methods to remove non-polar hydrogens that
+        aren't involved in an interaction. Added ``only_interacting`` parameter to the
+        ``display`` and ``compare`` methods to show all protein residues in the
+        vicinity of the ligand, or only the ones participating in an interaction.
     """  # noqa: E501
 
     COLORS: ClassVar[dict[str, str]] = {**separated_interaction_colors}
@@ -106,6 +125,7 @@ class Complex3D:
     }
     LIGAND_RING_INTERACTIONS: ClassVar[set[str]] = {*RING_SYSTEMS, "PiCation"}
     PROTEIN_RING_INTERACTIONS: ClassVar[set[str]] = {*RING_SYSTEMS, "CationPi"}
+    BRIDGED_INTERACTIONS: ClassVar[dict[str, str]] = {"WaterBridge": "water"}
     RESIDUE_HOVER_CALLBACK: ClassVar[str] = """
     function(atom,viewer) {
         if(!atom.label) {
@@ -128,10 +148,17 @@ class Complex3D:
         }
     }"""
 
-    def __init__(self, ifp: IFP, lig_mol: Molecule, prot_mol: Molecule) -> None:
+    def __init__(
+        self,
+        ifp: IFP,
+        lig_mol: Molecule,
+        prot_mol: Molecule,
+        water_mol: Molecule | None = None,
+    ) -> None:
         self.ifp = ifp
         self.lig_mol = lig_mol
         self.prot_mol = prot_mol
+        self.water_mol = water_mol
         self._view: py3Dmol.view | None = None  # type: ignore[no-any-unimported]
 
     @classmethod
@@ -140,6 +167,7 @@ class Complex3D:
         fp: Fingerprint,
         lig_mol: Molecule,
         prot_mol: Molecule,
+        water_mol: Molecule | None = None,
         *,
         frame: int,
     ) -> Complex3D:
@@ -157,6 +185,8 @@ class Complex3D:
             The ligand molecule to display.
         prot_mol : Molecule
             The protein molecule to display.
+        water_mol : Optional[Molecule]
+            Additional molecule (e.g. waters) to display.
         """
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
@@ -164,10 +194,11 @@ class Complex3D:
                 " results.",
             )
         ifp = fp.ifp[frame]
-        return cls(ifp, lig_mol, prot_mol)
+        return cls(ifp, lig_mol, prot_mol, water_mol)
 
     @staticmethod
     def get_ring_centroid(mol: Molecule, indices: tuple[int, ...]) -> Point3D:
+        """Get the centroid of a ring system."""
         centroid = mol.xyz[list(indices)].mean(axis=0)
         return Point3D(*centroid)
 
@@ -176,7 +207,7 @@ class Complex3D:
         size: tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein"] = True,
+        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
     ) -> Complex3D:
         """Display as a py3Dmol widget view.
 
@@ -191,14 +222,14 @@ class Complex3D:
         only_interacting : bool = True
             Whether to show all protein residues in the vicinity of the ligand, or
             only the ones participating in an interaction.
-        remove_hydrogens: bool | Literal["ligand", "protein"] = True
+        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
 
         .. versionchanged:: 2.1.0
             Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
             Non-polar hydrogen atoms that aren't involved in interactions are now
-            hidden.
+            hidden. Added support for waters involved in WaterBridge interactions.
 
         """
         v = py3Dmol.view(width=size[0], height=size[1], viewergrid=(1, 1), linked=False)
@@ -222,7 +253,7 @@ class Complex3D:
         linked: bool = True,
         color_unique: str | None = "magentaCarbon",
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein"] = True,
+        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
     ) -> Complex3D:
         """Displays the initial complex side-by-side with a second one for easier
         comparison.
@@ -245,7 +276,7 @@ class Complex3D:
         only_interacting : bool = True
             Whether to show all protein residues in the vicinity of the ligand, or
             only the ones participating in an interaction.
-        remove_hydrogens: bool | Literal["ligand", "protein"] = True
+        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
 
@@ -254,7 +285,7 @@ class Complex3D:
         .. versionchanged:: 2.1.0
             Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
             Non-polar hydrogen atoms that aren't involved in interactions are now
-            hidden.
+            hidden. Added support for waters involved in WaterBridge interactions.
 
         """
         v = py3Dmol.view(
@@ -316,9 +347,10 @@ class Complex3D:
         display_all: bool = False,
         colormap: dict[ResidueId, str] | None = None,
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein"] = True,
+        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
     ) -> None:
         if isinstance(view, Complex3D):
+            # backwards compatibility for when display/compare used to return the view
             if view._view is None:
                 raise ValueError(
                     "View not initialized, did you call `display`/`compare` first?",
@@ -332,6 +364,7 @@ class Complex3D:
         self._interacting_atoms: dict[str, set[int]] = {
             "ligand": set(),
             "protein": set(),
+            "water": set(),
         }
 
         # show all interacting residues
@@ -348,17 +381,7 @@ class Complex3D:
             for interaction, metadata_tuple in interactions.items():
                 # whether to display all interactions or only the one with the shortest
                 # distance
-                metadata_iterator = (
-                    metadata_tuple
-                    if display_all
-                    else (
-                        min(
-                            metadata_tuple,
-                            key=lambda m: m.get("distance", float("nan")),
-                        ),
-                    )
-                )
-                for metadata in metadata_iterator:
+                for metadata in metadata_iterator(metadata_tuple, display_all):
                     # record indices of atoms interacting
                     self._interacting_atoms["ligand"].update(
                         metadata["parent_indices"]["ligand"]
@@ -366,68 +389,85 @@ class Complex3D:
                     self._interacting_atoms["protein"].update(
                         metadata["parent_indices"]["protein"]
                     )
+                    if interaction in self.BRIDGED_INTERACTIONS and self.water_mol:
+                        self._interacting_atoms["water"].update(
+                            metadata["parent_indices"][
+                                self.BRIDGED_INTERACTIONS[interaction]
+                            ]
+                        )
+                        for wresid in metadata["water_residues"]:
+                            wres = self.water_mol[wresid]
+                            if wresid not in self._models:
+                                self._add_residue_to_view(
+                                    v, position, wres, self.RESIDUES_STYLE
+                                )
+                        # show cylinders for WaterBridge
+                        distances = [d for d in metadata if d.startswith("distance_")]
+                        for distlabel in distances:
+                            _, src, dest = distlabel.split("_")
+                            if src == "ligand":
+                                p1 = lres.GetConformer().GetAtomPosition(
+                                    metadata["indices"]["ligand"][
+                                        self.LIGAND_DISPLAYED_ATOM.get(interaction, 0)
+                                    ],
+                                )
+                            else:
+                                p1 = (
+                                    self.water_mol[src]
+                                    .GetConformer()
+                                    .GetAtomPosition(metadata["indices"][src][0])
+                                )
+                            if dest == "protein":
+                                p2 = pres.GetConformer().GetAtomPosition(
+                                    metadata["indices"]["protein"][
+                                        self.PROTEIN_DISPLAYED_ATOM.get(interaction, 0)
+                                    ],
+                                )
+                            else:
+                                p2 = (
+                                    self.water_mol[dest]
+                                    .GetConformer()
+                                    .GetAtomPosition(metadata["indices"][dest][0])
+                                )
 
-                    # get coordinates for both points of the interaction
-                    if interaction in self.LIGAND_RING_INTERACTIONS:
-                        p1 = self.get_ring_centroid(lres, metadata["indices"]["ligand"])
+                            self._add_interaction(
+                                v,
+                                position,
+                                lresid,
+                                interaction,
+                                metadata[distlabel],
+                                p1,
+                                p2,
+                            )
+
                     else:
-                        p1 = lres.GetConformer().GetAtomPosition(
-                            metadata["indices"]["ligand"][
-                                self.LIGAND_DISPLAYED_ATOM.get(interaction, 0)
-                            ],
+                        # get coordinates for both points of the interaction
+                        if interaction in self.LIGAND_RING_INTERACTIONS:
+                            p1 = self.get_ring_centroid(
+                                lres, metadata["indices"]["ligand"]
+                            )
+                        else:
+                            p1 = lres.GetConformer().GetAtomPosition(
+                                metadata["indices"]["ligand"][
+                                    self.LIGAND_DISPLAYED_ATOM.get(interaction, 0)
+                                ],
+                            )
+                        if interaction in self.PROTEIN_RING_INTERACTIONS:
+                            p2 = self.get_ring_centroid(
+                                pres,
+                                metadata["indices"]["protein"],
+                            )
+                        else:
+                            p2 = pres.GetConformer().GetAtomPosition(
+                                metadata["indices"]["protein"][
+                                    self.PROTEIN_DISPLAYED_ATOM.get(interaction, 0)
+                                ],
+                            )
+                        # add interaction line
+                        dist = metadata.get("distance", float("nan"))
+                        self._add_interaction(
+                            v, position, lresid, interaction, dist, p1, p2
                         )
-                    if interaction in self.PROTEIN_RING_INTERACTIONS:
-                        p2 = self.get_ring_centroid(
-                            pres,
-                            metadata["indices"]["protein"],
-                        )
-                    else:
-                        p2 = pres.GetConformer().GetAtomPosition(
-                            metadata["indices"]["protein"][
-                                self.PROTEIN_DISPLAYED_ATOM.get(interaction, 0)
-                            ],
-                        )
-                    # add interaction line
-                    v.addCylinder(
-                        {
-                            "start": {"x": p1.x, "y": p1.y, "z": p1.z},
-                            "end": {"x": p2.x, "y": p2.y, "z": p2.z},
-                            "color": self.COLORS.get(interaction, "grey"),
-                            "radius": 0.15,
-                            "dashed": True,
-                            "fromCap": 1,
-                            "toCap": 1,
-                        },
-                        viewer=position,
-                    )
-                    # add label when hovering the middle of the dashed line by adding a
-                    # dummy atom
-                    arr = np.array([list(p1), list(p2)], dtype=float)
-                    c = Point3D(*get_centroid(arr))
-                    modelID = self._models[lresid]
-                    model = v.getModel(modelID, viewer=position)
-                    interaction_label = f"{interaction}: {metadata['distance']:.2f}Å"
-                    model.addAtoms(
-                        [
-                            {
-                                "elem": "Z",
-                                "x": c.x,
-                                "y": c.y,
-                                "z": c.z,
-                                "interaction": interaction_label,
-                            },
-                        ],
-                    )
-                    model.setStyle(
-                        {"interaction": interaction_label},
-                        {"clicksphere": {"radius": 0.5}},
-                    )
-                    model.setHoverable(
-                        {"interaction": interaction_label},
-                        True,
-                        self.INTERACTION_HOVER_CALLBACK,
-                        self.DISABLE_HOVER_CALLBACK,
-                    )
 
         # show "protein" residues that are close to the "ligand"
         if not only_interacting:
@@ -444,6 +484,8 @@ class Complex3D:
                 to_remove.append(("ligand", self.lig_mol))
             if remove_hydrogens in {"protein", True}:
                 to_remove.append(("protein", self.prot_mol))
+            if remove_hydrogens in {"water", True} and self.water_mol:
+                to_remove.append(("water", self.water_mol))
 
             for resid in self._models:
                 for moltype, mol in to_remove:
@@ -480,6 +522,57 @@ class Complex3D:
 
         v.zoomTo({"model": list(self._models.values())}, viewer=position)
 
+    def _add_interaction(  # type: ignore[no-any-unimported]
+        self,
+        v: py3Dmol.view,
+        position: tuple[int, int],
+        resid: ResidueId,
+        interaction: str,
+        distance: float,
+        p1: Point3D,
+        p2: Point3D,
+    ) -> None:
+        """Add an interaction line (and hover label) to the view."""
+        v.addCylinder(
+            {
+                "start": {"x": p1.x, "y": p1.y, "z": p1.z},
+                "end": {"x": p2.x, "y": p2.y, "z": p2.z},
+                "color": self.COLORS.get(interaction, "grey"),
+                "radius": 0.15,
+                "dashed": True,
+                "fromCap": 1,
+                "toCap": 1,
+            },
+            viewer=position,
+        )
+        # add label when hovering the middle of the dashed line by adding a dummy atom
+        arr = np.array([list(p1), list(p2)], dtype=float)
+        c = Point3D(*get_centroid(arr))
+        modelID = self._models[resid]
+        model = v.getModel(modelID, viewer=position)
+        interaction_label = f"{interaction}: {distance:.2f}Å"
+        model.addAtoms(
+            [
+                {
+                    "elem": "Z",
+                    "x": c.x,
+                    "y": c.y,
+                    "z": c.z,
+                    "interaction": interaction_label,
+                },
+            ],
+        )
+        model.setStyle(
+            {"interaction": interaction_label},
+            {"clicksphere": {"radius": 0.5}},
+        )
+        model.setHoverable(
+            {"interaction": interaction_label},
+            True,
+            self.INTERACTION_HOVER_CALLBACK,
+            self.DISABLE_HOVER_CALLBACK,
+        )
+
     def _add_residue_to_view(  # type: ignore[no-any-unimported]
         self,
         v: py3Dmol.view,
@@ -487,6 +580,7 @@ class Complex3D:
         res: Residue,
         style: dict,
     ) -> None:
+        """Add a residue to the view."""
         self._mid += 1
         resid = res.resid
         v.addModel(Chem.MolToMolBlock(res), "sdf", viewer=position)
@@ -530,7 +624,15 @@ class Complex3D:
             """),
         )
 
-    def _repr_html_(self) -> str | None:  # noqa: PLW3201
+    def __getattr__(self, name: str) -> Any:
+        """Get an attribute from the py3Dmol view."""
+        if self._view is None:
+            raise ValueError(
+                "View not initialized, did you call `display`/`compare` first?",
+            )
+        return getattr(self._view, name)
+
+    def _repr_html_(self) -> str | None:
         if self._view:
             return self._view._repr_html_()  # type: ignore[no-any-return]
         return None

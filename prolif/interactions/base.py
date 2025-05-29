@@ -27,12 +27,20 @@ from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vec
 if TYPE_CHECKING:
     from typing import TypeVar
 
+    from prolif.molecule import Molecule
     from prolif.residue import Residue
-    from prolif.typeshed import Angles, InteractionMetadata
+    from prolif.typeshed import (
+        Angles,
+        IFPResults,
+        InteractionMetadata,
+        MDAObject,
+        Trajectory,
+    )
 
     Self = TypeVar("Self", bound="Interaction")
 
 _INTERACTIONS: dict[str, type["Interaction"]] = {}
+_BRIDGED_INTERACTIONS: dict[str, type["BridgedInteraction"]] = {}
 _BASE_INTERACTIONS: dict[str, type["Interaction"]] = {}
 
 
@@ -44,6 +52,11 @@ class Interaction(ABC):
     .. versionchanged:: 2.0.0
         Changed the return type of interactions. Added some helper methods to easily
         update/derive interaction classes.
+
+    .. versionchanged:: 2.1.0
+        Added the ``all``, ``any`` and ``best`` methods to the base class. These methods
+        are used to get all interactions, any interaction or the best interaction
+        (closest to the ligand) respectively.
     """
 
     _metadata_mapping: dict | None
@@ -95,6 +108,10 @@ class Interaction(ABC):
     def all(
         self, lig_res: "Residue", prot_res: "Residue", metadata: bool = False
     ) -> tuple[Union["InteractionMetadata", Literal[True]], ...]:
+        """Returns all interactions found between the ligand and protein.
+
+        .. versionadded:: 2.1.0
+        """
         return tuple(self(lig_res, prot_res, metadata=metadata))
 
     @overload
@@ -108,11 +125,21 @@ class Interaction(ABC):
     def any(
         self, lig_res: "Residue", prot_res: "Residue", metadata: bool = False
     ) -> Union["InteractionMetadata", Literal[True], None]:
+        """Returns the first interaction found between the ligand and protein.
+
+        .. versionadded:: 2.1.0
+        """
         return next(self(lig_res, prot_res, metadata=metadata), None)
 
     def best(
         self, lig_res: "Residue", prot_res: "Residue"
     ) -> Optional["InteractionMetadata"]:
+        """Returns the best interaction found between the ligand and protein.
+        The best interaction is defined as the one with the smallest distance as defined
+        by each interaction type.
+
+        .. versionadded:: 2.1.0
+        """
         return min(
             self(lig_res, prot_res, metadata=True),
             key=itemgetter("distance"),  # type: ignore[arg-type]
@@ -120,8 +147,7 @@ class Interaction(ABC):
         )
 
     def __repr__(self) -> str:  # pragma: no cover
-        cls = self.__class__
-        return f"<{cls.__module__}.{cls.__name__} at {id(self):#x}>"
+        return f"<prolif.{self.__class__.__name__} at {id(self):#x}>"
 
     def metadata(
         self,
@@ -198,6 +224,49 @@ class Interaction(ABC):
 
         inverted.detect = detect  # type: ignore[method-assign]
         return inverted
+
+
+class BridgedInteraction:
+    """Base class for bridged interactions.
+
+    .. versionadded:: 2.1.0
+    """
+
+    def __init_subclass__(cls) -> None:
+        super().__init_subclass__()
+        name = cls.__name__
+        register = _BRIDGED_INTERACTIONS
+        if name in register:
+            warnings.warn(
+                f"The {name!r} interaction has been superseded by a "
+                f"new class with id {id(cls):#x}",
+                stacklevel=2,
+            )
+        register[name] = cls
+
+    def __init__(self) -> None:
+        self.ifp: "IFPResults" = {}
+        # force empty setup to initialize args with defaults
+        self.setup()
+
+    def setup(self, ifp_store: Optional["IFPResults"] = None, **kwargs: Any) -> None:
+        """Setup additional arguments passed at runtime to the fingerprint generator's
+        ``run`` method.
+        """
+        self.ifp = ifp_store if ifp_store is not None else {}
+        self.kwargs = kwargs
+
+    @abstractmethod
+    def run(
+        self, traj: "Trajectory", lig: "MDAObject", prot: "MDAObject"
+    ) -> "IFPResults":
+        raise NotImplementedError()
+
+    @abstractmethod
+    def run_from_iterable(
+        self, lig_iterable: Iterable["Molecule"], prot_mol: "Molecule"
+    ) -> "IFPResults":
+        raise NotImplementedError()
 
 
 class Distance(Interaction, is_abstract=True):

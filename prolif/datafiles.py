@@ -9,3 +9,5 @@ datapath = _file_manager.enter_context(resources.as_file(_data_resource))
 
 TOP = str(datapath / "top.pdb")
 TRAJ = str(datapath / "traj.xtc")
+WATER_TOP = str(datapath / "water_m2.pdb")
+WATER_TRAJ = str(datapath / "water_m2.xtc")

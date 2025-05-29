@@ -2008,6 +2008,8 @@ dependencies = [
     { name = "mdanalysis", version = "2.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
     { name = "mdanalysis", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "multiprocess" },
+    { name = "networkx", version = "3.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "scipy", version = "1.13.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -2024,8 +2026,6 @@ plots = [
 tutorials = [
     { name = "matplotlib", version = "3.9.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "matplotlib", version = "3.10.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "networkx", version = "3.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "py3dmol" },
     { name = "pyvis" },
     { name = "rdkit" },
@@ -2055,6 +2055,7 @@ dev = [
     { name = "sphinx" },
     { name = "sphinx-book-theme" },
     { name = "sphinx-copybutton" },
+    { name = "types-networkx" },
     { name = "types-setuptools" },
     { name = "types-tqdm" },
 ]
@@ -2078,6 +2079,7 @@ type-check = [
     { name = "pandas-stubs" },
     { name = "rdkit" },
     { name = "scipy-stubs" },
+    { name = "types-networkx" },
     { name = "types-setuptools" },
     { name = "types-tqdm" },
 ]
@@ -2090,7 +2092,7 @@ requires-dist = [
     { name = "mdanalysis", marker = "python_full_version < '3.13'", specifier = ">=2.2.0,<3" },
     { name = "mdanalysis", marker = "python_full_version >= '3.13'", specifier = ">=2.7.0,<3" },
     { name = "multiprocess" },
-    { name = "networkx", marker = "extra == 'tutorials'" },
+    { name = "networkx", specifier = ">=2.5.0" },
     { name = "numpy", specifier = ">=1.13.3,<2" },
     { name = "pandas", specifier = ">=1.1.0" },
     { name = "prolif", extras = ["plots"], marker = "extra == 'tutorials'" },
@@ -2125,6 +2127,7 @@ dev = [
     { name = "sphinx", specifier = "==5.3.0" },
     { name = "sphinx-book-theme" },
     { name = "sphinx-copybutton" },
+    { name = "types-networkx" },
     { name = "types-setuptools" },
     { name = "types-tqdm" },
 ]
@@ -2148,6 +2151,7 @@ type-check = [
     { name = "pandas-stubs" },
     { name = "rdkit", specifier = ">=2024.3.2" },
     { name = "scipy-stubs" },
+    { name = "types-networkx" },
     { name = "types-setuptools" },
     { name = "types-tqdm" },
 ]
@@ -3071,6 +3075,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/eb/79/72064e6a701c2183016abbbfedaba506d81e30e232a68c9f0d6f6fcd1574/traitlets-5.14.3.tar.gz", hash = "sha256:9ed0579d3502c94b4b3732ac120375cda96f923114522847de4b3bb98b96b6b7", size = 161621 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl", hash = "sha256:b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f", size = 85359 },
+]
+
+[[package]]
+name = "types-networkx"
+version = "3.4.2.20250426"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9f/e5/6dd2000b990885cb966aefccba74c44cd1862e4032ea1360492ef918fdec/types_networkx-3.4.2.20250426.tar.gz", hash = "sha256:f1b73e144fb7072a5c1625fd5edc72bfaf93d4844eab4706b786faa10b2dc1a0", size = 55232 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/bb/a089be583f77ae94fbbc118380e096f8273b592c15ca6b5fef50adb84a17/types_networkx-3.4.2.20250426-py3-none-any.whl", hash = "sha256:ac3e48252ab3333777aea5dcf0849e744216d8bd1c70868e6d37659bf8fcbd5d", size = 137520 },
 ]
 
 [[package]]
