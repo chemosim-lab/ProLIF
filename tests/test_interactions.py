@@ -448,6 +448,29 @@ class TestBridgedInteractions:
         int_data = all_int_data[-1]
         assert "distance_TIP383.X_TIP317.X" in int_data.metadata
 
+    def test_water_bridge_with_updating_atomgroup(
+        self,
+        water_u: "Universe",
+        water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+    ) -> None:
+        ligand, protein, water = water_atomgroups
+        water = water_u.select_atoms(
+            "segid WAT and byres around 4 (group ligand or group pocket)",
+            ligand=ligand,
+            pocket=protein,
+            updating=True,
+        )
+        fp = Fingerprint(
+            ["WaterBridge"],
+            parameters={"WaterBridge": {"water": water, "order": 2}},
+        )
+        fp.run(water_u.trajectory[:1], ligand, protein)
+        all_int_data = list(fp.ifp[0].interactions())
+
+        assert len(all_int_data) == 3
+        int_data = all_int_data[-1]
+        assert "distance_TIP383.X_TIP317.X" in int_data.metadata
+
     def test_run_iter_water_bridge(
         self, water_mols: tuple["Molecule", "Molecule", "Molecule"]
     ) -> None:

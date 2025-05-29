@@ -17,6 +17,7 @@ from collections.abc import Iterable, Iterator
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import networkx as nx
+from MDAnalysis.core.groups import UpdatingAtomGroup
 
 from prolif.ifp import IFP, InteractionData
 from prolif.interactions.base import BridgedInteraction
@@ -47,6 +48,9 @@ class WaterBridge(BridgedInteraction):
         details.
     hbacceptor : Optional[dict]
         Same as above for :class:`~prolif.interactions.interactions.HBAcceptor`.
+    atomgroup_converter_kwargs : Optional[dict]
+        Optional parameters passed to the MDAnalysis' RDKitConverter if the
+        specified `water` is an MDAnalysis AtomGroup.
     count : bool
         Whether to generate a count fingerprint or just a binary one.
 
@@ -64,6 +68,7 @@ class WaterBridge(BridgedInteraction):
         min_order: int = 1,
         hbdonor: dict | None = None,
         hbacceptor: dict | None = None,
+        atomgroup_converter_kwargs: dict | None = None,
         count: bool = False,
     ) -> None:
         # circular import
@@ -75,6 +80,12 @@ class WaterBridge(BridgedInteraction):
         if min_order > order:
             raise ValueError("min_order cannot be greater than order")
         self.water = water
+        # handle AtomGroup generated with `updating=True` automatically
+        self.water_conv_kwargs = atomgroup_converter_kwargs or (
+            {"NoImplicit": False, "cache": False}
+            if isinstance(water, UpdatingAtomGroup)
+            else {}
+        )
         self.order = order
         self.min_order = min_order
         self.water_fp = Fingerprint(
@@ -85,9 +96,9 @@ class WaterBridge(BridgedInteraction):
 
     def setup(self, ifp_store: Optional["IFPResults"] = None, **kwargs: Any) -> None:
         super().setup(ifp_store=ifp_store, **kwargs)
-        kwargs.pop("n_jobs", None)
-        self.residues = kwargs.pop("residues", None)
-        self.kwargs = kwargs
+        self.kwargs.pop("n_jobs", None)
+        self.residues = self.kwargs.pop("residues", None)
+        self.converter_kwargs = self.kwargs.pop("converter_kwargs", ({}, {}))
 
     def run(
         self,
@@ -110,15 +121,30 @@ class WaterBridge(BridgedInteraction):
         water_obj = cast("MDAObject", self.water)
         # Run analysis for ligand-water and water-protein interactions
         lig_water_ifp: dict[int, IFP] = self.water_fp._run_serial(
-            traj, lig, water_obj, residues=None, **self.kwargs
+            traj,
+            lig,
+            water_obj,
+            residues=None,
+            converter_kwargs=(self.converter_kwargs[0], self.water_conv_kwargs),
+            **self.kwargs,
         )
         water_prot_ifp: dict[int, IFP] = self.water_fp._run_serial(
-            traj, water_obj, prot, residues=self.residues, **self.kwargs
+            traj,
+            water_obj,
+            prot,
+            residues=self.residues,
+            converter_kwargs=(self.water_conv_kwargs, self.converter_kwargs[1]),
+            **self.kwargs,
         )
         if self.order >= 2:
             # Run water-water interaction analysis
             water_ifp: dict[int, IFP] | None = self.water_fp._run_serial(
-                traj, water_obj, water_obj, residues=None, **self.kwargs
+                traj,
+                water_obj,
+                water_obj,
+                residues=None,
+                converter_kwargs=(self.water_conv_kwargs, self.water_conv_kwargs),
+                **self.kwargs,
             )
         else:
             water_ifp = None
