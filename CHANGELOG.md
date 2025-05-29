@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for `WaterBridge` interactions (PR #229 with @talagayev).
+- Refactored the `LigNetwork` plotting code (PR #268 by @nilay-v3rma).
 - Type-checking and related pipelines:
   - `poe` pipeline using preconfigured `mypy` (PR #254 by @nilay-v3rma).
   - script for viewing current the progress on type hints (PR #257 by H-EKE).
