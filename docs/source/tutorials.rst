@@ -43,7 +43,7 @@ that are being analyzed:
 
 An additional tutorial exitsts for the water-bridge interactions and analysis of them:
 
-- :ref:`notebooks/water-bridge:Water bridge interactions`
+- :ref:`notebooks/water-bridge:Water-bridge Interactions`
 
 Docking
 -------
