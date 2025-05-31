@@ -41,6 +41,10 @@ that are being analyzed:
 - :ref:`notebooks/md-ligand-protein:Ligand-protein MD`
 - :ref:`notebooks/md-protein-protein:Protein-protein MD`
 
+An additional tutorial exitsts for the water-bridge interactions and analysis of them:
+
+- :ref:`notebooks/water-bridge:Water bridge interactions`
+
 Docking
 -------
 
