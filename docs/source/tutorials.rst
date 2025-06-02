@@ -58,6 +58,9 @@ This tutorial showcases how to use ProLIF from a PDB file:
 Advanced usage
 --------------
 
+For investigating water-mediated interactions, you can follow this tutorial:
+:ref:`notebooks/water-bridge:Water-bridge Interactions`
+
 For more advanced usecases such as modifying interaction parameters, defining your own
 interactions, ignoring backbone interactions and such, you can have a look at this
 tutorial:
