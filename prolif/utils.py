@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 import numpy as np
 import pandas as pd
 from rdkit import Chem, rdBase
-from rdkit.Chem import FragmentOnBonds, GetMolFrags, SplitMolByPDBResidues
+from rdkit.Chem import FragmentOnBonds, GetMolFrags, Mol, SplitMolByPDBResidues
 from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 from rdkit.Geometry import Point3D
 from scipy.spatial import cKDTree
@@ -388,3 +388,135 @@ def to_countvectors(df: pd.DataFrame) -> list[UIntSparseIntVect]:
     return df.apply(  # type: ignore[no-any-return]
         pandas_series_to_countvector, axis=1
     ).tolist()
+
+class ProteinHelper:
+    def __init__(self, input_protein_top: Mol):
+        """Initialize the ProteinHelper class.
+
+        Parameters
+        ----------
+        input_protein_top : rdkit.Chem.rdchem.Mol
+            The input protein molecule in RDKit format.
+        """
+
+        from prolif.molecule import Molecule
+
+        # read as prolif molecule
+        self.protein_mol = Molecule.from_rdkit(input_protein_top)
+
+    def standardize_protein(self):
+        """Standardize the protein molecule."""
+
+        # guess forcefield
+        conv_resnames = set(self.protein_mol.residues.name)
+        forcefield_name = self.forcefield_guesser(conv_resnames)
+        
+
+        # standardize the protein molecule
+        standard_resnames = []
+        for res in self.protein_mol.residues.name:
+            standard_resname = self.convert_to_standard_resname(
+                res, forcefield_name=forcefield_name
+            )
+
+
+    def forcefield_guesser(
+        conv_resnames: set[str],
+    ):
+        """Guesses the forcefield based on the residue names.
+
+        Parameters
+        ----------
+        conv_resnames : set[str]
+            Set of residue names in the protein molecule.
+
+        Returns
+        -------
+        str
+            The guessed forcefield name.
+        """
+        opls_aa_pool = {
+            "HISD", "HISE", "PGLU"
+        }
+        gromos_pool = {
+            "DALA", "ASN1", "CYS1", "HIS1", "HIS2", "HISA", "HISB"
+        }
+        charmm_pool = {
+            "ALAD", "ASPP", "CYM", "CYN", "GLUP", "HSD", "HSE", "HSP", "LSN", "CME"
+        }
+        amber_pool = {
+            "NALA", "CALA", "NARG", "CARG", "NASN", "CASN", "CASF", "ASF", "NASP", "CASP",
+            "ASH", "CYX", "NCYS", "CCYS", "NCYX", "CCYX", "NGLN", "CGLN", "NGLY", "CGLY",
+            "GLH", "NGLU", "CGLU", "HID", "HIE", "HIP", "NHID", "NHIE", "NHIP", "CHID",
+            "CHIE", "CHIP", "NILE", "CILE", "NLEU", "CLEU", "LYN", "NLYS", "CLYS", "NMET",
+            "CMET", "NPRO", "CPRO", "NPHE", "CPHE", "NSER", "CSER", "NTYR", "CTYR", "NTHR",
+            "CTHR", "NTRP", "CTRP", "NVAL", "CVAL"
+        }
+        if len(amber_pool.intersection(conv_resnames)) != 0:
+            return "amber"
+        if len(charmm_pool.intersection(conv_resnames)) != 0:
+            return "charmm"
+        if len(gromos_pool.intersection(conv_resnames)) != 0:
+            return "gromos"
+        if len(opls_aa_pool.intersection(conv_resnames)) != 0:
+            return "oplsaa"
+
+        return "unknown"
+
+    def convert_to_standard_resname(
+            resname: str, forcefield_name: str = "unknown") -> str:
+        """Convert a residue name to its standard form based on the forcefield."""
+
+        if forcefield_name == "unknown":
+            warnings.warn(
+                "Could not guess the forcefield based on the residue names. "
+                "CYS is assigned to neutral CYS (charge = 0).",
+                stacklevel=2,
+            )
+
+        all_resnames_dict = {
+            "ALA": "ALA",
+            "ALAD": "ALA",
+            "DALA": "ALA",
+            "NALA": "ALA",
+            "CALA": "ALA",
+            # [TODO] Add more residue names here
+            # ARG
+            # ASN
+            # ASP
+            # ASH
+            # CYS
+            # CYX
+            # GLN
+            # GLY
+            # GLU
+            # GLH
+            # HIS
+            # HIE
+            # HID
+            # ILE
+            # LEU
+            # LYS
+            # MET
+            # PRO
+            # PHE
+            # SER
+            # TYR
+            # THR
+            # TRP
+            # VAL
+            # ACE
+            # CME
+            # NME
+            # ORN
+            # MSE
+            # DAB
+            # HYP
+            # QLN
+            # PGLU
+        }
+
+        if forcefield_name == "gromos" and resname == "CYS":
+            return "CYX"
+
+        return all_resnames_dict.get(resname, resname)
