@@ -41,6 +41,8 @@ __all__ = [
     "HBAcceptor",
     "HBDonor",
     "Hydrophobic",
+    "ImplicitHBAcceptor",
+    "ImplicitHBDonor",
     "MetalAcceptor",
     "MetalDonor",
     "PiCation",
@@ -128,6 +130,140 @@ class HBAcceptor(SingleAngle):
 HBDonor = HBAcceptor.invert_role(
     "HBDonor",
     "Hbond interaction between a ligand (donor) and a residue (acceptor)",
+)
+
+
+class ImplicitHBAcceptor(Distance):
+    """Implicit hydrogen bond acceptor interaction
+
+    Parameters
+    ----------
+    acceptor : str
+        SMARTS for ``[Acceptor]``
+    donor : str
+        SMARTS for ``[Donor]-[Hydrogen]``
+    tolerance_dev_aaa : float
+        Tolerance for the deviation from the ideal acceptor atom's angle
+    tolerance_dev_daa : float
+        Tolerance for the deviation from the ideal donor atom's angle
+    tolerance_dev_apa : float
+        Tolerance for the deviation from the ideal acceptor plane angle
+    tolerance_dev_dpa : float
+        Tolerance for the deviation from the ideal donor plane angle
+    distance : float
+        Distance threshold between the acceptor and donor atoms
+
+    """
+
+    def __init__(
+        self,
+        acceptor: str = (
+            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
+            "O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,"
+            "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
+        ),
+        donor: str = "[$([O,S;+0&h]),$([N;v3,v4&+1&h]),n+0&h]",
+        distance: float = 3.5,
+        tolerance_dev_aaa: float = 45,
+        tolerance_dev_daa: float = 45,
+        tolerance_dev_apa: float = 90,
+        tolerance_dev_dpa: float = 45,
+    ) -> None:
+        super().__init__(lig_pattern=acceptor, prot_pattern=donor, distance=distance)
+        self.tolerance_dev_aaa = tolerance_dev_aaa
+        self.tolerance_dev_daa = tolerance_dev_daa
+        self.tolerance_dev_apa = tolerance_dev_apa
+        self.tolerance_dev_dpa = tolerance_dev_dpa
+
+    def detect(self, lig_res, prot_res):
+        """Detect implicit hydrogen bond acceptor interactions.
+
+        Parameters
+        ----------
+        lig_res : Residue
+            Ligand residue.
+        prot_res : Residue
+            Protein residue.
+
+        Yields
+        ------
+        InteractionMetadata
+            Metadata for the detected interaction.
+
+        """
+        for interaction_data in super().detect(lig_res, prot_res):
+            # Check if the interaction geometry is valid
+            if self.check_geometry(
+                interaction_data,
+                lig_res,
+                prot_res,
+                max_dev_aaa=self.tolerance_dev_aaa,
+                max_dev_daa=self.tolerance_dev_daa,
+                max_dev_apa=self.tolerance_dev_apa,
+                max_dev_dpa=self.tolerance_dev_dpa,
+            ):
+                # If passed geometry checks, add hydrogen bond probability
+                yield self.add_Hbond_probability(interaction_data)
+
+    def check_geometry(
+        self,
+        interaction_data,
+        lig_res,
+        prot_res,
+        max_dev_aaa,
+        max_dev_daa,
+        max_dev_apa,
+        max_dev_dpa,
+    ):
+        """Check the geometry of the interaction.
+
+        Parameters
+        ----------
+        interaction_data : InteractionMetadata
+            Metadata for the detected interaction.
+        lig_res : Residue
+            Ligand residue.
+        prot_res : Residue
+            Protein residue.
+        max_dev_aaa : float
+            Maximum deviation allowed for the acceptor atom's angle.
+        max_dev_daa : float
+            Maximum deviation allowed for the donor atom's angle.
+        max_dev_apa : float
+            Maximum deviation allowed for the acceptor plane angle.
+        max_dev_dpa : float
+            Maximum deviation allowed for the donor plane angle.
+
+        Returns
+        -------
+        bool
+            True if the geometry is valid, False otherwise.
+
+        """
+        # [TODO] Implement geometry checks based on angles and distances.
+        return True
+
+    def add_Hbond_probability(self, interaction_data):
+        """Add hydrogen bond probability to the interaction metadata.
+
+        Parameters
+        ----------
+        interaction_data : InteractionMetadata
+            Metadata for the detected interaction.
+
+        Returns
+        -------
+        InteractionMetadata
+            Updated metadata with hydrogen bond probability.
+
+        """
+        # [TODO] Implement logic to calculate and add Hbond probability.
+        interaction_data.metadata["Hbond_probability"] = 1.0
+
+
+ImplicitHBDonor = ImplicitHBAcceptor.invert_role(
+    "ImplicitHBDonor",
+    "Implicit Hbond interaction between a ligand (donor) and a residue (acceptor)",
 )
 
 
