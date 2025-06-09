@@ -174,7 +174,7 @@ class ProteinHelper:
 
         self.protein_mol = Molecule.from_mda(input_protein_top)
 
-    def standardize_protein(self):
+    def standardize_protein(self) -> None:
         """Standardize the protein molecule."""
 
         # guess forcefield
@@ -198,7 +198,7 @@ class ProteinHelper:
     @staticmethod
     def forcefield_guesser(
         conv_resnames: set[str],
-    ):
+    ) -> str:
         """Guesses the forcefield based on the residue names.
 
         Parameters
@@ -333,7 +333,7 @@ class ProteinHelper:
         return all_resnames_dict.get(resname, resname)
 
     @staticmethod
-    def check_resnames(resnames_to_check: set[str]) -> None:
+    def check_resnames(resnames_to_check: set[str]) -> bool:
         """Check if the residue names are standard and raise a warning if not.
 
         Parameters
@@ -383,7 +383,7 @@ class ProteinHelper:
             return True
         return False
 
-    def fix_molecule_bond_orders(self):
+    def fix_molecule_bond_orders(self) -> None:
         """Fix the bond orders of a molecule."""
         raise NotImplementedError()
         # [TODO] fix the bond orders for non-standard residues
