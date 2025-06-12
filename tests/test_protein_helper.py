@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 
 from prolif.datafiles import datapath
@@ -9,8 +11,7 @@ def test_cif_parser_lite():
     # Test with a valid CIF file
 
     CIF = str(datapath / "TPO.cif")
-    with open(CIF) as f:
-        tpo_cif = f.read()
+    tpo_cif = Path(CIF).read_text()
     result = cif_parser_lite(tpo_cif)
 
     assert isinstance(result, dict)
