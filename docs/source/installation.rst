@@ -22,5 +22,15 @@ To run the tutorials, you can install the optional dependencies with::
 
     pip install prolif[tutorials]
 
+You can also install the development version of ProLIF from GitHub. This will contain
+the latest features and bugfixes but may also be unstable so use at your own risk::
+
+    pip install git+https://github.com/chemosim-lab/ProLIF.git
+
+
+To install a development environment for contributing to ProLIF, please check our
+`contributing guide <https://github.com/chemosim-lab/ProLIF/blob/master/CONTRIBUTING.md>`_
+on GitHub.
+
 
 .. _conda: https://docs.conda.io/projects/conda/en/latest/user-guide/index.html
