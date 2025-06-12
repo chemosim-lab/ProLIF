@@ -57,7 +57,7 @@ class ProteinHelper:
         forcefield_name = self.forcefield_guesser(conv_resnames)
 
         # standardize the protein molecule
-        new_mol = []
+        new_residues = []
         for residue in self.protein_mol.residues.values():
             standardized_resname = self.convert_to_standard_resname(
                 resname=residue.resid.name.upper(), forcefield_name=forcefield_name
@@ -84,9 +84,10 @@ class ProteinHelper:
                     stacklevel=2,
                 )
             # fix the bond orders
-            new_mol.append(self.fix_molecule_bond_orders(residue, **kwargs))
+            new_residues.append(self.fix_molecule_bond_orders(residue, **kwargs))
 
-        self.protein_mol.residues = ResidueGroup(new_mol)
+        # udpate the protein molecule with the new residues
+        self.protein_mol.residues = ResidueGroup(new_residues)
 
     @staticmethod
     def forcefield_guesser(
