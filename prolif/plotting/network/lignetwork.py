@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, TextIO, Union, cast
 from uuid import uuid4
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 from rdkit import Chem
@@ -35,8 +36,6 @@ from prolif.ifp import IFP
 from prolif.plotting.utils import grouped_interaction_colors, metadata_iterator
 from prolif.residue import ResidueId
 from prolif.utils import requires
-
-import networkx as nx
 
 try:
     from IPython.display import Javascript, display
@@ -473,75 +472,105 @@ class LigNetwork:
             },
         )
         self._nodes[idx] = node
-    
-    def to_networkx_graph_object(self, include_ligand_bonds=True) -> nx.Graph:
+
+    def to_networkx_graph_object(self, include_ligand_bonds: bool = True) -> nx.Graph:
         """Export the interaction data directly as a NetworkX graph object.
-    
+
         Parameters
         ----------
         include_ligand_bonds : bool, default=True
         Whether to include bonds between ligand atoms in the graph
-    
+
         Returns
         -------
         nx.Graph
             A NetworkX graph representation of the ligand-protein interaction network.
         """
-        G = nx.Graph()
+        G: nx.Graph = nx.Graph()
 
         # 1. Add protein residue nodes
-        protein_residues = set(self.df.index.get_level_values('protein'))
-        for prot_res in protein_residues:
-            resname = ResidueId.from_string(prot_res).name
+        protein_residues = set(self.df.index.get_level_values("protein"))
+        for protein_residue in protein_residues:
+            resname = ResidueId.from_string(protein_residue).name
             restype = self.RESIDUE_TYPES.get(resname)
-            G.add_node(prot_res, 
-                    node_type='protein', 
-                    residue_type=restype,
-                    label=prot_res)
-    
+            G.add_node(
+                protein_residue,
+                node_type="protein",
+                residue_type=restype,
+                label=protein_residue,
+            )
+
         # 2. Add ligand atom nodes
         if include_ligand_bonds:
             for atom in self.mol.GetAtoms():
                 idx = atom.GetIdx()
-                G.add_node(idx, 
-                        node_type='ligand',
-                        symbol=atom.GetSymbol(),
-                        charge=atom.GetFormalCharge(),
-                        coords=(float(self.xyz[idx, 0]), float(self.xyz[idx, 1]), float(self.xyz[idx, 2])),
-                        label=atom.GetSymbol())
-        
+                G.add_node(
+                    idx,
+                    node_type="ligand",
+                    symbol=atom.GetSymbol(),
+                    charge=atom.GetFormalCharge(),
+                    coords=(
+                        float(self.xyz[idx, 0]),
+                        float(self.xyz[idx, 1]),
+                        float(self.xyz[idx, 2]),
+                    ),
+                    label=atom.GetSymbol(),
+                )
+
             # Add ligand bonds
             for bond in self.mol.GetBonds():
                 begin_idx = bond.GetBeginAtomIdx()
                 end_idx = bond.GetEndAtomIdx()
-                G.add_edge(begin_idx, end_idx, 
-                        edge_type='bond',
-                        bond_type=bond.GetBondType(),
-                        bond_order=bond.GetBondTypeAsDouble())
-    
+                G.add_edge(
+                    begin_idx,
+                    end_idx,
+                    edge_type="bond",
+                    bond_type=bond.GetBondType(),
+                    bond_order=bond.GetBondTypeAsDouble(),
+                )
+
         # 3. Add interaction edges
-        for (lig_res, prot_res, interaction, lig_indices), (weight, distance, components) in self.df.iterrows():
+        for idx, row in self.df.iterrows():
+            # Explicitly extract and type the index elements
+            lig_res: str = idx[0]
+            prot_res: str = idx[1]
+            interaction: str = idx[2]
+            lig_indices: tuple[int, ...] = idx[3]
+
+            # Extract row values
+            weight: float = float(row["weight"])
+            distance: float = float(row["distance"])
+            components: str = row["components"]
+
             # For interactions involving multiple ligand atoms, create edges for each
             for lig_atom_idx in lig_indices:
                 if not include_ligand_bonds and lig_atom_idx not in G:
                     # If we're not including full ligand structure, add atom nodes as needed
                     atom = self.mol.GetAtomWithIdx(lig_atom_idx)
-                    G.add_node(lig_atom_idx, 
-                            node_type='ligand',
-                            symbol=atom.GetSymbol(),
-                            coords=(float(self.xyz[lig_atom_idx, 0]), 
-                                    float(self.xyz[lig_atom_idx, 1]), 
-                                    float(self.xyz[lig_atom_idx, 2])),
-                            label=atom.GetSymbol())
-            
+                    G.add_node(
+                        lig_atom_idx,
+                        node_type="ligand",
+                        symbol=atom.GetSymbol(),
+                        charge=atom.GetFormalCharge(),
+                        coords=(
+                            float(self.xyz[lig_atom_idx, 0]),
+                            float(self.xyz[lig_atom_idx, 1]),
+                            float(self.xyz[lig_atom_idx, 2]),
+                        ),
+                        label=atom.GetSymbol(),
+                    )
+
                 # Add the interaction edge
-                G.add_edge(lig_atom_idx, prot_res, 
-                      edge_type='interaction',
-                      interaction_type=interaction,
-                      weight=float(weight),
-                      distance=float(distance),
-                      components=components)
-    
+                G.add_edge(
+                    lig_atom_idx,
+                    prot_res,
+                    edge_type="interaction",
+                    interaction_type=interaction,
+                    weight=weight,
+                    distance=distance,
+                    components=components,
+                )
+
         return G
 
     def _make_lig_edge(self, bond: Chem.Bond) -> None:
