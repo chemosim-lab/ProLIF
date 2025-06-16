@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProteinHelper:
-    def __init__(self, input_topology: Molecule):
+    def __init__(self, input_topology: Molecule | str):
         """Initialize the ProteinHelper class.
         This class is designed for implicit H-bond detection.
 
