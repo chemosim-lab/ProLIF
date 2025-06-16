@@ -16,24 +16,25 @@ if TYPE_CHECKING:
 
 _RING_SYSTEMS = ("PiStacking", "EdgeToFace", "FaceToFace")
 
+StyleT = TypeVar("StyleT")
+
 
 @dataclass
-class Settings:
+class Settings(Generic[StyleT]):
     """
     Attributes
     ----------
     COLORS : dict
         Dictionnary of colors used in the plot for interactions.
-    LIGAND_STYLE : dict[str, dict] = {"stick": {"colorscheme": "cyanCarbon"}}
-        Style object passed to ``3Dmol.js`` for the ligand.
-    RESIDUES_STYLE : dict[str, dict] = {"stick": {}}
-        Style object passed to ``3Dmol.js`` for the protein residues involved in
-        interactions.
-    PROTEIN_STYLE : dict[str, dict] = {"cartoon": {"style": "edged"}}
-        Style object passed to ``3Dmol.js`` for the entire protein.
-    PEPTIDE_STYLE : dict[str, dict] = "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"}
-        Style object passed to ``3Dmol.js`` for the ligand as a peptide if appropriate.
-    PEPTIDE_THRESHOLD : int = 2
+    LIGAND_STYLE : dict
+        Style object for the ligand.
+    RESIDUES_STYLE : dict
+        Style object for any residue involved in interactions.
+    PROTEIN_STYLE : dict
+        Style object for the protein.
+    PEPTIDE_STYLE : dict
+        Style object for the ligand as a peptide if appropriate.
+    PEPTIDE_THRESHOLD : int = 5
         Ligands with this number of residues or more will be displayed using
         ``PEPTIDE_STYLE`` in addition to the ``LIGAND_STYLE``.
     LIGAND_DISPLAYED_ATOM : dict[str, int]
@@ -53,10 +54,10 @@ class Settings:
         and the value is the name of the molecule in the metadata indices dictionary.
     """
 
-    LIGAND_STYLE: dict
-    RESIDUES_STYLE: dict
-    PROTEIN_STYLE: dict
-    PEPTIDE_STYLE: dict
+    LIGAND_STYLE: StyleT
+    RESIDUES_STYLE: StyleT
+    PROTEIN_STYLE: StyleT
+    PEPTIDE_STYLE: StyleT
     COLORS: dict[str, str] = field(
         default_factory=lambda: {**separated_interaction_colors}
     )
@@ -96,7 +97,7 @@ class Backend(Protocol, Generic[SettingsT, ComponentT, ModelT]):
     """
 
     settings: SettingsT
-    view: Any
+    view: Any = None
     models: dict[ComponentT, ModelT]
     residues: dict["ResidueId", ComponentT]
     _model_count: int
@@ -125,25 +126,24 @@ class Backend(Protocol, Generic[SettingsT, ComponentT, ModelT]):
     def finalize(self) -> None:
         """Finalize the plot."""
 
-    def load_molecule(
-        self, mol: "Molecule", component: ComponentT, style: dict[str, dict]
-    ) -> None:
+    def load_molecule(self, mol: "Molecule", component: ComponentT, style: Any) -> None:
         """Load a molecule into the view with the given style."""
 
     def show_residue(
-        self, residue: "Residue", component: ComponentT, style: dict[str, dict]
+        self, residue: "Residue", component: ComponentT, style: Any
     ) -> None:
         """Show a residue on the plot."""
         self.residues[residue.resid] = component
 
-    def hide_hydrogens(self, component: ComponentT, to_hide: list[int]) -> None:
+    def hide_hydrogens(self, component: ComponentT, keep_indices: list[int]) -> None:
         """Hide non-polar hydrogens in the view."""
 
     def add_interaction(
         self,
         interaction: str,
         distance: float,
-        p1: "Point3D",
-        p2: "Point3D",
+        points: tuple["Point3D", "Point3D"],
+        residues: tuple["ResidueId", "ResidueId"],
+        atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
     ) -> None:
         """Add an interaction to the plot."""

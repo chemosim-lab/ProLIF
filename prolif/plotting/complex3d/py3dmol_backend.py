@@ -4,25 +4,25 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import py3Dmol
 from rdkit import Chem
-from rdkit.Geometry import Point3D
 
-from prolif.molecule import Molecule
 from prolif.plotting.complex3d.base import Backend, Settings
 
 if TYPE_CHECKING:
+    from rdkit.Geometry import Point3D
+
     from prolif.molecule import Molecule
     from prolif.residue import Residue, ResidueId
 
 
 @dataclass
-class Py3DMolSettings(Settings):
+class Py3DMolSettings(Settings[dict[str, dict]]):
     __doc__ = (
-        Settings.__doc__
-        + """
+        cast(str, Settings.__doc__)
+        + """\
     RESIDUE_HOVER_CALLBACK : str
         JavaScript callback executed when hovering a residue involved in an interaction.
     INTERACTION_HOVER_CALLBACK : str
@@ -31,12 +31,14 @@ class Py3DMolSettings(Settings):
         JavaScript callback executed when the hovering event is finished.
     """
     )
-    LIGAND_STYLE: dict = field(
+    LIGAND_STYLE: dict[str, dict] = field(
         default_factory=lambda: {"stick": {"colorscheme": "cyanCarbon"}}
     )
-    RESIDUES_STYLE: dict = field(default_factory=lambda: {"stick": {}})
-    PROTEIN_STYLE: dict = field(default_factory=lambda: {"cartoon": {"style": "edged"}})
-    PEPTIDE_STYLE: dict = field(
+    RESIDUES_STYLE: dict[str, dict] = field(default_factory=lambda: {"stick": {}})
+    PROTEIN_STYLE: dict[str, dict] = field(
+        default_factory=lambda: {"cartoon": {"style": "edged"}}
+    )
+    PEPTIDE_STYLE: dict[str, dict] = field(
         default_factory=lambda: {
             "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"},
         }
@@ -110,7 +112,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         return getattr(model, cmd)(*args, **kwargs)
 
     def load_molecule(
-        self, mol: Molecule, component: str, style: dict[str, dict]
+        self, mol: "Molecule", component: str, style: dict[str, dict]
     ) -> None:
         pdb_dump = Chem.MolToPDBBlock(mol, flavor=16 | 32)
         # load dummy model to show requested style (cartoon)
@@ -171,9 +173,11 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         self,
         interaction: str,
         distance: float,
-        p1: Point3D,
-        p2: Point3D,
+        points: tuple["Point3D", "Point3D"],
+        residues: tuple["ResidueId", "ResidueId"],
+        atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
     ) -> None:
+        p1, p2 = points
         interaction_label = f"{interaction}: {distance:.2f}Å"
         self.viewcmd(
             "addCylinder",
@@ -190,10 +194,10 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
             viewer=self.position,
         )
 
-    def hide_hydrogens(self, component: str, to_hide: list[int]) -> None:
+    def hide_hydrogens(self, component: str, keep_indices: list[int]) -> None:
         self.modelcmd(
             "setStyle",
-            {"index": to_hide},
+            {"and": [{"elem": "H"}, {"not": {"index": keep_indices}}]},
             {"stick": {"hidden": True}},
             model_id=self.models[component],
         )

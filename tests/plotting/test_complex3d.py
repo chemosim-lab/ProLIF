@@ -97,15 +97,6 @@ class TestComplex3D:
         with pytest.raises(ValueError, match="View not initialized"):
             plot_3d._make_html()
 
-    def test_passing_complex_to_populate_view(
-        self, simple_fp_results: tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]
-    ) -> None:
-        """For backwards compatibility"""
-        fp, lig_mol, prot_mol = simple_fp_results
-        plot_3d = Complex3D.from_fingerprint(fp, lig_mol, prot_mol, frame=0)
-        plot_3d.display()
-        plot_3d._populate_view(plot_3d)
-
     def test_water(
         self, water_mols: tuple[plf.Molecule, plf.Molecule, plf.Molecule]
     ) -> None:
