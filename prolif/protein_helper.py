@@ -105,7 +105,7 @@ class ProteinHelper:
         str
             The guessed forcefield name.
         """
-        if len(amber_pool.intersection(conv_resnames)) != 0:
+        if amber_pool.intersection(conv_resnames):
             return "amber"
         if len(charmm_pool.intersection(conv_resnames)) != 0:
             return "charmm"
