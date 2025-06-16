@@ -6,7 +6,7 @@ from prolif.datafiles import datapath
 
 
 def test_cif_parser_lite():
-    from prolif.protein_helper import cif_parser_lite
+    from prolif.io.cif import cif_parser_lite
 
     # Test with a valid CIF file
 

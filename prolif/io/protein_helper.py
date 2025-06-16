@@ -1,22 +1,19 @@
 import logging
-import shlex
 import warnings
 
-import numpy as np
-import pandas as pd
 from rdkit import Chem
-from rdkit.Chem import AllChem
 
 from prolif.constants import (
-    _STANDARD_AA,
+    AMBER_POOL,
     ATOMNAME_ALIASES,
+    CHARMM_POOL,
+    FORMAL_CHARGE_ALISES,
+    GROMOS_POOL,
     MAX_AMIDE_LENGTH,
-    amber_pool,
-    charmm_pool,
-    formal_charge_special_assign_map,
-    gromos_pool,
-    opls_aa_pool,
-    resnames_map,
+    OPLS_AA_POOL,
+    RESNAME_ALIASES,
+    STANDARD_AA,
+    STANDARD_RESNAME_MAP,
 )
 from prolif.molecule import Molecule
 from prolif.residue import Residue, ResidueGroup
@@ -25,16 +22,16 @@ logger = logging.getLogger(__name__)
 
 
 class ProteinHelper:
+    """ProteinHelper is a class to standardize the residue names and fix the bond order
+    when reading the non-standard residues with RDKit for a molecule.
+
+    Parameters
+    ----------
+    input_topology : str or Molecule
+        The path of input protein molecule (.pdb) or a ProLIF Molecule.
+    """
+
     def __init__(self, input_topology: Molecule | str):
-        """Initialize the ProteinHelper class.
-        This class is designed for implicit H-bond detection.
-
-        Parameters
-        ----------
-        input_topology : str or Molecule
-            The path of input protein molecule (.pdb) or a ProLIF Molecule.
-        """
-
         # read as prolif molecule
         if isinstance(input_topology, Molecule):
             self.protein_mol = input_topology
@@ -69,10 +66,8 @@ class ProteinHelper:
             residue.resid.name = standardized_resname
 
             # before fixing the bond orders: strict check with non-standard residues
-            assert self.check_resnames({standardized_resname}, **kwargs), (
-                f"Residue {residue.resid} is not a standard residue or "
-                "not in the templates. Please provide a custom template."
-            )
+            self.check_resnames({standardized_resname}, **kwargs)
+
             # soft check the heavy atoms in the residue compared to the standard one
             if self.n_residue_heavy_atoms(
                 residue
@@ -86,7 +81,7 @@ class ProteinHelper:
             # fix the bond orders
             new_residues.append(self.fix_molecule_bond_orders(residue, **kwargs))
 
-        # udpate the protein molecule with the new residues
+        # update the protein molecule with the new residues
         self.protein_mol.residues = ResidueGroup(new_residues)
 
     @staticmethod
@@ -105,13 +100,13 @@ class ProteinHelper:
         str
             The guessed forcefield name.
         """
-        if amber_pool.intersection(conv_resnames):
+        if AMBER_POOL.intersection(conv_resnames):
             return "amber"
-        if len(charmm_pool.intersection(conv_resnames)) != 0:
+        if len(CHARMM_POOL.intersection(conv_resnames)) != 0:
             return "charmm"
-        if len(gromos_pool.intersection(conv_resnames)) != 0:
+        if len(GROMOS_POOL.intersection(conv_resnames)) != 0:
             return "gromos"
-        if len(opls_aa_pool.intersection(conv_resnames)) != 0:
+        if len(OPLS_AA_POOL.intersection(conv_resnames)) != 0:
             return "oplsaa"
 
         return "unknown"
@@ -143,7 +138,7 @@ class ProteinHelper:
             The standard residue name.
         """
 
-        if forcefield_name == "unknown":
+        if forcefield_name == "unknown" and resname == "CYS":
             warnings.warn(
                 "Could not guess the forcefield based on the residue names. "
                 "CYS is assigned to neutral CYS (charge = 0).",
@@ -153,7 +148,7 @@ class ProteinHelper:
         elif forcefield_name == "gromos" and resname == "CYS":
             return "CYX"
 
-        return resnames_map.get(resname, resname)
+        return STANDARD_RESNAME_MAP.get(resname, resname)
 
     @staticmethod
     def check_resnames(
@@ -169,32 +164,22 @@ class ProteinHelper:
 
         Raises
         ------
-        UserWarning
+        ValueError
             If any residue name is not standard or not in the templates.
 
-        Returns
-        -------
-        bool
-            True if all residue names are standard or in the templates,
-            False otherwise.
         """
 
         if templates is None:
             templates = [STANDARD_AA]
 
-        all_available_resnames = set()
-        for t in templates:
-            all_available_resnames.update(t.keys())
+        all_available_resnames = set().union(*list(templates))
 
         non_standard_resnames = resnames_to_check - all_available_resnames
         if non_standard_resnames:
-            warnings.warn(
-                "Non-standard residue (or ligand/solvent) names found "
-                f"not in templates: {non_standard_resnames}",
-                stacklevel=2,
+            raise ValueError(
+                f"Residue {non_standard_resnames} is not a standard residue or "
+                "not in the templates. Please provide a custom template."
             )
-            return False
-        return True
 
     @staticmethod
     def n_residue_heavy_atoms(residue: Residue) -> int:
@@ -207,7 +192,7 @@ class ProteinHelper:
 
         Returns
         -------
-        int
+        const int
             The number of heavy atoms in the residue.
         """
         terminal_oxygen = {
@@ -220,7 +205,7 @@ class ProteinHelper:
             [
                 atom
                 for atom in residue.GetAtoms()
-                if atom.GetSymbol().strip() != "H"
+                if atom.GetAtomicNum() != 1
                 and atom.GetPDBResidueInfo().GetName().strip() not in terminal_oxygen
             ]
         )
@@ -279,16 +264,13 @@ class ProteinHelper:
         # strip bonds and chiral tags
         new_res = strip_bonds(residue)
 
-        # assign properties inside each Residue
-        valence = np.zeros(new_res.GetNumAtoms(), dtype=int)
-
+        # read the templates and assign intra properties
         for t in templates:
             # check if resname in template doc
             if resname not in t:
                 continue
             t[resname]["name"] = resname  # add name for the reference block
-            new_res, v = assign_intra_props(new_res, t[resname])
-            valence += v
+            new_res = assign_intra_props(new_res, t[resname])
             break  # avoid double assignment, ordering of templates is relevant
         else:
             raise ValueError(f"Failed to find template for residue: '{resname}'")
@@ -297,113 +279,42 @@ class ProteinHelper:
 
 
 # The below code contains functions for fixing molecule bond orders.
-# The idea is based on pdbinf: https://github.com/OpenFreeEnergy/pdbinf/tree/main
-# A user can provide a custom CIF file with the standard amino acid.
-def _block_decompose(data_block: list) -> tuple:
-    """
-    Decomposes a CIF data block into decriptive information and tables.
-    """
-    descriptions = []
-    data_tables = []
-    data_table = None
-
-    for idx, block_line in enumerate(data_block):
-        if block_line.startswith("#"):
-            if data_table is not None:
-                # save the current table
-                data_tables.append(data_table)
-            # reset the table
-            data_table = None
-        elif block_line.startswith("loop_"):
-            # table format
-            data_table = []
-        elif data_table is not None:
-            # add data to the current table
-            data_table.append(block_line)
-            if idx == len(data_block) - 1:  # last line of the block
-                # save the final table
-                data_tables.append(data_table)
-        else:
-            descriptions.append(block_line)
-
-    return descriptions, data_tables
-
-
-def cif_parser_lite(cif_string: str) -> dict:
-    """
-    Parses a CIF string and returns a dictionary of data blocks.
+# The code is adapted from pdbinf: https://github.com/OpenFreeEnergy/pdbinf/tree/main
+# Accessed on: 16 June, 2025 under MIT License.
+def strip_bonds(m: Chem.Mol) -> Chem.Mol:
+    """Strip all bonds and chiral tags from a molecule.
 
     Parameters
     ----------
-    cif_string : str
-        The CIF string to parse.
+    m : rdkit.Chem.Mol
+      The input molecule to strip bonds from.
 
+    Returns
+    -------
+    rdkit.Chem.Mol
+      The modified molecule with all bonds and chiral tags removed.
+
+    Notes
+    -----
+    This function is adapted from the pdbinf/_pdbinf.py module's strip_bonds
+    function.
+
+    Source: https://github.com/OpenFreeEnergy/pdbinf/blob/c0ddf00bd068d7860b2e99b9f03847c890e3efb5/src/pdbinf/_pdbinf.py#L71
     """
-    # Split the CIF string into blocks based on 'data_' lines
-    data_blocks = {}
-    current_block = None
-    all_lines = cif_string.strip().split("\n")
-    for idx, line in enumerate(all_lines):
-        if line.startswith("data_"):
-            current_block = line.split("data_")[1]
-            data_block = []
-        elif line.startswith("##") or idx == len(all_lines) - 1:
-            # end of a data block
-            data_blocks[current_block] = data_block
-        else:
-            data_block.append(line.strip())
+    with Chem.RWMol(m) as em:
+        for b in m.GetBonds():
+            em.RemoveBond(b.GetBeginAtomIdx(), b.GetEndAtomIdx())
+        # rdkit, perhaps rightfully, gets upset at chiral tags w/ no bonds
 
-    # create a dictionary to hold the parsed data
-    cif_dict = {}
-    for block_name, data_block in data_blocks.items():
-        descriptions, data_tables = _block_decompose(data_block)
-        cif_dict[block_name] = {}
+        for at in em.GetAtoms():
+            at.SetChiralTag(Chem.CHI_UNSPECIFIED)
 
-        # descriptive information
-        for each in descriptions:
-            content = shlex.split(each)
-            info_name = content[0].split(".")
-            info = content[1]
-            if info_name[0] not in cif_dict[block_name]:
-                cif_dict[block_name][info_name[0]] = {}
-            cif_dict[block_name][info_name[0]][info_name[1]] = info
-
-        # data tables
-        for data_table in data_tables:
-            header = []
-            content = []
-            table_name = data_table[0].split(".")[0]
-            for each_line in data_table:
-                if each_line.startswith("_"):
-                    # header line
-                    header.append(each_line.split(".")[1].strip())
-                else:
-                    # content line
-                    # Use shlex.split to respect quoted strings
-                    content.append(shlex.split(each_line))
-
-            table = pd.DataFrame(content, columns=header)
-            cif_dict[block_name][table_name] = table
-
-    return cif_dict
+    return em.GetMol()
 
 
-def strip_bonds(m: Chem.Mol) -> Chem.Mol:
-    em = AllChem.EditableMol(m)
-
-    for b in m.GetBonds():
-        em.RemoveBond(b.GetBeginAtomIdx(), b.GetEndAtomIdx())
-    # rdkit, perhaps rightfully, gets upset at chiral tags w/ no bonds
-    m = em.GetMol()
-    for at in m.GetAtoms():
-        at.SetChiralTag(Chem.CHI_UNSPECIFIED)
-    return m
-
-
-def assign_intra_props(
-    mol: Chem.Mol, reference_block: dict
-) -> tuple[Chem.Mol, np.ndarray]:
-    """assign bonds and aromaticity based on NAMES
+def assign_intra_props(mol: Chem.Mol, reference_block: dict) -> Chem.Mol:
+    """Assign bonds and aromaticity based on residue and atom names
+    from a reference block (template molecule).
 
     Parameters
     ----------
@@ -414,69 +325,65 @@ def assign_intra_props(
 
     Returns
     -------
-    tuple[rdkit.Chem.Mol, np.ndarray]
-      the modified molecule and an array of valences for each atom
+    rdkit.Chem.Mol
+      the modified molecule with assigned bonds and aromaticity
 
     Notes
     -----
     This function is adapted from the pdbinf/_pdbinf.py module's assign_intra_props
+    function, which is used to assign bonds and aromaticity based on
+    the standard amino acid templates.
+
+    Source: https://github.com/OpenFreeEnergy/pdbinf/blob/c0ddf00bd068d7860b2e99b9f03847c890e3efb5/src/pdbinf/_pdbinf.py#L117
     """
     nm_2_idx = {}
+    fc_special_assign_nm_idx_fc_pair = {}
 
     # convert indices to names
-    fc_special_assign_nm_idx_fc_pair = {}
-    aliases = ATOMNAME_ALIASES.get(reference_block["name"], {})
+    res_alias = RESNAME_ALIASES.get(reference_block["name"], reference_block["name"])
+    aliases = ATOMNAME_ALIASES.get(res_alias, {})
     for atom in mol.GetAtoms():
         nm = atom.GetMonomerInfo().GetName().strip()
         nm = aliases.get(nm, nm)
         if (
-            reference_block["name"] in formal_charge_special_assign_map
-            and nm in formal_charge_special_assign_map[reference_block["name"]]
+            reference_block["name"] in FORMAL_CHARGE_ALISES
+            and nm in FORMAL_CHARGE_ALISES[reference_block["name"]]
         ):
-            fc_special_assign_nm_idx_fc_pair[atom.GetIdx()] = (
-                formal_charge_special_assign_map[reference_block["name"]][nm]
-            )
+            fc_special_assign_nm_idx_fc_pair[atom.GetIdx()] = FORMAL_CHARGE_ALISES[
+                reference_block["name"]
+            ][nm]
         nm_2_idx[nm] = atom.GetIdx()
 
     logger.debug(f"assigning intra props for {reference_block['name']}")
 
-    em = AllChem.EditableMol(mol)
+    with Chem.RWMol(mol) as em:
+        # grab bond data from cif Block
+        for _, row in reference_block["_chem_comp_bond"].iterrows():
+            nm1, nm2 = row["atom_id_1"], row["atom_id_2"]
+            order, arom = row["value_order"], row["pdbx_aromatic_flag"]
+            try:
+                idx1, idx2 = nm_2_idx[nm1], nm_2_idx[nm2]
+            except KeyError:
+                continue
 
-    # we'll assign rdkit SINGLE, DOUBLE or AROMATIC bonds
-    # but we'll also want to know the original *valence*
-    valence = np.zeros(mol.GetNumAtoms(), dtype=int)
+            # [different from pdbinf] we priorituze SINGLE and DOUBLE bonds
+            if order == "SING":
+                order = Chem.BondType.SINGLE
+            elif order == "DOUB":
+                order = Chem.BondType.DOUBLE
+            elif arom == "Y":
+                order = Chem.BondType.AROMATIC
+            else:
+                order = Chem.BondType.UNSPECIFIED
 
-    # grab bond data from cif Block
-    for _, row in reference_block["_chem_comp_bond"].iterrows():
-        nm1, nm2 = row["atom_id_1"], row["atom_id_2"]
-        order, arom = row["value_order"], row["pdbx_aromatic_flag"]
-        try:
-            idx1, idx2 = nm_2_idx[nm1], nm_2_idx[nm2]
-        except KeyError:
-            continue
+            logger.debug(f"adding bond: {nm1}-{nm2} at {idx1} {idx2} {order}")
 
-        v = 1 if order == "SING" else 2  # 'DOUB'
-        valence[idx1] += v
-        valence[idx2] += v
-
-        if order == "SING":
-            order = Chem.BondType.SINGLE
-        elif order == "DOUB":
-            order = Chem.BondType.DOUBLE
-        elif arom == "Y":
-            order = Chem.BondType.AROMATIC
-        else:
-            order = Chem.BondType.UNSPECIFIED
-
-        logger.debug(f"adding bond: {nm1}-{nm2} at {idx1} {idx2} {order}")
-
-        em.AddBond(idx1, idx2, order=order)
-
-    mol = em.GetMol()
+            em.AddBond(idx1, idx2, order=order)
 
     # find lone hydrogens, then attach to the nearest heavy atom
-    _assign_intra_props_lone_H(mol)
+    em = _assign_intra_props_lone_H(em)
 
+    # assign aromaticity for atoms based on the template
     for _, row in reference_block["_chem_comp_atom"].iterrows():
         nm, arom = row["atom_id"].strip(), row["pdbx_aromatic_flag"].strip()
         try:
@@ -485,34 +392,55 @@ def assign_intra_props(
             # todo: could check atom is marked as leaving atom
             continue
 
-        atom = mol.GetAtomWithIdx(idx)
+        atom = em.GetAtomWithIdx(idx)
         atom.SetIsAromatic(arom == "Y")
 
-    # assign formal charge for a specific atom
+    # [different from pdbinf] assign formal charge for a specific atom
     if fc_special_assign_nm_idx_fc_pair != {}:
         for (
             fc_special_assign_nm_idx,
             fc_to_assign,
         ) in fc_special_assign_nm_idx_fc_pair.items():
-            atom = mol.GetAtomWithIdx(fc_special_assign_nm_idx)
+            atom = em.GetAtomWithIdx(fc_special_assign_nm_idx)
             atom.SetFormalCharge(fc_to_assign)
             logger.debug(
                 f"Assigned {reference_block['name']}'s formal charge {fc_to_assign} "
                 f"on {atom.GetPDBResidueInfo().GetName()}."
             )
 
-    # sanitize the molecule
+    # [different from pdbinf] sanitize the molecule
+    mol = em.GetMol()
     mol.UpdatePropertyCache()
     Chem.SanitizeMol(mol)
 
-    return mol, valence
+    return mol
 
 
-def _assign_intra_props_lone_H(mol):
+def _assign_intra_props_lone_H(em: Chem.RWMol) -> Chem.RWMol:
+    """Assign lone hydrogens to the nearest heavy atom in the molecule.
+    This is a part function for assign_intra_props.
+
+    Parameters
+    ----------
+    em : rdkit.Chem.RWMol
+      The input editable molecule to assign lone hydrogens to the nearest heavy atom.
+
+    Returns
+    -------
+    rdkit.Chem.RWMol
+      The modified molecule with lone hydrogens assigned to the nearest heavy atom.
+
+    Note
+    ----
+    This function is adapted from the pdbinf/_pdbinf.py module's
+    assign_intra_props function.
+
+    Source: https://github.com/OpenFreeEnergy/pdbinf/blob/c0ddf00bd068d7860b2e99b9f03847c890e3efb5/src/pdbinf/_pdbinf.py#L167
+    """
     additional_bonds = []
     heavy_atoms = []
     lone_H = []
-    for atom in mol.GetAtoms():
+    for atom in em.GetAtoms():
         if atom.GetAtomicNum() != 1:
             heavy_atoms.append(atom.GetIdx())
             continue
@@ -521,7 +449,7 @@ def _assign_intra_props_lone_H(mol):
         lone_H.append(atom.GetIdx())
     if lone_H:
         logger.debug(f"found lone hydrogens: {lone_H}")
-        conf = mol.GetConformer()
+        conf = em.GetConformer()
         for idx in lone_H:
             pos = conf.GetAtomPosition(idx)
             minidx, mindist = -1, float("inf")
@@ -538,23 +466,7 @@ def _assign_intra_props_lone_H(mol):
                 )
                 additional_bonds.append((idx, minidx))
     if additional_bonds:
-        em = Chem.EditableMol(mol)
         for i, j in additional_bonds:
             em.AddBond(i, j, order=Chem.BondType.SINGLE)
-        mol = em.GetMol()
 
-    return mol
-
-
-# amino acid template
-# ALA, ARG, ASN,
-# ASP (Deprotonated (-1), default), ASH (Neutral (0)),
-# CYS (Neutral (0), default), CYX,
-# GLN, GLY,
-# GLU (Deprotonated (-1), default), GLH (Neutral (0)),
-# HIS (Both NE2 and ND1 protonated, default),
-# HIE (neutral, hydrogen at NE2, might couple to HEME at ND1),
-# HID (neutral, hydrogen at ND1, might couple to HEME at NE2),
-# ILE, LEU, LYS, MET, PRO, PHE, SER, TYR, THR, TRP, VAL
-# HOH (water)
-STANDARD_AA = cif_parser_lite(_STANDARD_AA)
+    return em
