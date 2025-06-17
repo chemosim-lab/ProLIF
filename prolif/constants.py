@@ -31,7 +31,6 @@ MAX_DISULPHIDE_LENGTH = 2.5
 _STANDARD_AA = Path(str(datapath / "standard_aa.cif")).read_text()
 STANDARD_AA = cif_parser_lite(_STANDARD_AA)
 # --------- the above is originally from openmm and pdbinf ---------
-breakpoint()
 
 # Other constants are defined as follows:
 #
@@ -283,3 +282,34 @@ AMBER_POOL = {
     "NVAL",
     "CVAL",
 }
+
+
+def _n_standard_residue_heavy_atoms(resname: str) -> int:
+    """Count the number of heavy atoms in a standard residue.
+
+    Parameters
+    ----------
+    resname : str
+        The residue name to count the heavy atoms in.
+
+    Returns
+    -------
+    int
+        The number of heavy atoms in the standard residue.
+    """
+    if resname not in STANDARD_AA:
+        raise ValueError(f"Residue {resname} is not a standard residue.")
+    residue_atom_df = STANDARD_AA[resname]["_chem_comp_atom"]
+    residue_atom_df = residue_atom_df[residue_atom_df["alt_atom_id"] != "OXT"]
+
+    return sum(residue_atom_df["type_symbol"] != "H")
+
+
+N_STANDARD_RESIDUE_HEAVY_ATOMS = {
+    resname: _n_standard_residue_heavy_atoms(resname) for resname in STANDARD_AA
+}
+
+TERMINAL_OXYGEN_NAMES = {
+    key for key, value in ATOMNAME_ALIASES["Protein"].items() if value.strip() == "OXT"
+}
+TERMINAL_OXYGEN_NAMES.add("OXT")

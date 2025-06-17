@@ -10,10 +10,12 @@ from prolif.constants import (
     FORMAL_CHARGE_ALISES,
     GROMOS_POOL,
     MAX_AMIDE_LENGTH,
+    N_STANDARD_RESIDUE_HEAVY_ATOMS,
     OPLS_AA_POOL,
     RESNAME_ALIASES,
     STANDARD_AA,
     STANDARD_RESNAME_MAP,
+    TERMINAL_OXYGEN_NAMES,
 )
 from prolif.molecule import Molecule
 from prolif.residue import Residue, ResidueGroup
@@ -69,9 +71,10 @@ class ProteinHelper:
             self.check_resnames({standardized_resname}, **kwargs)
 
             # soft check the heavy atoms in the residue compared to the standard one
-            if self.n_residue_heavy_atoms(
-                residue
-            ) != self.n_standard_residue_heavy_atoms(standardized_resname):
+            if (
+                self.n_residue_heavy_atoms(residue)
+                != N_STANDARD_RESIDUE_HEAVY_ATOMS[standardized_resname]
+            ):
                 warnings.warn(
                     f"Residue {residue.resid} has a different number of "
                     "heavy atoms than the standard residue. "
@@ -102,11 +105,11 @@ class ProteinHelper:
         """
         if AMBER_POOL.intersection(conv_resnames):
             return "amber"
-        if len(CHARMM_POOL.intersection(conv_resnames)) != 0:
+        if CHARMM_POOL.intersection(conv_resnames):
             return "charmm"
-        if len(GROMOS_POOL.intersection(conv_resnames)) != 0:
+        if GROMOS_POOL.intersection(conv_resnames):
             return "gromos"
-        if len(OPLS_AA_POOL.intersection(conv_resnames)) != 0:
+        if OPLS_AA_POOL.intersection(conv_resnames):
             return "oplsaa"
 
         return "unknown"
@@ -192,44 +195,19 @@ class ProteinHelper:
 
         Returns
         -------
-        const int
+        int
             The number of heavy atoms in the residue.
         """
-        terminal_oxygen = {
-            key
-            for key, value in ATOMNAME_ALIASES["Protein"].items()
-            if value.strip() == "OXT"
-        }
-        terminal_oxygen.add("OXT")
+
         return len(
             [
                 atom
                 for atom in residue.GetAtoms()
                 if atom.GetAtomicNum() != 1
-                and atom.GetPDBResidueInfo().GetName().strip() not in terminal_oxygen
+                and atom.GetPDBResidueInfo().GetName().strip()
+                not in TERMINAL_OXYGEN_NAMES
             ]
         )
-
-    @staticmethod
-    def n_standard_residue_heavy_atoms(resname: str) -> int:
-        """Count the number of heavy atoms in a standard residue.
-
-        Parameters
-        ----------
-        resname : str
-            The residue name to count the heavy atoms in.
-
-        Returns
-        -------
-        int
-            The number of heavy atoms in the standard residue.
-        """
-        if resname not in STANDARD_AA:
-            raise ValueError(f"Residue {resname} is not a standard residue.")
-        residue_atom_df = STANDARD_AA[resname]["_chem_comp_atom"]
-        residue_atom_df = residue_atom_df[residue_atom_df["alt_atom_id"] != "OXT"]
-
-        return sum(residue_atom_df["type_symbol"] != "H")
 
     @staticmethod
     def fix_molecule_bond_orders(
