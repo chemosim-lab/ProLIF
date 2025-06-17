@@ -1,74 +1,231 @@
-class PyMOL:
-    def __init__(self):
-        self.viewer = MolViewer()
+from __future__ import annotations
+
+import atexit
+import os
+import struct
+from base64 import b64encode
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from functools import cache
+from pathlib import Path
+from tempfile import mktemp
+from time import sleep
+from typing import TYPE_CHECKING, Any, cast
+from xmlrpc.client import ServerProxy
+
+from rdkit import Chem
+
+from prolif.plotting.complex3d.base import Backend, Settings
+from prolif.typeshed import PyMOLRPCServer
+
+if TYPE_CHECKING:
+    from rdkit.Geometry import Point3D
+
+    from prolif.molecule import Molecule
+    from prolif.residue import Residue, ResidueId
+
+
+@dataclass
+class PyMOLSettings(Settings):
+    LIGAND_STYLE: dict[str, list[tuple[str, str]]] = field(
+        default_factory=lambda: {
+            "stick": [],
+        }
+    )
+    RESIDUES_STYLE: dict[str, list[tuple[str, str]]] = field(
+        default_factory=lambda: {
+            "stick": [],
+        }
+    )
+    PROTEIN_STYLE: dict[str, list[tuple[str, str]]] = field(
+        default_factory=lambda: {
+            "cartoon": [],
+        }
+    )
+    PEPTIDE_STYLE: dict[str, list[tuple[str, str]]] = field(
+        default_factory=lambda: {
+            "cartoon": [("cartoon_color", "cyan")],
+        }
+    )
+
+
+@cache
+def get_rpc_server() -> PyMOLRPCServer:
+    """Get proxy to the PyMOL RPC server."""
+    host = os.environ.get("PYMOL_RPCHOST", "localhost")
+    port = 9123
+    proxy = cast(PyMOLRPCServer, ServerProxy(f"http://{host}:{port}/RPC2"))
+    proxy.ping()
+    atexit.register(proxy.__close)
+    return proxy
+
+
+class PyMOLBackend(Backend[PyMOLSettings, str, str]):
+    def setup(
+        self,
+        handler: Callable[[str], None] | None = None,
+        group: str = "prolif",
+        **kwargs: Any,
+    ) -> None:
+        self.cmd = handler or get_rpc_server().do
+        self.group = group
+        self.view = PyMOLScreenshot(callback=self.cmd, kwargs=kwargs)
+        super().setup()
+
+    def prepare(self) -> None:
+        super().prepare()
+        self.interactions: set[str] = set()
         self.cmd("set group_auto_mode, 2")
 
-    def cmd(self, command: str) -> None:
-        self.viewer.server.do(command)
-
-    def show_interactions(self, ifp: IFP, group: str) -> None:
-        lig_displayed_atom = {**Complex3D.LIGAND_DISPLAYED_ATOM, "HBDonor": 0}
-        prot_displayed_atom = {**Complex3D.PROTEIN_DISPLAYED_ATOM, "HBAcceptor": 0}
-        itypes = set()
-        for (lres, pres), interactions in ifp.items():
-            for itype, dtuple in interactions.items():
-                itypes.add(itype)
-                for i, data in enumerate(dtuple):
-                    name = f"{group}.interactions.{itype}.{lres}_{pres}_{i}"
-                    colour = Complex3D.COLORS.get(itype, "#dedede").upper()
-
-                    lig_indices = data["parent_indices"]["ligand"]
-                    prot_indices = data["parent_indices"]["protein"]
-
-                    if itype in Complex3D.LIGAND_RING_INTERACTIONS:
-                        ranks = " or ".join([f"rank {x}" for x in lig_indices])
-                        lig_rank = f"({ranks})"
-                        lig_centroid = True
-                    else:
-                        lig_i = lig_displayed_atom.get(itype, 0)
-                        lig_rank = f"rank {lig_indices[lig_i]}"
-                        lig_centroid = False
-                    lig_sel = f"({group}.ligand and {lig_rank})"
-
-                    if itype in Complex3D.PROTEIN_RING_INTERACTIONS:
-                        ranks = " or ".join([f"rank {x}" for x in prot_indices])
-                        prot_rank = f"({ranks})"
-                        prot_centroid = True
-                    else:
-                        prot_i = prot_displayed_atom.get(itype, 0)
-                        prot_i = 0
-                        prot_rank = f"rank {prot_indices[prot_i]}"
-                        prot_centroid = False
-                    prot_sel = f"({group}.protein and {prot_rank})"
-
-                    mode = 4 if (lig_centroid or prot_centroid) else 0
-                    self.cmd(f"distance {name}, {lig_sel}, {prot_sel}, mode={mode}")
-                    self.cmd(f"hide labels, {name}")
-                    self.cmd(f"color {colour.replace('#', '0x')}, {name}")
-        self.cmd(f"group {group}, {group}.*, add")
-        self.cmd(f"group {group}.interactions, {group}.interactions.*, add")
-        for itype in itypes:
-            self.cmd(
-                f"group {group}.interactions.{itype}, {group}.interactions.{itype}.*, add"
-            )
-
-    def reset(self) -> None:
+    def clear(self) -> None:
         self.cmd("reinitialize")
 
-    def show_mols(self, lmol: Molecule, pmol: Molecule, group: str) -> None:
-        self.viewer.ShowMol(
-            lmol, name=f"{group}.ligand", showOnly=False, showSticks=True, zoom=False
-        )
-        self.viewer.ShowMol(
-            pmol, name=f"{group}.protein", showOnly=False, showSticks=True, zoom=False
-        )
-        self.cmd(f"set_bond stick_radius, 0.1, {group}.protein")
+    def finalize(self) -> None:
+        self.cmd("valence guess, all")
+        model_id = self.models["ligand"]
+        self.cmd(f"zoom %{model_id}")
 
-    def align(
-        self, fixed: str, mobile: str, source: str | None = None, *targets: str
+    @contextmanager
+    def ignore_autozoom(self) -> Iterator[None]:
+        """Context manager to ignore the automatic zoom when loading an object."""
+        self.cmd("view rdinterface, store")
+        yield
+        self.cmd("view rdinterface, recall")
+
+    def load_molecule(
+        self, mol: "Molecule", component: str, style: dict[str, list[tuple[str, str]]]
     ) -> None:
-        self.cmd(f"super {mobile}, {fixed}")
-        if not source:
-            source = mobile
-        for target in targets:
-            self.cmd(f"matrix_copy {source}, {target}")
+        pdb_dump = Chem.MolToPDBBlock(mol, flavor=16 | 32)
+        model_id = f"{self.group}.{component}"
+        with self.ignore_autozoom():
+            self.cmd(f"cmd.read_pdbstr({pdb_dump!r}, {model_id!r})")
+        self._model_count += 1
+        self.models[component] = model_id
+        self.apply_style(f"%{model_id}", style)
+
+    def show_residue(
+        self,
+        residue: "Residue",
+        component: str,
+        style: dict[str, list[tuple[str, str]]],
+    ) -> None:
+        super().show_residue(residue, component, style)
+        model_id = self.models[component]
+        resid = residue.resid
+        selection = (
+            f"%{model_id} and chain {resid.chain} and resid {resid.number} "
+            f"and resname {resid.name}"
+        )
+        self.apply_style(selection, style)
+
+    def apply_style(
+        self, selection: str, style: dict[str, list[tuple[str, str]]]
+    ) -> None:
+        for representation, extras in style.items():
+            self.cmd(f"show {representation}, {selection}")
+            if extras:
+                for key, value in extras:
+                    self.cmd(f"set {key}, {value}, {selection}")
+
+    def hide_hydrogens(self, component: str, keep_indices: list[int]) -> None:
+        model_id = self.models[component]
+        selection = " or ".join([f"rank {i}" for i in keep_indices])
+        self.cmd(f"hide %{model_id} and elem H and not ({selection})")
+
+    def add_interaction(
+        self,
+        interaction: str,
+        distance: float,
+        points: tuple["Point3D", "Point3D"],
+        residues: tuple["ResidueId", "ResidueId"],
+        atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
+    ) -> None:
+        lresid, presid = residues
+        latoms, patoms = atoms
+        colour = (
+            self.settings.COLORS.get(interaction, "#dedede").upper().replace("#", "0x")
+        )
+        selections = []
+        for component, indices in [("ligand", latoms), ("protein", patoms)]:
+            if isinstance(indices, int):
+                sel = f"%{self.group}.{component} and (rank {indices})"
+            else:
+                ring_indices = " or rank ".join(map(str, indices))
+                sel = f"%{self.group}.{component} and (rank {ring_indices})"
+            selections.append(sel)
+
+        resids = f"{lresid}_{presid}".replace(".", "")
+        atom_ids = "_".join(
+            [
+                "".join(map(str, (atoms,) if isinstance(atoms, int) else atoms))
+                for atoms in (latoms, patoms)
+            ]
+        )
+        name = f"{self.group}.interactions.{interaction}.{resids}.{atom_ids}"
+        self.cmd(f"distance {name}, {', '.join(selections)}, mode=4")
+        self.cmd(f"hide labels, {name}")
+        self.cmd(f"color {colour}, {name}")
+        self.interactions.add(interaction)
+
+
+@dataclass
+class PyMOLScreenshot:
+    callback: Callable[[str], None]
+    kwargs: dict
+
+    def _repr_png_(self) -> bytes | None:
+        if self.callback is not get_rpc_server().do:
+            # only generate PNG if using RPC server
+            return None
+
+        # wait for all commands to be done
+        self.callback("cmd.sync()")
+
+        # write to temp PNG file
+        png_path = Path(mktemp(suffix=".png"))
+        if self.kwargs:
+            params = ", ".join([f"{k}={v}" for k, v in self.kwargs.items()])
+            kwargs = f", {params}"
+        else:
+            kwargs = ""
+        self.callback(f"png {png_path}{kwargs}")
+
+        # wait for end chunk of PNG to be written
+        while not self._is_png_written(png_path):
+            sleep(0.1)
+        data = png_path.read_bytes()
+        png_path.unlink(missing_ok=True)
+        return data
+
+    @classmethod
+    def _is_png_written(cls, png_path: Path) -> bool:
+        """Returns whether the PNG has been completely written or not."""
+        return (
+            png_path.is_file()
+            and png_path.stat().st_size > 12
+            and struct.unpack("!I4sI", cls._last_n_bytes(png_path, 12))
+            # IEND data chunk for PNG files (12 bytes, network-byte order):
+            # 4 null bytes for length of data (always no data for this chunk)
+            # 4 bytes for name of chunk (IEND for last chunk)
+            # (0 bytes for data)
+            # CRC-32 checksum for `b"IEND"`
+            == (0, b"IEND", 2923585666)
+        )
+
+    @staticmethod
+    def _last_n_bytes(path: Path, n: int) -> bytes:
+        """Reads the last N bytes from a file."""
+        with open(path, "rb") as fh:
+            fh.seek(-n, os.SEEK_END)
+            return fh.read(n)
+
+    def _repr_html_(self) -> str | None:
+        png = self._repr_png_()
+        if not png:
+            return None
+        dump = b64encode(png).decode()
+        return (
+            '<image alt="ProLIF PyMOL screenshot" src="data:image/png;base64, '
+            f'{dump}" />'
+        )

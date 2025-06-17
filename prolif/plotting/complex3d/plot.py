@@ -19,6 +19,7 @@ from rdkit.Geometry import Point3D
 
 from prolif.exceptions import RunRequiredError
 from prolif.plotting.complex3d.py3dmol_backend import Py3DmolBackend, Py3DMolSettings
+from prolif.plotting.complex3d.pymol_backend import PyMOLBackend, PyMOLSettings
 from prolif.plotting.utils import metadata_iterator
 from prolif.utils import get_residues_near_ligand, requires
 
@@ -46,10 +47,12 @@ class Complex3D:
         The protein molecule to display.
     water_mol : Optional[Molecule]
         Additional molecule (e.g. waters) to display.
-    backend_settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings = "py3Dmol"
+    backend_settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings | PyMOLSettings = "py3Dmol"
         The backend or backend settings to use. If a string is provided, the
         relevant backend is used with default settings. If a Settings object is
         provided, this will be used instead.
+    backend_kwargs: Any
+        Additional parameters passed to the backend's setup.
 
     .. versionchanged:: 2.1.0
         Added ``water_mol`` parameter to the constructor to display waters
@@ -67,7 +70,10 @@ class Complex3D:
         lig_mol: Molecule,
         prot_mol: Molecule,
         water_mol: Molecule | None = None,
-        backend_settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings = "py3Dmol",
+        backend_settings: Literal["py3Dmol", "pymol"]
+        | Py3DMolSettings
+        | PyMOLSettings = "py3Dmol",
+        **backend_kwargs: Any,
     ) -> None:
         self.ifp = ifp
         self.lig_mol = lig_mol
@@ -75,6 +81,7 @@ class Complex3D:
         self.water_mol = water_mol
         self._view: Any = None
         self.backend: "Backend" = get_3d_plot_backend(backend_settings)
+        self.backend_kwargs = backend_kwargs
 
     @classmethod
     def from_fingerprint(
@@ -85,7 +92,10 @@ class Complex3D:
         water_mol: Molecule | None = None,
         *,
         frame: int,
-        backend_settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings = "py3Dmol",
+        backend_settings: Literal["py3Dmol", "pymol"]
+        | Py3DMolSettings
+        | PyMOLSettings = "py3Dmol",
+        **backend_kwargs: Any,
     ) -> Complex3D:
         """Creates a py3Dmol plot of interactions.
 
@@ -103,10 +113,12 @@ class Complex3D:
             The protein molecule to display.
         water_mol : Optional[Molecule]
             Additional molecule (e.g. waters) to display.
-        backend_settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings = "py3Dmol"
+        backend_settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings | PyMOLSettings = "py3Dmol"
             The backend or backend settings to use. If a string is provided, the
             relevant backend is used with default settings. If a Settings object is
             provided, this will be used instead.
+        backend_kwargs: Any
+            Additional parameters passed to the backend's setup.
         """
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
@@ -114,7 +126,14 @@ class Complex3D:
                 " results.",
             )
         ifp = fp.ifp[frame]
-        return cls(ifp, lig_mol, prot_mol, water_mol, backend_settings=backend_settings)
+        return cls(
+            ifp,
+            lig_mol,
+            prot_mol,
+            water_mol,
+            backend_settings=backend_settings,
+            **backend_kwargs,
+        )
 
     @staticmethod
     def get_ring_centroid(mol: Molecule, indices: tuple[int, ...]) -> Point3D:
@@ -155,14 +174,12 @@ class Complex3D:
         """
         # setup view parameters
         if isinstance(self.backend, Py3DmolBackend):
-            kwargs = {
-                "viewergrid": (1, 1),
-                "width": size[0],
-                "height": size[1],
-            }
+            kwargs = {"viewergrid": (1, 1), "width": size[0], "height": size[1]}
+        elif isinstance(self.backend, PyMOLBackend):
+            kwargs = {"width": size[0], "height": size[1]}
         else:
             kwargs = {}
-        self.backend.setup(**kwargs)
+        self.backend.setup(**{**self.backend_kwargs, **kwargs})
         self.backend.prepare()
 
         # plot
@@ -248,7 +265,7 @@ class Complex3D:
         else:
             kwargs = {}
 
-        self.backend.setup(**kwargs)
+        self.backend.setup(**{**self.backend_kwargs, **kwargs})
 
         # prepare first plot
         if isinstance(self.backend, Py3DmolBackend):
@@ -535,12 +552,14 @@ class Complex3D:
         )
 
     def __getattr__(self, name: str) -> Any:
-        """Get an attribute from the py3Dmol view."""
+        """Get an attribute from the view."""
         if self._view is None:
             raise ValueError(
                 "View not initialized, did you call `display`/`compare` first?",
             )
-        return getattr(self._view, name)
+        if isinstance(self.backend, Py3DmolBackend):
+            return getattr(self._view, name)
+        return None
 
     def _repr_html_(self) -> str | None:
         if self._view:
@@ -553,16 +572,22 @@ def get_3d_plot_backend(
     settings: Literal["py3Dmol"] | Py3DMolSettings,
 ) -> Py3DmolBackend: ...
 @overload
-def get_3d_plot_backend(settings: Literal["pymol"]) -> Backend: ...
+def get_3d_plot_backend(settings: Literal["pymol"] | PyMOLSettings) -> PyMOLBackend: ...
 def get_3d_plot_backend(
-    settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings,
+    settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings | PyMOLSettings,
 ) -> Backend:
     """Get the backend for making 3D plots."""
     if isinstance(settings, str):
         if settings == "py3Dmol":
             settings = Py3DMolSettings()
         elif settings == "pymol":
-            raise NotImplementedError("Pymol backend is not implemented yet.")
+            settings = PyMOLSettings()
         else:
             raise ValueError(f"Unknown backend: {settings}")
-    return Py3DmolBackend(settings)
+    if isinstance(settings, Py3DMolSettings):
+        return Py3DmolBackend(settings)
+    if isinstance(settings, PyMOLSettings):
+        return PyMOLBackend(settings)
+    raise TypeError(
+        f"Expected Py3DMolSettings or PyMOLSettings, got {type(settings)}",
+    )

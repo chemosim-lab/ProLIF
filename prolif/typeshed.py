@@ -1,7 +1,7 @@
 """Helper module containing type aliases."""
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, Union
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -38,3 +38,9 @@ MDAObject: TypeAlias = Union["Universe", "AtomGroup"]  # type: ignore[no-any-uni
 
 # Interaction parameters
 Angles: TypeAlias = tuple[float, float]
+
+
+class PyMOLRPCServer(Protocol):
+    def ping(self) -> None: ...
+    def do(self, command: str) -> None: ...
+    def __close(self) -> None: ...
