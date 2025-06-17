@@ -7,18 +7,18 @@ from prolif.datafiles import datapath
 
 
 @pytest.fixture(scope="module")
-def CIF():
+def CIF() -> str:
     """Fixture to load the CIF file for testing."""
     return Path(str(datapath / "TPO.cif")).read_text()
 
 
 @pytest.fixture(scope="module")
-def STANDARD_AA():
+def STANDARD_AA() -> str:
     """Fixture to load the standard amino acid CIF file for testing."""
     return Path(str(datapath / "standard_aa.cif")).read_text()
 
 
-def test_cif_parser_lite(CIF, STANDARD_AA):
+def test_cif_parser_lite(CIF: str, STANDARD_AA: str) -> None:
     from prolif.io.cif import cif_parser_lite
 
     # Test with a valid CIF file
@@ -36,12 +36,12 @@ def test_cif_parser_lite(CIF, STANDARD_AA):
 
 
 @pytest.fixture(scope="module")
-def XML_TEST_DATA():
+def XML_TEST_DATA() -> str:
     """Fixture to load the XML test data for altnames parsing."""
     return Path(str(datapath / "standard_aa_name.xml")).read_text()
 
 
-def test_xml_parse_altnames(XML_TEST_DATA):
+def test_xml_parse_altnames(XML_TEST_DATA: str) -> None:
     """Test the XML parsing of alternative names for residues and atoms."""
     from prolif.io.xml import parse_altnames
 

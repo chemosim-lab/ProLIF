@@ -10,7 +10,6 @@ from prolif.constants import (
     FORMAL_CHARGE_ALIASES,
     GROMOS_POOL,
     MAX_AMIDE_LENGTH,
-    N_STANDARD_RESIDUE_HEAVY_ATOMS,
     OPLS_AA_POOL,
     RESNAME_ALIASES,
     STANDARD_AA,
@@ -48,8 +47,37 @@ class ProteinHelper:
                 "a prolif Molecule instance."
             )
 
-    def standardize_protein(self, **kwargs) -> None:
-        """Standardize the protein molecule."""
+    def standardize_protein(self, templates: list[dict] | dict | None = None) -> None:
+        """Standardize the protein molecule.
+
+        This function will standardize the residue names, fix the bond orders,
+        and check the residue names against the templates.
+
+        Parameters
+        ----------
+        templates : list[dict] or dict or None, optional
+            The templates to use for standardizing the protein molecule.
+            If `None`, the standard amino acid template is used.
+            If a dict is provided, it should contain the templates for residues.
+            If a list is provided, it should contain dicts for each template.
+            Default is `None`.
+
+        """
+
+        # read the templates
+        if templates is None:
+            templates = [STANDARD_AA]
+        elif isinstance(templates, dict):
+            # if templates is a dict, convert it to a list of dicts
+            templates = [templates, STANDARD_AA]
+        elif isinstance(templates, list):
+            # if templates is a list, check if it contains dicts
+            if not all(isinstance(t, dict) for t in templates):
+                raise TypeError("Templates must be a dict, a list of dicts or None.")
+            templates.extend([STANDARD_AA])
+
+        # get a dict of the number of the heavy atoms in the template residues
+        n_template_res_hatms = self.n_template_residue_heavy_atoms(templates)
 
         # guess forcefield
         conv_resnames = set(self.protein_mol.residues.name)
@@ -68,12 +96,11 @@ class ProteinHelper:
             residue.resid.name = standardized_resname
 
             # before fixing the bond orders: strict check with non-standard residues
-            self.check_resnames({standardized_resname}, **kwargs)
+            self.check_resnames({standardized_resname}, templates)
 
             # soft check the heavy atoms in the residue compared to the standard one
-            if (
-                self.n_residue_heavy_atoms(residue)
-                != N_STANDARD_RESIDUE_HEAVY_ATOMS[standardized_resname]
+            if self.n_residue_heavy_atoms(residue) != n_template_res_hatms.get(
+                standardized_resname, 0
             ):
                 warnings.warn(
                     f"Residue {residue.resid} has a different number of "
@@ -82,7 +109,7 @@ class ProteinHelper:
                     stacklevel=2,
                 )
             # fix the bond orders
-            new_residues.append(self.fix_molecule_bond_orders(residue, **kwargs))
+            new_residues.append(self.fix_molecule_bond_orders(residue, templates))
 
         # update the protein molecule with the new residues
         self.protein_mol.residues = ResidueGroup(new_residues)
@@ -156,7 +183,7 @@ class ProteinHelper:
     @staticmethod
     def check_resnames(
         resnames_to_check: set[str], templates: list[dict] | None = None
-    ) -> bool:
+    ) -> None:
         """Check if the residue names are standard or in templates and
         raise a warning if not.
 
@@ -164,6 +191,10 @@ class ProteinHelper:
         ----------
         resnames_to_check : set[str]
             Set of residue names to check.
+        templates : list[dict] or None, optional
+            The templates to use for checking the residue names.
+            If `None`, the standard amino acid template is used.
+            Default is `None`.
 
         Raises
         ------
@@ -210,8 +241,48 @@ class ProteinHelper:
         )
 
     @staticmethod
+    def n_template_residue_heavy_atoms(
+        templates: list[dict] | None = None,
+    ) -> dict[str, int]:
+        """Count the number of heavy atoms in a residue based on the templates.
+
+        Parameters
+        ----------
+        templates : list or None, optional
+            The templates to use for counting the heavy atoms.
+            If `None`, the standard amino acid template is used.
+            Default is `None`.
+
+        Returns
+        -------
+        dict[str, int]
+            The dictionary with residue names as keys and
+            the number of heavy atoms as values.
+        """
+        # Check if templates are provided,
+        # otherwise use the standard amino acid template
+        if templates is None:
+            templates = [STANDARD_AA]
+
+        n_template_residue_heavy_atoms = {}
+        for t in templates:
+            for resname in t:
+                if resname in n_template_residue_heavy_atoms:
+                    continue
+                residue_atom_df = t[resname]["_chem_comp_atom"]
+                residue_atom_df = residue_atom_df[
+                    residue_atom_df["alt_atom_id"] != "OXT"
+                ]
+
+                n_template_residue_heavy_atoms = {
+                    resname: sum(residue_atom_df["type_symbol"] != "H")
+                }
+
+        return n_template_residue_heavy_atoms
+
+    @staticmethod
     def fix_molecule_bond_orders(
-        residue: Residue, templates: list | None = None
+        residue: Residue, templates: list[dict] | None = None
     ) -> Residue:
         """Fix the bond orders of a molecule.
 
@@ -219,7 +290,7 @@ class ProteinHelper:
         ----------
         residue : Residue
             The residue to fix the bond orders for.
-        templates : str or list of str, optional
+        templates : list[dict] or None, optional
             The templates to use for fixing the bond orders.
             If `None`, the standard amino acid template is used.
             Default is `None`. If the residue is not a standard amino acid,
@@ -236,7 +307,8 @@ class ProteinHelper:
         function, which is used to assign bonds and aromaticity based on
         the standard amino acid templates.
         """
-        templates = [STANDARD_AA] if templates is None else [templates, STANDARD_AA]
+        if templates is None:
+            templates = [STANDARD_AA]
         resname = residue.resid.name.upper()
 
         # strip bonds and chiral tags
@@ -247,7 +319,6 @@ class ProteinHelper:
             # check if resname in template doc
             if resname not in t:
                 continue
-            t[resname]["name"] = resname  # add name for the reference block
             new_res = assign_intra_props(new_res, t[resname])
             break  # avoid double assignment, ordering of templates is relevant
         else:

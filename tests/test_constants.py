@@ -1,17 +1,17 @@
 import pandas as pd
 
 
-def test_standard_aa():
+def test_standard_aa() -> None:
     """Test that STANDARD_AA contains the expected amino acids."""
 
     from prolif.constants import STANDARD_AA
 
     assert len(STANDARD_AA) == 26
-    assert len(STANDARD_AA["ALA"]) == 3
+    assert len(STANDARD_AA["ALA"]) == 4
     assert isinstance(STANDARD_AA["ALA"]["_chem_comp_atom"], pd.DataFrame)
 
 
-def test_resname_aliases():
+def test_resname_aliases() -> None:
     """Test that RESNAME_ALIASES contains the expected aliases."""
 
     from prolif.constants import RESNAME_ALIASES
@@ -20,7 +20,7 @@ def test_resname_aliases():
     assert RESNAME_ALIASES["HSH"] == "HIS"
 
 
-def test_atomname_aliases():
+def test_atomname_aliases() -> None:
     """Test that ATOMNAME_ALIASES contains the expected aliases."""
 
     from prolif.constants import ATOMNAME_ALIASES
@@ -30,7 +30,7 @@ def test_atomname_aliases():
     assert ATOMNAME_ALIASES["Protein"]["OT"] == "OXT"
 
 
-def test_standard_resname_map():
+def test_standard_resname_map() -> None:
     """Test that STANDARD_RESNAME_MAP contains the expected mappings."""
 
     from prolif.constants import STANDARD_RESNAME_MAP
@@ -42,7 +42,7 @@ def test_standard_resname_map():
     assert STANDARD_RESNAME_MAP["NMET"] == "MET"
 
 
-def test_force_field_pool():
+def test_force_field_pool() -> None:
     """Test the number of contents in force field pool."""
 
     from prolif.constants import AMBER_POOL, CHARMM_POOL, GROMOS_POOL, OPLS_AA_POOL
@@ -53,7 +53,7 @@ def test_force_field_pool():
     assert len(OPLS_AA_POOL) == 3
 
 
-def test_formal_charge_aliases():
+def test_formal_charge_aliases() -> None:
     """Test that FORMAL_CHARGE_ALIASES contains the expected aliases."""
 
     from prolif.constants import FORMAL_CHARGE_ALIASES
@@ -65,19 +65,17 @@ def test_formal_charge_aliases():
     assert FORMAL_CHARGE_ALIASES["HIS"]["ND1"] == 1
 
 
-def test_other_constants():
+def test_other_constants() -> None:
     """Test that other constants are defined correctly."""
 
     from prolif.constants import (
         MAX_AMIDE_LENGTH,
         MAX_DISULPHIDE_LENGTH,
-        N_STANDARD_RESIDUE_HEAVY_ATOMS,
         TERMINAL_OXYGEN_NAMES,
     )
 
     assert MAX_AMIDE_LENGTH == 2
     assert MAX_DISULPHIDE_LENGTH == 2.5
-    assert len(N_STANDARD_RESIDUE_HEAVY_ATOMS) == 26
     assert len(TERMINAL_OXYGEN_NAMES) == 6
     assert "OXT" in TERMINAL_OXYGEN_NAMES
     assert "OT" in TERMINAL_OXYGEN_NAMES

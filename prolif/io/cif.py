@@ -69,7 +69,7 @@ def cif_parser_lite(cif_string: str) -> dict:
     cif_dict: dict = {}
     for block_name, data_block in data_blocks.items():
         descriptions, data_tables = _block_decompose(data_block)
-        cif_dict[block_name] = {}
+        cif_dict[block_name] = {"name": block_name}
 
         # descriptive information
         for each in descriptions:
