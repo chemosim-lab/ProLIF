@@ -150,7 +150,7 @@ cmd = "sphinx-build -M html docs/ docs/_build/"
 
 [tool.poe.tasks.check]
 help = "Runs all of the checks"
-sequence = [{ ref = "style-check" }, { ref = "test" }, { ref = "docs" }]
+sequence = [{ ref = "style-check" }, { ref = "type-check" }, { ref = "test" }, { ref = "docs" }]
 
 [tool.mypy]
 python_version = "3.10"
