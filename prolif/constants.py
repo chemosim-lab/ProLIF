@@ -194,7 +194,7 @@ STANDARD_RESNAME_MAP = {
 
 # FORMAL_CHARGE_ALIASES: dict mapping residue names to a dict of atom names
 # (the below map is relevant to the above atom name/topology file in STANDARD_AA)
-FORMAL_CHARGE_ALISES = {
+FORMAL_CHARGE_ALIASES = {
     "ARG": {"NH2": 1},
     "ASP": {"OD2": -1},
     "ASH": {"OD2": 0},

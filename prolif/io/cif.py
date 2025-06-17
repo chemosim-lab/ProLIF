@@ -15,9 +15,9 @@ def _block_decompose(data_block: list) -> tuple:
     """
     Decomposes a CIF data block into decriptive information and tables.
     """
-    descriptions = []
-    data_tables = []
-    data_table = None
+    descriptions: list[str] = []
+    data_tables: list[list] = []
+    data_table: list[str] | None = None
 
     for idx, block_line in enumerate(data_block):
         if block_line.startswith("#"):
@@ -58,7 +58,7 @@ def cif_parser_lite(cif_string: str) -> dict:
     for idx, line in enumerate(all_lines):
         if line.startswith("data_"):
             current_block = line.split("data_")[1]
-            data_block = []
+            data_block: list[str] = []
         elif line.startswith("##") or idx == len(all_lines) - 1:
             # end of a data block
             data_blocks[current_block] = data_block
@@ -66,7 +66,7 @@ def cif_parser_lite(cif_string: str) -> dict:
             data_block.append(line.strip())
 
     # create a dictionary to hold the parsed data
-    cif_dict = {}
+    cif_dict: dict = {}
     for block_name, data_block in data_blocks.items():
         descriptions, data_tables = _block_decompose(data_block)
         cif_dict[block_name] = {}
@@ -83,18 +83,18 @@ def cif_parser_lite(cif_string: str) -> dict:
         # data tables
         for data_table in data_tables:
             header = []
-            content = []
+            data: list[list[str]] = []
             table_name = data_table[0].split(".")[0]
             for each_line in data_table:
                 if each_line.startswith("_"):
                     # header line
                     header.append(each_line.split(".")[1].strip())
                 else:
-                    # content line
+                    # data line
                     # Use shlex.split to respect quoted strings
-                    content.append(shlex.split(each_line))
+                    data.append(shlex.split(each_line))
 
-            table = pd.DataFrame(content, columns=header)
+            table = pd.DataFrame(data, columns=header)
             cif_dict[block_name][table_name] = table
 
     return cif_dict

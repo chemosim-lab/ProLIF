@@ -7,7 +7,7 @@ from prolif.constants import (
     AMBER_POOL,
     ATOMNAME_ALIASES,
     CHARMM_POOL,
-    FORMAL_CHARGE_ALISES,
+    FORMAL_CHARGE_ALIASES,
     GROMOS_POOL,
     MAX_AMIDE_LENGTH,
     N_STANDARD_RESIDUE_HEAVY_ATOMS,
@@ -324,10 +324,10 @@ def assign_intra_props(mol: Chem.Mol, reference_block: dict) -> Chem.Mol:
         nm = atom.GetMonomerInfo().GetName().strip()
         nm = aliases.get(nm, nm)
         if (
-            reference_block["name"] in FORMAL_CHARGE_ALISES
-            and nm in FORMAL_CHARGE_ALISES[reference_block["name"]]
+            reference_block["name"] in FORMAL_CHARGE_ALIASES
+            and nm in FORMAL_CHARGE_ALIASES[reference_block["name"]]
         ):
-            fc_special_assign_nm_idx_fc_pair[atom.GetIdx()] = FORMAL_CHARGE_ALISES[
+            fc_special_assign_nm_idx_fc_pair[atom.GetIdx()] = FORMAL_CHARGE_ALIASES[
                 reference_block["name"]
             ][nm]
         nm_2_idx[nm] = atom.GetIdx()
