@@ -274,9 +274,9 @@ class ProteinHelper:
                     residue_atom_df["alt_atom_id"] != "OXT"
                 ]
 
-                n_template_residue_heavy_atoms = {
-                    resname: sum(residue_atom_df["type_symbol"] != "H")
-                }
+                n_template_residue_heavy_atoms[resname] = sum(
+                    residue_atom_df["type_symbol"] != "H"
+                )
 
         return n_template_residue_heavy_atoms
 

@@ -198,8 +198,8 @@ FORMAL_CHARGE_ALIASES = {
     "ARG": {"NH2": 1},
     "ASP": {"OD2": -1},
     "ASH": {"OD2": 0},
-    "CYS": {"SG": 0},
-    "CYX": {"SG": -1},
+    "CYS": {"SG": 0, "SG1": 0},  # alternative name for SG
+    "CYX": {"SG": -1, "SG1": -1},  # alternative name for SG
     "GLU": {"OE2": -1},
     "GLH": {"OE2": 0},
     "HIS": {"ND1": 1, "NE2": 0},
