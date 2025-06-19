@@ -147,3 +147,6 @@ class Backend(Protocol, Generic[SettingsT, ComponentT, ModelT]):
         atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
     ) -> None:
         """Add an interaction to the plot."""
+
+    def save_png(self, name: str) -> None:
+        """Saves the current state of the 3D viewer to a PNG."""
