@@ -65,7 +65,6 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
     def setup(
         self,
         handler: Callable[[str], None] | None = None,
-        group: str = "prolif",
         **kwargs: Any,
     ) -> None:
         self.cmd = handler or get_rpc_server().do
@@ -77,6 +76,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
     def prepare(self) -> None:
         super().prepare()
         self.interactions: set[str] = set()
+        self.group_id = self.settings.GROUP_ID
         self.cmd("set group_auto_mode, 2")
 
     def clear(self) -> None:
@@ -98,7 +98,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         self, mol: "Molecule", component: str, style: dict[str, list[tuple[str, str]]]
     ) -> None:
         pdb_dump = Chem.MolToPDBBlock(mol, flavor=16 | 32)
-        model_id = f"{self.group}.{component}"
+        model_id = f"{self.group_id}.{component}"
         with self.ignore_autozoom():
             self.cmd(f"cmd.read_pdbstr({pdb_dump!r}, {model_id!r})")
         self._model_count += 1
@@ -150,10 +150,10 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         selections = []
         for component, indices in [("ligand", latoms), ("protein", patoms)]:
             if isinstance(indices, int):
-                sel = f"%{self.group}.{component} and (rank {indices})"
+                sel = f"%{self.group_id}.{component} and (rank {indices})"
             else:
                 ring_indices = " or rank ".join(map(str, indices))
-                sel = f"%{self.group}.{component} and (rank {ring_indices})"
+                sel = f"%{self.group_id}.{component} and (rank {ring_indices})"
             selections.append(sel)
 
         resids = f"{lresid}_{presid}".replace(".", "")
@@ -163,7 +163,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
                 for atoms in (latoms, patoms)
             ]
         )
-        name = f"{self.group}.interactions.{interaction}.{resids}.{atom_ids}"
+        name = f"{self.group_id}.interactions.{interaction}.{resids}.{atom_ids}"
         self.cmd(f"distance {name}, {', '.join(selections)}, mode=4")
         self.cmd(f"hide labels, {name}")
         self.cmd(f"color {colour}, {name}")
