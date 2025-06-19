@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
 import py3Dmol
+from IPython.display import display_javascript
 from rdkit import Chem
 
 from prolif.plotting.complex3d.base import Backend, Settings
@@ -202,4 +203,18 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
             {"and": [{"elem": "H"}, {"not": {"index": keep_indices}}]},
             {"stick": {"hidden": True}},
             model_id=self.models[component],
+        )
+
+    def save_png(self, name: str) -> None:
+        uid = self.view.uniqueid
+        display_javascript(
+            f"""
+            var png = viewer_{uid}.pngURI()
+            var a = document.createElement('a')
+            a.href = png
+            a.download = "{name}"
+            a.click()
+            a.remove()
+            """,
+            raw=True,
         )

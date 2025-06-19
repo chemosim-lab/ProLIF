@@ -12,7 +12,6 @@ Plot interactions in 3D --- :mod:`prolif.plotting.complex3d`
 from __future__ import annotations
 
 from collections import defaultdict
-from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 from rdkit.Geometry import Point3D
@@ -21,11 +20,7 @@ from prolif.exceptions import RunRequiredError
 from prolif.plotting.complex3d.py3dmol_backend import Py3DmolBackend, Py3DMolSettings
 from prolif.plotting.complex3d.pymol_backend import PyMOLBackend, PyMOLSettings
 from prolif.plotting.utils import metadata_iterator
-from prolif.utils import get_residues_near_ligand, requires
-
-with suppress(ModuleNotFoundError):
-    from IPython.display import Javascript, display
-
+from prolif.utils import get_residues_near_ligand
 
 if TYPE_CHECKING:
     from prolif.fingerprint import Fingerprint
@@ -528,10 +523,8 @@ class Complex3D:
             ]
             self.backend.hide_hydrogens(component, keep_indices)
 
-    @requires("IPython.display")
-    def save_png(self) -> None:
-        """Saves the current state of the 3D viewer to a PNG. Not available outside of a
-        notebook.
+    def save_png(self, name: str = "prolif-3d.png") -> None:
+        """Saves the current state of the 3D viewer to a PNG.
 
         .. versionadded:: 2.1.0
         """
@@ -539,25 +532,15 @@ class Complex3D:
             raise ValueError(
                 "View not initialized, did you call `display`/`compare` first?",
             )
-        uid = self._view.uniqueid
-        display(
-            Javascript(f"""
-            var png = viewer_{uid}.pngURI()
-            var a = document.createElement('a')
-            a.href = png
-            a.download = "prolif-3d.png"
-            a.click()
-            a.remove()
-            """),
-        )
+        self.backend.save_png(name)
 
     def __getattr__(self, name: str) -> Any:
         """Get an attribute from the view."""
-        if self._view is None:
-            raise ValueError(
-                "View not initialized, did you call `display`/`compare` first?",
-            )
         if isinstance(self.backend, Py3DmolBackend):
+            if self._view is None:
+                raise ValueError(
+                    "View not initialized, did you call `display`/`compare` first?",
+                )
             return getattr(self._view, name)
         return None
 

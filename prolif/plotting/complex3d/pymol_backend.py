@@ -69,8 +69,9 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         **kwargs: Any,
     ) -> None:
         self.cmd = handler or get_rpc_server().do
-        self.group = group
-        self.view = PyMOLScreenshot(callback=self.cmd, kwargs=kwargs)
+        self.view = PyMOLScreenshot(
+            callback=self.cmd, kwargs=kwargs, is_interactive=handler is None
+        )
         super().setup()
 
     def prepare(self) -> None:
@@ -168,32 +169,44 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         self.cmd(f"color {colour}, {name}")
         self.interactions.add(interaction)
 
+    def save_png(self, name: str) -> None:
+        path = Path(name)
+        screenshot = cast(PyMOLScreenshot, self.view)
+        return screenshot.save_png(path, dpi=300, ray=1, **screenshot.kwargs)
+
 
 @dataclass
 class PyMOLScreenshot:
     callback: Callable[[str], None]
     kwargs: dict
+    is_interactive: bool
+
+    def save_png(self, path: Path, **kwargs: Any) -> None:
+        # wait for all commands to be done
+        self.callback("cmd.sync(timeout=5)")
+
+        # build command
+        if kwargs:
+            params = ", ".join([f"{k}={v}" for k, v in kwargs.items()])
+            params = f", {params}"
+        else:
+            params = ""
+        self.callback(f"png {path}{params}")
+
+        # wait for end chunk of PNG to be written
+        while not self._is_png_written(path):
+            sleep(0.1)
 
     def _repr_png_(self) -> bytes | None:
-        if self.callback is not get_rpc_server().do:
+        if not self.is_interactive:
             # only generate PNG if using RPC server
             return None
 
-        # wait for all commands to be done
-        self.callback("cmd.sync()")
-
         # write to temp PNG file
         png_path = Path(mktemp(suffix=".png"))
-        if self.kwargs:
-            params = ", ".join([f"{k}={v}" for k, v in self.kwargs.items()])
-            kwargs = f", {params}"
-        else:
-            kwargs = ""
-        self.callback(f"png {png_path}{kwargs}")
+        self.save_png(png_path, **self.kwargs)
 
-        # wait for end chunk of PNG to be written
-        while not self._is_png_written(png_path):
-            sleep(0.1)
+        # read data and delete temp file
         data = png_path.read_bytes()
         png_path.unlink(missing_ok=True)
         return data
