@@ -28,26 +28,27 @@ if TYPE_CHECKING:
 
 @dataclass
 class PyMOLSettings(Settings):
-    LIGAND_STYLE: dict[str, list[tuple[str, str]]] = field(
+    LIGAND_STYLE: dict[str, list[str]] = field(
         default_factory=lambda: {
-            "stick": [],
+            "stick": ["util.cbac {}"],
         }
     )
-    RESIDUES_STYLE: dict[str, list[tuple[str, str]]] = field(
+    RESIDUES_STYLE: dict[str, list[str]] = field(
         default_factory=lambda: {
-            "stick": [],
+            "stick": ["util.cbag {}"],
         }
     )
-    PROTEIN_STYLE: dict[str, list[tuple[str, str]]] = field(
+    PROTEIN_STYLE: dict[str, list[str]] = field(
         default_factory=lambda: {
-            "cartoon": [],
+            "cartoon": ["set cartoon_color, green, {}"],
         }
     )
-    PEPTIDE_STYLE: dict[str, list[tuple[str, str]]] = field(
+    PEPTIDE_STYLE: dict[str, list[str]] = field(
         default_factory=lambda: {
-            "cartoon": [("cartoon_color", "cyan")],
+            "cartoon": ["set cartoon_color, cyan, {}"],
         }
     )
+    GROUP_ID: str = "complex"
 
 
 @cache
@@ -95,7 +96,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         self.cmd("view rdinterface, recall")
 
     def load_molecule(
-        self, mol: "Molecule", component: str, style: dict[str, list[tuple[str, str]]], kekulize: bool=False
+        self, mol: "Molecule", component: str, style: dict[str, list[str]], kekulize: bool=False
     ) -> None:
         if kekulize:
             mol = Chem.Mol(mol)
@@ -112,7 +113,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         self,
         residue: "Residue",
         component: str,
-        style: dict[str, list[tuple[str, str]]],
+        style: dict[str, list[str]],
     ) -> None:
         super().show_residue(residue, component, style)
         model_id = self.models[component]
@@ -123,14 +124,12 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         )
         self.apply_style(selection, style)
 
-    def apply_style(
-        self, selection: str, style: dict[str, list[tuple[str, str]]]
-    ) -> None:
+    def apply_style(self, selection: str, style: dict[str, list[str]]) -> None:
         for representation, extras in style.items():
             self.cmd(f"show {representation}, {selection}")
             if extras:
-                for key, value in extras:
-                    self.cmd(f"set {key}, {value}, {selection}")
+                for extra in extras:
+                    self.cmd(extra.format(selection))
 
     def hide_hydrogens(self, component: str, keep_indices: list[int]) -> None:
         model_id = self.models[component]
