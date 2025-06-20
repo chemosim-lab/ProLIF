@@ -182,7 +182,7 @@ class PyMOLScreenshot:
 
     def save_png(self, path: Path, **kwargs: Any) -> None:
         # wait for all commands to be done
-        self.callback("cmd.sync(timeout=5)")
+        self.callback("cmd.sync(timeout=3)")
 
         # build command
         if kwargs:
