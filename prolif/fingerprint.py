@@ -1326,7 +1326,7 @@ class Fingerprint:
             hidden. Added support for waters involved in WaterBridge interactions.
             Added ``backend_settings``.
 
-        """
+        """  # noqa: E501
         from prolif.plotting.complex3d import Complex3D
 
         plot3d = Complex3D.from_fingerprint(

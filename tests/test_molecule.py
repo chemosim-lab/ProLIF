@@ -1,5 +1,5 @@
-from contextlib import nullcontext
-from typing import TYPE_CHECKING, ClassVar, ContextManager
+from contextlib import AbstractContextManager, nullcontext
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 from MDAnalysis import SelectionError
@@ -67,7 +67,7 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
 
 class SupplierBase:
     resid = ResidueId("UNL", 1, "")
-    slice_behavior: ClassVar[ContextManager] = nullcontext()
+    slice_behavior: ClassVar[AbstractContextManager] = nullcontext()
 
     def test_len(self, suppl: "Sequence[Molecule]") -> None:
         assert len(suppl) == 9

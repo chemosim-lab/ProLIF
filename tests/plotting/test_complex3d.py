@@ -53,20 +53,20 @@ class TestComplex3D:
 
     def test_integration_display_single(self, plot_3d: Complex3D) -> None:
         view = plot_3d.display(display_all=False)
-        assert view._view
-        html = view._view._make_html()
+        assert view.interface
+        html = view.interface._make_html()
         assert "Hydrophobic" in html
 
     def test_integration_display_all(self, plot_3d: Complex3D) -> None:
         view = plot_3d.display(display_all=True)
-        assert view._view
-        html = view._view._make_html()
+        assert view.interface
+        html = view.interface._make_html()
         assert "Hydrophobic" in html
 
     def test_integration_compare(self, plot_3d: Complex3D) -> None:
         view = plot_3d.compare(plot_3d)
-        assert view._view
-        html = view._view._make_html()
+        assert view.interface
+        html = view.interface._make_html()
         assert "Hydrophobic" in html
 
     def test_from_fingerprint_raises_not_executed(
@@ -85,8 +85,8 @@ class TestComplex3D:
     ) -> None:
         fp, lig_mol, prot_mol = fp_mols
         view = fp.plot_3d(lig_mol, prot_mol, frame=0, display_all=fp.count)
-        assert view._view
-        html = view._view._make_html()
+        assert view.interface
+        html = view.interface._make_html()
         assert "Hydrophobic" in html
 
     def test_getattr_raises_error_if_not_initialized(
@@ -107,5 +107,5 @@ class TestComplex3D:
         )
         fp.run_from_iterable([ligand], protein)
         view = fp.plot_3d(ligand, protein, water, frame=0)
-        html = view._make_html()
+        html = view.interface._make_html()
         assert "TIP383.X" in html

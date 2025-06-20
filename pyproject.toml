@@ -74,7 +74,7 @@ type-check = [
     "types-networkx",
 ]
 dev = [
-    "ruff==0.11.2",
+    "ruff==0.12.0",
     "black[jupyter]",
     "poethepoet>=0.33.0",
     { include-group = "build" },
@@ -245,6 +245,9 @@ ignore = [
     "COM812",
     "UP037",
 ]
+
+[tool.ruff.lint.pylint]
+allow-dunder-method-names = ["_repr_html", "_repr_png_"]
 
 [tool.isort]
 profile = "black"

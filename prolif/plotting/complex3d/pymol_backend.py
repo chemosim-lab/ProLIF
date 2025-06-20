@@ -136,8 +136,8 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
     def add_interaction(
         self,
         interaction: str,
-        distance: float,
-        points: tuple["Point3D", "Point3D"],
+        distance: float,  # noqa: ARG002
+        points: tuple["Point3D", "Point3D"],  # noqa: ARG002
         residues: tuple["ResidueId", "ResidueId"],
         atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
     ) -> None:

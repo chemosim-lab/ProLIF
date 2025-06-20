@@ -106,12 +106,12 @@ class Backend(Protocol, Generic[SettingsT, ComponentT, ModelT]):
         """Initialize the backend with the given settings."""
         self.settings = settings
 
-    def setup(self, *args: Any, **kwargs: Any) -> None:
+    def setup(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
         """Setup the backend for a new plot."""
         self.prepare()
         self.clear()
 
-    def prepare(self, *args: Any, **kwargs: Any) -> None:
+    def prepare(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
         """
         Prepare the backend for plotting new elements. This method must have defaults
         for all parameters.
@@ -130,7 +130,10 @@ class Backend(Protocol, Generic[SettingsT, ComponentT, ModelT]):
         """Load a molecule into the view with the given style."""
 
     def show_residue(
-        self, residue: "Residue", component: ComponentT, style: Any
+        self,
+        residue: "Residue",
+        component: ComponentT,
+        style: Any,  # noqa: ARG002
     ) -> None:
         """Show a residue on the plot."""
         self.residues[residue.resid] = component
