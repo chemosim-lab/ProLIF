@@ -11,6 +11,7 @@ Plot interactions in 3D --- :mod:`prolif.plotting.complex3d`
 
 from __future__ import annotations
 
+import warnings
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
@@ -56,7 +57,9 @@ class Complex3D:
         to the ``display`` and ``compare`` methods to remove non-polar hydrogens that
         aren't involved in an interaction. Added ``only_interacting`` parameter to the
         ``display`` and ``compare`` methods to show all protein residues in the
-        vicinity of the ligand, or only the ones participating in an interaction.
+        vicinity of the ligand, or only the ones participating in an interaction. Moved
+        most options to the `backend_settings` object (accessible through
+        :attr:`backend`'s :attr:`settings`).
     """
 
     def __init__(
@@ -70,13 +73,14 @@ class Complex3D:
         | PyMOLSettings = "py3Dmol",
         **backend_kwargs: Any,
     ) -> None:
+        object.__setattr__(self, "backend", get_3d_plot_backend(backend_settings))
+        self.backend: "Backend"
+        self.backend_kwargs = backend_kwargs
         self.ifp = ifp
         self.lig_mol = lig_mol
         self.prot_mol = prot_mol
         self.water_mol = water_mol
-        self._view: Any = None
-        self.backend: "Backend" = get_3d_plot_backend(backend_settings)
-        self.backend_kwargs = backend_kwargs
+        self.interface: Any = None
 
     @classmethod
     def from_fingerprint(
@@ -143,12 +147,12 @@ class Complex3D:
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
     ) -> Complex3D:
-        """Display as a py3Dmol widget view.
+        """Display the complex in 3D.
 
         Parameters
         ----------
         size: tuple[int, int] = (650, 600)
-            Deprecated. Use ``backend_settings`` instead.
+            Size of the interface.
         display_all : bool = False
             Display all occurences for a given pair of residues and interaction, or only
             the shortest one. Not relevant if ``count=False`` in the ``Fingerprint``
@@ -183,7 +187,7 @@ class Complex3D:
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
         )
-        self._view = self.backend.view
+        self.interface = self.backend.interface
         return self
 
     def compare(
@@ -205,7 +209,7 @@ class Complex3D:
         other: Complex3D
             Other ``Complex3D`` object to compare to.
         size: tuple[int, int] = (900, 600)
-            The size of the py3Dmol widget view.
+            The size of the interface.
         display_all : bool = False
             Display all occurences for a given pair of residues and interaction, or only
             the shortest one. Not relevant if ``count=False`` in the ``Fingerprint``
@@ -303,7 +307,7 @@ class Complex3D:
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
         )
-        self._view = self.backend.view
+        self.interface = self.backend.interface
         return self
 
     def add(
@@ -339,7 +343,7 @@ class Complex3D:
         other_settings = other.backend.settings
         backend = other.backend = self.backend
 
-        if not self._view:
+        if not self.interface:
             self.display(
                 display_all=display_all,
                 only_interacting=only_interacting,
@@ -359,7 +363,7 @@ class Complex3D:
             remove_hydrogens=remove_hydrogens,
         )
 
-        self._view = other._view = backend.view
+        self.interface = other.interface = backend.interface
         # restore
         backend.settings = saved_settings
         other.backend = get_3d_plot_backend(other_settings)
@@ -378,13 +382,13 @@ class Complex3D:
         backend.load_molecule(
             self.lig_mol,
             "ligand",
-            settings.PEPTIDE_STYLE
-            if self.lig_mol.n_residues >= settings.PEPTIDE_THRESHOLD
-            else settings.LIGAND_STYLE,
+            settings.peptide_style
+            if self.lig_mol.n_residues >= settings.peptide_threshold
+            else settings.ligand_style,
         )
-        backend.load_molecule(self.prot_mol, "protein", settings.PROTEIN_STYLE)
+        backend.load_molecule(self.prot_mol, "protein", settings.protein_style)
         if self.water_mol:
-            backend.load_molecule(self.water_mol, "water", settings.RESIDUES_STYLE)
+            backend.load_molecule(self.water_mol, "water", settings.residues_style)
 
         self._interacting_atoms: defaultdict[str, set[int]] = defaultdict(set)
         # show all interacting residues
@@ -393,8 +397,8 @@ class Complex3D:
             pres = self.prot_mol[presid]
             # set model ids for reusing later
             for res, component, style in [
-                (lres, "ligand", settings.LIGAND_STYLE),
-                (pres, "protein", settings.RESIDUES_STYLE),
+                (lres, "ligand", settings.ligand_style),
+                (pres, "protein", settings.residues_style),
             ]:
                 if res.resid not in backend.residues:
                     backend.show_residue(res, component, style)
@@ -409,17 +413,17 @@ class Complex3D:
                     self._interacting_atoms["protein"].update(
                         metadata["parent_indices"]["protein"]
                     )
-                    if interaction in settings.BRIDGED_INTERACTIONS and self.water_mol:
+                    if interaction in settings.bridged_interactions and self.water_mol:
                         for wresid in metadata["water_residues"]:
                             self._interacting_atoms["water"].update(
                                 metadata["parent_indices"][
-                                    settings.BRIDGED_INTERACTIONS[interaction]
+                                    settings.bridged_interactions[interaction]
                                 ]
                             )
                             wres = self.water_mol[wresid]
                             if wresid not in backend.residues:
                                 backend.show_residue(
-                                    wres, "water", settings.RESIDUES_STYLE
+                                    wres, "water", settings.residues_style
                                 )
                         # show cylinders for WaterBridge
                         distances = [d for d in metadata if d.startswith("distance_")]
@@ -427,7 +431,7 @@ class Complex3D:
                             _, src, dest = distlabel.split("_")
                             if src == "ligand":
                                 atoms1 = metadata["parent_indices"]["ligand"][
-                                    settings.LIGAND_DISPLAYED_ATOM.get(interaction, 0)
+                                    settings.ligand_displayed_atoms.get(interaction, 0)
                                 ]
                                 p1 = self.lig_mol.GetConformer().GetAtomPosition(atoms1)
                             else:
@@ -437,7 +441,7 @@ class Complex3D:
                                 )
                             if dest == "protein":
                                 atoms2 = metadata["parent_indices"]["protein"][
-                                    settings.PROTEIN_DISPLAYED_ATOM.get(interaction, 0)
+                                    settings.protein_displayed_atoms.get(interaction, 0)
                                 ]
                                 p2 = self.prot_mol.GetConformer().GetAtomPosition(
                                     atoms2
@@ -458,20 +462,20 @@ class Complex3D:
 
                     else:
                         # get coordinates for both points of the interaction
-                        if interaction in settings.LIGAND_RING_INTERACTIONS:
+                        if interaction in settings.ligand_ring_interactions:
                             atoms1 = metadata["parent_indices"]["ligand"]
                             p1 = self.get_ring_centroid(self.lig_mol, atoms1)
                         else:
                             atoms1 = metadata["parent_indices"]["ligand"][
-                                settings.LIGAND_DISPLAYED_ATOM.get(interaction, 0)
+                                settings.ligand_displayed_atoms.get(interaction, 0)
                             ]
                             p1 = self.lig_mol.GetConformer().GetAtomPosition(atoms1)
-                        if interaction in settings.PROTEIN_RING_INTERACTIONS:
+                        if interaction in settings.protein_ring_interactions:
                             atoms2 = metadata["parent_indices"]["protein"]
                             p2 = self.get_ring_centroid(self.prot_mol, atoms2)
                         else:
                             atoms2 = metadata["parent_indices"]["protein"][
-                                settings.PROTEIN_DISPLAYED_ATOM.get(interaction, 0)
+                                settings.protein_displayed_atoms.get(interaction, 0)
                             ]
                             p2 = self.prot_mol.GetConformer().GetAtomPosition(atoms2)
                         # add interaction line
@@ -528,25 +532,48 @@ class Complex3D:
 
         .. versionadded:: 2.1.0
         """
-        if self._view is None:
+        if self.interface is None:
             raise ValueError(
                 "View not initialized, did you call `display`/`compare` first?",
             )
         self.backend.save_png(name)
 
     def __getattr__(self, name: str) -> Any:
-        """Get an attribute from the view."""
+        """Get an attribute from the interface."""
         if isinstance(self.backend, Py3DmolBackend):
-            if self._view is None:
+            if self.interface is None:
                 raise ValueError(
                     "View not initialized, did you call `display`/`compare` first?",
                 )
-            return getattr(self._view, name)
-        return None
+            warnings.warn(
+                f"Accessing `.{name}` from a Complex3D object is deprecated, "
+                "go through the `interface` attribute first, "
+                f"i.e. `.interface.{name}` instead of `.{name}`",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return getattr(self.interface, name)
+        return super().__getattribute__(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if isinstance(self.backend, Py3DmolBackend) and hasattr(
+            self.backend.settings, name.lower()
+        ):
+            warnings.warn(
+                f"Configuring Py3Dmol styles/options `.{name}` on a Complex3D object "
+                "is deprecated, use "
+                f"`backend_settings=Py3DmolSettings({name.lower()}={value})` "
+                "when creating the plot instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            setattr(self.backend.settings, name.lower(), value)
+        else:
+            super().__setattr__(name, value)
 
     def _repr_html_(self) -> str | None:
-        if self._view:
-            return self._view._repr_html_()  # type: ignore[no-any-return]
+        if self.interface:
+            return self.interface._repr_html_()  # type: ignore[no-any-return]
         return None
 
 

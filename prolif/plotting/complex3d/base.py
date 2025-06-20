@@ -24,64 +24,64 @@ class Settings(Generic[StyleT]):
     """
     Attributes
     ----------
-    COLORS : dict
-        Dictionnary of colors used in the plot for interactions.
-    LIGAND_STYLE : dict
+    ligand_style : dict
         Style object for the ligand.
-    RESIDUES_STYLE : dict
+    residues_style : dict
         Style object for any residue involved in interactions.
-    PROTEIN_STYLE : dict
+    protein_style : dict
         Style object for the protein.
-    PEPTIDE_STYLE : dict
+    peptide_style : dict
         Style object for the ligand as a peptide if appropriate.
-    PEPTIDE_THRESHOLD : int = 5
+    colors : dict
+        Dictionnary of colors used in the plot for interactions.
+    peptide_threshold : int = 5
         Ligands with this number of residues or more will be displayed using
-        ``PEPTIDE_STYLE`` in addition to the ``LIGAND_STYLE``.
-    LIGAND_DISPLAYED_ATOM : dict[str, int]
+        :attr:`peptide_style` in addition to the :attr:`ligand_style`.
+    ligand_displayed_atom : dict[str, int]
         Which atom should be used to display an atom-to-atom interaction for the ligand.
         Refers to the order defined in the SMARTS pattern used in interaction
         definition. Interactions not specified here use ``0`` by default.
-    PROTEIN_DISPLAYED_ATOM : dict[str, int]
-        Same as :attr:`LIGAND_DISPLAYED_ATOM` for the protein.
-    LIGAND_RING_INTERACTIONS : set[str]
+    protein_displayed_atom : dict[str, int]
+        Same as :attr:`ligand_displayed_atom` for the protein.
+    ligand_ring_interactions : set[str]
         Which interactions should be displayed using the centroid instead of using
-        :attr:`LIGAND_DISPLAYED_ATOM` for the ligand.
-    PROTEIN_RING_INTERACTIONS : set[str]
+        :attr:`ligand_displayed_atom` for the ligand.
+    protein_ring_interactions : set[str]
         Which interactions should be displayed using the centroid instead of using
-        :attr:`PROTEIN_DISPLAYED_ATOM` for the protein.
-    BRIDGED_INTERACTIONS : dict[str, str]
+        :attr:`protein_displayed_atom` for the protein.
+    bridged_interactions : dict[str, str]
         For bridged-interactions such as WaterBridge. The key is the interaction name,
         and the value is the name of the molecule in the metadata indices dictionary.
     """
 
-    LIGAND_STYLE: StyleT
-    RESIDUES_STYLE: StyleT
-    PROTEIN_STYLE: StyleT
-    PEPTIDE_STYLE: StyleT
-    COLORS: dict[str, str] = field(
+    ligand_style: StyleT
+    residues_style: StyleT
+    protein_style: StyleT
+    peptide_style: StyleT
+    colors: dict[str, str] = field(
         default_factory=lambda: {**separated_interaction_colors}
     )
-    PEPTIDE_THRESHOLD: int = 5
-    LIGAND_DISPLAYED_ATOM: dict = field(
+    peptide_threshold: int = 5
+    ligand_displayed_atoms: dict = field(
         default_factory=lambda: {
             "HBDonor": 1,
             "XBDonor": 1,
         }
     )
-    PROTEIN_DISPLAYED_ATOM: dict = field(
+    protein_displayed_atoms: dict = field(
         default_factory=lambda: {
             "HBAcceptor": 1,
             "XBAcceptor": 1,
         }
     )
-    RING_SYSTEMS: set[str] = field(default_factory=lambda: {*_RING_SYSTEMS})
-    LIGAND_RING_INTERACTIONS: set[str] = field(
+    ring_systems: set[str] = field(default_factory=lambda: {*_RING_SYSTEMS})
+    ligand_ring_interactions: set[str] = field(
         default_factory=lambda: {*_RING_SYSTEMS, "PiCation"}
     )
-    PROTEIN_RING_INTERACTIONS: set[str] = field(
+    protein_ring_interactions: set[str] = field(
         default_factory=lambda: {*_RING_SYSTEMS, "CationPi"}
     )
-    BRIDGED_INTERACTIONS: dict[str, str] = field(
+    bridged_interactions: dict[str, str] = field(
         default_factory=lambda: {"WaterBridge": "water"}
     )
 
@@ -97,7 +97,7 @@ class Backend(Protocol, Generic[SettingsT, ComponentT, ModelT]):
     """
 
     settings: SettingsT
-    view: Any = None
+    interface: Any = None
     models: dict[ComponentT, ModelT]
     residues: dict["ResidueId", ComponentT]
     _model_count: int

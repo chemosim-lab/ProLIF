@@ -1324,6 +1324,7 @@ class Fingerprint:
             Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
             Non-polar hydrogen atoms that aren't involved in interactions are now
             hidden. Added support for waters involved in WaterBridge interactions.
+            Added ``backend_settings``.
 
         """
         from prolif.plotting.complex3d import Complex3D

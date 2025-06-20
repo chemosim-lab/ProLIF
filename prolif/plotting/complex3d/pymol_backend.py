@@ -28,27 +28,27 @@ if TYPE_CHECKING:
 
 @dataclass
 class PyMOLSettings(Settings):
-    LIGAND_STYLE: dict[str, list[str]] = field(
+    ligand_style: dict[str, list[str]] = field(
         default_factory=lambda: {
             "stick": ["util.cbac {}"],
         }
     )
-    RESIDUES_STYLE: dict[str, list[str]] = field(
+    residues_style: dict[str, list[str]] = field(
         default_factory=lambda: {
             "stick": ["util.cbag {}"],
         }
     )
-    PROTEIN_STYLE: dict[str, list[str]] = field(
+    protein_style: dict[str, list[str]] = field(
         default_factory=lambda: {
             "cartoon": ["set cartoon_color, green, {}"],
         }
     )
-    PEPTIDE_STYLE: dict[str, list[str]] = field(
+    peptide_style: dict[str, list[str]] = field(
         default_factory=lambda: {
             "cartoon": ["set cartoon_color, cyan, {}"],
         }
     )
-    GROUP_ID: str = "complex"
+    group_id: str = "complex"
 
 
 @cache
@@ -69,7 +69,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         **kwargs: Any,
     ) -> None:
         self.cmd = handler or get_rpc_server().do
-        self.view = PyMOLScreenshot(
+        self.interface = PyMOLScreenshot(
             callback=self.cmd, kwargs=kwargs, is_interactive=handler is None
         )
         super().setup()
@@ -77,7 +77,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
     def prepare(self) -> None:
         super().prepare()
         self.interactions: set[str] = set()
-        self.group_id = self.settings.GROUP_ID
+        self.group_id = self.settings.group_id
         self.cmd("set group_auto_mode, 2")
 
     def clear(self) -> None:
@@ -144,7 +144,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         lresid, presid = residues
         latoms, patoms = atoms
         colour = (
-            self.settings.COLORS.get(interaction, "#dedede").upper().replace("#", "0x")
+            self.settings.colors.get(interaction, "#dedede").upper().replace("#", "0x")
         )
         selections = []
         for component, indices in [("ligand", latoms), ("protein", patoms)]:
@@ -170,7 +170,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
 
     def save_png(self, name: str) -> None:
         path = Path(name)
-        screenshot = cast(PyMOLScreenshot, self.view)
+        screenshot = cast(PyMOLScreenshot, self.interface)
         return screenshot.save_png(path, dpi=300, ray=1, **screenshot.kwargs)
 
 

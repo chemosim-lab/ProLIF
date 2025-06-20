@@ -24,27 +24,27 @@ class Py3DMolSettings(Settings[dict[str, dict]]):
     __doc__ = (
         cast(str, Settings.__doc__)
         + """\
-    RESIDUE_HOVER_CALLBACK : str
+    residue_hover_callback : str
         JavaScript callback executed when hovering a residue involved in an interaction.
-    INTERACTION_HOVER_CALLBACK : str
+    interaction_hover_callback : str
         JavaScript callback executed when hovering an interaction line.
-    DISABLE_HOVER_CALLBACK : str
+    disable_hover_callback : str
         JavaScript callback executed when the hovering event is finished.
     """
     )
-    LIGAND_STYLE: dict[str, dict] = field(
+    ligand_style: dict[str, dict] = field(
         default_factory=lambda: {"stick": {"colorscheme": "cyanCarbon"}}
     )
-    RESIDUES_STYLE: dict[str, dict] = field(default_factory=lambda: {"stick": {}})
-    PROTEIN_STYLE: dict[str, dict] = field(
+    residues_style: dict[str, dict] = field(default_factory=lambda: {"stick": {}})
+    protein_style: dict[str, dict] = field(
         default_factory=lambda: {"cartoon": {"style": "edged"}}
     )
-    PEPTIDE_STYLE: dict[str, dict] = field(
+    peptide_style: dict[str, dict] = field(
         default_factory=lambda: {
             "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"},
         }
     )
-    INTERACTION_STYLE: dict = field(
+    interaction_style: dict = field(
         default_factory=lambda: {
             "radius": 0.15,
             "dashed": True,
@@ -52,7 +52,7 @@ class Py3DMolSettings(Settings[dict[str, dict]]):
             "toCap": 1,
         }
     )
-    RESIDUE_HOVER_CALLBACK: str = """
+    residue_hover_callback: str = """
     function(atom,viewer) {
         if(!atom.label) {
             atom.label = viewer.addLabel(
@@ -61,14 +61,14 @@ class Py3DMolSettings(Settings[dict[str, dict]]):
             );
         }
     }"""
-    INTERACTION_HOVER_CALLBACK: str = """
+    interaction_hover_callback: str = """
     function(shape,viewer) {
         if(!shape.label) {
             shape.label = viewer.addLabel('%s',
                 {position: shape, backgroundColor: 'black', fontColor:'white'});
         }
     }"""
-    DISABLE_HOVER_CALLBACK: str = """
+    disable_hover_callback: str = """
     function(obj,viewer) {
         if(obj.label) {
             viewer.removeLabel(obj.label);
@@ -83,7 +83,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         viewergrid: tuple[int, int],
         **view_kwargs: Any,
     ) -> None:
-        self.view = py3Dmol.view(viewergrid=viewergrid, **view_kwargs)
+        self.interface = py3Dmol.view(viewergrid=viewergrid, **view_kwargs)
         super().setup()
 
     def prepare(
@@ -96,20 +96,20 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         self.colormap = {} if colormap is None else colormap
 
     def clear(self) -> None:
-        self.viewcmd("removeAllModels")
+        self.cmd("removeAllModels")
 
     def finalize(self) -> None:
-        self.viewcmd("zoomTo", {"model": self.models["ligand"]}, viewer=self.position)
+        self.cmd("zoomTo", {"model": self.models["ligand"]}, viewer=self.position)
 
-    def viewcmd(self, cmd: str, /, *args: Any, **kwargs: Any) -> Any:
-        return getattr(self.view, cmd)(*args, **kwargs)
+    def cmd(self, cmd: str, /, *args: Any, **kwargs: Any) -> Any:
+        return getattr(self.interface, cmd)(*args, **kwargs)
 
     def modelcmd(self, cmd: str, /, *args: Any, **kwargs: Any) -> Any:
         model_id = kwargs.pop("model_id", None)
         if model_id is None:
-            model = self.viewcmd("getModel", viewer=self.position)
+            model = self.cmd("getModel", viewer=self.position)
         else:
-            model = self.viewcmd("getModel", model_id, viewer=self.position)
+            model = self.cmd("getModel", model_id, viewer=self.position)
         return getattr(model, cmd)(*args, **kwargs)
 
     def load_molecule(
@@ -119,7 +119,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         needs_dummy = "cartoon" in style
         if needs_dummy:
             # load dummy model to show requested style (cartoon)
-            self.viewcmd(
+            self.cmd(
                 "addModel",
                 pdb_dump,
                 "pdb",
@@ -132,7 +132,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
             )
             self._model_count += 1
         # load actual model with hydrogens and handling of events
-        self.viewcmd(
+        self.cmd(
             "addModel",
             pdb_dump,
             "pdb",
@@ -147,8 +147,8 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
             "setHoverable",
             {},
             True,
-            self.settings.RESIDUE_HOVER_CALLBACK,
-            self.settings.DISABLE_HOVER_CALLBACK,
+            self.settings.residue_hover_callback,
+            self.settings.disable_hover_callback,
         )
         self.models[component] = self._model_count
         self._model_count += 1
@@ -182,17 +182,17 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
     ) -> None:
         p1, p2 = points
         interaction_label = f"{interaction}: {distance:.2f}Å"
-        self.viewcmd(
+        self.cmd(
             "addCylinder",
             {
                 "start": {"x": p1.x, "y": p1.y, "z": p1.z},
                 "end": {"x": p2.x, "y": p2.y, "z": p2.z},
-                "color": self.settings.COLORS.get(interaction, "grey"),
-                **self.settings.INTERACTION_STYLE,
+                "color": self.settings.colors.get(interaction, "grey"),
+                **self.settings.interaction_style,
                 "hoverable": True,
-                "hover_callback": self.settings.INTERACTION_HOVER_CALLBACK
+                "hover_callback": self.settings.interaction_hover_callback
                 % interaction_label,
-                "unhover_callback": self.settings.DISABLE_HOVER_CALLBACK,
+                "unhover_callback": self.settings.disable_hover_callback,
             },
             viewer=self.position,
         )
@@ -206,7 +206,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         )
 
     def save_png(self, name: str) -> None:
-        uid = self.view.uniqueid
+        uid = self.interface.uniqueid
         display_javascript(
             f"""
             var png = viewer_{uid}.pngURI()
