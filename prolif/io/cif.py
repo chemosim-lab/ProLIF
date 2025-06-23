@@ -6,6 +6,7 @@ Yu-Yuan (Stuart) Yang, 2025
 """
 
 import shlex
+from pathlib import Path
 
 import pandas as pd
 
@@ -98,3 +99,22 @@ def cif_parser_lite(cif_string: str) -> dict:
             cif_dict[block_name][table_name] = table
 
     return cif_dict
+
+
+def cif_template_reader(cif_filepath: Path | str) -> dict:
+    """
+    Reads a CIF file and returns a dictionary of data blocks.
+
+    Parameters
+    ----------
+    cif_filepath : str
+        The path to the CIF file to read.
+
+    Returns
+    -------
+    dict
+        A dictionary containing the parsed data blocks.
+    """
+    cif_string = Path(cif_filepath).read_text()
+
+    return cif_parser_lite(cif_string)

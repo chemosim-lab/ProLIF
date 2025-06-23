@@ -1,7 +1,9 @@
 import logging
 import warnings
+from pathlib import Path
 
 from rdkit import Chem
+from rdkit.Chem import AllChem
 
 from prolif.constants import (
     AMBER_POOL,
@@ -32,12 +34,14 @@ class ProteinHelper:
         The path of input protein molecule (.pdb) or a ProLIF Molecule.
     """
 
-    def __init__(self, input_topology: Molecule | str):
+    def __init__(self, input_topology: Molecule | str | Path):
         # read as prolif molecule
         if isinstance(input_topology, Molecule):
             self.protein_mol = input_topology
 
-        elif isinstance(input_topology, str) and input_topology.endswith(".pdb"):
+        elif isinstance(input_topology, str | Path) and str(input_topology).endswith(
+            ".pdb"
+        ):
             input_protein_top = Chem.MolFromPDBFile(input_topology)
             self.protein_mol = Molecule.from_rdkit(input_protein_top)
 
@@ -75,6 +79,13 @@ class ProteinHelper:
             if not all(isinstance(t, dict) for t in templates):
                 raise TypeError("Templates must be a dict, a list of dicts or None.")
             templates.extend([STANDARD_AA])
+
+        # check the templates with "name" for each residue
+        for template in templates:
+            for t in template:
+                # if not, set the residue name as the template name
+                if "name" not in template[t]:
+                    template[t]["name"] = t  # use the residue name as the template name
 
         # get a dict of the number of the heavy atoms in the template residues
         n_template_res_hatms = self.n_template_residue_heavy_atoms(templates)
@@ -269,6 +280,16 @@ class ProteinHelper:
             for resname in t:
                 if resname in n_template_residue_heavy_atoms:
                     continue
+
+                # SMILES template
+                if "SMILES" in t[resname]:
+                    t_mol = Chem.MolFromSmiles(t[resname]["SMILES"])
+                    n_template_residue_heavy_atoms[resname] = len(
+                        [at for at in t_mol.GetAtoms() if at.GetAtomicNum() != 1]
+                    )
+                    continue
+
+                # CIF template
                 residue_atom_df = t[resname]["_chem_comp_atom"]
                 residue_atom_df = residue_atom_df[
                     residue_atom_df["alt_atom_id"] != "OXT"
@@ -311,16 +332,26 @@ class ProteinHelper:
             templates = [STANDARD_AA]
         resname = residue.resid.name.upper()
 
-        # strip bonds and chiral tags
-        new_res = strip_bonds(residue)
-
-        # read the templates and assign intra properties
+        # read the templates and assign correct bond orders
         for t in templates:
             # check if resname in template doc
             if resname not in t:
                 continue
+
+            # SMILES template
+            if "SMILES" in t[resname]:
+                # convert SMILES to RDKit molecule
+                mol_template = AllChem.MolFromSmiles(t[resname]["SMILES"])
+
+                # assign bond orders from template
+                new_res = AllChem.AssignBondOrdersFromTemplate(mol_template, residue)
+                break
+
+            # cif template
+            new_res = strip_bonds(residue)  # strip bonds and chiral tags
             new_res = assign_intra_props(new_res, t[resname])
             break  # avoid double assignment, ordering of templates is relevant
+
         else:
             raise ValueError(f"Failed to find template for residue: '{resname}'")
 
@@ -363,14 +394,14 @@ def strip_bonds(m: Chem.Mol) -> Chem.Mol:
 
 def assign_intra_props(mol: Chem.Mol, reference_block: dict) -> Chem.Mol:
     """Assign bonds and aromaticity based on residue and atom names
-    from a reference block (template molecule).
+    from a reference block (cif template molecule).
 
     Parameters
     ----------
     mol : rdkit.Chem.Mol
       the input molecule, this is modified in place and returned
     reference_block : dict
-      the template molecule from which to assign bonds
+      the cif template molecule from which to assign bonds
 
     Returns
     -------
