@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 from numpy.testing import assert_equal
 from rdkit import Chem
+from rdkit.Chem import AllChem
 
 from prolif.datafiles import datapath
 from prolif.molecule import Molecule
@@ -358,6 +359,17 @@ class TestProteinHelper:
         assert len(protein_helper.protein_mol.residues) == 1
         assert str(protein_helper.protein_mol.residues[0].resid) == "HID109.A"
 
+        # Test with the template having different names
+        protein_helper = ProteinHelper(Molecule(HSD_RESIDUE))
+        with pytest.warns(
+            UserWarning, match=r"Align the template name \(BEN\) with \(RESNAME\)\."
+        ):
+            protein_helper.standardize_protein(
+                templates=[
+                    {"RESNAME": {"name": "BEN", "SMILES": "NC(=N)c1ccccc1"}},
+                ]
+            )
+
         # Test with a BENZAMIDINE residue
         protein_helper = ProteinHelper(BEN_MOL)
         protein_helper.standardize_protein(templates=CUSTOM_TEMPLATE)
@@ -389,3 +401,21 @@ class TestProteinHelper:
             ],
             all_bonds_info,
         )
+
+    def test_assign_intra_props_lone_H(self) -> None:
+        """
+        Test the assignment of intra properties for a residue with a lone hydrogen.
+        """
+        from prolif.io.protein_helper import _assign_intra_props_lone_H, strip_bonds
+
+        mol = Chem.MolFromSmiles("C")
+        mol = Chem.AddHs(mol)
+        AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+
+        strip_mol = strip_bonds(mol)
+
+        with Chem.RWMol(strip_mol) as em:
+            em_fixed = _assign_intra_props_lone_H(em)
+
+        for bond1, bond2 in zip(mol.GetBonds(), em_fixed.GetBonds(), strict=False):
+            assert bond1.GetBondType() == bond2.GetBondType()

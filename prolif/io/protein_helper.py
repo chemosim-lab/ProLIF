@@ -32,6 +32,19 @@ class ProteinHelper:
     ----------
     input_topology : str or Molecule
         The path of input protein molecule (.pdb) or a ProLIF Molecule.
+
+    Attributes
+    ----------
+    protein_mol : Molecule
+        The ProLIF Molecule instance representing the protein.
+
+    Notes
+    -----
+    This class is designed to work with ProLIF Molecule instances or PDB files.
+    It reads the input topology, standardizes the residue names, and fixes the bond
+    orders based on the provided templates or standard amino acid
+    template. However, the explicit hydrogen atoms will be removed from the molecule.
+
     """
 
     def __init__(self, input_topology: Molecule | str | Path):
