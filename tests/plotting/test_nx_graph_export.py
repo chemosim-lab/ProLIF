@@ -3,7 +3,7 @@ from typing import Any, cast
 import pandas as pd
 import pytest
 from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit.Chem.rdDistGeom import EmbedMolecule
 
 from prolif.plotting.network.lignetwork import LigNetwork
 
@@ -13,7 +13,7 @@ def simple_ligand_mol() -> Chem.rdchem.Mol:
     """Create a simple ligand molecule (benzene) for testing"""
     mol = Chem.MolFromSmiles("c1ccccc1")
     mol = Chem.AddHs(mol)
-    AllChem.EmbedMolecule(mol, randomSeed=42)  # type: ignore
+    EmbedMolecule(mol, randomSeed=42)
     return mol
 
 
@@ -23,11 +23,11 @@ def simple_interaction_df() -> pd.DataFrame:
     # Create a simple dataframe with interactions
     data = [
         # ligand, protein, interaction, atoms, weight, distance, components
-        ["LIG:1", "PRO:A:100", "Hydrophobic", (0, 1), 1.0, 3.5, "ligand_protein"],
-        ["LIG:1", "PRO:A:101", "HBAcceptor", (2,), 0.8, 2.9, "ligand_protein"],
+        ["LIG1", "PRO100.A", "Hydrophobic", (0,), 1.0, 3.5, "ligand_protein"],
+        ["LIG1", "PRO100.A", "HBAcceptor", (1,), 0.8, 2.9, "ligand_protein"],
         [
-            "LIG:1",
-            "PRO:A:102",
+            "LIG1",
+            "PHE102.A",
             "PiStacking",
             (0, 1, 2, 3, 4, 5),
             0.9,
@@ -60,15 +60,15 @@ def lignetwork_obj(
     return LigNetwork(simple_interaction_df, simple_ligand_mol)
 
 
-def test_to_networkx_graph_with_bonds(
+def test_to_networkx_graph(
     lignetwork_obj: LigNetwork, simple_ligand_mol: Chem.rdchem.Mol
 ) -> None:
-    """Test to_networkx_graph_object with include_ligand_bonds=True (default)"""
+    """Test to_networkx_graph_object"""
     G = lignetwork_obj.to_networkx_graph_object()
 
     # Check that the graph has the correct number of nodes
-    # All atoms + 3 protein residues
-    expected_nodes = simple_ligand_mol.GetNumAtoms() + 3
+    # All atoms + 2 protein residues
+    expected_nodes = simple_ligand_mol.GetNumAtoms() + 2
     assert len(G.nodes) == expected_nodes
 
     # Check for ligand atoms
@@ -77,7 +77,7 @@ def test_to_networkx_graph_with_bonds(
         assert G.nodes[i]["node_type"] == "ligand"
 
     # Check for protein residues
-    expected_residues = ["PRO:A:100", "PRO:A:101", "PRO:A:102"]
+    expected_residues = ["PRO100.A", "PHE102.A"]  # Updated to match the data
     for res in expected_residues:
         assert res in G.nodes
         assert G.nodes[res]["node_type"] == "protein"
@@ -91,40 +91,6 @@ def test_to_networkx_graph_with_bonds(
 
     # There should be the same number of bonds as in the molecule
     assert bond_edges == simple_ligand_mol.GetNumBonds()
-
-
-def test_to_networkx_graph_without_bonds(
-    lignetwork_obj: LigNetwork, simple_interaction_df: pd.DataFrame
-) -> None:
-    """Test to_networkx_graph_object with include_ligand_bonds=False"""
-    G = lignetwork_obj.to_networkx_graph_object(include_ligand_bonds=False)
-
-    # Get unique atoms involved in interactions
-    interaction_atoms = set()
-    for idx in simple_interaction_df.index:
-        interaction_atoms.update(idx[3])
-
-    # Protein residues
-    protein_residues = set(simple_interaction_df.index.get_level_values("protein"))
-
-    # Check that only interacting atoms and protein residues are present
-    assert len(G.nodes) == len(interaction_atoms) + len(protein_residues)
-
-    # Check all expected nodes are present
-    for atom in interaction_atoms:
-        assert atom in G.nodes
-        assert G.nodes[atom]["node_type"] == "ligand"
-
-    for residue in protein_residues:
-        assert residue in G.nodes
-        assert G.nodes[residue]["node_type"] == "protein"
-
-    # No bonds should be present
-    bond_edges = 0
-    for u, v, data in G.edges(data=True):
-        if data.get("edge_type") == "bond":
-            bond_edges += 1
-    assert bond_edges == 0
 
 
 def test_interaction_edge_attributes(
@@ -206,7 +172,7 @@ def test_empty_interaction_df() -> None:
     # Create a small molecule
     mol = Chem.MolFromSmiles("CC")
     mol = Chem.AddHs(mol)
-    AllChem.EmbedMolecule(mol)  # type: ignore
+    EmbedMolecule(mol, randomSeed=42)
 
     # Create an empty DataFrame with the right structure
     idx = pd.MultiIndex.from_tuples(

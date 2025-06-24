@@ -473,13 +473,8 @@ class LigNetwork:
         )
         self._nodes[idx] = node
 
-    def to_networkx_graph_object(self, include_ligand_bonds: bool = True) -> nx.Graph:
+    def to_networkx_graph_object(self) -> nx.Graph:
         """Export the interaction data directly as a NetworkX graph object.
-
-        Parameters
-        ----------
-        include_ligand_bonds : bool, default=True
-        Whether to include bonds between ligand atoms in the graph
 
         Returns
         -------
@@ -501,33 +496,32 @@ class LigNetwork:
             )
 
         # 2. Add ligand atom nodes
-        if include_ligand_bonds:
-            for atom in self.mol.GetAtoms():
-                idx = atom.GetIdx()
-                G.add_node(
-                    idx,
-                    node_type="ligand",
-                    symbol=atom.GetSymbol(),
-                    charge=atom.GetFormalCharge(),
-                    coords=(
-                        float(self.xyz[idx, 0]),
-                        float(self.xyz[idx, 1]),
-                        float(self.xyz[idx, 2]),
-                    ),
-                    label=atom.GetSymbol(),
-                )
+        for atom in self.mol.GetAtoms():
+            idx = atom.GetIdx()
+            G.add_node(
+                idx,
+                node_type="ligand",
+                symbol=atom.GetSymbol(),
+                charge=atom.GetFormalCharge(),
+                coords=(
+                    float(self.xyz[idx, 0]),
+                    float(self.xyz[idx, 1]),
+                    float(self.xyz[idx, 2]),
+                ),
+                label=atom.GetSymbol(),
+            )
 
-            # Add ligand bonds
-            for bond in self.mol.GetBonds():
-                begin_idx = bond.GetBeginAtomIdx()
-                end_idx = bond.GetEndAtomIdx()
-                G.add_edge(
-                    begin_idx,
-                    end_idx,
-                    edge_type="bond",
-                    bond_type=bond.GetBondType(),
-                    bond_order=bond.GetBondTypeAsDouble(),
-                )
+        # Add ligand bonds
+        for bond in self.mol.GetBonds():
+            begin_idx = bond.GetBeginAtomIdx()
+            end_idx = bond.GetEndAtomIdx()
+            G.add_edge(
+                begin_idx,
+                end_idx,
+                edge_type="bond",
+                bond_type=bond.GetBondType(),
+                bond_order=bond.GetBondTypeAsDouble(),
+            )
 
         # 3. Add interaction edges
         for idx, row in self.df.iterrows():
@@ -544,23 +538,6 @@ class LigNetwork:
 
             # For interactions involving multiple ligand atoms, create edges for each
             for lig_atom_idx in lig_indices:
-                if not include_ligand_bonds and lig_atom_idx not in G:
-                    # If we're not including full ligand structure, add atom nodes as needed
-                    atom = self.mol.GetAtomWithIdx(lig_atom_idx)
-                    G.add_node(
-                        lig_atom_idx,
-                        node_type="ligand",
-                        symbol=atom.GetSymbol(),
-                        charge=atom.GetFormalCharge(),
-                        coords=(
-                            float(self.xyz[lig_atom_idx, 0]),
-                            float(self.xyz[lig_atom_idx, 1]),
-                            float(self.xyz[lig_atom_idx, 2]),
-                        ),
-                        label=atom.GetSymbol(),
-                    )
-
-                # Add the interaction edge
                 G.add_edge(
                     lig_atom_idx,
                     prot_res,
