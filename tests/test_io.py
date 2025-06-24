@@ -82,6 +82,13 @@ class TestProteinHelper:
         return Molecule.from_rdkit(input_mol)
 
     @pytest.fixture(scope="class")
+    def BEN_MOL(self) -> Molecule:
+        """Return a Molecule object for the BEN residue."""
+        ben_path = datapath / "ben_test.pdb"
+        input_mol = Chem.MolFromPDBFile(str(ben_path))
+        return Molecule.from_rdkit(input_mol)
+
+    @pytest.fixture(scope="class")
     def CUSTOM_TEMPLATE(self) -> dict:
         """Return a custom template for testing."""
         from prolif.io.cif import cif_template_reader
@@ -89,6 +96,7 @@ class TestProteinHelper:
         tpo_template = cif_template_reader(datapath / "TPO.cif")
         ace_template = cif_template_reader(datapath / "ACE.cif")
         nme_template = cif_template_reader(datapath / "NME.cif")
+        ben_template = cif_template_reader(datapath / "BEN.cif")
 
         return {
             "XYZ": {
@@ -102,6 +110,7 @@ class TestProteinHelper:
             "TPO": tpo_template["TPO"],
             "ACE": ace_template["ACE"],
             "NME": nme_template["NME"],
+            "BEN": ben_template["BEN"],
         }
 
     @pytest.fixture(scope="class")
@@ -293,7 +302,11 @@ class TestProteinHelper:
         assert forcefield == "unknown"
 
     def test_standardize_protein(
-        self, INPUT_MOL: Molecule, CUSTOM_TEMPLATE: dict, HSD_RESIDUE: Residue
+        self,
+        INPUT_MOL: Molecule,
+        BEN_MOL: Molecule,
+        CUSTOM_TEMPLATE: dict,
+        HSD_RESIDUE: Residue,
     ) -> None:
         """Test the standardization of a protein molecule."""
         from prolif.io.protein_helper import ProteinHelper
@@ -309,6 +322,20 @@ class TestProteinHelper:
         assert isinstance(protein_helper.protein_mol, Molecule)
         assert len(protein_helper.protein_mol.residues) == len(INPUT_MOL.residues)
 
+        protein_helper2 = ProteinHelper(INPUT_MOL)
+        with pytest.warns(
+            UserWarning,
+            match="Residue NME3 has a different number of heavy atoms "
+            r"than the standard residue\. This may affect H-bond detection\.",
+        ):
+            protein_helper2.standardize_protein(
+                templates=[CUSTOM_TEMPLATE, {"BEN": {"SMILES": "NC(=N)c1ccccc1"}}]
+            )
+        assert isinstance(protein_helper2.protein_mol, Molecule)
+        assert len(protein_helper2.protein_mol.residues) == len(
+            protein_helper.protein_mol.residues
+        )
+
         # Test with no valid templates
         protein_helper = ProteinHelper(INPUT_MOL)
         with pytest.raises(
@@ -318,9 +345,47 @@ class TestProteinHelper:
         ):
             protein_helper.standardize_protein()
 
+        # Test with a format
+        protein_helper = ProteinHelper(INPUT_MOL)
+        with pytest.raises(
+            TypeError, match=r"Templates must be a dict, a list of dicts or None\."
+        ):
+            protein_helper.standardize_protein(templates=["invalid_format"])
+
         # Test with a residue
         protein_helper = ProteinHelper(Molecule(HSD_RESIDUE))
         protein_helper.standardize_protein()
-        assert isinstance(protein_helper.protein_mol, Molecule)
         assert len(protein_helper.protein_mol.residues) == 1
         assert str(protein_helper.protein_mol.residues[0].resid) == "HID109.A"
+
+        # Test with a BENZAMIDINE residue
+        protein_helper = ProteinHelper(BEN_MOL)
+        protein_helper.standardize_protein(templates=CUSTOM_TEMPLATE)
+        assert isinstance(protein_helper.protein_mol, Molecule)
+        all_bonds_info = []
+        for bond in protein_helper.protein_mol.residues[0].GetBonds():
+            if bond.GetBeginAtomIdx() < bond.GetEndAtomIdx():
+                all_bonds_info.append(
+                    f"{bond.GetBeginAtomIdx()}_{bond.GetEndAtomIdx()}_"
+                    f"{bond.GetBondType()!s}"
+                )
+            else:
+                all_bonds_info.append(
+                    f"{bond.GetEndAtomIdx()}_{bond.GetBeginAtomIdx()}_"
+                    f"{bond.GetBondType()!s}"
+                )
+        all_bonds_info = sorted(all_bonds_info)
+        assert_equal(
+            [
+                "0_1_UNSPECIFIED",
+                "0_2_DOUBLE",
+                "0_4_SINGLE",
+                "1_3_AROMATIC",
+                "1_8_AROMATIC",
+                "3_5_AROMATIC",
+                "5_6_AROMATIC",
+                "6_7_AROMATIC",
+                "7_8_AROMATIC",
+            ],
+            all_bonds_info,
+        )

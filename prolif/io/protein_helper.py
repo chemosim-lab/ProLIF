@@ -87,6 +87,13 @@ class ProteinHelper:
                 if "name" not in template[t]:
                     template[t]["name"] = t  # use the residue name as the template name
 
+                elif template[t]["name"] != t:
+                    warnings.warn(
+                        f"Align the template name ({template[t]['name']}) with ({t}).",
+                        stacklevel=2,
+                    )
+                    template[t]["name"] = t
+
         # get a dict of the number of the heavy atoms in the template residues
         n_template_res_hatms = self.n_template_residue_heavy_atoms(templates)
 
