@@ -87,6 +87,9 @@ class TestProteinHelper:
         from prolif.io.cif import cif_template_reader
 
         tpo_template = cif_template_reader(datapath / "TPO.cif")
+        ace_template = cif_template_reader(datapath / "ACE.cif")
+        nme_template = cif_template_reader(datapath / "NME.cif")
+
         return {
             "XYZ": {
                 "name": "XYZ",
@@ -97,7 +100,16 @@ class TestProteinHelper:
                 "SMILES": "C(C(=O)O)N",
             },
             "TPO": tpo_template["TPO"],
+            "ACE": ace_template["ACE"],
+            "NME": nme_template["NME"],
         }
+
+    @pytest.fixture(scope="class")
+    def HSD_RESIDUE(self) -> Residue:
+        """Return a HID residue for testing."""
+        protein_path = datapath / "implicitHbond/1s2g__1__1.A_2.C__1.D/receptor_hsd.pdb"
+        input_mol = Chem.MolFromPDBFile(str(protein_path))
+        return Molecule.from_rdkit(input_mol).residues[106]
 
     def test_initialization(self, INPUT_PATH: str, INPUT_MOL: Molecule) -> None:
         """Test the initialization of the TestProteinHelper class."""
@@ -185,7 +197,10 @@ class TestProteinHelper:
 
         # Test with a custom (SMILES) template
         custom_template_n_heavy_atoms = ProteinHelper.n_template_residue_heavy_atoms(
-            templates=[CUSTOM_TEMPLATE]
+            templates=[
+                CUSTOM_TEMPLATE,
+                {"XYZ": {"name": "XYZ", "test": "duplicate XYZ will be skiped."}},
+            ]
         )
         assert isinstance(custom_template_n_heavy_atoms, dict)
         assert custom_template_n_heavy_atoms["XYZ"] == 6
@@ -201,7 +216,6 @@ class TestProteinHelper:
             INPUT_MOL.residues[1], templates=[CUSTOM_TEMPLATE]
         )
         assert isinstance(fixed_mol, Residue)
-        # assert len(fixed_mol.bonds) > 0
 
         # Test with a Molecule object (using SMILES template)
         fixed_mol_custom = ProteinHelper.fix_molecule_bond_orders(
@@ -251,10 +265,62 @@ class TestProteinHelper:
         bond2_info = sorted(bond2_info)
         assert_equal(bond1_info, bond2_info)
 
+        # Test: not found template for residue (TPO) in default templates
         with pytest.raises(
             ValueError,
-            match=r"Failed to find template for residue: \'ACE\'",
+            match=r"Failed to find template for residue: \'TPO\'",
         ):
-            ProteinHelper.fix_molecule_bond_orders(
-                INPUT_MOL.residues[0], templates=CUSTOM_TEMPLATE
-            )
+            ProteinHelper.fix_molecule_bond_orders(INPUT_MOL.residues[1])
+
+    def test_forcefield_guesser(self) -> None:
+        """Test the forcefield guesser."""
+        from prolif.io.protein_helper import ProteinHelper
+
+        # Test with a known forcefield
+        forcefield = ProteinHelper.forcefield_guesser({"HSD"})
+        assert forcefield == "charmm"
+
+        forcefield = ProteinHelper.forcefield_guesser({"NASP"})
+        assert forcefield == "amber"
+
+        forcefield = ProteinHelper.forcefield_guesser({"ASN1"})
+        assert forcefield == "gromos"
+
+        forcefield = ProteinHelper.forcefield_guesser({"HISD"})
+        assert forcefield == "oplsaa"
+
+        forcefield = ProteinHelper.forcefield_guesser({"CYS"})
+        assert forcefield == "unknown"
+
+    def test_standardize_protein(
+        self, INPUT_MOL: Molecule, CUSTOM_TEMPLATE: dict, HSD_RESIDUE: Residue
+    ) -> None:
+        """Test the standardization of a protein molecule."""
+        from prolif.io.protein_helper import ProteinHelper
+
+        # Test standardizing a protein molecule
+        protein_helper = ProteinHelper(INPUT_MOL)
+        with pytest.warns(
+            UserWarning,
+            match="Residue NME3 has a different number of heavy atoms "
+            r"than the standard residue\. This may affect H-bond detection\.",
+        ):
+            protein_helper.standardize_protein(templates=CUSTOM_TEMPLATE)
+        assert isinstance(protein_helper.protein_mol, Molecule)
+        assert len(protein_helper.protein_mol.residues) == len(INPUT_MOL.residues)
+
+        # Test with no valid templates
+        protein_helper = ProteinHelper(INPUT_MOL)
+        with pytest.raises(
+            ValueError,
+            match=r"Residue \{'ACE'\} is not a standard residue or "
+            r"not in the templates\. Please provide a custom template\.",
+        ):
+            protein_helper.standardize_protein()
+
+        # Test with a residue
+        protein_helper = ProteinHelper(Molecule(HSD_RESIDUE))
+        protein_helper.standardize_protein()
+        assert isinstance(protein_helper.protein_mol, Molecule)
+        assert len(protein_helper.protein_mol.residues) == 1
+        assert str(protein_helper.protein_mol.residues[0].resid) == "HID109.A"
