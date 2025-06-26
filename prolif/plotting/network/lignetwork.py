@@ -716,8 +716,7 @@ class LigNetwork:
                 edge["label"] = self._edge_label_formatter.format_map(int_data)
                 edge["font"] = self._edge_label_font
             self.edges.append(edge)
-
-            self._calculate_protein_node_coordinates()
+        self._calculate_protein_node_coordinates()
 
     def _calculate_protein_node_coordinates(self) -> None:
         """Calculates optimal 2D coordinates for protein residue nodes in the visualization.
@@ -754,15 +753,15 @@ class LigNetwork:
         ligand_atom_indices = []
         for idx in range(self.mol.GetNumAtoms()):
             atom = self.mol.GetAtomWithIdx(idx)
-            if atom.GetSymbol() != "H" and idx not in self.exclude:
-                ligand_atom_indices.append(idx)
-                G.add_node(
-                    idx,
-                    node_type="ligand",
-                    fixed=True,
-                    x=float(self.xyz[idx, 0]),
-                    y=float(self.xyz[idx, 1]),
-                )
+            # not checking self.exclude here, to get a proper direction vector for all the residues interacting with H atoms
+            ligand_atom_indices.append(idx)
+            G.add_node(
+                idx,
+                node_type="ligand",
+                fixed=True,
+                x=float(self.xyz[idx, 0]),
+                y=float(self.xyz[idx, 1]),
+            )
 
         # 4. Create edges between residues and ligand atoms based on interactions
         for (lig_res, prot_res, interaction, lig_indices), (
@@ -819,6 +818,7 @@ class LigNetwork:
                 pos[prot_res] = center + width * np.array(
                     [np.cos(angle), np.sin(angle)]
                 )
+            
 
         # 6. Run spring layout
         pos = nx.spring_layout(
@@ -843,8 +843,8 @@ class LigNetwork:
             # Calculate desired dimensions
             current_width = max_coords[0] - min_coords[0]
             current_height = max_coords[1] - min_coords[1]
-            desired_width = width * 2
-            desired_height = height * 2
+            desired_width = width * 2.5
+            desired_height = height * 2.5
 
             # Scale if needed
             if current_width > 0 and current_height > 0:
@@ -857,7 +857,7 @@ class LigNetwork:
                     residue_pos[res] = (coords - center) * scale_factor + center
 
             # Check for and resolve overlaps
-            min_distance = max(width, height) * 0.18  # Minimum separation
+            min_distance = max(width, height) * 0.2  # Minimum separation
             max_iterations = 10
 
             for _ in range(max_iterations):
@@ -978,12 +978,7 @@ class LigNetwork:
             "nodes": {
                 "font": {"size": fontsize},
             },
-            "physics": {
-                "barnesHut": {
-                    "avoidOverlap": self._avoidOverlap,
-                    "springConstant": self._springConstant,
-                },
-            },
+            "physics": False,
         }
         options.update(self.options)
 
