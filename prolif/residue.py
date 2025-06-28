@@ -32,6 +32,9 @@ class ResidueId:
         Residue number
     chain : str or None, default = None
         Protein chain
+    segidx : int, default = 0
+        MDAnalysis segment index (mainly used to avoid duplicate ResidueId for very
+        large systems that may reuse residue numbers without defining a chain).
 
     Notes
     -----
@@ -39,7 +42,8 @@ class ResidueId:
 
     .. versionchanged:: 2.1.0
         Whitespaces are now stripped from the name and chain. Better support for water
-        and monatomic ion residue names.
+        and monatomic ion residue names. Added segment indices to avoid ResidueId
+        clashes for large systems (especially water molecules).
     """
 
     def __init__(
@@ -47,13 +51,15 @@ class ResidueId:
         name: str | None = "UNK",
         number: int | None = 0,
         chain: str | None = None,
+        segidx: int = 0,
     ):
         self.name = "UNK" if not name else name.strip()
         self.number = number or 0
         self.chain = None if not chain else chain.strip()
+        self._segidx = segidx
 
     def __repr__(self) -> str:
-        return f"ResidueId({self.name}, {self.number}, {self.chain})"
+        return f"ResidueId({self.name}, {self.number}, {self.chain}, {self._segidx})"
 
     def __str__(self) -> str:
         resid = f"{self.name}{self.number}"
@@ -62,26 +68,23 @@ class ResidueId:
         return resid
 
     def __hash__(self) -> int:
-        return hash((self.name, self.number, self.chain))
+        return hash((self.name, self.number, self.chain, self._segidx))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ResidueId):
             return NotImplemented
-        return (self.name, self.number, self.chain) == (
+        return (self.name, self.number, self.chain, self._segidx) == (
             other.name,
             other.number,
             other.chain,
+            other._segidx,
         )
 
     def __lt__(self, other: "ResidueId") -> bool:
-        def chain_key(chain: str | None) -> tuple[bool, str | None]:
-            # Handles the case where the two chains are of different types
-            # e.g., None from WAT123, and str from ALA42.A
-            return (chain is not None, chain)
-
-        return (chain_key(self.chain), self.number) < (
-            chain_key(other.chain),
+        return (_chain_key(self.chain), self.number, self._segidx) < (
+            _chain_key(other.chain),
             other.number,
+            other._segidx,
         )
 
     @classmethod
@@ -95,10 +98,12 @@ class ResidueId:
         """
         mi = atom.GetMonomerInfo()
         if mi:
-            name = mi.GetResidueName()
-            number = mi.GetResidueNumber()
-            chain = mi.GetChainId()
-            return cls(name, number, chain)
+            return cls(
+                mi.GetResidueName(),
+                mi.GetResidueNumber(),
+                mi.GetChainId(),
+                mi.GetSegmentNumber(),
+            )
         return cls()
 
     @classmethod
@@ -140,6 +145,12 @@ class ResidueId:
         name, number, chain = matches.groups()
         number = int(number) if number else 0
         return cls(name, number, chain)
+
+
+def _chain_key(chain: str | None) -> tuple[bool, str | None]:
+    # Handles the case where the two chains are of different types
+    # e.g., None from WAT123, and str from ALA42.A
+    return (chain is not None, chain)
 
 
 class Residue(BaseRDKitMol):

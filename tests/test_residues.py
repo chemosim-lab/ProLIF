@@ -39,27 +39,33 @@ class TestResidueId:
         assert resid.name == name
         assert resid.number == number
         assert resid.chain == chain
+        assert resid._segidx == 0
 
     @pytest.mark.parametrize(
-        ("name", "number", "chain"),
+        ("name", "number", "chain", "segidx"),
         [
-            ("ALA", None, None),
-            ("ALA", 1, None),
-            ("ALA", 0, None),
-            ("ALA", None, "B"),
-            ("ALA", 1, "B"),
-            ("DA", 1, None),
-            (None, 1, "B"),
-            (None, None, "B"),
-            (None, 1, None),
-            (None, None, None),
-            ("", None, None),
-            (None, None, ""),
-            ("", None, ""),
+            ("ALA", None, None, None),
+            ("ALA", 1, None, None),
+            ("ALA", 0, None, None),
+            ("ALA", None, "B", None),
+            ("ALA", 1, "B", None),
+            ("ALA", 1, "B", 2),
+            ("DA", 1, None, None),
+            (None, 1, "B", None),
+            (None, None, "B", None),
+            (None, 1, None, None),
+            (None, None, None, None),
+            ("", None, None, None),
+            (None, None, "", None),
+            ("", None, "", None),
         ],
     )
     def test_from_atom(
-        self, name: str | None, number: int | None, chain: str | None
+        self,
+        name: str | None,
+        number: int | None,
+        chain: str | None,
+        segidx: int | None,
     ) -> None:
         atom = Chem.Atom(1)
         mi = Chem.AtomPDBResidueInfo()
@@ -69,14 +75,18 @@ class TestResidueId:
             mi.SetResidueNumber(number)
         if chain is not None:
             mi.SetChainId(chain)
+        if segidx is not None:
+            mi.SetSegmentNumber(segidx)
         atom.SetMonomerInfo(mi)
         resid = ResidueId.from_atom(atom)
         name = name or "UNK"
         number = number or 0
         chain = chain or None
+        segidx = segidx or 0
         assert resid.name == name
         assert resid.number == number
         assert resid.chain == chain
+        assert resid._segidx == segidx
 
     def test_from_atom_no_mi(self) -> None:
         atom = Chem.Atom(1)
@@ -84,6 +94,7 @@ class TestResidueId:
         assert resid.name == "UNK"
         assert resid.number == 0
         assert resid.chain is None
+        assert resid._segidx == 0
 
     @pytest.mark.parametrize(
         ("resid_str", "expected"),
@@ -130,6 +141,9 @@ class TestResidueId:
         assert res1 == res2
         assert res1.__eq__(42) is NotImplemented
 
+        res3 = ResidueId(name, number, chain, 1)
+        assert res3 != res1
+
     @pytest.mark.parametrize(
         ("res1", "res2"),
         [
@@ -145,11 +159,22 @@ class TestResidueId:
         resid2 = ResidueId.from_string(res2)
         assert resid1 < resid2
 
-    @pytest.mark.parametrize("resid_str", ["ALA1.A", "DA2.B", "HIS3", "UNK0"])
-    def test_repr(self, resid_str: str) -> None:
+    def test_lt_segidx(self) -> None:
+        assert ResidueId("HOH", 1) < ResidueId("HOH", 1, segidx=1)
+
+    @pytest.mark.parametrize(
+        ("resid_str", "expected"),
+        [
+            ("ALA1.A", ("ALA", 1, "A")),
+            ("DA2.B", ("DA", 2, "B")),
+            ("HIS3", ("HIS", 3, None)),
+            ("UNK0", ("UNK", 0, None)),
+        ],
+    )
+    def test_repr(self, resid_str: str, expected: tuple[str, int, str | None]) -> None:
         resid = ResidueId.from_string(resid_str)
-        expected = f"ResidueId({resid.name}, {resid.number}, {resid.chain})"
-        assert repr(resid) == expected
+        expected_repr = f"ResidueId({expected[0]}, {expected[1]}, {expected[2]}, 0)"
+        assert repr(resid) == expected_repr
         assert str(resid) == resid_str
 
 
