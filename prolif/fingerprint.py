@@ -642,12 +642,13 @@ class Fingerprint:
         residues: "ResidueSelection",
         converter_kwargs: tuple[dict, dict],
         progress: bool,
+        **kwargs: Any,
     ) -> "IFPResults":
         """Serial implementation for trajectories."""
         # support single frame
         if isinstance(traj, Timestep):
             traj = (traj,)
-        iterator = tqdm(traj) if progress else traj
+        iterator = tqdm(traj, **kwargs) if progress else traj
         ifp: "IFPResults" = {}
         for ts in iterator:
             lig_mol = Molecule.from_mda(lig, **converter_kwargs[0])
@@ -669,6 +670,7 @@ class Fingerprint:
         converter_kwargs: tuple[dict, dict],
         progress: bool,
         n_jobs: int | None,
+        **kwargs: Any,
     ) -> "IFPResults":
         """Parallel implementation of :meth:`~Fingerprint.run`"""
         n_chunks = n_jobs or cast(int, mp.cpu_count())
@@ -707,7 +709,7 @@ class Fingerprint:
             n_jobs,
             fingerprint=self,
             residues=residues,
-            tqdm_kwargs={"total": len(frames), "disable": not progress},
+            tqdm_kwargs={"total": len(frames), "disable": not progress, **kwargs},
             rdkitconverter_kwargs=converter_kwargs,
         ) as pool:
             for ifp_data_chunk in pool.process(args_iterable):
@@ -828,8 +830,9 @@ class Fingerprint:
         prot_mol: Molecule,
         residues: "ResidueSelection" = None,
         progress: bool = True,
+        **kwargs: Any,
     ) -> "IFPResults":
-        iterator = tqdm(lig_iterable) if progress else lig_iterable
+        iterator = tqdm(lig_iterable, **kwargs) if progress else lig_iterable
         ifp: "IFPResults" = {}
         for i, lig_mol in enumerate(iterator):
             ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
@@ -842,6 +845,7 @@ class Fingerprint:
         residues: "ResidueSelection" = None,
         progress: bool = True,
         n_jobs: int | None = None,
+        **kwargs: Any,
     ) -> "IFPResults":
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
         total = (
@@ -856,7 +860,7 @@ class Fingerprint:
             fingerprint=self,
             prot_mol=prot_mol,
             residues=residues,
-            tqdm_kwargs={"total": total, "disable": not progress},
+            tqdm_kwargs={"total": total, "disable": not progress, **kwargs},
         ) as pool:
             for i, ifp_data in enumerate(pool.process(lig_iterable)):
                 ifp[i] = ifp_data

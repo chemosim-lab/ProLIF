@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Added an internal segment index to `ResidueId` to avoid overwriting residues when
+  identical name, number and chain are used for water molecules.
 - Strip whitespaces in `ResidueId` name and chain.
 - Improved parsing for less standard residue names in `ResidueId`.
 

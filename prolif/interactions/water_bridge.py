@@ -127,6 +127,7 @@ class WaterBridge(BridgedInteraction):
             residues=None,
             converter_kwargs=(self.converter_kwargs[0], self.water_conv_kwargs),
             **self.kwargs,
+            desc="Ligand-Water",
         )
         water_prot_ifp: dict[int, IFP] = self.water_fp._run_serial(
             traj,
@@ -135,6 +136,7 @@ class WaterBridge(BridgedInteraction):
             residues=self.residues,
             converter_kwargs=(self.water_conv_kwargs, self.converter_kwargs[1]),
             **self.kwargs,
+            desc="Water-Protein",
         )
         if self.order >= 2:
             # Run water-water interaction analysis
@@ -145,6 +147,7 @@ class WaterBridge(BridgedInteraction):
                 residues=None,
                 converter_kwargs=(self.water_conv_kwargs, self.water_conv_kwargs),
                 **self.kwargs,
+                desc="Water-Water",
             )
         else:
             water_ifp = None
