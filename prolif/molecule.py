@@ -34,6 +34,8 @@ class Molecule(BaseRDKitMol):
     ----------
     mol : rdkit.Chem.rdchem.Mol
         A ligand or protein with a single conformer
+    use_segid: bool, default = False
+        Use the segment number rather than the chain identifier as a chain.
 
     Attributes
     ----------
@@ -77,26 +79,31 @@ class Molecule(BaseRDKitMol):
         mol[prolif.ResidueId("TYR", 38, "A")] # by ResidueId
 
     See :mod:`prolif.residue` for more information on residues
+
+    .. versionchanged:: 2.1.0
+        Added `use_segid`.
     """
 
-    def __init__(self, mol: Chem.Mol) -> None:
+    def __init__(self, mol: Chem.Mol, *, use_segid: bool = False) -> None:
         super().__init__(mol)
         # set mapping of atoms
         for atom in self.GetAtoms():
             atom.SetUnsignedProp("mapindex", atom.GetIdx())
         # split in residues
         residues = split_mol_by_residues(self)
-        residues = [Residue(mol) for mol in residues]
+        residues = [Residue(mol, use_segid=use_segid) for mol in residues]
         residues.sort(key=attrgetter("resid"))
         self.residues = ResidueGroup(residues)
 
     @classmethod
     def from_mda(
-        cls: type["Self"],
+        cls,
         obj: "MDAObject",
         selection: str | None = None,
+        *,
+        use_segid: bool | None = None,
         **kwargs: Any,
-    ) -> "Self":
+    ) -> "Molecule":
         """Creates a Molecule from an MDAnalysis object
 
         Parameters
@@ -106,6 +113,8 @@ class Molecule(BaseRDKitMol):
         selection : None or str
             Apply a selection to `obj` to create an AtomGroup. Uses all atoms
             in `obj` if ``selection=None``
+        use_segid: bool | None, default = None
+            Use the segment number rather than the chain identifier as a chain.
         **kwargs : object
             Other arguments passed to the
             :class:`~MDAnalysis.converters.RDKit.RDKitConverter` of MDAnalysis
@@ -127,21 +136,40 @@ class Molecule(BaseRDKitMol):
             mol = prolif.Molecule.from_mda(protein)
             mol
 
+        .. versionchanged:: 2.1.0
+            Added `use_segid`.
         """
         ag = obj.select_atoms(selection) if selection else obj.atoms
         if ag.n_atoms == 0:
             raise mda.SelectionError("AtomGroup is empty, please check your selection")
         mol = ag.convert_to.rdkit(**kwargs)
-        return cls(mol)
+        use_segid = cls._use_segid(ag, use_segid)
+        return cls(mol, use_segid=use_segid)
+
+    @classmethod
+    def _use_segid(cls, obj: "MDAObject", use_segid: bool | None = None) -> bool:
+        """Whether to use the segment index or the chainID as a chain."""
+        if use_segid is not None:
+            return use_segid
+        ag = obj.atoms
+        try:
+            # chainID not always defined
+            n_chains = len(set(ag.chainIDs))
+        except Exception:
+            return True
+        # segindices is always defined
+        n_segids = len(set(ag.residues.segindices))
+        return n_segids > n_chains
 
     @classmethod
     def from_rdkit(
-        cls: type["Self"],
+        cls,
         mol: Chem.Mol,
         resname: str = "UNL",
         resnumber: int = 1,
         chain: str = "",
-    ) -> "Self":
+        use_segid: bool = False,
+    ) -> "Molecule":
         """Creates a Molecule from an RDKit molecule
 
         While directly instantiating a molecule with ``prolif.Molecule(mol)``
@@ -158,15 +186,20 @@ class Molecule(BaseRDKitMol):
             The default residue number that is used if none was found
         chain : str
             The default chain Id that is used if none was found
+        use_segid: bool, default = False
+            Use the segment number rather than the chain identifier as a chain
 
         Notes
         -----
         This method only checks for an existing AtomPDBResidueInfo in the first
         atom. If none was found, it will patch all atoms with the one created
         from the method's arguments (resname, resnumber, chain).
+
+        .. versionchanged:: 2.1.0
+            Added `use_segid`.
         """
         if mol.GetAtomWithIdx(0).GetMonomerInfo():
-            return cls(mol)
+            return cls(mol, use_segid=use_segid)
         mol = copy.deepcopy(mol)
         for atom in mol.GetAtoms():
             mi = Chem.AtomPDBResidueInfo(

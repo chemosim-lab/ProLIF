@@ -106,6 +106,8 @@ class TrajectoryPool:
     rdkitconverter_kwargs : tuple[dict, dict]
         Parameters for the :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
         from MDAnalysis: the first for the ligand, and the second for the protein
+    use_segid: bool
+        Use the segment number rather than the chain identifier as a chain.
 
     Attributes
     ----------
@@ -114,12 +116,16 @@ class TrajectoryPool:
         processed since the last progress bar update.
     pool : multiprocess.pool.Pool
         The underlying pool instance.
+
+    .. versionchanged:: 2.1.0
+        Added `use_segid`.
     """
 
     tracker: ClassVar["Synchronized"] = cast("Synchronized", Value(c_uint32, lock=True))
     fp: ClassVar["Fingerprint"]
     residues: ClassVar["ResidueSelection"]
     converter_kwargs: ClassVar[tuple[dict, dict]]
+    use_segid: bool
 
     def __init__(
         self,
@@ -128,6 +134,7 @@ class TrajectoryPool:
         residues: "ResidueSelection",
         tqdm_kwargs: dict,
         rdkitconverter_kwargs: tuple[dict, dict],
+        use_segid: bool,
     ) -> None:
         self.tqdm_kwargs = tqdm_kwargs
         self.pool = cast(
@@ -140,6 +147,7 @@ class TrajectoryPool:
                     fingerprint,
                     residues,
                     rdkitconverter_kwargs,
+                    use_segid,
                 ),
             ),
         )
@@ -151,6 +159,7 @@ class TrajectoryPool:
         fingerprint: "Fingerprint",
         residues: "ResidueSelection",
         rdkitconverter_kwargs: tuple[dict, dict],
+        use_segid: bool,
     ) -> None:
         """Initializer classmethod passed to the pool so that each child process can
         access these objects without copying them."""
@@ -158,6 +167,7 @@ class TrajectoryPool:
         cls.fp = fingerprint
         cls.residues = residues
         cls.converter_kwargs = rdkitconverter_kwargs
+        cls.use_segid = use_segid
 
     @classmethod
     def executor(
@@ -173,10 +183,18 @@ class TrajectoryPool:
         traj, lig, prot, chunk = args
         ifp: "IFPResults" = {}
         for ts in traj[chunk]:
-            lig_mol = Molecule.from_mda(lig, **cls.converter_kwargs[0])
-            prot_mol = Molecule.from_mda(prot, **cls.converter_kwargs[1])
+            lig_mol = Molecule.from_mda(
+                lig, use_segid=cls.use_segid, **cls.converter_kwargs[0]
+            )
+            prot_mol = Molecule.from_mda(
+                prot, use_segid=cls.use_segid, **cls.converter_kwargs[1]
+            )
             data = cls.fp.generate(
-                lig_mol, prot_mol, residues=cls.residues, metadata=True
+                lig_mol,
+                prot_mol,
+                residues=cls.residues,
+                metadata=True,
+                use_segid=cls.use_segid,
             )
             ifp[int(ts.frame)] = data
             with cls.tracker.get_lock():

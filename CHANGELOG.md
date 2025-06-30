@@ -44,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- ProLIF can now use the segment number as a `ResidueId` chain. This should help with
+  solvated systems that may reuse the same resname, resnumber and chain and were using
+  the segment number/identifier to distinguish them in the topology file.
 - Sorting `ResidueId` objects where a subset of residues had no chain was raising a
   `TypeError`, it will now put cases without a chain first (PR #235 by @amorehead).
 - `display_residues` was sanitizing each residue while preparing them for display, which

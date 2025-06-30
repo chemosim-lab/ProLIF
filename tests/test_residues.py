@@ -78,6 +78,23 @@ class TestResidueId:
         assert resid.number == number
         assert resid.chain == chain
 
+    @pytest.mark.parametrize(
+        ("use_segid", "expected"), [(True, "UNK42.13"), (False, "UNK42.A")]
+    )
+    def test_from_atom_use_segid(self, use_segid: bool, expected: str) -> None:
+        atom = Chem.Atom(1)
+        mi = Chem.AtomPDBResidueInfo()
+        mi.SetResidueName("UNK")
+        mi.SetResidueNumber(42)
+        mi.SetChainId("A")
+        mi.SetSegmentNumber(13)
+        atom.SetMonomerInfo(mi)
+        resid = ResidueId.from_atom(atom, use_segid=use_segid)
+        resid_expected = ResidueId.from_string(expected)
+        assert resid.name == resid_expected.name
+        assert resid.number == resid_expected.number
+        assert resid.chain == resid_expected.chain
+
     def test_from_atom_no_mi(self) -> None:
         atom = Chem.Atom(1)
         resid = ResidueId.from_atom(atom)
@@ -108,6 +125,7 @@ class TestResidueId:
             ("TIP3.A", ("TIP3", 0, "A")),
             ("TIP31", ("TIP3", 1, None)),
             ("TIP31.A", ("TIP3", 1, "A")),
+            ("TIP31.1", ("TIP3", 1, "1")),
             ("T3P1", ("T3P", 1, None)),
             ("HISE1", ("HISE", 1, None)),
             ("H2O1", ("H2O", 1, None)),

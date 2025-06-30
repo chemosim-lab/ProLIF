@@ -127,7 +127,10 @@ def angle_between_limits(
 
 
 def get_residues_near_ligand(
-    lig: "BaseRDKitMol", prot: "BaseRDKitMol", cutoff: float = 6.0
+    lig: "BaseRDKitMol",
+    prot: "BaseRDKitMol",
+    cutoff: float = 6.0,
+    use_segid: bool = False,
 ) -> list[ResidueId]:
     """Detects residues close to a reference ligand
 
@@ -140,19 +143,26 @@ def get_residues_near_ligand(
     cutoff : float
         If any interatomic distance between the ligand reference points and a
         residue is below or equal to this cutoff, the residue will be selected
+    use_segid: bool, default = False
+        Use the segment number rather than the chain identifier as a chain.
 
     Returns
     -------
     residues : list
         A list of unique :class:`~prolif.residue.ResidueId` that are close to
         the ligand
+
+    .. versionchanged:: 2.1.0
+        Added `use_segid`.
     """
     tree = cKDTree(prot.xyz)
     ix: Sequence[list[int]] = tree.query_ball_point(  # type: ignore[assignment]
         lig.xyz, cutoff
     )
     ix = {i for lst in ix for i in lst}
-    resids = [ResidueId.from_atom(prot.GetAtomWithIdx(i)) for i in ix]
+    resids = [
+        ResidueId.from_atom(prot.GetAtomWithIdx(i), use_segid=use_segid) for i in ix
+    ]
     return list(set(resids))
 
 
