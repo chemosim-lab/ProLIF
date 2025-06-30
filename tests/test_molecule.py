@@ -64,6 +64,18 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
     def test_n_residues(self, mol: Molecule) -> None:
         assert mol.n_residues == mol.residues.n_residues
 
+    def test_large_selection_automatically_uses_segid(
+        self, water_u: "Universe"
+    ) -> None:
+        """
+        If more segids than chains are present, Molecule should switch to segindex.
+        """
+        water = water_u.select_atoms("resname TIP3 and byres around 6 protein")
+        water_mol = Molecule.from_mda(water, NoImplicit=False)
+        assert water_mol["TIP34.3"]
+        # would have overwritten TIP34.3 if using chain as there's only chain X
+        assert water_mol["TIP34.4"]
+
 
 class SupplierBase:
     resid = ResidueId("UNL", 1, "")

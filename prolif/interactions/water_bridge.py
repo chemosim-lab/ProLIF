@@ -99,6 +99,7 @@ class WaterBridge(BridgedInteraction):
         self.kwargs.pop("n_jobs", None)
         self.residues = self.kwargs.pop("residues", None)
         self.converter_kwargs = self.kwargs.pop("converter_kwargs", ({}, {}))
+        self.use_segid = self.kwargs.pop("use_segid", False)
 
     def run(
         self,
@@ -126,6 +127,7 @@ class WaterBridge(BridgedInteraction):
             water_obj,
             residues=None,
             converter_kwargs=(self.converter_kwargs[0], self.water_conv_kwargs),
+            use_segid=self.use_segid,
             **self.kwargs,
             desc="Ligand-Water",
         )
@@ -135,6 +137,7 @@ class WaterBridge(BridgedInteraction):
             prot,
             residues=self.residues,
             converter_kwargs=(self.water_conv_kwargs, self.converter_kwargs[1]),
+            use_segid=self.use_segid,
             **self.kwargs,
             desc="Water-Protein",
         )
@@ -146,6 +149,7 @@ class WaterBridge(BridgedInteraction):
                 water_obj,
                 residues=None,
                 converter_kwargs=(self.water_conv_kwargs, self.water_conv_kwargs),
+                use_segid=self.use_segid,
                 **self.kwargs,
                 desc="Water-Water",
             )

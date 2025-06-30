@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from MDAnalysis.core.groups import AtomGroup
 
-    from prolif.molecule import Molecule, sdf_supplier
+    from prolif.molecule import Molecule
     from prolif.typeshed import InteractionMetadata
 
 
@@ -36,7 +36,7 @@ def dummy_cls(cleanup_dummy: "Iterator[None]") -> type[Interaction]:  # noqa: AR
 
 
 def test_interaction_base(
-    sdf_suppl: "sdf_supplier", dummy_cls: type[Interaction]
+    sdf_suppl: sdf_supplier, dummy_cls: type[Interaction]
 ) -> None:
     interaction = dummy_cls()
     repr_ = repr(interaction)
@@ -528,3 +528,18 @@ class TestFingerprint:
         fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
         fp.run(water_u.trajectory[:1], ligand, protein)
         mocked.assert_called_once_with(3)
+
+    def test_run_can_switch_to_segid_over_chains(
+        self,
+        water_u: "mda.Universe",
+        water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+    ) -> None:
+        """
+        If more segids than chains are present, Molecule should switch to segindex.
+        """
+        lig, prot, water = water_atomgroups
+        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
+        assert fp._use_segid(lig, prot) is False
+        water = water_u.select_atoms("resname TIP3 and byres around 6 protein")
+        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
+        assert fp._use_segid(lig, prot) is True
