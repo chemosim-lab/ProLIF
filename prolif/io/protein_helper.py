@@ -42,8 +42,16 @@ class ProteinHelper:
     -----
     This class is designed to work with ProLIF Molecule instances or PDB files.
     It reads the input topology, standardizes the residue names, and fixes the bond
-    orders based on the provided templates or standard amino acid
-    template. However, the explicit hydrogen atoms will be removed from the molecule.
+    orders based on the provided templates or standard amino acid template.
+    However, the explicit hydrogen atoms will be removed from the molecule.
+
+    Example
+    -------
+    >>> from prolif.io import ProteinHelper
+    >>> protein_helper = ProteinHelper("path/to/protein.pdb")
+    >>> protein_helper.standardize_protein()
+    >>> # Now, protein_helper.protein_mol contains the standardized protein molecule.
+    >>> # You can access the residues using protein_helper.protein_mol.residues.
 
     """
 
@@ -55,7 +63,7 @@ class ProteinHelper:
         elif isinstance(input_topology, str | Path) and str(input_topology).endswith(
             ".pdb"
         ):
-            input_protein_top = Chem.MolFromPDBFile(input_topology)
+            input_protein_top = Chem.MolFromPDBFile(str(input_topology))
             self.protein_mol = Molecule.from_rdkit(input_protein_top)
 
         else:
@@ -76,9 +84,16 @@ class ProteinHelper:
             The templates to use for standardizing the protein molecule.
             If `None`, the standard amino acid template is used.
             If a dict is provided, it should contain the templates for residues.
-            If a list is provided, it should contain dicts for each template.
+            If a list is provided, it should contain dictionaries for each template.
             Default is `None`.
 
+        Example
+        -------
+        >>> from prolif.io import ProteinHelper
+        >>> protein_helper = ProteinHelper("path/to/protein.pdb")
+        >>> protein_helper.standardize_protein(
+                templates=[{"ALA": {"SMILES": "CC(C(=O)O)N"}}]
+            )
         """
 
         # read the templates
@@ -149,7 +164,7 @@ class ProteinHelper:
     def forcefield_guesser(
         conv_resnames: set[str],
     ) -> str:
-        """Guesses the forcefield based on the residue names.
+        """Guess the forcefield based on the residue names.
 
         Parameters
         ----------
@@ -178,25 +193,28 @@ class ProteinHelper:
     ) -> str:
         """Convert a residue name to its standard form based on the forcefield.
 
-        Note that this conversion is designed to distinguish residues with
-        different possible H-bond donors at side chains, instead of the
-        actual protonated states of residues.
-        For example, neutral and protonated arginine are both assigned to ARG,
-        while neutral and deprotonated arginine in GROMOS force field
-        are assigned to ARGN and ARG, respectively.
-
-
         Parameters
         ----------
         resname : str
             The residue name to convert.
         forcefield_name : str
-            The name of the forcefield to use for conversion. Default is "unknown".
+            The name of the forcefield for assigning the correct standard name for CYS.
+            Default is "unknown".
 
         Returns
         -------
         str
             The standard residue name.
+
+        Notes
+        -----
+        This conversion is designed to distinguish residues with
+        different possible H-bond donors at side chains, instead of the
+        actual protonated states of residues.
+
+        For example, neutral and protonated arginine are both assigned to ARG,
+        while neutral and deprotonated arginine in GROMOS force field
+        are assigned to ARGN and ARG, respectively.
         """
 
         if forcefield_name == "unknown" and resname == "CYS":
@@ -342,11 +360,15 @@ class ProteinHelper:
 
         Note
         ----
-        Any bonds and chiral designation on the input molecule will be removed
-        at the start of the process.
-        This function is adapted from the pdbinf/_pdbinf.py module's assign_pdb_bonds
-        function, which is used to assign bonds and aromaticity based on
-        the standard amino acid templates.
+        If the user provides a SMILES template, it will be converted to an RDKit
+        molecule, and the bond orders will be assigned from the template.
+
+        SMILES templates are prioritized over CIF templates.
+
+        For CIF templates, any bonds and chiral designation on the input molecule will
+        be removed at the start of the process. This function is adapted from the
+        pdbinf/_pdbinf.py module's assign_pdb_bonds function, which is used to assign
+        bonds and aromaticity based on the standard amino acid templates.
         """
         if templates is None:
             templates = [STANDARD_AA]
@@ -361,7 +383,7 @@ class ProteinHelper:
             # SMILES template
             if "SMILES" in t[resname]:
                 # convert SMILES to RDKit molecule
-                mol_template = AllChem.MolFromSmiles(t[resname]["SMILES"])
+                mol_template = Chem.MolFromSmiles(t[resname]["SMILES"])
 
                 # assign bond orders from template
                 new_res = AllChem.AssignBondOrdersFromTemplate(mol_template, residue)
@@ -387,12 +409,12 @@ def strip_bonds(m: Chem.Mol) -> Chem.Mol:
     Parameters
     ----------
     m : rdkit.Chem.Mol
-      The input molecule to strip bonds from.
+        The input molecule to strip bonds from.
 
     Returns
     -------
     rdkit.Chem.Mol
-      The modified molecule with all bonds and chiral tags removed.
+        The modified molecule with all bonds and chiral tags removed.
 
     Notes
     -----
@@ -419,14 +441,14 @@ def assign_intra_props(mol: Chem.Mol, reference_block: dict) -> Chem.Mol:
     Parameters
     ----------
     mol : rdkit.Chem.Mol
-      the input molecule, this is modified in place and returned
+        The input molecule, this is modified in place and returned.
     reference_block : dict
-      the cif template molecule from which to assign bonds
+        The cif template molecule from which to assign bonds.
 
     Returns
     -------
     rdkit.Chem.Mol
-      the modified molecule with assigned bonds and aromaticity
+        The modified molecule with assigned bonds and aromaticity.
 
     Notes
     -----
@@ -523,12 +545,12 @@ def _assign_intra_props_lone_H(em: Chem.RWMol) -> Chem.RWMol:
     Parameters
     ----------
     em : rdkit.Chem.RWMol
-      The input editable molecule to assign lone hydrogens to the nearest heavy atom.
+        The input editable molecule to assign lone hydrogens to the nearest heavy atom.
 
     Returns
     -------
     rdkit.Chem.RWMol
-      The modified molecule with lone hydrogens assigned to the nearest heavy atom.
+        The modified molecule with lone hydrogens assigned to the nearest heavy atom.
 
     Note
     ----

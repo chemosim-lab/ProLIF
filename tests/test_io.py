@@ -137,7 +137,7 @@ class TestProteinHelper:
 
         # test type error
         with pytest.raises(TypeError):
-            ProteinHelper(12345)
+            ProteinHelper(12345)  # type: ignore
 
     def test_convert_to_standard_resname(self) -> None:
         """Test the conversion of residue names to standard names."""
@@ -351,7 +351,7 @@ class TestProteinHelper:
         with pytest.raises(
             TypeError, match=r"Templates must be a dict, a list of dicts or None\."
         ):
-            protein_helper.standardize_protein(templates=["invalid_format"])
+            protein_helper.standardize_protein(templates=["invalid_format"])  # type: ignore
 
         # Test with a residue
         protein_helper = ProteinHelper(Molecule(HSD_RESIDUE))
@@ -410,7 +410,7 @@ class TestProteinHelper:
 
         mol = Chem.MolFromSmiles("CC")
         mol = Chem.AddHs(mol)
-        AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+        AllChem.EmbedMolecule(mol, AllChem.ETKDG())  # type: ignore
 
         strip_mol = strip_bonds(mol)
 
