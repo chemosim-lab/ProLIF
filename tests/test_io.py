@@ -408,13 +408,18 @@ class TestProteinHelper:
         """
         from prolif.io.protein_helper import _assign_intra_props_lone_H, strip_bonds
 
-        mol = Chem.MolFromSmiles("C")
+        mol = Chem.MolFromSmiles("CC")
         mol = Chem.AddHs(mol)
         AllChem.EmbedMolecule(mol, AllChem.ETKDG())
 
         strip_mol = strip_bonds(mol)
 
         with Chem.RWMol(strip_mol) as em:
+            # add a existing bond before testing the function
+            em.AddBond(0, 1, order=Chem.BondType.SINGLE)
+            em.AddBond(0, 2, order=Chem.BondType.SINGLE)
+
+            # test the function
             em_fixed = _assign_intra_props_lone_H(em)
 
         for bond1, bond2 in zip(mol.GetBonds(), em_fixed.GetBonds(), strict=False):
