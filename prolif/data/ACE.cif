@@ -1,0 +1,162 @@
+data_ACE
+# 
+_chem_comp.id                                    ACE 
+_chem_comp.name                                  "ACETYL GROUP" 
+_chem_comp.type                                  NON-POLYMER 
+_chem_comp.pdbx_type                             HETAIN 
+_chem_comp.formula                               "C2 H4 O" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2024-12-23 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ACU 
+_chem_comp.formula_weight                        44.053 
+_chem_comp.one_letter_code                       ? 
+_chem_comp.three_letter_code                     ACE 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        ? 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  EBI 
+_chem_comp.pdbx_pcm                              Y 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+ACE C   C   C 0 1 N N N Y N Y 0.772  -10.072 6.578 -0.133 0.453  0.000  C   ACE 1 
+ACE O   O   O 0 1 N N N Y N Y 1.973  -10.223 6.862 -1.113 -0.252 0.000  O   ACE 2 
+ACE CH3 CH3 C 0 1 N N N N N N -0.322 -10.677 7.405 1.241  -0.167 0.000  CH3 ACE 3 
+ACE H   H   H 0 1 N N N Y N Y 0.685  -9.453  5.669 -0.240 1.528  0.000  H   ACE 4 
+ACE H1  1H  H 0 1 N N N N N N -1.191 -10.444 7.018 1.360  -0.785 0.890  H1  ACE 5 
+ACE H2  2H  H 0 1 N N N N N N -0.269 -10.331 8.320 1.360  -0.785 -0.890 H2  ACE 6 
+ACE H3  3H  H 0 1 N N N N N N -0.221 -11.652 7.418 1.995  0.620  0.000  H3  ACE 7 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+ACE C   O   DOUB N N 1 
+ACE C   CH3 SING N N 2 
+ACE C   H   SING N N 3 
+ACE CH3 H1  SING N N 4 
+ACE CH3 H2  SING N N 5 
+ACE CH3 H3  SING N N 6 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+ACE SMILES           ACDLabs              10.04 O=CC                          
+ACE SMILES_CANONICAL CACTVS               3.341 CC=O                          
+ACE SMILES           CACTVS               3.341 CC=O                          
+ACE SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 CC=O                          
+ACE SMILES           "OpenEye OEToolkits" 1.5.0 CC=O                          
+ACE InChI            InChI                1.03  InChI=1S/C2H4O/c1-2-3/h2H,1H3 
+ACE InChIKey         InChI                1.03  IKHGUXGNUITLKF-UHFFFAOYSA-N   
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+ACE "SYSTEMATIC NAME" ACDLabs              10.04 acetaldehyde 
+ACE "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 ethanal      
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+ACE "Create component"  1999-07-08 EBI  
+ACE "Modify descriptor" 2011-06-04 RCSB 
+ACE "Modify backbone"   2023-11-03 PDBE 
+ACE "Modify PCM"        2024-09-27 PDBE 
+ACE "Modify PCM"        2024-12-23 PDBJ 
+# 
+loop_
+_pdbx_chem_comp_pcm.pcm_id 
+_pdbx_chem_comp_pcm.comp_id 
+_pdbx_chem_comp_pcm.modified_residue_id 
+_pdbx_chem_comp_pcm.type 
+_pdbx_chem_comp_pcm.category 
+_pdbx_chem_comp_pcm.position 
+_pdbx_chem_comp_pcm.polypeptide_position 
+_pdbx_chem_comp_pcm.comp_id_linking_atom 
+_pdbx_chem_comp_pcm.modified_residue_id_linking_atom 
+_pdbx_chem_comp_pcm.uniprot_specific_ptm_accession 
+_pdbx_chem_comp_pcm.uniprot_generic_ptm_accession 
+1  ACE ALA None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0199 ? 
+2  ACE VAL None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0210 ? 
+3  ACE ILE None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0204 ? 
+4  ACE MET None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0205 ? 
+5  ACE TYR None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0209 ? 
+6  ACE SER None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0207 ? 
+7  ACE THR None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0208 ? 
+8  ACE ARG None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0180 ? 
+9  ACE ASP None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0200 ? 
+10 ACE GLU None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0202 ? 
+11 ACE CYS None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0201 ? 
+12 ACE GLY None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0203 ? 
+13 ACE PRO None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? PTM-0206 ? 
+14 ACE LEU None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+15 ACE PHE None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+16 ACE TRP None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+17 ACE ASN None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+18 ACE GLN None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+19 ACE HIS None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+20 ACE LYS None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+21 ACE DPR None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+22 ACE DAL None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+23 ACE DCY None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+24 ACE DTY None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+25 ACE DVA None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+26 ACE DAS None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+27 ACE DPN None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+28 ACE DTR None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+29 ACE DAR None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+30 ACE DTH None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+31 ACE DLE None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+32 ACE DHI None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+33 ACE DSN None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+34 ACE DGL None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+35 ACE DLY None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+36 ACE MED None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+37 ACE DSG None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+38 ACE DIL None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+39 ACE DGN None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+40 ACE PYL None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+41 ACE SEC None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+42 ACE ?   None "Terminal acetylation" "Amino-acid backbone" N-terminal ? ? ?        ? 
+# 
