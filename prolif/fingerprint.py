@@ -139,6 +139,12 @@ class Fingerprint:
         Dict of interaction fingerprints in a sparse format for the given trajectory or
         docking poses: ``{<frame number>: <IFP>}``. See the :class:`~prolif.ifp.IFP`
         class for more information.
+    uses_segid : bool
+        Whether to use the segment index or the chain identifier as a chain in
+        :class:`~profif.residue.ResidueId` objects.
+        This is automatically set to ``True`` for MD simulations if any of the
+        inputs passed to :meth:`~prolif.molecule.Molecule.from_mda` have more segments
+        than chains.
 
     Raises
     ------
@@ -226,7 +232,8 @@ class Fingerprint:
         return all occurences of an interaction or only the first one.
 
     .. versionchanged:: 2.1.0
-        Added support for bridged interactions (e.g. ``WaterBridge``).
+        Added support for bridged interactions (e.g. ``WaterBridge``). Added
+        ``uses_segid`` attribute.
     """
 
     def __init__(
@@ -242,6 +249,7 @@ class Fingerprint:
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
         self.parameters = parameters
+        self.uses_segid = False
 
     def _set_interactions(
         self,
@@ -614,7 +622,7 @@ class Fingerprint:
         if n_jobs is None:
             n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
         if use_segid is None:
-            use_segid = self._use_segid(lig, prot)
+            self.uses_segid = self._use_segid(lig, prot)
         if residues == "all":
             residues = list(
                 Molecule.from_mda(
@@ -631,7 +639,7 @@ class Fingerprint:
                     residues=residues,
                     converter_kwargs=converter_kwargs,
                     progress=progress,
-                    use_segid=use_segid,
+                    use_segid=self.uses_segid,
                 )
             else:
                 ifp = self._run_parallel(
@@ -642,7 +650,7 @@ class Fingerprint:
                     converter_kwargs=converter_kwargs,
                     progress=progress,
                     n_jobs=n_jobs,
-                    use_segid=use_segid,
+                    use_segid=self.uses_segid,
                 )
             self.ifp = ifp
 
@@ -654,7 +662,7 @@ class Fingerprint:
                 residues=residues,
                 converter_kwargs=converter_kwargs,
                 progress=progress,
-                use_segid=use_segid,
+                use_segid=self.uses_segid,
             )
         return self
 

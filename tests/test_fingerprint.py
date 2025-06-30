@@ -533,6 +533,7 @@ class TestFingerprint:
         self,
         water_u: "mda.Universe",
         water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """
         If more segids than chains are present, Molecule should switch to segindex.
@@ -543,3 +544,15 @@ class TestFingerprint:
         water = water_u.select_atoms("resname TIP3 and byres around 6 protein")
         fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
         assert fp._use_segid(lig, prot) is True
+
+        def patch_run_serial(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            return {0: {}}
+
+        monkeypatch.setattr(fp, "_run_serial", patch_run_serial)
+        fp.run(
+            water_u.trajectory[:1],
+            lig,
+            prot,
+            n_jobs=1,
+        )
+        assert fp.uses_segid is True
