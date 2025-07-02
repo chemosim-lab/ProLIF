@@ -194,7 +194,6 @@ class TrajectoryPool:
                 prot_mol,
                 residues=cls.residues,
                 metadata=True,
-                use_segid=cls.use_segid,
             )
             ifp[int(ts.frame)] = data
             with cls.tracker.get_lock():
