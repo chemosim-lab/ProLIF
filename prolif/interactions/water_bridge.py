@@ -74,7 +74,6 @@ class WaterBridge(BridgedInteraction):
         # circular import
         from prolif.fingerprint import Fingerprint
 
-        super().__init__()
         if order < 1:
             raise ValueError("order must be greater than 0")
         if min_order > order:
@@ -93,13 +92,14 @@ class WaterBridge(BridgedInteraction):
             parameters={"HBDonor": hbdonor or {}, "HBAcceptor": hbacceptor or {}},
             count=count,
         )
+        super().__init__()
 
     def setup(self, ifp_store: Optional["IFPResults"] = None, **kwargs: Any) -> None:
         super().setup(ifp_store=ifp_store, **kwargs)
         self.kwargs.pop("n_jobs", None)
         self.residues = self.kwargs.pop("residues", None)
         self.converter_kwargs = self.kwargs.pop("converter_kwargs", ({}, {}))
-        self.use_segid = self.kwargs.pop("use_segid", False)
+        self.water_fp.use_segid = self.kwargs.pop("use_segid", False)
 
     def run(
         self,
@@ -127,7 +127,6 @@ class WaterBridge(BridgedInteraction):
             water_obj,
             residues=None,
             converter_kwargs=(self.converter_kwargs[0], self.water_conv_kwargs),
-            use_segid=self.use_segid,
             **self.kwargs,
             desc="Ligand-Water",
         )
@@ -137,7 +136,6 @@ class WaterBridge(BridgedInteraction):
             prot,
             residues=self.residues,
             converter_kwargs=(self.water_conv_kwargs, self.converter_kwargs[1]),
-            use_segid=self.use_segid,
             **self.kwargs,
             desc="Water-Protein",
         )
@@ -149,7 +147,6 @@ class WaterBridge(BridgedInteraction):
                 water_obj,
                 residues=None,
                 converter_kwargs=(self.water_conv_kwargs, self.water_conv_kwargs),
-                use_segid=self.use_segid,
                 **self.kwargs,
                 desc="Water-Water",
             )

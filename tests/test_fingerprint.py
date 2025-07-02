@@ -555,4 +555,4 @@ class TestFingerprint:
             prot,
             n_jobs=1,
         )
-        assert fp.uses_segid is True
+        assert fp.use_segid is True
