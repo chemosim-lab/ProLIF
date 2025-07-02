@@ -9,13 +9,12 @@ from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+from rdkit import Chem
 from rdkit.Chem.rdmolops import FastFindRings
 
 from prolif.rdkitmol import BaseRDKitMol
 
 if TYPE_CHECKING:
-    from rdkit import Chem
-
     from prolif.typeshed import ResidueKey
 
 _RE_RESID = re.compile(
@@ -207,9 +206,19 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
 
     def __init__(self, residues: Iterable[Residue]):
         self._residues = cast(Sequence[Residue], np.asarray(residues, dtype=object))
-        resinfo = [
-            (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
-        ]
+        resinfo: list[tuple[str, int, str | None]] = []
+        previous: Residue | None = None
+        for r in self._residues:
+            if previous is not None and previous.resid == r.resid:
+                smiles = "\n".join([Chem.MolToSmiles(previous), Chem.MolToSmiles(r)])
+                raise ValueError(
+                    f"{r.resid!r} was encountered more than once. Corresponding SMILES:"
+                    f"\n{smiles}\n"
+                    "This can indicate a missing bond within a residue, or "
+                    "duplicated residue name, number, and chain/segment identifier."
+                )
+            resinfo.append((r.resid.name, r.resid.number, r.resid.chain))
+            previous = r
         try:
             name, number, chain = zip(*resinfo, strict=True)
         except ValueError:

@@ -194,6 +194,12 @@ class TestResidueGroup:
         protein = Chem.MolFromSequence(sequence)
         return [Residue(res) for res in Chem.SplitMolByPDBResidues(protein).values()]
 
+    def test_duplicated_residue_id(self, residues: list[Residue]) -> None:
+        with pytest.raises(
+            ValueError, match=r"ResidueId\(ALA, 1, A\) was encountered more than once"
+        ):
+            ResidueGroup([residues[0], *residues])
+
     def test_init(self, residues: list[Residue]) -> None:
         rg = ResidueGroup(residues)
         for rg_res, res in zip(rg._residues, residues, strict=True):
