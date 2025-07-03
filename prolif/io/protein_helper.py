@@ -30,13 +30,17 @@ class ProteinHelper:
 
     Parameters
     ----------
-    input_topology : str or Molecule
-        The path of input protein molecule (.pdb) or a ProLIF Molecule.
+    templates : list[dict] or dict or None, optional
+        The templates to use for standardizing the protein molecule.
+        If `None`, the standard amino acid template is used.
+        If a dict is provided, it should contain the templates for residues.
+        If a list is provided, it should contain dictionaries for each template.
+        Default is `None`.
 
     Attributes
     ----------
-    protein_mol : Molecule
-        The ProLIF Molecule instance representing the protein.
+    templates : list[dict]
+        The templates used for standardizing the protein molecule.
 
     Notes
     -----
@@ -47,69 +51,32 @@ class ProteinHelper:
 
     Example
     -------
+    >>> import prolif as plf
     >>> from prolif.io import ProteinHelper
-    >>> protein_helper = ProteinHelper("path/to/protein.pdb")
-    >>> protein_helper.standardize_protein()
-    >>> # Now, protein_helper.protein_mol contains the standardized protein molecule.
-    >>> # You can access the residues using protein_helper.protein_mol.residues.
+
+    >>> protein_helper = ProteinHelper(templates=[{"ALA": {"SMILES": "CC(C(=O)O)N"}}])
+    >>> mol = protein_helper.standardize_protein(input_topology="path/to/protein.pdb")
+    >>> plf.display_residues(mol)
 
     """
 
-    def __init__(self, input_topology: Molecule | str | Path):
-        # read as prolif molecule
-        if isinstance(input_topology, Molecule):
-            self.protein_mol = input_topology
-
-        elif isinstance(input_topology, str | Path) and str(input_topology).endswith(
-            ".pdb"
-        ):
-            input_protein_top = Chem.MolFromPDBFile(str(input_topology))
-            self.protein_mol = Molecule.from_rdkit(input_protein_top)
-
-        else:
-            raise TypeError(
-                "input_topology must be a string (path to a PDB file) or "
-                "a prolif Molecule instance."
-            )
-
-    def standardize_protein(self, templates: list[dict] | dict | None = None) -> None:
-        """Standardize the protein molecule.
-
-        This function will standardize the residue names, fix the bond orders,
-        and check the residue names against the templates.
-
-        Parameters
-        ----------
-        templates : list[dict] or dict or None, optional
-            The templates to use for standardizing the protein molecule.
-            If `None`, the standard amino acid template is used.
-            If a dict is provided, it should contain the templates for residues.
-            If a list is provided, it should contain dictionaries for each template.
-            Default is `None`.
-
-        Example
-        -------
-        >>> from prolif.io import ProteinHelper
-        >>> protein_helper = ProteinHelper("path/to/protein.pdb")
-        >>> protein_helper.standardize_protein(
-                templates=[{"ALA": {"SMILES": "CC(C(=O)O)N"}}]
-            )
-        """
-
+    def __init__(self, templates: list[dict] | dict | None = None):
         # read the templates
         if templates is None:
-            templates = [STANDARD_AA]
+            self.templates = [STANDARD_AA]
         elif isinstance(templates, dict):
             # if templates is a dict, convert it to a list of dicts
-            templates = [templates, STANDARD_AA]
+            self.templates = [templates, STANDARD_AA]
         elif isinstance(templates, list):
             # if templates is a list, check if it contains dicts
             if not all(isinstance(t, dict) for t in templates):
                 raise TypeError("Templates must be a dict, a list of dicts or None.")
-            templates = [*templates, STANDARD_AA]
+            self.templates = [*templates, STANDARD_AA]
+        else:
+            raise TypeError("Templates must be a dict, a list of dicts or None.")
 
         # check the templates with "name" for each residue
-        for template in templates:
+        for template in self.templates:
             for t in template:
                 # if not, set the residue name as the template name
                 if "name" not in template[t]:
@@ -123,15 +90,59 @@ class ProteinHelper:
                     template[t]["name"] = t
 
         # get a dict of the number of the heavy atoms in the template residues
-        n_template_res_hatms = self.n_template_residue_heavy_atoms(templates)
+        self.n_template_res_hatms = self.n_template_residue_heavy_atoms(self.templates)
+
+    def standardize_protein(self, input_topology: Molecule | str | Path) -> Molecule:
+        """Standardize the protein molecule.
+
+        This function will standardize the residue names, fix the bond orders,
+        and check the residue names against the templates.
+
+        Parameters
+        ----------
+        input_topology : Molecule | str | Path
+            The input topology to standardize.
+            It can be a ProLIF Molecule or a path to a PDB file.
+
+        Returns
+        -------
+        Molecule
+            The standardized protein molecule.
+
+        Example
+        -------
+        >>> from prolif.io import ProteinHelper
+        >>> protein_helper = ProteinHelper(
+                templates=[{"ALA": {"SMILES": "CC(C(=O)O)N"}}]
+            )
+        >>> protein_helper.standardize_protein(
+               "path/to/protein.pdb"
+            )
+        """
+
+        # read as prolif molecule
+        if isinstance(input_topology, Molecule):
+            protein_mol = input_topology
+
+        elif isinstance(input_topology, str | Path) and str(input_topology).endswith(
+            ".pdb"
+        ):
+            input_protein_top = Chem.MolFromPDBFile(str(input_topology))
+            protein_mol = Molecule.from_rdkit(input_protein_top)
+
+        else:
+            raise TypeError(
+                "input_topology must be a string (path to a PDB file) or "
+                "a prolif Molecule instance."
+            )
 
         # guess forcefield
-        conv_resnames = set(self.protein_mol.residues.name)
+        conv_resnames = set(protein_mol.residues.name)
         forcefield_name = self.forcefield_guesser(conv_resnames)
 
         # standardize the protein molecule
         new_residues = []
-        for residue in self.protein_mol.residues.values():
+        for residue in protein_mol.residues.values():
             standardized_resname = self.convert_to_standard_resname(
                 resname=residue.resid.name.upper(), forcefield_name=forcefield_name
             )
@@ -142,10 +153,10 @@ class ProteinHelper:
             residue.resid.name = standardized_resname
 
             # before fixing the bond orders: strict check with non-standard residues
-            self.check_resnames({standardized_resname}, templates)
+            self.check_resnames({standardized_resname}, self.templates)
 
             # soft check the heavy atoms in the residue compared to the standard one
-            if self.n_residue_heavy_atoms(residue) != n_template_res_hatms.get(
+            if self.n_residue_heavy_atoms(residue) != self.n_template_res_hatms.get(
                 standardized_resname, 0
             ):
                 warnings.warn(
@@ -155,10 +166,12 @@ class ProteinHelper:
                     stacklevel=2,
                 )
             # fix the bond orders
-            new_residues.append(self.fix_molecule_bond_orders(residue, templates))
+            new_residues.append(self.fix_molecule_bond_orders(residue, self.templates))
 
         # update the protein molecule with the new residues
-        self.protein_mol.residues = ResidueGroup(new_residues)
+        protein_mol.residues = ResidueGroup(new_residues)
+
+        return protein_mol
 
     @staticmethod
     def forcefield_guesser(

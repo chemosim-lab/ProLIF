@@ -3,6 +3,7 @@ import pytest
 from numpy.testing import assert_equal
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from rdkit.Chem.rdDetermineBonds import DetermineConnectivity
 
 from prolif.datafiles import datapath
 from prolif.io.cif import cif_parser_lite, cif_template_reader
@@ -81,7 +82,11 @@ class TestProteinHelper:
     @pytest.fixture(scope="class")
     def INPUT_MOL(self, INPUT_PATH: str) -> Molecule:
         """Return the Molecule object for the input file."""
-        input_mol = Chem.MolFromPDBFile(INPUT_PATH)
+        input_mol = Chem.MolFromPDBFile(INPUT_PATH, removeHs=True)
+        # [TODO] need to deal with the situation not to remove hydrogens
+        DetermineConnectivity(input_mol, useHueckel=True)
+        for atm in input_mol.GetAtoms():
+            atm.SetNoImplicit(False)  # set no implicit to False
         return Molecule.from_rdkit(input_mol)
 
     @pytest.fixture(scope="class")
@@ -122,22 +127,41 @@ class TestProteinHelper:
         input_mol = Chem.MolFromPDBFile(str(protein_path))
         return Molecule.from_rdkit(input_mol).residues[106]
 
-    def test_initialization(self, INPUT_PATH: str, INPUT_MOL: Molecule) -> None:
+    @pytest.fixture(scope="class")
+    def MOL_MISSING_ATOM(self) -> Molecule:
+        """Return a molecule missing side chain atoms for testing."""
+        protein_path = datapath / "implicitHbond/1s2g__1__1.A_2.C__1.D/receptor_hsd.pdb"
+        input_mol = Chem.MolFromPDBFile(str(protein_path))
+        return Molecule(Molecule.from_rdkit(input_mol).residues[0])
+
+    @pytest.mark.parametrize(
+        ("templates", "expect_type_error", "expect_warning"),
+        [
+            (None, False, False),
+            ([], False, False),
+            ({"ACE": {"SMILES": "CC=O"}}, False, False),
+            (12345, True, False),
+            (["invalid_format"], True, False),
+            ({"RES": {"name": "BEN", "SMILES": "NC(=N)c1ccccc1"}}, False, True),
+        ],
+    )
+    def test_initialization(self, templates, expect_type_error, expect_warning) -> None:  # type: ignore
         """Test the initialization of the TestProteinHelper class."""
 
-        # test reading with a path
-        protein_helper = ProteinHelper(INPUT_PATH)
-        assert isinstance(protein_helper, ProteinHelper)
-        assert isinstance(protein_helper.protein_mol, Molecule)
-
-        # test reading with a Molecule object
-        protein_helper2 = ProteinHelper(INPUT_MOL)
-        assert isinstance(protein_helper2, ProteinHelper)
-        assert isinstance(protein_helper2.protein_mol, Molecule)
-
-        # test type error
-        with pytest.raises(TypeError):
-            ProteinHelper(12345)  # type: ignore
+        if expect_type_error:
+            with pytest.raises(
+                TypeError, match=r"Templates must be a dict, a list of dicts or None\."
+            ):
+                ProteinHelper(templates)
+        elif expect_warning:
+            with pytest.warns(
+                UserWarning, match=r"Align the template name \(BEN\) with \(RES\)\."
+            ):
+                ProteinHelper(templates)
+        else:
+            protein_helper = ProteinHelper(templates)
+            assert isinstance(protein_helper, ProteinHelper)
+            assert isinstance(protein_helper.templates, list)
 
     def test_convert_to_standard_resname(self) -> None:
         """Test the conversion of residue names to standard names."""
@@ -256,95 +280,78 @@ class TestProteinHelper:
             ProteinHelper.fix_molecule_bond_orders(INPUT_MOL.residues[1])
 
     @pytest.mark.parametrize(
-            ("resnames", "expected"),
-            [
-                ({"HSD"}, "charmm"),
-                ({"NASP"}, "amber"),
-                ({"ASN1"}, "gromos"),
-                ({"HISD"}, "oplsaa"),
-                ({"CYS"}, "unknown"),
-            ]
+        ("resnames", "expected"),
+        [
+            ({"HSD"}, "charmm"),
+            ({"NASP"}, "amber"),
+            ({"ASN1"}, "gromos"),
+            ({"HISD"}, "oplsaa"),
+            ({"CYS"}, "unknown"),
+        ],
     )
-    def test_forcefield_guesser(self, resnames, expected) -> None:
+    def test_forcefield_guesser(self, resnames, expected) -> None:  # type: ignore
         """Test the forcefield guesser."""
 
         # Test with a known forcefield
         forcefield = ProteinHelper.forcefield_guesser(resnames)
         assert forcefield == expected
 
-    def test_standardize_protein(
-        self,
-        INPUT_MOL: Molecule,
-        BEN_MOL: Molecule,
-        CUSTOM_TEMPLATE: dict,
-        HSD_RESIDUE: Residue,
-    ) -> None:
-        """Test the standardization of a protein molecule."""
-
-        # Test standardizing a protein molecule
-        protein_helper = ProteinHelper(INPUT_MOL)
-        with pytest.warns(
-            UserWarning,
-            match="Residue NME3 has a different number of heavy atoms "
-            r"than the standard residue\. This may affect H-bond detection\.",
-        ):
-            protein_helper.standardize_protein(templates=CUSTOM_TEMPLATE)
-        assert isinstance(protein_helper.protein_mol, Molecule)
-        assert len(protein_helper.protein_mol.residues) == len(INPUT_MOL.residues)
-
-        protein_helper2 = ProteinHelper(INPUT_MOL)
-        with pytest.warns(
-            UserWarning,
-            match="Residue NME3 has a different number of heavy atoms "
-            r"than the standard residue\. This may affect H-bond detection\.",
-        ):
-            protein_helper2.standardize_protein(
-                templates=[CUSTOM_TEMPLATE, {"BEN": {"SMILES": "NC(=N)c1ccccc1"}}]
-            )
-        assert isinstance(protein_helper2.protein_mol, Molecule)
-        assert len(protein_helper2.protein_mol.residues) == len(
-            protein_helper.protein_mol.residues
-        )
-
+    def test_standardize_protein_no_valid_templates(self, INPUT_MOL: Molecule) -> None:
+        """Test the standardization of a protein molecule with no valid templates."""
         # Test with no valid templates
-        protein_helper = ProteinHelper(INPUT_MOL)
+        protein_helper = ProteinHelper()
         with pytest.raises(
             ValueError,
             match=r"Residue \{'ACE'\} is not a standard residue or "
             r"not in the templates\. Please provide a custom template\.",
         ):
-            protein_helper.standardize_protein()
+            protein_helper.standardize_protein(INPUT_MOL)
 
-        # Test with a format
-        protein_helper = ProteinHelper(INPUT_MOL)
-        with pytest.raises(
-            TypeError, match=r"Templates must be a dict, a list of dicts or None\."
+    def test_standardize_protein_missing_heavy_atoms(
+        self, MOL_MISSING_ATOM: Molecule
+    ) -> None:
+        """Test the standardization of a protein molecule with missing heavy atoms."""
+        # Set up protein helper
+        protein_helper = ProteinHelper()
+
+        # Test standardizing a molecule with missing heavy atoms
+        with pytest.warns(
+            UserWarning,
+            match=r"Residue MET1\.A has a different number of heavy atoms "
+            r"than the standard residue\. This may affect H-bond detection\.",
         ):
-            protein_helper.standardize_protein(templates=["invalid_format"])  # type: ignore
+            protein_mol = protein_helper.standardize_protein(MOL_MISSING_ATOM)
+
+        assert isinstance(protein_mol, Molecule)
+        assert len(protein_mol.residues) == len(MOL_MISSING_ATOM.residues)
+
+    def test_standardize_protein(
+        self,
+        CUSTOM_TEMPLATE: dict,
+        INPUT_MOL: Molecule,
+        BEN_MOL: Molecule,
+        HSD_RESIDUE: Residue,
+    ) -> None:
+        """Test the standardization of a protein molecule."""
+
+        # Set up protein helper with a custom template
+        protein_helper = ProteinHelper(templates=CUSTOM_TEMPLATE)
+
+        # Test standardizing a protein molecule
+        protein_mol = protein_helper.standardize_protein(input_topology=INPUT_MOL)
+        assert isinstance(protein_mol, Molecule)
+        assert len(protein_mol.residues) == len(INPUT_MOL.residues)
 
         # Test with a residue
-        protein_helper = ProteinHelper(Molecule(HSD_RESIDUE))
-        protein_helper.standardize_protein()
-        assert len(protein_helper.protein_mol.residues) == 1
-        assert str(protein_helper.protein_mol.residues[0].resid) == "HID109.A"
-
-        # Test with the template having different names
-        protein_helper = ProteinHelper(Molecule(HSD_RESIDUE))
-        with pytest.warns(
-            UserWarning, match=r"Align the template name \(BEN\) with \(RESNAME\)\."
-        ):
-            protein_helper.standardize_protein(
-                templates=[
-                    {"RESNAME": {"name": "BEN", "SMILES": "NC(=N)c1ccccc1"}},
-                ]
-            )
+        residue_mol = protein_helper.standardize_protein(Molecule(HSD_RESIDUE))
+        assert len(residue_mol.residues) == 1
+        assert str(residue_mol.residues[0].resid) == "HID109.A"
 
         # Test with a BENZAMIDINE residue
-        protein_helper = ProteinHelper(BEN_MOL)
-        protein_helper.standardize_protein(templates=CUSTOM_TEMPLATE)
-        assert isinstance(protein_helper.protein_mol, Molecule)
+        ben_mol = protein_helper.standardize_protein(BEN_MOL)
+        assert isinstance(ben_mol, Molecule)
         all_bonds_info = []
-        for bond in protein_helper.protein_mol.residues[0].GetBonds():
+        for bond in ben_mol.residues[0].GetBonds():
             if bond.GetBeginAtomIdx() < bond.GetEndAtomIdx():
                 all_bonds_info.append(
                     f"{bond.GetBeginAtomIdx()}_{bond.GetEndAtomIdx()}_"
