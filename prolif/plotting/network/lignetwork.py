@@ -652,7 +652,7 @@ class LigNetwork:
                 "font": {"color": self._FONTCOLORS.get(restype, "black")},
                 "shape": "box",
                 "borderWidth": 0,
-                "physics": True,
+                "physics": False,
                 "mass": mass,
                 "group": "protein",
                 "residue_type": restype,
@@ -721,20 +721,18 @@ class LigNetwork:
     def _calculate_protein_node_coordinates(self) -> None:
         """Calculates optimal 2D coordinates for protein residue nodes in the visualization.
 
-        This method creates a graph representation with fixed ligand atom positions and
-        movable protein residue nodes. It connects each residue to its interacting ligand atoms
-        and uses NetworkX's spring layout algorithm to optimize residue positions.
+        This method calculates the 2D coordinates for protein residues based on their
+        interactions with ligand atoms.
 
         The algorithm follows these steps:
         1. Creates a graph with ligand atoms (fixed) and protein residues (movable)
         2. Places protein residues initially near the ligand atoms they interact with
         3. Optimizes the layout using spring_layout from NetworkX while keeping ligand atoms fixed
-        4. Scales the layout to a suitable size relative to the ligand dimensions
-        5. Detects and resolves overlapping residue nodes
+        4. Detects and resolves overlapping
         """
         # 1. Extract protein nodes
         protein_nodes = [
-            node_id
+            str(node_id)
             for node_id, node in self._nodes.items()
             if node.get("group") == "protein"
         ]
@@ -745,16 +743,72 @@ class LigNetwork:
         center, width, height = self._get_ligand_center_and_dimensions()
 
         # 3. Create a graph with both protein residues and ligand atoms
+        G: nx.Graph = self._setup_graph(
+            protein_nodes=protein_nodes,
+        )
+
+        # 4. Create initial positions with ligand atoms fixed at their coordinates
+        pos: dict[Any, "NDArray[np.float64]"] = self._initial_protein_coordinates(
+            protein_nodes, G, center, width
+        )
+
+        # 5. Run spring layout
+        pos = nx.spring_layout(
+            G,
+            pos=pos,  # Initial positions for residues and fixed ligand atoms
+            fixed=self._interacting_atoms,  # Fix ligand atoms at their coordinates
+            scale=2,  # performs rescaling to fit the layout in a reasonable size
+            iterations=100,
+            center=center,
+        )
+
+        # 6. Adjust positions to avoid overlaps
+        residue_pos = {res: pos[res] for res in protein_nodes if res in pos}
+
+        if residue_pos:
+            residue_pos = self._fix_residue_overlaps(
+                residue_pos, protein_nodes, width, height
+            )
+            # Update node positions
+            for res, coords in residue_pos.items():
+                self._nodes[res]["x"] = float(coords[0])
+                self._nodes[res]["y"] = float(coords[1])
+
+    def _get_ligand_center_and_dimensions(
+        self,
+    ) -> tuple["NDArray[np.float64]", float, float]:
+        """Calculate center and dimensions of the ligand using all atoms"""
+        # Get all atom coordinates
+        atom_coords = self.xyz[:, :2]  # Only use x,y coordinates
+
+        # Find the bounding box
+        min_x = np.min(atom_coords[:, 0])
+        max_x = np.max(atom_coords[:, 0])
+        min_y = np.min(atom_coords[:, 1])
+        max_y = np.max(atom_coords[:, 1])
+
+        # Calculate center and dimensions
+        center = np.array([(min_x + max_x) / 2, (min_y + max_y) / 2])
+        width = max_x - min_x
+        height = max_y - min_y
+
+        return center, width, height
+
+    def _setup_graph(
+        self,
+        protein_nodes: list[str],
+    ) -> nx.Graph:
+        """Sets up a NetworkX graph with protein residues and ligand atoms."""
+
         G: nx.Graph = nx.Graph()
+
         # Add protein residue nodes
         G.add_nodes_from(protein_nodes, node_type="protein")
 
-        # Add ligand atom nodes, filtering out hydrogens and special nodes
-        ligand_atom_indices = []
-        for idx in range(self.mol.GetNumAtoms()):
-            atom = self.mol.GetAtomWithIdx(idx)
-            # not checking self.exclude here, to get a proper direction vector for all the residues interacting with H atoms
-            ligand_atom_indices.append(idx)
+        # Add ligand atom nodes with fixed positions
+        for idx in (
+            self._interacting_atoms
+        ):  # not including ligand atoms that are not interacting
             G.add_node(
                 idx,
                 node_type="ligand",
@@ -763,7 +817,7 @@ class LigNetwork:
                 y=float(self.xyz[idx, 1]),
             )
 
-        # 4. Create edges between residues and ligand atoms based on interactions
+        # Add edges between ligand atoms and protein residues based on interactions
         for (lig_res, prot_res, interaction, lig_indices), (
             weight,
             distance,
@@ -777,19 +831,33 @@ class LigNetwork:
             if components.startswith("ligand") and prot_res in protein_nodes:
                 # For each ligand atom involved in this interaction, add an edge
                 for lig_atom_idx in lig_indices:
-                    if lig_atom_idx in ligand_atom_indices:
+                    if lig_atom_idx in self._interacting_atoms:
                         # Add edge from ligand atom to protein residue
-                        # Ensure lig_atom_idx is an int
                         atom_idx: int = lig_atom_idx
                         G.add_edge(prot_res, atom_idx)
 
-        # 5. Create initial positions with ligand atoms fixed at their coordinates
+        return G
+
+    def _initial_protein_coordinates(
+        self,
+        protein_nodes: list[str],
+        G: nx.Graph,
+        center: "NDArray[np.float64]",
+        width: float,
+    ) -> dict[Any, "NDArray[np.float64]"]:
+        """Initial positions for protein residues based on ligand atom interactions.
+
+        This method calculates initial positions for protein residues based on the
+        average position of their interacting ligand atoms.
+        """
         pos: dict[Any, "NDArray[np.float64]"] = {}
+
         # Set ligand atom positions (fixed)
-        for idx in ligand_atom_indices:
+        for idx in (
+            self._interacting_atoms
+        ):  # not including ligand atoms that are not interacting
             pos[idx] = np.array([self.xyz[idx, 0], self.xyz[idx, 1]])
 
-        # Set initial positions for protein residues based on average of connected ligand atoms
         for prot_res in protein_nodes:
             connected_atoms = list(G.neighbors(prot_res))
             if connected_atoms:
@@ -818,106 +886,87 @@ class LigNetwork:
                 pos[prot_res] = center + width * np.array(
                     [np.cos(angle), np.sin(angle)]
                 )
-            
+        return pos
 
-        # 6. Run spring layout
-        pos = nx.spring_layout(
-            G,
-            pos=pos,  # Initial positions for residues and fixed ligand atoms
-            fixed=ligand_atom_indices,  # Fix ligand atoms at their coordinates
-            k=width * 0.02,  # Spring constant based on ligand size
-            iterations=100,
-            center=center,
-        )
-
-        # 7. Scale and adjust positions to avoid overlaps
-        # extract just the residue positions for scaling
-        residue_pos = {res: pos[res] for res in protein_nodes if res in pos}
-
-        if residue_pos:
-            # Find the range of residue positions
-            positions = np.array(list(residue_pos.values()))
-            min_coords = positions.min(axis=0)
-            max_coords = positions.max(axis=0)
-
-            # Calculate desired dimensions
-            current_width = max_coords[0] - min_coords[0]
-            current_height = max_coords[1] - min_coords[1]
-            desired_width = width * 2.5
-            desired_height = height * 2.5
-
-            # Scale if needed
-            if current_width > 0 and current_height > 0:
-                scale_x = desired_width / current_width
-                scale_y = desired_height / current_height
-                scale_factor = min(scale_x, scale_y, 2.0)  # Limits scaling
-
-                # Scale and center the residue positions
-                for res, coords in residue_pos.items():
-                    residue_pos[res] = (coords - center) * scale_factor + center
-
-            # Check for and resolve overlaps
-            min_distance = max(width, height) * 0.2  # Minimum separation
-            max_iterations = 10
-
-            for _ in range(max_iterations):
-                overlap_found = False
-                adjustments = {node: np.zeros(2) for node in protein_nodes}
-
-                # Check all pairs of residues for overlaps
-                for i, res1 in enumerate(protein_nodes):
-                    if res1 not in residue_pos:
-                        continue
-                    for res2 in protein_nodes[i + 1 :]:
-                        if res2 not in residue_pos:
-                            continue
-
-                        delta = residue_pos[res2] - residue_pos[res1]
-                        if delta[0] == 0:  # handles edge cases where delta is zero
-                            delta = [40, 40]
-                        dist = np.linalg.norm(delta)
-
-                        if 0 < dist < min_distance:
-                            overlap_found = True
-                            force = (min_distance - dist) * 0.5
-                            direction = delta / dist
-
-                            # Push apart
-                            adjustments[res1] -= direction * force
-                            adjustments[res2] += direction * force
-
-                # Apply adjustments
-                for res, adjustment in adjustments.items():
-                    if res in residue_pos:
-                        residue_pos[res] = residue_pos[res] + adjustment
-
-                if not overlap_found:
-                    break
-
-            # Update node positions
-            for res, coords in residue_pos.items():
-                self._nodes[res]["x"] = float(coords[0])
-                self._nodes[res]["y"] = float(coords[1])
-
-    def _get_ligand_center_and_dimensions(
+    def _fix_residue_overlaps(
         self,
-    ) -> tuple["NDArray[np.float64]", float, float]:
-        """Calculate center and dimensions of the ligand using all atoms"""
-        # Get all atom coordinates
-        atom_coords = self.xyz[:, :2]  # Only use x,y coordinates
+        residue_pos: dict[Any, "NDArray[np.float64]"],
+        protein_nodes: list[str],
+        width: float,
+        height: float,
+    ) -> dict[Any, "NDArray[np.float64]"]:
+        """Detect and resolve overlaps between residues and with ligand atoms."""
 
-        # Find the bounding box
-        min_x = np.min(atom_coords[:, 0])
-        max_x = np.max(atom_coords[:, 0])
-        min_y = np.min(atom_coords[:, 1])
-        max_y = np.max(atom_coords[:, 1])
+        min_distance = min(100, max(width, height) * 0.2)  # Minimum separation
+        max_iterations = 20  # max number of cycles to resolve overlaps
 
-        # Calculate center and dimensions
-        center = np.array([(min_x + max_x) / 2, (min_y + max_y) / 2])
-        width = max_x - min_x
-        height = max_y - min_y
+        for _ in range(max_iterations):
+            overlap_found = False
+            residue_adjustments = {node: np.zeros(2) for node in protein_nodes}
 
-        return center, width, height
+            # First phase: Check residue-residue overlaps
+            for i, res1 in enumerate(protein_nodes):
+                if res1 not in residue_pos:
+                    continue
+
+                # check overlap with other residues
+                for res2 in protein_nodes[i + 1 :]:
+                    if res2 not in residue_pos:
+                        continue
+
+                    delta = residue_pos[res2] - residue_pos[res1]
+                    if delta[0] == 0:  # handles edge cases where delta is zero
+                        delta = np.array([40, 40])
+                    dist = np.linalg.norm(delta)
+
+                    if 0 < dist < min_distance:
+                        overlap_found = True
+                        force = (min_distance - dist) * 0.5
+                        direction = delta / dist
+
+                        # Push apart
+                        residue_adjustments[res1] -= direction * force
+                        residue_adjustments[res2] += direction * force
+
+            # Apply residue-residue adjustments
+            for res, adjustment in residue_adjustments.items():
+                if res in residue_pos:
+                    residue_pos[res] = residue_pos[res] + adjustment
+
+            ligand_atom_indices = []  # to store all ligands, irrespective of interaction with residues
+            for idx in range(self.mol.GetNumAtoms()):
+                ligand_atom_indices.append(idx)
+
+            # Second phase: Check residue-ligand overlaps after residue adjustments
+            ligand_adjustments = {node: np.zeros(2) for node in protein_nodes}
+            for res1 in protein_nodes:
+                if res1 not in residue_pos:
+                    continue
+
+                # check overlap with ligand atoms
+                for idx in ligand_atom_indices:
+                    delta = residue_pos[res1] - np.array(
+                        [self.xyz[idx, 0], self.xyz[idx, 1]]
+                    )
+                    dist = np.linalg.norm(delta)
+
+                    if 0 < dist < min_distance:
+                        overlap_found = True
+                        force = (min_distance - dist) * 1.5
+                        direction = delta / dist
+
+                        # Push away from ligand atom
+                        ligand_adjustments[res1] += direction * force
+
+            # Apply ligand overlap adjustments
+            for res, adjustment in ligand_adjustments.items():
+                if res in residue_pos:
+                    residue_pos[res] = residue_pos[res] + adjustment
+
+            if not overlap_found:
+                break
+
+        return residue_pos
 
     def _get_ring_centroid(self, indices: tuple[int, ...]) -> "NDArray[np.float64]":
         """Find ring centroid coordinates using the indices of the ring atoms"""
