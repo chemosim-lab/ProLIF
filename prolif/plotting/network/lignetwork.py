@@ -473,7 +473,7 @@ class LigNetwork:
         )
         self._nodes[idx] = node
 
-    def to_networkx_graph_object(self) -> nx.Graph:
+    def to_networkx(self) -> nx.Graph:
         """Export the interaction data directly as a NetworkX graph object.
 
         Returns

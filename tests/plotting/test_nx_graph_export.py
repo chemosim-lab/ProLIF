@@ -9,7 +9,7 @@ from prolif.plotting.network.lignetwork import LigNetwork
 
 
 @pytest.fixture
-def simple_ligand_mol() -> Chem.rdchem.Mol:
+def simple_ligand_mol() -> Chem.Mol:
     """Create a simple ligand molecule (benzene) for testing"""
     mol = Chem.MolFromSmiles("c1ccccc1")
     mol = Chem.AddHs(mol)
@@ -54,17 +54,17 @@ def simple_interaction_df() -> pd.DataFrame:
 
 @pytest.fixture
 def lignetwork_obj(
-    simple_ligand_mol: Chem.rdchem.Mol, simple_interaction_df: pd.DataFrame
+    simple_ligand_mol: Chem.Mol, simple_interaction_df: pd.DataFrame
 ) -> LigNetwork:
     """Create a LigNetwork object for testing"""
     return LigNetwork(simple_interaction_df, simple_ligand_mol)
 
 
 def test_to_networkx_graph(
-    lignetwork_obj: LigNetwork, simple_ligand_mol: Chem.rdchem.Mol
+    lignetwork_obj: LigNetwork, simple_ligand_mol: Chem.Mol
 ) -> None:
-    """Test to_networkx_graph_object"""
-    G = lignetwork_obj.to_networkx_graph_object()
+    """Test to_networkx"""
+    G = lignetwork_obj.to_networkx()
 
     # Check that the graph has the correct number of nodes
     # All atoms + 2 protein residues
@@ -97,7 +97,7 @@ def test_interaction_edge_attributes(
     lignetwork_obj: LigNetwork, simple_interaction_df: pd.DataFrame
 ) -> None:
     """Test that interaction edges have the correct attributes"""
-    G = lignetwork_obj.to_networkx_graph_object()
+    G = lignetwork_obj.to_networkx()
 
     # Track interactions found in the graph
     interaction_types = set(simple_interaction_df.index.get_level_values("interaction"))
@@ -156,7 +156,7 @@ def test_interaction_edge_attributes(
 
 def test_node_attributes(lignetwork_obj: LigNetwork) -> None:
     """Test that nodes have the correct attributes"""
-    G = lignetwork_obj.to_networkx_graph_object()
+    G = lignetwork_obj.to_networkx()
 
     # Check ligand atom attributes
     for i in range(lignetwork_obj.mol.GetNumAtoms()):
@@ -182,7 +182,7 @@ def test_empty_interaction_df() -> None:
 
     # Create the LigNetwork and convert to NetworkX
     network = LigNetwork(df, mol)
-    G = network.to_networkx_graph_object()
+    G = network.to_networkx()
 
     # Should only have ligand atoms, no protein nodes, no interaction edges
     assert len(G.nodes) == mol.GetNumAtoms()
