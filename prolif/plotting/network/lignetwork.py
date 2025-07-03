@@ -760,6 +760,7 @@ class LigNetwork:
             scale=2,  # performs rescaling to fit the layout in a reasonable size
             iterations=100,
             center=center,
+            weight="weight",
         )
 
         # 6. Adjust positions to avoid overlaps
@@ -816,7 +817,6 @@ class LigNetwork:
                 x=float(self.xyz[idx, 0]),
                 y=float(self.xyz[idx, 1]),
             )
-
         # Add edges between ligand atoms and protein residues based on interactions
         for (lig_res, prot_res, interaction, lig_indices), (
             weight,
@@ -834,7 +834,7 @@ class LigNetwork:
                     if lig_atom_idx in self._interacting_atoms:
                         # Add edge from ligand atom to protein residue
                         atom_idx: int = lig_atom_idx
-                        G.add_edge(prot_res, atom_idx)
+                        G.add_edge(prot_res, atom_idx, weight=10 / distance)
 
         return G
 
