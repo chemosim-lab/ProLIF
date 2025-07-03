@@ -106,7 +106,7 @@ class ProteinHelper:
             # if templates is a list, check if it contains dicts
             if not all(isinstance(t, dict) for t in templates):
                 raise TypeError("Templates must be a dict, a list of dicts or None.")
-            templates.extend([STANDARD_AA])
+            templates = [*templates, STANDARD_AA]
 
         # check the templates with "name" for each residue
         for template in templates:
