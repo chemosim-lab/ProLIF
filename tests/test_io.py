@@ -422,5 +422,5 @@ class TestProteinHelper:
             # test the function
             em_fixed = _assign_intra_props_lone_H(em)
 
-        for bond1, bond2 in zip(mol.GetBonds(), em_fixed.GetBonds(), strict=False):
+        for bond1, bond2 in zip(mol.GetBonds(), em_fixed.GetBonds(), strict=True):
             assert bond1.GetBondType() == bond2.GetBondType()
