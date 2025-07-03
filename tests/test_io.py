@@ -243,7 +243,7 @@ class TestProteinHelper:
 
         # check two residue are equal and bond orders are fixed
         for at1, at2 in zip(
-            fixed_mol.GetAtoms(), fixed_mol_custom.GetAtoms(), strict=False
+            fixed_mol.GetAtoms(), fixed_mol_custom.GetAtoms(), strict=True
         ):
             assert at1.GetSymbol() == at2.GetSymbol()
 
