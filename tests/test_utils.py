@@ -17,12 +17,15 @@ from prolif.utils import (
     is_peptide_bond,
     pandas_series_to_bv,
     requires,
+    select_over_trajectory,
     split_mol_by_residues,
     to_bitvectors,
     to_dataframe,
 )
 
 if TYPE_CHECKING:
+    from MDAnalysis import Universe
+
     from prolif.typeshed import IFPResults
 
 
@@ -292,3 +295,52 @@ def test_to_bv(ifp: "IFPResults") -> None:
     bvs = to_bitvectors(df)
     assert len(bvs) == 2
     assert bvs[0].GetNumOnBits() == 2
+
+
+@pytest.mark.parametrize(
+    ("selections", "expected_num_groups", "expected_num_atoms"),
+    [
+        (
+            [
+                "protein and byres around 4 group ligand",
+                "resname TIP3 and byres around 4 (group ligand or group {0})",
+            ],
+            2,
+            [314, 333],
+        ),
+        (
+            [
+                "protein and byres around 4 group ligand",
+                "resname TIP3 and byres around 4 (group ligand or group {0})",
+                "protein and byres around 4 (group {1})",
+            ],
+            3,
+            [314, 333, 1020],
+        ),
+    ],
+)
+def test_select_over_trajectory(
+    water_u: "Universe",
+    selections: list[str],
+    expected_num_groups: int,
+    expected_num_atoms: list[int],
+) -> None:
+    ligand_selection = water_u.select_atoms("resname QNB")
+    atomgroups = select_over_trajectory(
+        water_u, water_u.trajectory[:5], *selections, ligand=ligand_selection
+    )
+    assert len(atomgroups) == expected_num_groups
+    for group, expected in zip(atomgroups, expected_num_atoms, strict=True):
+        assert group.n_atoms == expected
+
+
+def test_select_over_trajectory_single(water_u: "Universe") -> None:
+    ligand_selection = water_u.select_atoms("resname QNB")
+    atomgroup = select_over_trajectory(
+        water_u,
+        water_u.trajectory[:5],
+        "protein and byres around 4 group ligand",
+        ligand=ligand_selection,
+    )
+    # also indirectly tests for typing
+    assert atomgroup.n_atoms == 314

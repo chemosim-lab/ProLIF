@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `select_over_trajectory` to easily make AtomGroup distance-based selections
+  (including recursive selections) over the whole trajectory rather than just the first
+  frame. This helps making optimised selections when a protein is highly flexible
+  instead of using `protein and byres around X group ligand` with a very large X.
 - Support for `WaterBridge` interactions (PR #229 with @talagayev).
 - Refactored the `LigNetwork` plotting code (PR #268 by @nilay-v3rma).
 - Type-checking and related pipelines:
