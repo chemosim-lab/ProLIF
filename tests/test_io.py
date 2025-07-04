@@ -80,7 +80,7 @@ class TestProteinHelper:
         return str(datapath / "tpo.pdb")
 
     @pytest.fixture(scope="class", params=[True, False])
-    def INPUT_MOL(self, INPUT_PATH: str, request) -> Molecule:
+    def INPUT_MOL(self, INPUT_PATH: str, request) -> Molecule:  # type: ignore
         """Return the Molecule object for the input file."""
         input_mol = Chem.MolFromPDBFile(INPUT_PATH, removeHs=request.param)
         DetermineConnectivity(input_mol, useHueckel=True)
@@ -363,6 +363,14 @@ class TestProteinHelper:
         assert isinstance(ben_mol, Molecule)
         all_bonds_info = []
         for bond in ben_mol.residues[0].GetBonds():
+            if bond.GetBeginAtom().GetAtomicNum() == 1:
+                # skip bonds involving hydrogen atoms
+                continue
+
+            if bond.GetEndAtom().GetAtomicNum() == 1:
+                # skip bonds involving hydrogen atoms
+                continue
+
             if bond.GetBeginAtomIdx() < bond.GetEndAtomIdx():
                 all_bonds_info.append(
                     f"{bond.GetBeginAtomIdx()}_{bond.GetEndAtomIdx()}_"

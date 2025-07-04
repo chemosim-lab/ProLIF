@@ -46,7 +46,6 @@ class ProteinHelper:
     This class is designed to work with ProLIF Molecule instances or PDB files.
     It reads the input topology, standardizes the residue names, and fixes the bond
     orders based on the provided templates or standard amino acid template.
-    However, the explicit hydrogen atoms will be removed from the molecule.
 
     Example
     -------
@@ -126,7 +125,7 @@ class ProteinHelper:
         elif isinstance(input_topology, str | Path) and str(input_topology).endswith(
             ".pdb"
         ):
-            input_protein_top = Chem.MolFromPDBFile(str(input_topology))
+            input_protein_top = Chem.MolFromPDBFile(str(input_topology), removeHs=False)
             protein_mol = Molecule.from_rdkit(input_protein_top)
 
         else:
