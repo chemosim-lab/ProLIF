@@ -3,7 +3,6 @@ import warnings
 from pathlib import Path
 
 from rdkit import Chem
-from rdkit.Chem import AllChem
 
 from prolif.constants import (
     AMBER_POOL,
@@ -18,7 +17,7 @@ from prolif.constants import (
     STANDARD_RESNAME_MAP,
     TERMINAL_OXYGEN_NAMES,
 )
-from prolif.molecule import Molecule
+from prolif.molecule import Molecule, pdbqt_supplier
 from prolif.residue import Residue, ResidueGroup
 
 logger = logging.getLogger(__name__)
@@ -395,11 +394,9 @@ class ProteinHelper:
 
             # SMILES template
             if "SMILES" in t[resname]:
-                # convert SMILES to RDKit molecule
-                mol_template = Chem.MolFromSmiles(t[resname]["SMILES"])
-
-                # assign bond orders from template
-                new_res = AllChem.AssignBondOrdersFromTemplate(mol_template, residue)
+                new_res = assign_bond_orders_from_smiles(
+                    template_smiles=t[resname]["SMILES"], mol=residue
+                )
                 break
 
             # cif template
@@ -411,6 +408,34 @@ class ProteinHelper:
             raise ValueError(f"Failed to find template for residue: '{resname}'")
 
         return Residue(new_res)
+
+
+def assign_bond_orders_from_smiles(
+    template_smiles: str, mol: Residue | Chem.Mol
+) -> Chem.Mol:
+    """Assign bond orders from a SMILES template to a residue.
+
+    Parameters
+    ----------
+    template_smiles : str
+        The SMILES string of the template to assign bond orders from.
+    residue : Residue | Chem.Mol
+        The residue or molecule to assign bond orders to.
+
+    Returns
+    -------
+    Chem.Mol
+        The residue or molecule with assigned bond orders from the template.
+    """
+    for atm in mol.GetAtoms():
+        # Set the necessary property for _adjust_hydrogens function (index of the atom)
+        atm.SetIntProp("_MDAnalysis_index", atm.GetIdx())
+
+    # Call template from SMILES
+    mol_template = Chem.MolFromSmiles(template_smiles)
+
+    # use the available function to assign bond orders (adjust hydrogens)
+    return pdbqt_supplier._adjust_hydrogens(mol_template, mol)
 
 
 # The below code contains functions for fixing molecule bond orders.

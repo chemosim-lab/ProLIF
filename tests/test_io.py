@@ -79,11 +79,10 @@ class TestProteinHelper:
         """Return the path to the input file."""
         return str(datapath / "tpo.pdb")
 
-    @pytest.fixture(scope="class")
-    def INPUT_MOL(self, INPUT_PATH: str) -> Molecule:
+    @pytest.fixture(scope="class", params=[True, False])
+    def INPUT_MOL(self, INPUT_PATH: str, request) -> Molecule:
         """Return the Molecule object for the input file."""
-        input_mol = Chem.MolFromPDBFile(INPUT_PATH, removeHs=True)
-        # [TODO] need to deal with the situation not to remove hydrogens
+        input_mol = Chem.MolFromPDBFile(INPUT_PATH, removeHs=request.param)
         DetermineConnectivity(input_mol, useHueckel=True)
         for atm in input_mol.GetAtoms():
             atm.SetNoImplicit(False)  # set no implicit to False
