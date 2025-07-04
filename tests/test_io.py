@@ -89,11 +89,10 @@ class TestProteinHelper:
         return Molecule.from_rdkit(input_mol)
 
     @pytest.fixture(scope="class")
-    def BEN_MOL(self) -> Molecule:
-        """Return a Molecule object for the BEN residue."""
+    def BEN_PATH(self) -> str:
+        """Return a Molecule object for the BEN path."""
         ben_path = datapath / "ben_test.pdb"
-        input_mol = Chem.MolFromPDBFile(str(ben_path))
-        return Molecule.from_rdkit(input_mol)
+        return str(ben_path)
 
     @pytest.fixture(scope="class")
     def CUSTOM_TEMPLATE(self) -> dict:
@@ -324,11 +323,24 @@ class TestProteinHelper:
         assert isinstance(protein_mol, Molecule)
         assert len(protein_mol.residues) == len(MOL_MISSING_ATOM.residues)
 
+    def test_standardize_protein_wrong_format(self) -> None:
+        """Test the standardization of a protein molecule with wrong format."""
+        # Set up protein helper
+        protein_helper = ProteinHelper()
+
+        # Test with a wrong format (string)
+        with pytest.raises(
+            TypeError,
+            match=r"input_topology must be a string \(path to a PDB file\) or "
+            r"a prolif Molecule instance\.",
+        ):
+            protein_helper.standardize_protein("invalid_format")
+
     def test_standardize_protein(
         self,
         CUSTOM_TEMPLATE: dict,
         INPUT_MOL: Molecule,
-        BEN_MOL: Molecule,
+        BEN_PATH: str,
         HSD_RESIDUE: Residue,
     ) -> None:
         """Test the standardization of a protein molecule."""
@@ -346,8 +358,8 @@ class TestProteinHelper:
         assert len(residue_mol.residues) == 1
         assert str(residue_mol.residues[0].resid) == "HID109.A"
 
-        # Test with a BENZAMIDINE residue
-        ben_mol = protein_helper.standardize_protein(BEN_MOL)
+        # Test with a BENZAMIDINE residue (from path)
+        ben_mol = protein_helper.standardize_protein(BEN_PATH)
         assert isinstance(ben_mol, Molecule)
         all_bonds_info = []
         for bond in ben_mol.residues[0].GetBonds():
