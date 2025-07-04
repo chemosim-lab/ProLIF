@@ -27,6 +27,8 @@ ResidueSelection: TypeAlias = Literal["all"] | Sequence[ResidueKey] | None
 
 # IFP
 IFPResults: TypeAlias = dict[int, "IFP"]
+"""A dictionary holding the interaction fingerprint data for each frame/pose."""
+
 InteractionMetadata: TypeAlias = dict[str, Any]
 IFPData: TypeAlias = dict[str, Sequence[InteractionMetadata]]
 
@@ -34,7 +36,10 @@ IFPData: TypeAlias = dict[str, Sequence[InteractionMetadata]]
 Trajectory: TypeAlias = Union[  # type: ignore[no-any-unimported]
     "ProtoReader", "FrameIteratorSliced", "FrameIteratorIndices", "Timestep"
 ]
+"""Trajectory-like object from MDAnalysis."""
+
 MDAObject: TypeAlias = Union["Universe", "AtomGroup"]  # type: ignore[no-any-unimported]
+"""An MDAnalysis Universe or Atomgroup."""
 
 # Interaction parameters
 Angles: TypeAlias = tuple[float, float]
