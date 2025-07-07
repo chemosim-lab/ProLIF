@@ -197,23 +197,15 @@ class ImplicitHBAcceptor(Distance):
                 interaction_data,
                 lig_res,
                 prot_res,
-                max_dev_aaa=self.tolerance_dev_aaa,
-                max_dev_daa=self.tolerance_dev_daa,
-                max_dev_apa=self.tolerance_dev_apa,
-                max_dev_dpa=self.tolerance_dev_dpa,
             ):
                 # If passed geometry checks, add hydrogen bond probability
-                yield self.add_Hbond_probability(interaction_data)
+                yield self.add_hbond_probability(interaction_data)
 
     def check_geometry(
         self,
         interaction_data,
         lig_res,
         prot_res,
-        max_dev_aaa,
-        max_dev_daa,
-        max_dev_apa,
-        max_dev_dpa,
     ):
         """Check the geometry of the interaction.
 
@@ -225,14 +217,6 @@ class ImplicitHBAcceptor(Distance):
             Ligand residue.
         prot_res : Residue
             Protein residue.
-        max_dev_aaa : float
-            Maximum deviation allowed for the acceptor atom's angle.
-        max_dev_daa : float
-            Maximum deviation allowed for the donor atom's angle.
-        max_dev_apa : float
-            Maximum deviation allowed for the acceptor plane angle.
-        max_dev_dpa : float
-            Maximum deviation allowed for the donor plane angle.
 
         Returns
         -------
@@ -243,7 +227,7 @@ class ImplicitHBAcceptor(Distance):
         # [TODO] Implement geometry checks based on angles and distances.
         return True
 
-    def add_Hbond_probability(self, interaction_data):
+    def add_hbond_probability(self, interaction_data):
         """Add hydrogen bond probability to the interaction metadata.
 
         Parameters
@@ -258,7 +242,7 @@ class ImplicitHBAcceptor(Distance):
 
         """
         # [TODO] Implement logic to calculate and add Hbond probability.
-        interaction_data.metadata["Hbond_probability"] = 1.0
+        interaction_data.metadata["hbond_probability"] = 1.0
 
 
 ImplicitHBDonor = ImplicitHBAcceptor.invert_role(
