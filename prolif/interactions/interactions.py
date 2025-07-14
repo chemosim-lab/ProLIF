@@ -133,183 +133,6 @@ HBDonor = HBAcceptor.invert_role(
 )
 
 
-class ImplicitHBAcceptor(Distance, VdWContact):
-    """Implicit hydrogen bond acceptor interaction
-
-    Parameters
-    ----------
-    acceptor : str
-        SMARTS for ``[Acceptor]``.
-    donor : str
-        SMARTS for ``[Donor]-[Implicit Hydrogen]``.
-    tolerance_dev_aaa : float
-        Tolerance for the deviation from the ideal acceptor atom's angle.
-    tolerance_dev_daa : float
-        Tolerance for the deviation from the ideal donor atom's angle.
-    tolerance_dev_apa : float
-        Tolerance for the deviation from the ideal acceptor plane angle.
-    tolerance_dev_dpa : float
-        Tolerance for the deviation from the ideal donor plane angle.
-    distance : float
-        Distance threshold between the acceptor and donor atoms.
-
-    """
-
-    def __init__(
-        self,
-        acceptor: str = (
-            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
-            "O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,"
-            "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
-        ),
-        donor: str = "[$([O,S;+0&h]),$([N;v2&h,v3&h,v4&+1&h]),n+0&h]",
-        distance: float = 3.5,
-        tolerance_dev_aaa: float = 45,
-        tolerance_dev_daa: float = 45,
-        tolerance_dev_apa: float = 90,
-        tolerance_dev_dpa: float = 45,
-        vdwradii: dict | None = None,
-        vdwradii_preset: Literal["mdanalysis", "rdkit", "csd"] = "mdanalysis",
-    ) -> None:
-        super().__init__(lig_pattern=acceptor, prot_pattern=donor, distance=distance)
-        self.acceptor = acceptor
-        self.donor = donor
-        self.tolerance_dev_aaa = tolerance_dev_aaa
-        self.tolerance_dev_daa = tolerance_dev_daa
-        self.tolerance_dev_apa = tolerance_dev_apa
-        self.tolerance_dev_dpa = tolerance_dev_dpa
-
-        self.vdwradii_preset = vdwradii_preset.lower()
-        preset_vdw = VDW_PRESETS[self.vdwradii_preset]
-        self.vdwradii = {**preset_vdw, **vdwradii} if vdwradii else preset_vdw
-
-    def detect(self, lig_res, prot_res):
-        """Detect implicit hydrogen bond acceptor interactions.
-
-        Parameters
-        ----------
-        lig_res : Residue
-            Ligand residue.
-        prot_res : Residue
-            Protein residue.
-
-        Yields
-        ------
-        InteractionMetadata
-            Metadata for the detected interaction.
-
-        """
-        for interaction_data in super().detect(lig_res, prot_res):
-            # Check if the interaction geometry is valid
-            if self.check_geometry(
-                interaction_data,
-                lig_res=lig_res,
-                prot_res=prot_res,
-            ):
-                # If passed geometry checks, add hydrogen bond probability
-                yield self.add_hbond_probability(
-                    interaction_data, prot_res=prot_res, lig_res=lig_res
-                )
-
-    def check_geometry(
-        self,
-        interaction_data,
-        lig_res,
-        prot_res,
-    ):
-        """Check the geometry of the interaction.
-
-        Parameters
-        ----------
-        interaction_data : InteractionMetadata
-            Metadata for the detected interaction.
-        lig_res : Residue
-            Ligand residue.
-        prot_res : Residue
-            Protein residue.
-
-        Returns
-        -------
-        bool
-            True if the geometry is valid, False otherwise.
-
-        """
-        # [TODO] Implement geometry checks based on angles and distances.
-        return True
-
-    def add_hbond_probability(
-        self,
-        interaction_data: dict,
-        prot_res: "Residue",
-        lig_res: "Residue",
-        b: float = 0.4,
-    ) -> dict:
-        """Add hydrogen bond probability to the interaction metadata.
-
-        Parameters
-        ----------
-        interaction_data : dict
-            Metadata for the detected interaction.
-        prot_res : Residue
-            Protein residue.
-        lig_res : Residue
-            Ligand residue.
-        b : float, optional
-            Parameter to specify where the piecewise linear terms become zero.
-
-        Returns
-        -------
-        Dict
-            Updated metadata with hydrogen bond probability.
-
-        """
-        # [TODO] need to tune the b parameter based on the dataset
-
-        # Hbond probability is based on the Autodock Vina Hbond interaction term
-        lig_atom = lig_res.GetAtomWithIdx(interaction_data["indices"]["ligand"][0])
-        prot_atom = prot_res.GetAtomWithIdx(interaction_data["indices"]["protein"][0])
-        vdw_sum = self._get_radii_sum(lig_atom.GetSymbol(), prot_atom.GetSymbol())
-        d_diff = interaction_data["distance"] - vdw_sum
-
-        if d_diff < -0.7:
-            interaction_data["hbond_probability"] = 1.0
-        elif d_diff >= b:
-            interaction_data["hbond_probability"] = 0.0
-        else:
-            # Piecewise linear function for the hydrogen bond probability
-            interaction_data["hbond_probability"] = (d_diff - b) / (-0.7 - b)
-
-        return interaction_data
-
-    def _get_radii_sum(self, atom1: str, atom2: str) -> float:
-        """Get the sum of van der Waals radii for two atoms.
-
-        Note
-        ----
-        This method is adapted from the VdWContact class.
-        """
-        try:
-            return self.vdwradii[atom1] + self.vdwradii[atom2]
-        except KeyError:
-            missing = []
-            if atom1 not in self.vdwradii:
-                missing.append(f"{atom1!r}")
-            if atom2 not in self.vdwradii:
-                missing.append(f"{atom2!r}")
-            raise ValueError(
-                f"van der Waals radius for atom {' and '.join(missing)} not found."
-                " Either specify the missing radii in the `vdwradii` parameter for the"
-                " VdWContact interaction, or use a preset different from the current"
-                f" {self.preset!r}."
-            ) from None
-
-
-ImplicitHBDonor = ImplicitHBAcceptor.invert_role(
-    "ImplicitHBDonor",
-    "Implicit Hbond interaction between a ligand (donor) and a residue (acceptor)",
-)
-
-
 class XBAcceptor(DoubleAngle):
     """Halogen bonding between a ligand (acceptor) and a residue (donor).
 
@@ -720,3 +543,156 @@ class VdWContact(Interaction):
                     (ra.GetIdx(),),
                     distance=dist,
                 )
+
+
+class ImplicitHBAcceptor(Distance, VdWContact):
+    """Implicit hydrogen bond acceptor interaction
+
+    Parameters
+    ----------
+    acceptor : str
+        SMARTS for ``[Acceptor]``.
+    donor : str
+        SMARTS for ``[Donor]-[Implicit Hydrogen]``.
+    distance : float
+        Distance threshold between the acceptor and donor atoms.
+    tolerance_dev_aaa : float
+        Tolerance for the deviation from the ideal acceptor atom's angle.
+    tolerance_dev_daa : float
+        Tolerance for the deviation from the ideal donor atom's angle.
+    tolerance_dev_apa : float
+        Tolerance for the deviation from the ideal acceptor plane angle.
+    tolerance_dev_dpa : float
+        Tolerance for the deviation from the ideal donor plane angle.
+
+    """
+
+    def __init__(
+        self,
+        acceptor: str = (
+            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
+            "O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,"
+            "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
+        ),
+        donor: str = "[$([O,S;+0&h]),$([N;v2&h,v3&h,v4&+1&h]),n+0&h]",
+        distance: float = 3.5,
+        tolerance_dev_aaa: float = 45,
+        tolerance_dev_daa: float = 45,
+        tolerance_dev_apa: float = 90,
+        tolerance_dev_dpa: float = 45,
+        vdwradii: dict[str, float] | None = None,
+        vdwradii_preset: Literal["mdanalysis", "rdkit", "csd"] = "mdanalysis",
+    ) -> None:
+        super().__init__(
+            lig_pattern=acceptor, prot_pattern=donor, distance=distance)
+        VdWContact.__init__(self, vdwradii=vdwradii, preset=vdwradii_preset)
+        self.acceptor = acceptor
+        self.donor = donor
+        self.tolerance_dev_aaa = tolerance_dev_aaa
+        self.tolerance_dev_daa = tolerance_dev_daa
+        self.tolerance_dev_apa = tolerance_dev_apa
+        self.tolerance_dev_dpa = tolerance_dev_dpa
+
+    def detect(self, lig_res, prot_res):
+        """Detect implicit hydrogen bond acceptor interactions.
+
+        Parameters
+        ----------
+        lig_res : Residue
+            Ligand residue.
+        prot_res : Residue
+            Protein residue.
+
+        Yields
+        ------
+        InteractionMetadata
+            Metadata for the detected interaction.
+
+        """
+        for interaction_data in super().detect(lig_res, prot_res):
+            # Check if the interaction geometry is valid
+            if self.check_geometry(
+                interaction_data,
+                lig_res=lig_res,
+                prot_res=prot_res,
+            ):
+                # If passed geometry checks, add hydrogen bond probability
+                yield self.add_hbond_probability(
+                    interaction_data, prot_res=prot_res, lig_res=lig_res
+                )
+
+    def check_geometry(
+        self,
+        interaction_data,
+        lig_res,
+        prot_res,
+    ):
+        """Check the geometry of the interaction.
+
+        Parameters
+        ----------
+        interaction_data : InteractionMetadata
+            Metadata for the detected interaction.
+        lig_res : Residue
+            Ligand residue.
+        prot_res : Residue
+            Protein residue.
+
+        Returns
+        -------
+        bool
+            True if the geometry is valid, False otherwise.
+
+        """
+        # [TODO] Implement geometry checks based on angles and distances.
+        return True
+
+    def add_hbond_probability(
+        self,
+        interaction_data: dict,
+        prot_res: "Residue",
+        lig_res: "Residue",
+        b: float = 0.4,
+    ) -> dict:
+        """Add hydrogen bond probability to the interaction metadata.
+
+        Parameters
+        ----------
+        interaction_data : dict
+            Metadata for the detected interaction.
+        prot_res : Residue
+            Protein residue.
+        lig_res : Residue
+            Ligand residue.
+        b : float, optional
+            Parameter to specify where the piecewise linear terms become zero.
+
+        Returns
+        -------
+        Dict
+            Updated metadata with hydrogen bond probability.
+
+        """
+        # [TODO] need to tune the b parameter based on the dataset
+
+        # Hbond probability is based on the Autodock Vina Hbond interaction term
+        lig_atom = lig_res.GetAtomWithIdx(interaction_data["indices"]["ligand"][0])
+        prot_atom = prot_res.GetAtomWithIdx(interaction_data["indices"]["protein"][0])
+        vdw_sum = VdWContact._get_radii_sum(
+            self, lig_atom.GetSymbol(), prot_atom.GetSymbol())
+        d_diff = interaction_data["distance"] - vdw_sum
+
+        if d_diff < -0.7:
+            interaction_data["hbond_probability"] = 1.0
+        elif d_diff >= b:
+            interaction_data["hbond_probability"] = 0.0
+        else:
+            # Piecewise linear function for the hydrogen bond probability
+            interaction_data["hbond_probability"] = (d_diff - b) / (-0.7 - b)
+
+        return interaction_data
+
+ImplicitHBDonor = ImplicitHBAcceptor.invert_role(
+    "ImplicitHBDonor",
+    "Implicit Hbond interaction between a ligand (donor) and a residue (acceptor)",
+)
