@@ -146,20 +146,9 @@ class TestProteinHelper:
     def test_initialization(self, templates, expected_context) -> None:  # type: ignore
         """Test the initialization of the TestProteinHelper class."""
 
-        if expect_type_error:
-            with pytest.raises(
-                TypeError, match=r"Templates must be a dict, a list of dicts or None\."
-            ):
-                ProteinHelper(templates)
-        elif expect_warning:
-            with pytest.warns(
-                UserWarning, match=r"Align the template name \(BEN\) with \(RES\)\."
-            ):
-                ProteinHelper(templates)
-        else:
+        with expected_context:
             protein_helper = ProteinHelper(templates)
-            assert isinstance(protein_helper, ProteinHelper)
-            assert isinstance(protein_helper.templates, list)
+        assert isinstance(protein_helper.templates, list)
 
     def test_convert_to_standard_resname(self) -> None:
         """Test the conversion of residue names to standard names."""
