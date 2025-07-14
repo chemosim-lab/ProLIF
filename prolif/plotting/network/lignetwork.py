@@ -549,6 +549,7 @@ class LigNetwork:
                     weight=weight,
                     distance=distance,
                     components=components,
+                    weight_spring_layout=10 / distance,
                 )
 
         return G
@@ -731,36 +732,33 @@ class LigNetwork:
         4. Detects and resolves overlapping
         """
         # 1. Extract protein nodes
-        protein_nodes = [
-            str(node_id)
-            for node_id, node in self._nodes.items()
-            if node.get("group") == "protein"
-        ]
+        protein_nodes = list(set(self.df.index.get_level_values("protein")))
         if not protein_nodes:
             return
+
+        # Get ligand atom indices
+        ligand_indices = [atom.GetIdx() for atom in self.mol.GetAtoms()]
 
         # 2. Get ligand center and dimensions
         center, width, height = self._get_ligand_center_and_dimensions()
 
         # 3. Create a graph with both protein residues and ligand atoms
-        G: nx.Graph = self._setup_graph(
-            protein_nodes=protein_nodes,
-        )
+        G: nx.Graph = self.to_networkx()
 
         # 4. Create initial positions with ligand atoms fixed at their coordinates
         pos: dict[Any, "NDArray[np.float64]"] = self._initial_protein_coordinates(
-            protein_nodes, G, center, width
+            protein_nodes, G, center, width, ligand_indices
         )
 
         # 5. Run spring layout
         pos = nx.spring_layout(
             G,
             pos=pos,  # Initial positions for residues and fixed ligand atoms
-            fixed=self._interacting_atoms,  # Fix ligand atoms at their coordinates
+            fixed=ligand_indices,  # Fix ligand atoms at their coordinates
             scale=2,  # performs rescaling to fit the layout in a reasonable size
             iterations=100,
             center=center,
-            weight="weight",
+            weight="weight_spring_layout",
         )
 
         # 6. Adjust positions to avoid overlaps
@@ -795,55 +793,13 @@ class LigNetwork:
 
         return center, width, height
 
-    def _setup_graph(
-        self,
-        protein_nodes: list[str],
-    ) -> nx.Graph:
-        """Sets up a NetworkX graph with protein residues and ligand atoms."""
-
-        G: nx.Graph = nx.Graph()
-
-        # Add protein residue nodes
-        G.add_nodes_from(protein_nodes, node_type="protein")
-
-        # Add ligand atom nodes with fixed positions
-        for idx in (
-            self._interacting_atoms
-        ):  # not including ligand atoms that are not interacting
-            G.add_node(
-                idx,
-                node_type="ligand",
-                fixed=True,
-                x=float(self.xyz[idx, 0]),
-                y=float(self.xyz[idx, 1]),
-            )
-        # Add edges between ligand atoms and protein residues based on interactions
-        for (lig_res, prot_res, interaction, lig_indices), (
-            weight,
-            distance,
-            components,
-        ) in cast(
-            Iterable[
-                tuple[tuple[str, str, str, tuple[int, ...]], tuple[float, float, str]]
-            ],
-            self.df.iterrows(),
-        ):
-            if components.startswith("ligand") and prot_res in protein_nodes:
-                # For each ligand atom involved in this interaction, add an edge
-                for lig_atom_idx in lig_indices:
-                    if lig_atom_idx in self._interacting_atoms:
-                        # Add edge from ligand atom to protein residue
-                        atom_idx: int = lig_atom_idx
-                        G.add_edge(prot_res, atom_idx, weight=10 / distance)
-
-        return G
-
     def _initial_protein_coordinates(
         self,
         protein_nodes: list[str],
         G: nx.Graph,
         center: "NDArray[np.float64]",
         width: float,
+        ligand_indices: list[int],
     ) -> dict[Any, "NDArray[np.float64]"]:
         """Initial positions for protein residues based on ligand atom interactions.
 
@@ -853,9 +809,9 @@ class LigNetwork:
         pos: dict[Any, "NDArray[np.float64]"] = {}
 
         # Set ligand atom positions (fixed)
-        for idx in (
-            self._interacting_atoms
-        ):  # not including ligand atoms that are not interacting
+        for (
+            idx
+        ) in ligand_indices:  # not including ligand atoms that are not interacting
             pos[idx] = np.array([self.xyz[idx, 0], self.xyz[idx, 1]])
 
         for prot_res in protein_nodes:
@@ -897,10 +853,10 @@ class LigNetwork:
     ) -> dict[Any, "NDArray[np.float64]"]:
         """Detect and resolve overlaps between residues and with ligand atoms."""
 
-        min_distance = min(100, max(width, height) * 0.2)  # Minimum separation
-        max_iterations = 20  # max number of cycles to resolve overlaps
+        min_distance = min(100, max(width, height) * 0.3)  # Minimum separation
+        max_iterations = 100  # max number of cycles to resolve overlaps
 
-        for _ in range(max_iterations):
+        for itr in range(max_iterations):
             overlap_found = False
             residue_adjustments = {node: np.zeros(2) for node in protein_nodes}
 
@@ -916,12 +872,14 @@ class LigNetwork:
 
                     delta = residue_pos[res2] - residue_pos[res1]
                     if delta[0] == 0:  # handles edge cases where delta is zero
-                        delta = np.array([40, 40])
+                        delta = np.array([1, 1])
                     dist = np.linalg.norm(delta)
 
                     if 0 < dist < min_distance:
                         overlap_found = True
                         force = (min_distance - dist) * 0.5
+                        if itr >= 50:
+                            force *= 0.8 / 0.5
                         direction = delta / dist
 
                         # Push apart
@@ -953,6 +911,8 @@ class LigNetwork:
                     if 0 < dist < min_distance:
                         overlap_found = True
                         force = (min_distance - dist) * 1.5
+                        if itr >= 50:
+                            force *= 2 / 1.5
                         direction = delta / dist
 
                         # Push away from ligand atom
