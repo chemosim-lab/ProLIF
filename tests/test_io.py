@@ -133,17 +133,17 @@ class TestProteinHelper:
         return Molecule(Molecule.from_rdkit(input_mol).residues[0])
 
     @pytest.mark.parametrize(
-        ("templates", "expect_type_error", "expect_warning"),
+        ("templates", "expected_context"),
         [
-            (None, False, False),
-            ([], False, False),
-            ({"ACE": {"SMILES": "CC=O"}}, False, False),
-            (12345, True, False),
-            (["invalid_format"], True, False),
-            ({"RES": {"name": "BEN", "SMILES": "NC(=N)c1ccccc1"}}, False, True),
+            (None, nullcontext()),
+            ([], nullcontext()),
+            ({"ACE": {"SMILES": "CC=O"}}, nullcontext()),
+            (12345, pytest.raises(TypeError, match=r"Templates must be a dict, a list of dicts or None\.")),
+            (["invalid_format"], pytest.raises(TypeError, match=r"Templates must be a dict, a list of dicts or None\.")),
+            ({"RES": {"name": "BEN", "SMILES": "NC(=N)c1ccccc1"}}, pytest.warns(UserWarning, match=r"Align the template name \(BEN\) with \(RES\)\.")),
         ],
     )
-    def test_initialization(self, templates, expect_type_error, expect_warning) -> None:  # type: ignore
+    def test_initialization(self, templates, expected_context) -> None:  # type: ignore
         """Test the initialization of the TestProteinHelper class."""
 
         if expect_type_error:
