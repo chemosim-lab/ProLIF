@@ -133,7 +133,7 @@ HBDonor = HBAcceptor.invert_role(
 )
 
 
-class ImplicitHBAcceptor(Distance):
+class ImplicitHBAcceptor(Distance, VdWContact):
     """Implicit hydrogen bond acceptor interaction
 
     Parameters
