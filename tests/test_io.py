@@ -172,7 +172,10 @@ class TestProteinHelper:
 
         with expected_context:
             protein_helper = ProteinHelper(templates)
-        assert isinstance(protein_helper.templates, list)
+
+        # Exclude the case generating an TypeError, check if templates are set correctly
+        if not isinstance(expected_context, type(pytest.raises(TypeError))):
+            assert isinstance(protein_helper.templates, list)
 
     def test_convert_to_standard_resname(self) -> None:
         """Test the conversion of residue names to standard names."""
@@ -380,36 +383,31 @@ class TestProteinHelper:
         assert isinstance(ben_mol, Molecule)
         all_bonds_info = []
         for bond in ben_mol.residues[0].GetBonds():
-            if bond.GetBeginAtom().GetAtomicNum() == 1:
+            if (bond.GetBeginAtom().GetAtomicNum() == 1) or (
+                bond.GetEndAtom().GetAtomicNum() == 1
+            ):
                 # skip bonds involving hydrogen atoms
                 continue
 
-            if bond.GetEndAtom().GetAtomicNum() == 1:
-                # skip bonds involving hydrogen atoms
-                continue
+            all_bonds_info.append(
+                (
+                    {bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()},
+                    str(bond.GetBondType()),
+                )
+            )
 
-            if bond.GetBeginAtomIdx() < bond.GetEndAtomIdx():
-                all_bonds_info.append(
-                    f"{bond.GetBeginAtomIdx()}_{bond.GetEndAtomIdx()}_"
-                    f"{bond.GetBondType()!s}"
-                )
-            else:
-                all_bonds_info.append(
-                    f"{bond.GetEndAtomIdx()}_{bond.GetBeginAtomIdx()}_"
-                    f"{bond.GetBondType()!s}"
-                )
-        all_bonds_info = sorted(all_bonds_info)
+        all_bonds_info.sort()
         assert_equal(
             [
-                "0_1_UNSPECIFIED",
-                "0_2_DOUBLE",
-                "0_4_SINGLE",
-                "1_3_AROMATIC",
-                "1_8_AROMATIC",
-                "3_5_AROMATIC",
-                "5_6_AROMATIC",
-                "6_7_AROMATIC",
-                "7_8_AROMATIC",
+                ({1, 3}, "AROMATIC"),
+                ({1, 8}, "AROMATIC"),
+                ({0, 1}, "UNSPECIFIED"),
+                ({3, 5}, "AROMATIC"),
+                ({5, 6}, "AROMATIC"),
+                ({6, 7}, "AROMATIC"),
+                ({7, 8}, "AROMATIC"),
+                ({0, 2}, "DOUBLE"),
+                ({0, 4}, "SINGLE"),
             ],
             all_bonds_info,
         )
