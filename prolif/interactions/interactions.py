@@ -65,12 +65,24 @@ class Hydrophobic(Distance):
     .. versionchanged:: 1.1.0
         The initial SMARTS pattern was too broad.
 
+    .. versionchanged:: 2.1.0
+        Properly excluded all carbon linked to nitrogen/oxygen/fluoride from being
+        hydrophobic, previous versions were allowing such carbons if they were aromatic.
+        Fixed patterns taken from RDKit that were not made for mols with explicit H.
     """
 
     def __init__(
         self,
         hydrophobic: str = (
-            "[c,s,Br,I,S&H0&v2,$([D3,D4;#6])&!$([#6]~[#7,#8,#9])&!$([#6X4H0]);+0]"
+            "[c,s,Br,I,S&H0&v2"
+            # equivalent to RDKit's ChainTwoWayAttach with explicit H support
+            ",$([C&R0;$([CH0](=*)=*),$([CH1](=*)-[!#1]),$([CH2](-[!#1])-[!#1])])"
+            # equivalent to RDKit's ThreeWayAttach
+            ",$([C;$([CH0](=*)(-[!#1])-[!#1]),$([CH1](-[!#1])(-[!#1])-[!#1])])"
+            # tButyl
+            ",$([C&D4!R](-[CH3])(-[CH3])-[CH3])"
+            # not carbon connected to N/O/F and not charged
+            ";!$([#6]~[#7,#8,#9]);+0]"
         ),
         distance: float = 4.5,
     ) -> None:
