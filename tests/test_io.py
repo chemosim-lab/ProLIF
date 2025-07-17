@@ -22,19 +22,19 @@ from prolif.residue import Residue
 @pytest.fixture(scope="module")
 def cif() -> str:
     """Fixture to load the CIF file for testing."""
-    return (datapath / "TPO.cif").read_text()
+    return (datapath / "protein_helper/templates/TPO.cif").read_text()
 
 
 @pytest.fixture(scope="module")
 def standard_aa() -> str:
     """Fixture to load the standard amino acid CIF file for testing."""
-    return (datapath / "standard_aa.cif").read_text()
+    return (datapath / "protein_helper/templates/standard_aa.cif").read_text()
 
 
 @pytest.fixture(scope="module")
 def xml_test_data() -> str:
     """Fixture to load the XML test data for altnames parsing."""
-    return (datapath / "standard_aa_name.xml").read_text()
+    return (datapath / "protein_helper/templates/standard_aa_name.xml").read_text()
 
 
 def test_cif_parser_lite(cif: str, standard_aa: str) -> None:
@@ -57,7 +57,7 @@ def test_cif_template_reader() -> None:
     """Test the CIF template reader."""
 
     # Test reading the standard amino acid CIF template
-    result = cif_template_reader(datapath / "TPO.cif")
+    result = cif_template_reader(datapath / "protein_helper/templates/TPO.cif")
 
     # Check the result structure
     assert isinstance(result["TPO"]["_pdbx_chem_comp_synonyms"], dict)
@@ -79,7 +79,7 @@ class TestProteinHelper:
     @pytest.fixture(scope="class")
     def input_path(self) -> str:
         """Return the path to the input file."""
-        return str(datapath / "tpo.pdb")
+        return str(datapath / "protein_helper/tpo.pdb")
 
     @pytest.fixture(scope="class", params=[True, False])
     def input_molecule(self, input_path: str, request) -> Molecule:  # type: ignore
@@ -93,17 +93,25 @@ class TestProteinHelper:
     @pytest.fixture(scope="class")
     def ben_path(self) -> str:
         """Return a Molecule object for the BEN path."""
-        ben_path = datapath / "ben_test.pdb"
+        ben_path = datapath / "protein_helper/ben_test.pdb"
         return str(ben_path)
 
     @pytest.fixture(scope="class")
     def custom_template(self) -> dict:
         """Return a custom template for testing."""
 
-        tpo_template = cif_template_reader(datapath / "TPO.cif")
-        ace_template = cif_template_reader(datapath / "ACE.cif")
-        nme_template = cif_template_reader(datapath / "NME.cif")
-        ben_template = cif_template_reader(datapath / "BEN.cif")
+        tpo_template = cif_template_reader(
+            datapath / "protein_helper/templates/TPO.cif"
+        )
+        ace_template = cif_template_reader(
+            datapath / "protein_helper/templates/ACE.cif"
+        )
+        nme_template = cif_template_reader(
+            datapath / "protein_helper/templates/NME.cif"
+        )
+        ben_template = cif_template_reader(
+            datapath / "protein_helper/templates/BEN.cif"
+        )
 
         return {
             "XYZ": {

@@ -17,7 +17,9 @@ from prolif.io.xml import parse_altnames
 #                   mapping atomnames to canonical
 # Source:
 # https://github.com/OpenFreeEnergy/pdbinf/blob/c0ddf00bd068d7860b2e99b9f03847c890e3efb5/src/pdbinf/_aliases.py#L323
-_PDB_NAMES = Path(str(datapath / "standard_aa_name.xml")).read_text()
+_PDB_NAMES = Path(
+    str(datapath / "protein_helper/templates/standard_aa_name.xml")
+).read_text()
 RESNAME_ALIASES, ATOMNAME_ALIASES = parse_altnames(_PDB_NAMES)
 
 # Source:
@@ -28,7 +30,9 @@ MAX_DISULPHIDE_LENGTH = 2.5
 # amino acid template
 # Source:
 # https://github.com/OpenFreeEnergy/pdbinf/blob/c0ddf00bd068d7860b2e99b9f03847c890e3efb5/src/pdbinf/_standard_AAs.py#L6
-_STANDARD_AA = Path(str(datapath / "standard_aa.cif")).read_text()
+_STANDARD_AA = Path(
+    str(datapath / "protein_helper/templates/standard_aa.cif")
+).read_text()
 STANDARD_AA = cif_parser_lite(_STANDARD_AA)
 # --------- the above is originally from openmm and pdbinf ---------
 

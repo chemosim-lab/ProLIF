@@ -1,10 +1,23 @@
 import pandas as pd
 
+from prolif.constants import (
+    AMBER_POOL,
+    ATOMNAME_ALIASES,
+    CHARMM_POOL,
+    FORMAL_CHARGE_ALIASES,
+    GROMOS_POOL,
+    MAX_AMIDE_LENGTH,
+    MAX_DISULPHIDE_LENGTH,
+    OPLS_AA_POOL,
+    RESNAME_ALIASES,
+    STANDARD_AA,
+    STANDARD_RESNAME_MAP,
+    TERMINAL_OXYGEN_NAMES,
+)
+
 
 def test_standard_aa() -> None:
     """Test that STANDARD_AA contains the expected amino acids."""
-
-    from prolif.constants import STANDARD_AA
 
     assert len(STANDARD_AA) == 26
     assert len(STANDARD_AA["ALA"]) == 4
@@ -14,16 +27,12 @@ def test_standard_aa() -> None:
 def test_resname_aliases() -> None:
     """Test that RESNAME_ALIASES contains the expected aliases."""
 
-    from prolif.constants import RESNAME_ALIASES
-
     assert len(RESNAME_ALIASES) == 42
     assert RESNAME_ALIASES["HSH"] == "HIS"
 
 
 def test_atomname_aliases() -> None:
     """Test that ATOMNAME_ALIASES contains the expected aliases."""
-
-    from prolif.constants import ATOMNAME_ALIASES
 
     assert len(ATOMNAME_ALIASES) == 40
     assert len(ATOMNAME_ALIASES["Protein"]) == 20
@@ -32,8 +41,6 @@ def test_atomname_aliases() -> None:
 
 def test_standard_resname_map() -> None:
     """Test that STANDARD_RESNAME_MAP contains the expected mappings."""
-
-    from prolif.constants import STANDARD_RESNAME_MAP
 
     assert len(STANDARD_RESNAME_MAP) == 100
     assert STANDARD_RESNAME_MAP["ASN1"] == "ASN"
@@ -45,8 +52,6 @@ def test_standard_resname_map() -> None:
 def test_force_field_pool() -> None:
     """Test the number of contents in force field pool."""
 
-    from prolif.constants import AMBER_POOL, CHARMM_POOL, GROMOS_POOL, OPLS_AA_POOL
-
     assert len(AMBER_POOL) == 55
     assert len(CHARMM_POOL) == 10
     assert len(GROMOS_POOL) == 7
@@ -55,8 +60,6 @@ def test_force_field_pool() -> None:
 
 def test_formal_charge_aliases() -> None:
     """Test that FORMAL_CHARGE_ALIASES contains the expected aliases."""
-
-    from prolif.constants import FORMAL_CHARGE_ALIASES
 
     assert len(FORMAL_CHARGE_ALIASES) == 11
     assert FORMAL_CHARGE_ALIASES["ARG"]["NH2"] == 1
@@ -67,12 +70,6 @@ def test_formal_charge_aliases() -> None:
 
 def test_other_constants() -> None:
     """Test that other constants are defined correctly."""
-
-    from prolif.constants import (
-        MAX_AMIDE_LENGTH,
-        MAX_DISULPHIDE_LENGTH,
-        TERMINAL_OXYGEN_NAMES,
-    )
 
     assert MAX_AMIDE_LENGTH == 2
     assert MAX_DISULPHIDE_LENGTH == 2.5
