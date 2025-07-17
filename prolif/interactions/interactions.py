@@ -681,7 +681,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         vdw_sum = self._get_radii_sum(lig_atom.GetSymbol(), prot_atom.GetSymbol())
         d_diff = interaction_data["distance"] - vdw_sum
 
-        if d_diff < -0.7:
+        if d_diff <= -0.7:
             interaction_data["hbond_probability"] = 1.0
         elif d_diff >= b:
             interaction_data["hbond_probability"] = 0.0
