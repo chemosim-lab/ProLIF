@@ -11,15 +11,18 @@ from copy import deepcopy
 from functools import wraps
 from importlib.util import find_spec
 from math import pi
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
 
 import numpy as np
 import pandas as pd
+from MDAnalysis import AtomGroup, Universe
+from MDAnalysis.coordinates.timestep import Timestep
 from rdkit import Chem, rdBase
 from rdkit.Chem import FragmentOnBonds, GetMolFrags, SplitMolByPDBResidues
 from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 from rdkit.Geometry import Point3D
 from scipy.spatial import cKDTree
+from tqdm.auto import tqdm
 
 from prolif.residue import ResidueId
 
@@ -27,7 +30,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from prolif.rdkitmol import BaseRDKitMol
-    from prolif.typeshed import IFPResults
+    from prolif.typeshed import IFPResults, Trajectory
 
 _90_deg_to_rad = pi / 2
 
@@ -127,7 +130,10 @@ def angle_between_limits(
 
 
 def get_residues_near_ligand(
-    lig: "BaseRDKitMol", prot: "BaseRDKitMol", cutoff: float = 6.0
+    lig: "BaseRDKitMol",
+    prot: "BaseRDKitMol",
+    cutoff: float = 6.0,
+    use_segid: bool = False,
 ) -> list[ResidueId]:
     """Detects residues close to a reference ligand
 
@@ -140,19 +146,26 @@ def get_residues_near_ligand(
     cutoff : float
         If any interatomic distance between the ligand reference points and a
         residue is below or equal to this cutoff, the residue will be selected
+    use_segid: bool, default = False
+        Use the segment number rather than the chain identifier as a chain.
 
     Returns
     -------
     residues : list
         A list of unique :class:`~prolif.residue.ResidueId` that are close to
         the ligand
+
+    .. versionchanged:: 2.1.0
+        Added `use_segid`.
     """
     tree = cKDTree(prot.xyz)
     ix: Sequence[list[int]] = tree.query_ball_point(  # type: ignore[assignment]
         lig.xyz, cutoff
     )
     ix = {i for lst in ix for i in lst}
-    resids = [ResidueId.from_atom(prot.GetAtomWithIdx(i)) for i in ix]
+    resids = [
+        ResidueId.from_atom(prot.GetAtomWithIdx(i), use_segid=use_segid) for i in ix
+    ]
     return list(set(resids))
 
 
@@ -388,3 +401,35 @@ def to_countvectors(df: pd.DataFrame) -> list[UIntSparseIntVect]:
     return df.apply(  # type: ignore[no-any-return]
         pandas_series_to_countvector, axis=1
     ).tolist()
+
+
+@overload
+def select_over_trajectory(  # type: ignore[no-any-unimported]
+    u: Universe, trajectory: "Trajectory", selections: str, **kwargs: Any
+) -> AtomGroup: ...
+@overload
+def select_over_trajectory(  # type: ignore[no-any-unimported]
+    u: Universe, trajectory: "Trajectory", *selections: str, **kwargs: Any
+) -> list[AtomGroup]: ...
+def select_over_trajectory(  # type: ignore[no-any-unimported]
+    u: Universe, trajectory: "Trajectory", *selections: str, **kwargs: Any
+) -> AtomGroup | list[AtomGroup]:
+    """Returns AtomGroup(s) that satisfy each distance-based ``selection`` over the
+    entire trajectory rather than only the first frame. Only useful for distance-based
+    selections.
+    Use ``group {0}`` in any additional selection to refer to the AtomGroup generated
+    by the first selection, or ``group {N-1}`` for the Nth selection.
+    """
+    ix: list[set[int]] = [set() for _ in selections]
+    groups: dict[str, AtomGroup] = {  # type: ignore[no-any-unimported]
+        f"group{i}": Universe.empty(0).atoms for i, _ in enumerate(selections)
+    }
+    trajectory = (trajectory,) if isinstance(trajectory, Timestep) else trajectory
+    for _ in tqdm(trajectory):
+        for i, sel in enumerate(selections):
+            groups[f"group{i}"] = group = u.select_atoms(
+                sel.format(*groups), **{**kwargs, **groups}
+            )
+            ix[i].update(group.ix)
+    atomgroups = [AtomGroup(sorted(indices), u) for indices in ix]
+    return atomgroups[0] if len(atomgroups) == 1 else atomgroups

@@ -216,6 +216,9 @@ class LigNetwork:
         carbon: float = 0.16,
     ) -> None:
         self.df = df
+        self._ligand_resids = {
+            str(ResidueId.from_atom(atom)) for atom in lig_mol.GetAtoms()
+        }
         self._interacting_atoms: set[int] = {
             atom for atoms in df.index.get_level_values("atoms") for atom in atoms
         }
@@ -632,11 +635,10 @@ class LigNetwork:
     def _make_interactions(self, mass: int = 2) -> None:
         """Prepare lig-prot interactions"""
         restypes: dict[str, str | None] = {}
-        lig_prot_df = self.df[self.df["components"] == "ligand_protein"]
         prot_and_waters: set[str] = (
             set(self.df.index.get_level_values("protein"))
             .union(self.df.index.get_level_values("ligand"))
-            .difference(lig_prot_df.index.get_level_values("ligand"))
+            .difference(self._ligand_resids)
         )
         for prot_res in prot_and_waters:
             resname = ResidueId.from_string(prot_res).name
