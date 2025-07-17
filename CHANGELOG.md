@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `select_over_trajectory` to easily make AtomGroup distance-based selections
+  (including recursive selections) over the whole trajectory rather than just the first
+  frame. This helps making optimised selections when a protein is highly flexible
+  instead of using `protein and byres around X group ligand` with a very large X.
 - Support for `WaterBridge` interactions (PR #229 with @talagayev).
 - Refactored the `LigNetwork` plotting code (PR #268 by @nilay-v3rma).
 - Type-checking and related pipelines:
@@ -44,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- SMARTS pattern for `Hydrophobic` were not matching as expected due to the presence of
+  explicit hydrogens in the molecules. The SMARTS have been rewritten to account for
+  this.
+- ProLIF can now use the segment number as a `ResidueId` chain. This should help with
+  solvated systems that may reuse the same resname, resnumber and chain and were using
+  the segment number/identifier to distinguish them in the topology file.
 - Sorting `ResidueId` objects where a subset of residues had no chain was raising a
   `TypeError`, it will now put cases without a chain first (PR #235 by @amorehead).
 - `display_residues` was sanitizing each residue while preparing them for display, which
@@ -52,6 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Hydrophobic` SMARTS pattern now excludes all carbon linked to
+  nitrogen/oxygen/fluoride from being hydrophobic, previous versions were allowing such
+  carbons if they were aromatic.
+- `HBond` SMARTS patterns now removes charged aromatic nitrogen, triazolium, and
+  guanidine/anidine-like from acceptors, and enables the charged nitrogen from
+  histidine as donor.
 - Strip whitespaces in `ResidueId` name and chain.
 - Improved parsing for less standard residue names in `ResidueId`.
 

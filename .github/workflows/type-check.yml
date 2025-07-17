@@ -9,9 +9,6 @@ jobs:
     name: Type checking
     runs-on: ubuntu-latest
 
-    strategy:
-      fail-fast: false
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,9 +54,14 @@ jobs:
         run: |
           {
             echo '### Type-checking report'
-            echo '```'
-            cat tmp_data/diff.txt | ansi2txt
-            echo '```'
+            if [ -s tmp_data/diff.txt ]; then
+              echo 'Difference in type-hints coverage:'
+              echo '```'
+              cat tmp_data/diff.txt | ansi2txt
+              echo '```'
+            else
+              echo 'No changes in type-hints coverage :tada:'
+            fi
             echo '<details>'
             echo '<summary>Overview</summary>'
             echo ''

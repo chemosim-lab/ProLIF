@@ -18,7 +18,9 @@ if TYPE_CHECKING:
 
     from prolif.typeshed import ResidueKey
 
-_RE_RESID = re.compile(r"(TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?(\d*)\.?(\w)?")
+_RE_RESID = re.compile(
+    r"(TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?(\d*)\.?([A-Z\d]{1,2})?"
+)
 
 
 class ResidueId:
@@ -31,7 +33,7 @@ class ResidueId:
     number : int or None, default = 0
         Residue number
     chain : str or None, default = None
-        Protein chain
+        Protein chain or segment index
 
     Notes
     -----
@@ -39,7 +41,7 @@ class ResidueId:
 
     .. versionchanged:: 2.1.0
         Whitespaces are now stripped from the name and chain. Better support for water
-        and monatomic ion residue names.
+        and monatomic ion residue names. Ability to use the segment index as chain.
     """
 
     def __init__(
@@ -74,30 +76,27 @@ class ResidueId:
         )
 
     def __lt__(self, other: "ResidueId") -> bool:
-        def chain_key(chain: str | None) -> tuple[bool, str | None]:
-            # Handles the case where the two chains are of different types
-            # e.g., None from WAT123, and str from ALA42.A
-            return (chain is not None, chain)
-
-        return (chain_key(self.chain), self.number) < (
-            chain_key(other.chain),
+        return (_chain_key(self.chain), self.number) < (
+            _chain_key(other.chain),
             other.number,
         )
 
     @classmethod
-    def from_atom(cls, atom: "Chem.Atom") -> "ResidueId":
+    def from_atom(cls, atom: "Chem.Atom", use_segid: bool = False) -> "ResidueId":
         """Creates a ResidueId from an RDKit atom
 
         Parameters
         ----------
         atom : rdkit.Chem.rdchem.Atom
             An atom that contains an RDKit :class:`~rdkit.Chem.rdchem.AtomMonomerInfo`
+        use_segid: bool, default = False
+            Use the segment number rather than the chain identifier as a chain
         """
         mi = atom.GetMonomerInfo()
         if mi:
             name = mi.GetResidueName()
             number = mi.GetResidueNumber()
-            chain = mi.GetChainId()
+            chain = str(mi.GetSegmentNumber()) if use_segid else mi.GetChainId()
             return cls(name, number, chain)
         return cls()
 
@@ -142,6 +141,12 @@ class ResidueId:
         return cls(name, number, chain)
 
 
+def _chain_key(chain: str | None) -> tuple[bool, str | None]:
+    """Handles the case where the two chains are of different types"""
+    # e.g., None from WAT123, and str from ALA42.A
+    return (chain is not None, chain)
+
+
 class Residue(BaseRDKitMol):
     """A class for residues as RDKit molecules
 
@@ -149,6 +154,8 @@ class Residue(BaseRDKitMol):
     ----------
     mol : rdkit.Chem.rdchem.Mol
         The residue as an RDKit molecule
+    use_segid: bool, default = False
+        Use the segment number rather than the chain identifier as a chain
 
     Attributes
     ----------
@@ -159,12 +166,15 @@ class Residue(BaseRDKitMol):
     -----
     The name of the residue can be converted to a string by using
     ``str(Residue)``
+
+    .. versionchanged:: 2.1.0
+        Added `use_segid`.
     """
 
-    def __init__(self, mol: "Chem.Mol"):
+    def __init__(self, mol: "Chem.Mol", *, use_segid: bool = False):
         super().__init__(mol)
         FastFindRings(self)
-        self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0))
+        self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0), use_segid=use_segid)
 
     def __repr__(self) -> str:  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
