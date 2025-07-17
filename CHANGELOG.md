@@ -65,6 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Hydrophobic` SMARTS pattern now excludes all carbon linked to
   nitrogen/oxygen/fluoride from being hydrophobic, previous versions were allowing such
   carbons if they were aromatic.
+- `HBond` SMARTS patterns now removes charged aromatic nitrogen, triazolium, and
+  guanidine/anidine-like from acceptors, and enables the charged nitrogen from
+  histidine as donor.
 - Strip whitespaces in `ResidueId` name and chain.
 - Improved parsing for less standard residue names in `ResidueId`.
 

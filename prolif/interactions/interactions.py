@@ -114,16 +114,22 @@ class HBAcceptor(SingleAngle):
     .. versionchanged:: 2.0.0
         ``angles`` parameter renamed to ``DHA_angle``.
 
+    .. versionchanged:: 2.1.0
+        Removed charged aromatic nitrogen, triazolium, and guanidine/anidine-like from
+        acceptors. Added charged nitrogen from histidine as donor.
+
     """
 
     def __init__(
         self,
         acceptor: str = (
-            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
-            "O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,"
-            "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
+            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
+            ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
+            ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
+            ",$([o+0])"
+            ",$([F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])])]"
         ),
-        donor: str = "[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
+        donor: str = "[$([O,S,#7;+0]),$([Nv4+1]),$([n+]c[nH])]-[H]",
         distance: float = 3.5,
         DHA_angle: "Angles" = (130, 180),
     ) -> None:
