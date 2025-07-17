@@ -581,7 +581,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         tolerance_dev_apa: float = 90,
         tolerance_dev_dpa: float = 45,
         vdwradii: dict[str, float] | None = None,
-        vdwradii_preset: Literal["mdanalysis", "rdkit", "csd"] = "mdanalysis",
+        vdwradii_preset: Literal["mdanalysis", "rdkit", "csd"] = "csd",
     ) -> None:
         super().__init__(
             lig_pattern=acceptor, prot_pattern=donor, distance=distance)
@@ -616,8 +616,8 @@ class ImplicitHBAcceptor(Distance, VdWContact):
                 lig_res=lig_res,
                 prot_res=prot_res,
             ):
-                # If passed geometry checks, add hydrogen bond probability
-                yield self.add_hbond_probability(
+                # If passed geometry checks, add hydrogen bond potential
+                yield self.add_vina_hbond_potential(
                     interaction_data, prot_res=prot_res, lig_res=lig_res
                 )
 
@@ -647,14 +647,16 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         # [TODO] Implement geometry checks based on angles and distances.
         return True
 
-    def add_hbond_probability(
+    def add_vina_hbond_potential(
         self,
         interaction_data: dict,
         prot_res: "Residue",
         lig_res: "Residue",
+        g: float = -0.7,
         b: float = 0.4,
     ) -> dict:
-        """Add hydrogen bond probability to the interaction metadata.
+        """Add hydrogen bond potential (derived from Autodock Vina_) to the interaction
+        metadata.
 
         Parameters
         ----------
@@ -664,14 +666,19 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             Protein residue.
         lig_res : Residue
             Ligand residue.
+        g : float, optional
+            Parameter to specify where the piecewise linear terms become one (good
+            interaction).
         b : float, optional
-            Parameter to specify where the piecewise linear terms become zero.
+            Parameter to specify where the piecewise linear terms become zero (bad
+            interaction).
 
         Returns
         -------
         Dict
             Updated metadata with hydrogen bond probability.
 
+        .. _ Autodock Vina: https://github.com/ccsb-scripps/AutoDock-Vina/blob/develop/src/lib/potentials.h#L217
         """
         # [TODO] need to tune the b parameter based on the dataset
 
@@ -681,13 +688,13 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         vdw_sum = self._get_radii_sum(lig_atom.GetSymbol(), prot_atom.GetSymbol())
         d_diff = interaction_data["distance"] - vdw_sum
 
-        if d_diff <= -0.7:
-            interaction_data["hbond_probability"] = 1.0
+        if d_diff <= g:
+            interaction_data["vina_hbond_potential"] = 1.0
         elif d_diff >= b:
-            interaction_data["hbond_probability"] = 0.0
+            interaction_data["vina_hbond_potential"] = 0.0
         else:
-            # Piecewise linear function for the hydrogen bond probability
-            interaction_data["hbond_probability"] = (d_diff - b) / (-0.7 - b)
+            # Piecewise linear function for the hydrogen bond potential
+            interaction_data["vina_hbond_potential"] = (d_diff - b) / (g - b)
 
         return interaction_data
 
