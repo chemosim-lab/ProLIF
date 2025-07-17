@@ -583,8 +583,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         vdwradii: dict[str, float] | None = None,
         vdwradii_preset: Literal["mdanalysis", "rdkit", "csd"] = "csd",
     ) -> None:
-        super().__init__(
-            lig_pattern=acceptor, prot_pattern=donor, distance=distance)
+        super().__init__(lig_pattern=acceptor, prot_pattern=donor, distance=distance)
         VdWContact.__init__(self, vdwradii=vdwradii, preset=vdwradii_preset)
         self.acceptor = acceptor
         self.donor = donor
@@ -697,6 +696,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             interaction_data["vina_hbond_potential"] = (d_diff - b) / (g - b)
 
         return interaction_data
+
 
 ImplicitHBDonor = ImplicitHBAcceptor.invert_role(
     "ImplicitHBDonor",
