@@ -1,5 +1,12 @@
 The example `1s2g__1__1.A_2.C__1.D` is originally from PLINDER tutorial dataset.
 
+Raw file from PLINDER:
+* `ligand_files/1.D.sdf`
+* `receptor.pdb`
+
+A manually modified version of `receptor.pdb` by replacing resname `HIS` to `HSD` was tested for certain protonated state.
+* `receptor_hsd.pdb`
+
 Suggested by [our PDB tutorial](https://prolif.readthedocs.io/en/latest/notebooks/pdb.html#pdb):
 The protonated protein was prepared with [PypKa](https://pypka.org/) and its default settings.
 * `receptor_ph7_amber.pdb`
