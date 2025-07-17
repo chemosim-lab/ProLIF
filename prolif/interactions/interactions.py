@@ -678,8 +678,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         # Hbond probability is based on the Autodock Vina Hbond interaction term
         lig_atom = lig_res.GetAtomWithIdx(interaction_data["indices"]["ligand"][0])
         prot_atom = prot_res.GetAtomWithIdx(interaction_data["indices"]["protein"][0])
-        vdw_sum = VdWContact._get_radii_sum(
-            self, lig_atom.GetSymbol(), prot_atom.GetSymbol())
+        vdw_sum = self._get_radii_sum(lig_atom.GetSymbol(), prot_atom.GetSymbol())
         d_diff = interaction_data["distance"] - vdw_sum
 
         if d_diff < -0.7:
