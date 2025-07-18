@@ -48,9 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- SMARTS pattern for `Hydrophobic` were not matching as expected due to the presence of
-  explicit hydrogens in the molecules. The SMARTS have been rewritten to account for
-  this.
 - ProLIF can now use the segment number as a `ResidueId` chain. This should help with
   solvated systems that may reuse the same resname, resnumber and chain and were using
   the segment number/identifier to distinguish them in the topology file.
