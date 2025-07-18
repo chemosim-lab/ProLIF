@@ -118,13 +118,13 @@ class TestFingerprint:
             u.trajectory[0:1],
             ligand_ag,
             protein_ag,
-            residues=["TYR109.A"],
+            residues=["VAL201.A"],
             progress=False,
         )
         lig_id = ResidueId.from_string("LIG1.G")
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
-        res = ResidueId.from_string("TYR109.A")
+        res = ResidueId.from_string("VAL201.A")
         assert (lig_id, res) in fp_simple.ifp[0]
         fp_simple.run(
             u.trajectory[1:2],
@@ -135,7 +135,7 @@ class TestFingerprint:
         )
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
-        res = ResidueId.from_string("TRP125.A")
+        res = ResidueId.from_string("MET337.B")
         assert (lig_id, res) in fp_simple.ifp[1]
         fp_simple.run(
             u.trajectory[:3],
@@ -147,7 +147,7 @@ class TestFingerprint:
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 3
         assert len(fp_simple.ifp[0]) > 1
-        res = ResidueId.from_string("ALA216.A")
+        res = ResidueId.from_string("PHE351.B")
         assert (lig_id, res) in fp_simple.ifp[0]
         u.trajectory[0]
 
@@ -302,7 +302,7 @@ class TestFingerprint:
         )
         cvs = fp_count.to_countvectors()
         assert isinstance(cvs[0], UIntSparseIntVect)
-        assert cvs[0][0] == 4
+        assert list(cvs[0])[:5] == [0, 1, 2, 3, 1]
         assert len(cvs) == 3
 
     def test_list_avail(self) -> None:

@@ -56,9 +56,9 @@ class TestLigNetwork:
         view = net.display()
         assert view._iframe
         html = view._iframe
-        assert escape('"from": 18, "to": "PHE351.B", "title": "Hydrophobic') in html
+        assert escape('"from": 5, "to": "PHE331.B", "title": "Hydrophobic') in html
         if fp.count:
-            assert escape('"from": 19, "to": "PHE351.B", "title": "Hydrophobic') in html
+            assert escape('"from": 14, "to": "PHE331.B", "title": "Hydrophobic') in html
 
     def test_integration_agg(self, get_ligplot: partial[LigNetwork]) -> None:
         net = get_ligplot(kind="aggregate", threshold=0)

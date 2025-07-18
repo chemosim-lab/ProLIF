@@ -19,14 +19,14 @@ def ifp(u: "Universe", ligand_ag: "AtomGroup", protein_ag: "AtomGroup") -> IFP:
 
 
 def test_ifp_indexing(ifp: IFP) -> None:
-    lig_id, prot_id = "LIG1.G", "LEU126.A"
+    lig_id, prot_id = "LIG1.G", "VAL201.A"
     metadata1 = ifp[ResidueId.from_string(lig_id), ResidueId.from_string(prot_id)]
     metadata2 = ifp[lig_id, prot_id]
     assert metadata1 is metadata2
 
 
 def test_ifp_filtering(ifp: IFP) -> None:
-    lig_id, prot_id = "LIG1.G", "LEU126.A"
+    lig_id, prot_id = "LIG1.G", "VAL201.A"
     assert ifp[lig_id] == ifp
     assert (
         next(iter(ifp[prot_id].values()))
