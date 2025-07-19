@@ -7,7 +7,13 @@ from numpy.testing import assert_array_equal
 from rdkit import Chem
 
 from prolif.datafiles import datapath
-from prolif.molecule import Molecule, mol2_supplier, pdbqt_supplier, sdf_supplier
+from prolif.molecule import (
+    Molecule,
+    mol2_supplier,
+    pdbqt_supplier,
+    sdf_supplier,
+    split_molecule,
+)
 from prolif.residue import Residue, ResidueId
 
 if TYPE_CHECKING:
@@ -189,3 +195,15 @@ class TestMOL2Supplier(SupplierBase):
         suppl = mol2_supplier(path, cleanup_substructures=False)
         mol = next(iter(suppl))
         assert isinstance(mol, Molecule)
+
+
+def test_split_molecule(water_u: "Universe") -> None:
+    prot = water_u.select_atoms("protein and resid 20-30")
+    water = water_u.select_atoms("resname TIP3 and segindex 5 and resid 10-20")
+    combined = Molecule.from_mda(prot + water)
+    wmol, pmol = split_molecule(combined, lambda x: x.name == "TIP3")
+    assert (wmol.residues.name == "TIP3").all()
+    assert (wmol.residues.number == [range(10, 21)]).all()
+    assert (pmol.residues.number == [range(20, 31)]).all()
+    assert len(Chem.GetMolFrags(pmol)) == 1
+    assert len(Chem.GetMolFrags(wmol)) == 11

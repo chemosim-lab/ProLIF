@@ -5,7 +5,7 @@ Reading proteins and ligands --- :mod:`prolif.molecule`
 
 import copy
 from collections import defaultdict
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from operator import attrgetter
 from typing import TYPE_CHECKING, Any, TypeVar, Union, overload
 
@@ -14,7 +14,7 @@ from rdkit import Chem
 from rdkit.Chem.AllChem import AssignBondOrdersFromTemplate
 
 from prolif.rdkitmol import BaseRDKitMol
-from prolif.residue import Residue, ResidueGroup
+from prolif.residue import Residue, ResidueGroup, ResidueId
 from prolif.utils import catch_rdkit_logs, catch_warning, split_mol_by_residues
 
 if TYPE_CHECKING:
@@ -547,3 +547,29 @@ class mol2_supplier(Sequence[Molecule]):
     def __len__(self) -> int:
         with open(self.path) as f:
             return sum(line.startswith("@<TRIPOS>MOLECULE") for line in f)
+
+
+def split_molecule(
+    mol: Molecule, predicate: Callable[[ResidueId], bool]
+) -> tuple[Molecule, Molecule]:
+    """
+    Splits a molecule into two based on a predicate function. The first molecule
+    returned contains all residues of the input mol for which the predicate function was
+    true, the second molecule contains the rest.
+    This function is typically used to extract a ligand or water molecules from a file
+    containing a solvated complex::
+
+        >>> solvated_system = Molecule(...)
+        >>> water_mol, protein_mol = split_molecule(
+        ...     solvated_system, lambda x: x.name == "WAT"
+        ... )
+
+    .. versionadded:: 2.1.0
+
+    """
+    with Chem.RWMol(mol) as lhs, Chem.RWMol(mol) as rhs:
+        for residue in mol:
+            target = rhs if predicate(residue.resid) else lhs
+            for atom in residue.GetAtoms():
+                target.RemoveAtom(atom.GetUnsignedProp("mapindex"))
+    return Molecule(lhs.GetMol()), Molecule(rhs.GetMol())
