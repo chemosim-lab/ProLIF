@@ -879,7 +879,7 @@ class LigNetwork:
                         overlap_found = True
                         force = (min_distance - dist) * 0.5
                         if itr >= 50:
-                            force *= 0.8 / 0.5
+                            force *= 1.6
                         direction = delta / dist
 
                         # Push apart
@@ -912,7 +912,7 @@ class LigNetwork:
                         overlap_found = True
                         force = (min_distance - dist) * 1.5
                         if itr >= 50:
-                            force *= 2 / 1.5
+                            force *= 4 / 3
                         direction = delta / dist
 
                         # Push away from ligand atom
@@ -921,7 +921,7 @@ class LigNetwork:
             # Apply ligand overlap adjustments
             for res, adjustment in ligand_adjustments.items():
                 if res in residue_pos:
-                    residue_pos[res] = residue_pos[res] + adjustment
+                    residue_pos[res] += adjustment
 
             if not overlap_found:
                 break
