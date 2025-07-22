@@ -12,10 +12,9 @@ Note that some of the SMARTS patterns used in the interaction classes are inspir
 
 from collections.abc import Iterator
 from itertools import product
-from math import degrees, radians
+from math import degrees, pi, radians
 from typing import TYPE_CHECKING, Literal
 
-import numpy as np
 from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
 from rdkit.Chem.rdchem import Atom, HybridizationType
@@ -549,7 +548,7 @@ class VdWContact(Interaction):
 
 
 class ImplicitHBAcceptor(Distance, VdWContact):
-    """Implicit hydrogen bond acceptor interaction
+    """Implicit Hbond interaction between a ligand (acceptor) and a residue (donor).
 
     Parameters
     ----------
@@ -571,10 +570,11 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         Tolerance for the deviation from the ideal donor plane angle.
     vdwradii : dict[str, float] | None
         Custom van der Waals radii for elements, if not provided, the default preset
-        will be used.
+        will be used (to calculate vina_hbond_potential).
     vdwradii_preset : Literal["mdanalysis", "rdkit", "csd"]
-        Preset for van der Waals radii to use. Defaults to "csd". The presets are
-        defined in :mod:`prolif.interactions.constants.VDW_PRESETS`.
+        Preset for van der Waals radii (to calculate vina_hbond_potential). Defaults to
+        "csd". The presets are defined in
+        :mod:`prolif.interactions.constants.VDW_PRESETS`.
 
     """
 
@@ -676,43 +676,74 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         prot_atom = prot_res.GetAtomWithIdx(prot_atom_idx)
 
         # Check acceptor atom's angle (ligand-centered)
-        ideal_acceptor_atom_angle = self._get_ideal_atom_angle(prot_atom)
-        deviation_aaa = max(
-            np.abs(each_atom_angle - ideal_acceptor_atom_angle)
-            for each_atom_angle in self._get_atom_angle(
-                res=lig_res,
-                res_atom_idx=lig_atom_idx,
-                remote_res=prot_res,
-                remote_res_atom_idx=prot_atom_idx,
-            )
+        ideal_acceptor_atom_angle = self._get_ideal_atom_angle(lig_atom)
+        acceptor_atom_angles = self._get_atom_angles(
+            res=lig_res,
+            res_atom_idx=lig_atom_idx,
+            remote_res=prot_res,
+            remote_res_atom_idx=prot_atom_idx,
+        )
+        deviation_aaa = min(
+            abs(each_atom_angle - ideal_acceptor_atom_angle)
+            for each_atom_angle in acceptor_atom_angles
         )
         if deviation_aaa > self.tolerance_dev_aaa:
             return False
 
         # Check donor atom's angle (protein-centered)
-        ideal_donor_atom_angle = self._get_ideal_atom_angle(lig_atom)
-        deviation_daa = max(
-            np.abs(each_atom_angle - ideal_donor_atom_angle)
-            for each_atom_angle in self._get_atom_angle(
-                res=prot_res,
-                res_atom_idx=prot_atom_idx,
-                remote_res=lig_res,
-                remote_res_atom_idx=lig_atom_idx,
-            )
+        ideal_donor_atom_angle = self._get_ideal_atom_angle(prot_atom)
+        donor_atom_angles = self._get_atom_angles(
+            res=prot_res,
+            res_atom_idx=prot_atom_idx,
+            remote_res=lig_res,
+            remote_res_atom_idx=lig_atom_idx,
+        )
+        deviation_daa = min(
+            abs(each_atom_angle - ideal_donor_atom_angle)
+            for each_atom_angle in donor_atom_angles
         )
         if deviation_daa > self.tolerance_dev_daa:
             return False
 
         # Check acceptor plane angle (if applicable, sp2)
+        acceptor_plane_angle = None
         if lig_atom.GetHybridization() == HybridizationType.SP2:
-            # [TODO] Implement check for acceptor plane angle
-            return True
+            # Check for acceptor's plane angle (ligand-centered)
+            acceptor_plane_angle = self._get_plane_angle(
+                res=lig_res,
+                res_atom_idx=lig_atom_idx,
+                remote_res=prot_res,
+                remote_res_atom_idx=prot_atom_idx,
+            )
+            # Ideal acceptor's plane angle is 0 degrees
+            if acceptor_plane_angle > self.tolerance_dev_apa:
+                return False
 
         # Check donor plane angle (if applicable, sp2)
+        donor_plane_angle = None
         if prot_atom.GetHybridization() == HybridizationType.SP2:
-            # [TODO] Implement check for donor plane angle
-            return True
+            # Check for donor's plane angle (protein-centered)
+            donor_plane_angle = self._get_plane_angle(
+                res=prot_res,
+                res_atom_idx=prot_atom_idx,
+                remote_res=lig_res,
+                remote_res_atom_idx=lig_atom_idx,
+            )
+            # Ideal donor's plane angle is 0 degrees
+            if donor_plane_angle > self.tolerance_dev_dpa:
+                return False
 
+        # Save geometry features in interaction data
+        interaction_data["ideal_donor_angle"] = ideal_donor_atom_angle
+        interaction_data["donor_atom_angles"] = donor_atom_angles
+        interaction_data["ideal_acceptor_angle"] = ideal_acceptor_atom_angle
+        interaction_data["acceptor_atom_angles"] = acceptor_atom_angles
+        if donor_plane_angle:
+            interaction_data["donor_plane_angle"] = donor_plane_angle
+        if acceptor_plane_angle:
+            interaction_data["acceptor_plane_angle"] = acceptor_plane_angle
+
+        # Return the result of the geometry checks
         return True
 
     def add_vina_hbond_potential(
@@ -782,7 +813,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         resname = RESNAME_ALIASES.get(res.resid.name, res.resid.name)
         return resname == "HOH"
 
-    def _get_atom_angle(
+    def _get_atom_angles(
         self,
         res: "Residue",
         res_atom_idx: int,
@@ -862,6 +893,72 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             f"Unsupported hybridization {atom.GetHybridization()} "
             f"for atom {atom.GetSymbol()!r}."
         )
+
+    def _get_plane_angle(
+        self,
+        res: "Residue",
+        res_atom_idx: int,
+        remote_res: "Residue",
+        remote_res_atom_idx: int,
+    ) -> float:
+        """Get the plane angle of the sp2 atom in the residue
+        (relative to the far atom).
+
+        Parameters
+        ----------
+        res : Residue
+            The residue containing the atom.
+        res_atom_idx : int
+            The index of the atom in the residue.
+        remote_res : Residue
+            The remote residue containing the far atom.
+        remote_res_atom_idx : int
+            The index of the far atom in the remote residue.
+
+        Returns
+        -------
+        float
+            The angle in degrees.
+        """
+        res_atom = res.GetAtomWithIdx(res_atom_idx)
+        nearby_heavy_atoms = [
+            atom for atom in res_atom.GetNeighbors() if atom.GetAtomicNum() != 1
+        ]
+        # If there are less than 2 nearby heavy atoms, we cannot calculate the plane.
+        # We will need to extend the search of nearby atoms.
+        if len(nearby_heavy_atoms) < 2:
+            nearby_nearby_atoms = []
+            for each_atom in nearby_heavy_atoms:
+                nearby_nearby_atoms.extend(
+                    [
+                        nearby_nearby_atom
+                        for nearby_nearby_atom in each_atom.GetNeighbors()
+                        if nearby_nearby_atom.GetAtomicNum() != 1
+                        and nearby_nearby_atom.GetIdx() != res_atom_idx
+                    ]
+                )
+            nearby_heavy_atoms.extend(nearby_nearby_atoms)
+
+        # Get the coordinates of the atoms
+        nearby_atom_1_idx = nearby_heavy_atoms[0].GetIdx()
+        nearby_atom_2_idx = nearby_heavy_atoms[1].GetIdx()
+        res_atom_coords = Geometry.Point3D(*res.xyz[res_atom_idx])
+        nearby_atom_1_coords = Geometry.Point3D(*res.xyz[nearby_atom_1_idx])
+        nearby_atom_2_coords = Geometry.Point3D(*res.xyz[nearby_atom_2_idx])
+        remote_atom_coords = Geometry.Point3D(*remote_res.xyz[remote_res_atom_idx])
+
+        # Calculate the normal vector of the plane
+        atom2nearby_1 = res_atom_coords.DirectionVector(nearby_atom_1_coords)
+        atom2nearby_2 = res_atom_coords.DirectionVector(nearby_atom_2_coords)
+        normal_vector = atom2nearby_1.CrossProduct(atom2nearby_2)
+
+        # Calculate the angle between the normal vector and
+        # the vector to the remote atom
+        atom2remote_atom = res_atom_coords.DirectionVector(remote_atom_coords)
+        angle = normal_vector.AngleTo(atom2remote_atom)
+
+        # Convert it to plane angle in degrees
+        return abs(degrees(angle - pi / 2))
 
 
 ImplicitHBDonor = ImplicitHBAcceptor.invert_role(
