@@ -15,9 +15,12 @@ from itertools import product
 from math import degrees, radians
 from typing import TYPE_CHECKING, Literal
 
+import numpy as np
 from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
+from rdkit.Chem.rdchem import Atom, HybridizationType
 
+from prolif.constants import RESNAME_ALIASES
 from prolif.interactions.base import (
     BasePiStacking,
     Distance,
@@ -25,7 +28,7 @@ from prolif.interactions.base import (
     Interaction,
     SingleAngle,
 )
-from prolif.interactions.constants import VDW_PRESETS, VDWRADII  # noqa
+from prolif.interactions.constants import VDW_PRESETS
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 if TYPE_CHECKING:
@@ -556,6 +559,8 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         SMARTS for ``[Donor]-[Implicit Hydrogen]``.
     distance : float
         Distance threshold between the acceptor and donor atoms.
+    include_water : bool
+        Whether to include water residues in the detection of interactions.
     tolerance_dev_aaa : float
         Tolerance for the deviation from the ideal acceptor atom's angle.
     tolerance_dev_daa : float
@@ -564,6 +569,12 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         Tolerance for the deviation from the ideal acceptor plane angle.
     tolerance_dev_dpa : float
         Tolerance for the deviation from the ideal donor plane angle.
+    vdwradii : dict[str, float] | None
+        Custom van der Waals radii for elements, if not provided, the default preset
+        will be used.
+    vdwradii_preset : Literal["mdanalysis", "rdkit", "csd"]
+        Preset for van der Waals radii to use. Defaults to "csd". The presets are
+        defined in :mod:`prolif.interactions.constants.VDW_PRESETS`.
 
     """
 
@@ -576,6 +587,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         ),
         donor: str = "[$([O,S;+0&h]),$([N;v2&h,v3&h,v4&+1&h]),n+0&h]",
         distance: float = 3.5,
+        include_water: bool = False,
         tolerance_dev_aaa: float = 45,
         tolerance_dev_daa: float = 45,
         tolerance_dev_apa: float = 90,
@@ -585,6 +597,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
     ) -> None:
         super().__init__(lig_pattern=acceptor, prot_pattern=donor, distance=distance)
         VdWContact.__init__(self, vdwradii=vdwradii, preset=vdwradii_preset)
+        self.include_water = include_water
         self.acceptor = acceptor
         self.donor = donor
         self.tolerance_dev_aaa = tolerance_dev_aaa
@@ -609,8 +622,20 @@ class ImplicitHBAcceptor(Distance, VdWContact):
 
         """
         for interaction_data in super().detect(lig_res, prot_res):
-            # Check if the interaction geometry is valid
-            if self.check_geometry(
+            # Check if the interaction including water residues
+            if self.check_water_residue(prot_res) or self.check_water_residue(lig_res):
+                # Check if the user wants to include water residues
+                if self.include_water:
+                    # If water residues are included, skip the geometry checks
+                    yield self.add_vina_hbond_potential(
+                        interaction_data, prot_res=prot_res, lig_res=lig_res
+                    )
+
+                # If not, skip water residues
+                continue
+
+            # For the rest of the interaction, check geometry
+            elif self.check_geometry(
                 interaction_data,
                 lig_res=lig_res,
                 prot_res=prot_res,
@@ -625,7 +650,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         interaction_data,
         lig_res,
         prot_res,
-    ):
+    ) -> bool:
         """Check the geometry of the interaction.
 
         Parameters
@@ -643,7 +668,51 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             True if the geometry is valid, False otherwise.
 
         """
-        # [TODO] Implement geometry checks based on angles and distances.
+
+        # Get the atoms involved in the interaction
+        lig_atom_idx = interaction_data["indices"]["ligand"][0]
+        lig_atom = lig_res.GetAtomWithIdx(lig_atom_idx)
+        prot_atom_idx = interaction_data["indices"]["protein"][0]
+        prot_atom = prot_res.GetAtomWithIdx(prot_atom_idx)
+
+        # Check acceptor atom's angle (ligand-centered)
+        ideal_acceptor_atom_angle = self._get_ideal_atom_angle(prot_atom)
+        deviation_aaa = max(
+            np.abs(each_atom_angle - ideal_acceptor_atom_angle)
+            for each_atom_angle in self._get_atom_angle(
+                res=lig_res,
+                res_atom_idx=lig_atom_idx,
+                remote_res=prot_res,
+                remote_res_atom_idx=prot_atom_idx,
+            )
+        )
+        if deviation_aaa > self.tolerance_dev_aaa:
+            return False
+
+        # Check donor atom's angle (protein-centered)
+        ideal_donor_atom_angle = self._get_ideal_atom_angle(lig_atom)
+        deviation_daa = max(
+            np.abs(each_atom_angle - ideal_donor_atom_angle)
+            for each_atom_angle in self._get_atom_angle(
+                res=prot_res,
+                res_atom_idx=prot_atom_idx,
+                remote_res=lig_res,
+                remote_res_atom_idx=lig_atom_idx,
+            )
+        )
+        if deviation_daa > self.tolerance_dev_daa:
+            return False
+
+        # Check acceptor plane angle (if applicable, sp2)
+        if lig_atom.GetHybridization() == HybridizationType.SP2:
+            # [TODO] Implement check for acceptor plane angle
+            return True
+
+        # Check donor plane angle (if applicable, sp2)
+        if prot_atom.GetHybridization() == HybridizationType.SP2:
+            # [TODO] Implement check for donor plane angle
+            return True
+
         return True
 
     def add_vina_hbond_potential(
@@ -679,7 +748,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
 
         .. _ Autodock Vina: https://github.com/ccsb-scripps/AutoDock-Vina/blob/develop/src/lib/potentials.h#L217
         """
-        # [TODO] need to tune the b parameter based on the dataset
+        # [TODO] need to tune the g and b parameter based on the dataset
 
         # Hbond probability is based on the Autodock Vina Hbond interaction term
         lig_atom = lig_res.GetAtomWithIdx(interaction_data["indices"]["ligand"][0])
@@ -696,6 +765,103 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             interaction_data["vina_hbond_potential"] = (d_diff - b) / (g - b)
 
         return interaction_data
+
+    def check_water_residue(self, res: "Residue") -> bool:
+        """Check if the residue is a water molecule.
+
+        Parameters
+        ----------
+        res : Residue
+            The residue to check.
+
+        Returns
+        -------
+        bool
+            True if the residue is a water molecule, False otherwise.
+        """
+        resname = RESNAME_ALIASES.get(res.resid.name, res.resid.name)
+        return resname == "HOH"
+
+    def _get_atom_angle(
+        self,
+        res: "Residue",
+        res_atom_idx: int,
+        remote_res: "Residue",
+        remote_res_atom_idx: int,
+    ) -> list[float]:
+        """Get the angle of the atom in the residue (relative to the far atom).
+        The angle is defined as follows:
+        [nearby heavy atom]-[res_atom] ... [remote_res_atom]
+
+        Parameters
+        ----------
+        res : Residue
+            The residue containing the atom.
+        res_atom_idx : int
+            The index of the atom in the residue.
+        remote_res : Residue
+            The remote residue containing the far atom.
+        remote_res_atom_idx : int
+            The index of the far atom in the remote residue.
+
+        Returns
+        -------
+        float
+            The angle in degrees."""
+
+        res_atom = res.GetAtomWithIdx(res_atom_idx)
+        nearby_heavy_atoms = [
+            atom for atom in res_atom.GetNeighbors() if atom.GetAtomicNum() != 1
+        ]
+        if not nearby_heavy_atoms:
+            raise ValueError(
+                f"No heavy atoms found in residue {res.GetName()} "
+                f"for atom {res_atom.GetSymbol()!r} at index {res_atom_idx}."
+            )
+
+        angles = []
+        for nearby_heavy_atom in nearby_heavy_atoms:
+            # Get the coordinates of the atoms
+            nearby_coords = Geometry.Point3D(*res.xyz[nearby_heavy_atom.GetIdx()])
+            res_atom_coords = Geometry.Point3D(*res.xyz[res_atom_idx])
+            far_atom_coords = Geometry.Point3D(*remote_res.xyz[remote_res_atom_idx])
+
+            # Calculate the angle
+            res2nearby = res_atom_coords.DirectionVector(nearby_coords)
+            res2far = res_atom_coords.DirectionVector(far_atom_coords)
+            angle = res2nearby.AngleTo(res2far)
+            angles.append(degrees(angle))
+
+        return angles
+
+    def _get_ideal_atom_angle(
+        self,
+        atom: "Atom",
+    ) -> float:
+        """Get the ideal angle for the atom based on its hybridization.
+
+        Parameters
+        ----------
+        atom : Atom
+            The atom for which to get the ideal angle.
+
+        Returns
+        -------
+        float
+            The ideal angle in degrees.
+
+        """
+        if atom.GetHybridization() == HybridizationType.SP3:
+            return 109.5
+        if atom.GetHybridization() == HybridizationType.SP2:
+            return 120.0
+        if atom.GetHybridization() == HybridizationType.SP:
+            return 180.0
+
+        raise ValueError(
+            f"Unsupported hybridization {atom.GetHybridization()} "
+            f"for atom {atom.GetSymbol()!r}."
+        )
 
 
 ImplicitHBDonor = ImplicitHBAcceptor.invert_role(
