@@ -605,7 +605,9 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         self.tolerance_dev_apa = tolerance_dev_apa
         self.tolerance_dev_dpa = tolerance_dev_dpa
 
-    def detect(self, lig_res, prot_res):
+    def detect(
+        self, lig_res: "Residue", prot_res: "Residue"
+    ) -> Iterator["InteractionMetadata"]:
         """Detect implicit hydrogen bond acceptor interactions.
 
         Parameters
@@ -647,9 +649,9 @@ class ImplicitHBAcceptor(Distance, VdWContact):
 
     def check_geometry(
         self,
-        interaction_data,
-        lig_res,
-        prot_res,
+        interaction_data: "InteractionMetadata",
+        lig_res: "Residue",
+        prot_res: "Residue",
     ) -> bool:
         """Check the geometry of the interaction.
 
@@ -811,7 +813,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             True if the residue is a water molecule, False otherwise.
         """
         resname = RESNAME_ALIASES.get(res.resid.name, res.resid.name)
-        return resname == "HOH"
+        return bool(resname == "HOH")
 
     def _get_atom_angles(
         self,

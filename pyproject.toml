@@ -100,6 +100,8 @@ include = ["prolif*"]
 "prolif" = ["py.typed"]
 "prolif.data" = ["*"]
 "prolif.data.vina" = ["*"]
+"prolif.data.protein_helper" = ["*"]
+"prolif.data.implicitHbond" = ["*"]
 "prolif.plotting.network" = ["*"]
 
 [tool.setuptools.dynamic]
