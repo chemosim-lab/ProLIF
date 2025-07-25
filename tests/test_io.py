@@ -131,14 +131,14 @@ class TestProteinHelper:
     @pytest.fixture(scope="class")
     def hsd_residue(self) -> Residue:
         """Return a HID residue for testing."""
-        protein_path = datapath / "implicitHbond/1s2g__1__1.A_2.C__1.D/receptor_hsd.pdb"
+        protein_path = datapath / "implicitHbond/receptor_hsd.pdb"
         input_mol = Chem.MolFromPDBFile(str(protein_path))
         return Molecule.from_rdkit(input_mol).residues[106]
 
     @pytest.fixture(scope="class")
     def mol_missing_atom(self) -> Molecule:
         """Return a molecule missing side chain atoms for testing."""
-        protein_path = datapath / "implicitHbond/1s2g__1__1.A_2.C__1.D/receptor_hsd.pdb"
+        protein_path = datapath / "implicitHbond/receptor_hsd.pdb"
         input_mol = Chem.MolFromPDBFile(str(protein_path))
         return Molecule(Molecule.from_rdkit(input_mol).residues[0])
 
