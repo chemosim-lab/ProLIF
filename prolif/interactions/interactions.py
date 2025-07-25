@@ -738,8 +738,10 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         # Save geometry features in interaction data
         interaction_data["ideal_donor_angle"] = ideal_donor_atom_angle
         interaction_data["donor_atom_angles"] = donor_atom_angles
+        interaction_data["donor_atom_angle_deviation"] = deviation_daa
         interaction_data["ideal_acceptor_angle"] = ideal_acceptor_atom_angle
         interaction_data["acceptor_atom_angles"] = acceptor_atom_angles
+        interaction_data["acceptor_atom_angle_deviation"] = deviation_aaa
         if donor_plane_angle:
             interaction_data["donor_plane_angle"] = donor_plane_angle
         if acceptor_plane_angle:
