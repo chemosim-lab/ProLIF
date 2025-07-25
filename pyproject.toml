@@ -101,6 +101,7 @@ include = ["prolif*"]
 "prolif.data" = ["*"]
 "prolif.data.vina" = ["*"]
 "prolif.data.protein_helper" = ["*"]
+"prolif.data.protein_helper.templates" = ["*"]
 "prolif.data.implicitHbond" = ["*"]
 "prolif.plotting.network" = ["*"]
 
