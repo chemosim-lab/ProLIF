@@ -644,13 +644,6 @@ class ImplicitHBAcceptor(Distance, VdWContact):
 
         """
         for interaction_data in super().detect(lig_res, prot_res):
-            # If ignore_geometry_checks is True, skip geometry checks
-            if self.ignore_geometry_checks:
-                yield self.add_vina_hbond_potential(
-                    interaction_data, prot_res=prot_res, lig_res=lig_res
-                )
-                continue
-
             # Check if the interaction including water residues
             if self.check_water_residue(prot_res) or self.check_water_residue(lig_res):
                 # Check if the user wants to include water residues
@@ -662,6 +655,12 @@ class ImplicitHBAcceptor(Distance, VdWContact):
 
                 # If not, skip water residues
                 continue
+
+            # If ignore_geometry_checks is True, skip geometry checks
+            if self.ignore_geometry_checks:
+                yield self.add_vina_hbond_potential(
+                    interaction_data, prot_res=prot_res, lig_res=lig_res
+                )
 
             # For the rest of the interaction, check geometry
             elif self.check_geometry(

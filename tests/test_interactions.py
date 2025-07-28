@@ -442,6 +442,7 @@ class TestInteractions:
             ("ihb_ligand", "ihb_asp95a"),
             ("ihb_acceptor_tyr167b", "ihb_ligand"),
             ("ihb_asp95a", "ihb_ligand"),
+            ("ihb_ligand", "ihb_donor_h2o"),
         ],
         indirect=["any_mol", "any_other_mol"],
     )
@@ -449,29 +450,55 @@ class TestInteractions:
         self,
         any_mol: "Molecule",
         any_other_mol: "Molecule",
+        ihb_ignore_geometry_checks: bool,
+        ihb_include_water: bool,
     ) -> None:
-        interaction = ImplicitHBAcceptor()
+        interaction = ImplicitHBAcceptor(
+            ignore_geometry_checks=ihb_ignore_geometry_checks,
+            include_water=ihb_include_water,
+        )
         metadata = next(interaction.detect(any_mol[0], any_other_mol[0]), {})
 
-        assert "vina_hbond_potential" in metadata
-        assert "donor_atom_angle_deviation" in metadata
-        assert "acceptor_atom_angle_deviation" in metadata
-
-        if (
+        # if water is involved in the interaction, no geometry checks are performed
+        if interaction.check_water_residue(
             any_mol[0]
-            .GetAtomWithIdx(metadata["indices"]["ligand"][0])
-            .GetHybridization()
-            == Chem.HybridizationType.SP2
-        ):
-            assert "acceptor_plane_angle" in metadata
+        ) or interaction.check_water_residue(any_other_mol[0]):
+            # if the user wants to include water
+            if ihb_include_water:
+                assert "donor_atom_angle_deviation" not in metadata
+                assert "acceptor_atom_angle_deviation" not in metadata
 
-        if (
-            any_other_mol[0]
-            .GetAtomWithIdx(metadata["indices"]["protein"][0])
-            .GetHybridization()
-            == Chem.HybridizationType.SP2
-        ):
-            assert "donor_plane_angle" in metadata
+                assert "vina_hbond_potential" in metadata
+
+            # if the user doesn't want to include water
+            else:
+                # (no interaction is detected)
+                assert metadata == {}
+
+        # For cases where water is not included
+        else:
+            assert "vina_hbond_potential" in metadata
+
+            if not ihb_ignore_geometry_checks:
+                # Geometry checks are only performed if water is not included
+                assert "donor_atom_angle_deviation" in metadata
+                assert "acceptor_atom_angle_deviation" in metadata
+
+                if (
+                    any_mol[0]
+                    .GetAtomWithIdx(metadata["indices"]["ligand"][0])
+                    .GetHybridization()
+                    == Chem.HybridizationType.SP2
+                ):
+                    assert "acceptor_plane_angle" in metadata
+
+                if (
+                    any_other_mol[0]
+                    .GetAtomWithIdx(metadata["indices"]["protein"][0])
+                    .GetHybridization()
+                    == Chem.HybridizationType.SP2
+                ):
+                    assert "donor_plane_angle" in metadata
 
 
 class TestBridgedInteractions:
