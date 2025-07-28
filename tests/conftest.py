@@ -230,22 +230,22 @@ class BaseTestMixinRDKitMol:
 
 
 @pytest.fixture(scope="session")
-def ihb_donor() -> Molecule:
+def ihb_ligand() -> Molecule:
     path = str(datapath / "implicitHbond" / "1.D.sdf")
     return sdf_supplier(path)[0]
 
 
 @pytest.fixture(scope="session")
-def implicit_protein() -> Molecule:
+def ihb_protein() -> Molecule:
     path = str(datapath / "implicitHbond" / "receptor.pdb")
     return Molecule.from_rdkit(Chem.MolFromPDBFile(path))
 
 
 @pytest.fixture(scope="session")
-def ihb_acceptor_tyr167b(implicit_protein: Molecule) -> Molecule:
-    return Molecule(implicit_protein[331])  # TYR167.B residue
+def ihb_acceptor_tyr167b(ihb_protein: Molecule) -> Molecule:
+    return Molecule(ihb_protein["TYR167.B"])  # TYR167.B residue
 
 
 @pytest.fixture(scope="session")
-def ihb_acceptor_tyr17a(implicit_protein: Molecule) -> Molecule:
-    return Molecule(implicit_protein[16])  # TYR17.A residue
+def ihb_asp95a(ihb_protein: Molecule) -> Molecule:
+    return Molecule(ihb_protein["ASP95.A"])  # ASP95.A residue

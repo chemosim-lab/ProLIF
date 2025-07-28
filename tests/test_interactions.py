@@ -9,7 +9,7 @@ from rdkit import Chem, RDLogger
 
 import prolif
 from prolif.fingerprint import Fingerprint
-from prolif.interactions import VdWContact
+from prolif.interactions import ImplicitHBAcceptor, VdWContact
 from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.interactions.constants import VDW_PRESETS
 from prolif.interactions.utils import get_mapindex
@@ -132,9 +132,11 @@ class TestInteractions:
             ("metalacceptor", "metal", "ligand", False),
             ("vdwcontact", "benzene", "etf", True),
             ("vdwcontact", "hb_acceptor", "metal_false", False),
-            ("implicithbdonor", "ihb_donor", "ihb_acceptor_tyr167b", True),
-            ("implicithbacceptor", "ihb_donor", "ihb_acceptor_tyr167b", False),
-            ("implicithbacceptor", "ihb_acceptor_tyr167b", "ihb_donor", True),
+            ("implicithbacceptor", "ihb_ligand", "ihb_asp95a", True),
+            ("implicithbacceptor", "ihb_acceptor_tyr167b", "ihb_ligand", True),
+            ("implicithbacceptor", "ihb_ligand", "ihb_acceptor_tyr167b", False),
+            ("implicithbdonor", "ihb_ligand", "ihb_asp95a", True),
+            ("implicithbdonor", "ihb_ligand", "ihb_acceptor_tyr167b", True),
         ],
         indirect=["any_mol", "any_other_mol"],
     )
@@ -433,6 +435,43 @@ class TestInteractions:
         assert fingerprint.edgetoface.any(lig, phe331)  # type: ignore[attr-defined]
         assert not fingerprint.facetoface.any(lig, phe331)  # type: ignore[attr-defined]
         assert fingerprint.pistacking.any(lig, phe331)  # type: ignore[attr-defined]
+
+    @pytest.mark.parametrize(
+        ("any_mol", "any_other_mol"),
+        [
+            ("ihb_ligand", "ihb_asp95a"),
+            ("ihb_acceptor_tyr167b", "ihb_ligand"),
+            ("ihb_asp95a", "ihb_ligand"),
+        ],
+        indirect=["any_mol", "any_other_mol"],
+    )
+    def test_implicithbacceptor_metadata_check(
+        self,
+        any_mol: "Molecule",
+        any_other_mol: "Molecule",
+    ) -> None:
+        interaction = ImplicitHBAcceptor()
+        metadata = next(interaction.detect(any_mol[0], any_other_mol[0]), {})
+
+        assert "vina_hbond_potential" in metadata
+        assert "donor_atom_angle_deviation" in metadata
+        assert "acceptor_atom_angle_deviation" in metadata
+
+        if (
+            any_mol[0]
+            .GetAtomWithIdx(metadata["indices"]["ligand"][0])
+            .GetHybridization()
+            == Chem.HybridizationType.SP2
+        ):
+            assert "acceptor_plane_angle" in metadata
+
+        if (
+            any_other_mol[0]
+            .GetAtomWithIdx(metadata["indices"]["protein"][0])
+            .GetHybridization()
+            == Chem.HybridizationType.SP2
+        ):
+            assert "donor_plane_angle" in metadata
 
 
 class TestBridgedInteractions:
