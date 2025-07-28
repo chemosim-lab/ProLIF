@@ -132,8 +132,9 @@ class TestInteractions:
             ("metalacceptor", "metal", "ligand", False),
             ("vdwcontact", "benzene", "etf", True),
             ("vdwcontact", "hb_acceptor", "metal_false", False),
-            ("implicithbdonor", "implicit_hb_donor", "implicit_hb_acceptor", True),
-            ("implicithbacceptor", "implicit_hb_donor", "implicit_hb_acceptor", False),
+            ("implicithbdonor", "ihb_donor", "ihb_acceptor_tyr167b", True),
+            ("implicithbacceptor", "ihb_donor", "ihb_acceptor_tyr167b", False),
+            ("implicithbacceptor", "ihb_acceptor_tyr167b", "ihb_donor", True),
         ],
         indirect=["any_mol", "any_other_mol"],
     )

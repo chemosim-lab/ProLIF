@@ -230,15 +230,22 @@ class BaseTestMixinRDKitMol:
 
 
 @pytest.fixture(scope="session")
-def implicit_hb_donor() -> Molecule:
+def ihb_donor() -> Molecule:
     path = str(datapath / "implicitHbond" / "1.D.sdf")
     return sdf_supplier(path)[0]
 
 
 @pytest.fixture(scope="session")
-def implicit_hb_acceptor() -> Molecule:
+def implicit_protein() -> Molecule:
     path = str(datapath / "implicitHbond" / "receptor.pdb")
-    protein_mol = Molecule.from_rdkit(Chem.MolFromPDBFile(path))
-    # Select the residue TYR167.B which is the one that forms
-    # the implicit hydrogen bond
-    return Molecule(protein_mol[331])
+    return Molecule.from_rdkit(Chem.MolFromPDBFile(path))
+
+
+@pytest.fixture(scope="session")
+def ihb_acceptor_tyr167b(implicit_protein: Molecule) -> Molecule:
+    return Molecule(implicit_protein[331])  # TYR167.B residue
+
+
+@pytest.fixture(scope="session")
+def ihb_acceptor_tyr17a(implicit_protein: Molecule) -> Molecule:
+    return Molecule(implicit_protein[16])  # TYR17.A residue
