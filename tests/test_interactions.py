@@ -132,6 +132,8 @@ class TestInteractions:
             ("metalacceptor", "metal", "ligand", False),
             ("vdwcontact", "benzene", "etf", True),
             ("vdwcontact", "hb_acceptor", "metal_false", False),
+            ("implicithbdonor", "implicit_hb_donor", "implicit_hb_acceptor", True),
+            ("implicithbacceptor", "implicit_hb_donor", "implicit_hb_acceptor", False),
         ],
         indirect=["any_mol", "any_other_mol"],
     )
@@ -306,6 +308,17 @@ class TestInteractions:
             ("MetalDonor.prot_pattern", "Nc1ccccc1", 0),
             ("MetalDonor.prot_pattern", "o1cccc1", 0),
             ("MetalDonor.prot_pattern", "COC=O", 2),
+            (
+                "ImplicitHBAcceptor.lig_pattern",
+                "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1",
+                6,
+            ),
+            (
+                "ImplicitHBAcceptor.prot_pattern",
+                "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1",
+                3,
+            ),
+            ("ImplicitHBAcceptor.prot_pattern", "NC(C=O)Cc1c[nH]c[nH+]1", 3),
         ],
         indirect=["interaction_qmol"],
     )
@@ -314,6 +327,39 @@ class TestInteractions:
     ) -> None:
         mol = Chem.MolFromSmiles(smiles)
         mol = Chem.AddHs(mol)
+        if isinstance(interaction_qmol, list):
+            n_matches = sum(
+                len(mol.GetSubstructMatches(qmol)) for qmol in interaction_qmol
+            )
+        else:
+            n_matches = len(mol.GetSubstructMatches(interaction_qmol))
+        assert n_matches == expected
+
+    @pytest.mark.parametrize(
+        ("interaction_qmol", "smiles", "expected"),
+        [
+            (
+                "ImplicitHBAcceptor.lig_pattern",
+                "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1",
+                6,
+            ),
+            (
+                "ImplicitHBAcceptor.prot_pattern",
+                "Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1",
+                3,
+            ),
+            ("ImplicitHBAcceptor.prot_pattern", "NC(C=O)Cc1c[nH]c[nH+]1", 3),
+        ],
+        indirect=["interaction_qmol"],
+    )
+    def test_implicit_smarts_matches(
+        self,
+        interaction_qmol: Chem.Mol | list[Chem.Mol],
+        smiles: str,
+        expected: int,
+    ) -> None:
+        # Test that implicit hydrogens are added to the query molecule
+        mol = Chem.MolFromSmiles(smiles)
         if isinstance(interaction_qmol, list):
             n_matches = sum(
                 len(mol.GetSubstructMatches(qmol)) for qmol in interaction_qmol

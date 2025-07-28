@@ -29,6 +29,14 @@ def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: ARG001
         pytest.exit(
             f"Example Vina data files are not accessible: {vina_path!s} does not exist",
         )
+
+    implicit_hbond_path = datapath / "implicitHbond"
+    if not implicit_hbond_path.exists():
+        pytest.exit(
+            "Example implicit Hbond data files are not accessible: "
+            f"{implicit_hbond_path!s} does not exist",
+        )
+
     # ugly patch to add Mixin class as attribute to pytest so that we don't have to
     # worry about relative imports in the test codebase
     pytest.BaseTestMixinRDKitMol = BaseTestMixinRDKitMol  # type: ignore[attr-defined]
@@ -219,3 +227,18 @@ class BaseTestMixinRDKitMol:
     def test_xyz(self, mol: "BaseRDKitMol") -> None:
         expected = mol.GetConformer().GetPositions()
         assert_array_almost_equal(mol.xyz, expected)
+
+
+@pytest.fixture(scope="session")
+def implicit_hb_donor() -> Molecule:
+    path = str(datapath / "implicitHbond" / "1.D.sdf")
+    return sdf_supplier(path)[0]
+
+
+@pytest.fixture(scope="session")
+def implicit_hb_acceptor() -> Molecule:
+    path = str(datapath / "implicitHbond" / "receptor.pdb")
+    protein_mol = Molecule.from_rdkit(Chem.MolFromPDBFile(path))
+    # Select the residue TYR167.B which is the one that forms
+    # the implicit hydrogen bond
+    return Molecule(protein_mol[331])

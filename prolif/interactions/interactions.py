@@ -561,31 +561,49 @@ class ImplicitHBAcceptor(Distance, VdWContact):
     include_water : bool
         Whether to include water residues in the detection of interactions.
     tolerance_dev_aaa : float
-        Tolerance for the deviation from the ideal acceptor atom's angle.
+        Tolerance for the deviation from the ideal acceptor atom's angle (degrees).
+        If the deviation is larger than this value, the interaction will not be
+        considered valid (geometry checks).
     tolerance_dev_daa : float
-        Tolerance for the deviation from the ideal donor atom's angle.
+        Tolerance for the deviation from the ideal donor atom's angle (degrees).
+        If the deviation is larger than this value, the interaction will not be
+        considered valid (geometry checks).
     tolerance_dev_apa : float
-        Tolerance for the deviation from the ideal acceptor plane angle.
+        Tolerance for the deviation from the ideal acceptor plane angle (degrees).
+        If the deviation is larger than this value, the interaction will not be
+        considered valid (geometry checks).
     tolerance_dev_dpa : float
-        Tolerance for the deviation from the ideal donor plane angle.
+        Tolerance for the deviation from the ideal donor plane angle (degrees).
+        If the deviation is larger than this value, the interaction will not be
+        considered valid (geometry checks).
     vdwradii : dict[str, float] | None
         Custom van der Waals radii for elements, if not provided, the default preset
-        will be used (to calculate vina_hbond_potential).
+        will be used (to calculate `vina_hbond_potential`).
     vdwradii_preset : Literal["mdanalysis", "rdkit", "csd"]
-        Preset for van der Waals radii (to calculate vina_hbond_potential). Defaults to
-        "csd". The presets are defined in
+        Preset for van der Waals radii (to calculate `vina_hbond_potential`). Defaults
+        to "csd". The presets are defined in
         :mod:`prolif.interactions.constants.VDW_PRESETS`.
-
+    ignore_geometry_checks : bool
+        If True, the geometry checks for the interaction will be skipped. This is useful
+        for cases where the geometry is not relevant or when the user wants to skip the
+        geometry checks for performance reasons. Defaults to False.
     """
 
     def __init__(
         self,
         acceptor: str = (
-            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
-            "O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,"
-            "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
+            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
+            ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
+            ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
+            ",$([o+0])"
+            ",$([F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])])]"
         ),
-        donor: str = "[$([O,S;+0&h]),$([N;v2&h,v3&h,v4&+1&h]),n+0&h]",
+        donor: str = (
+            # implicit or explicit hydrogen bond donors
+            "[$([O,S,#7;+0&h,+0&H,+0&H2,+0H3])"
+            ",$([N;v4&+1&h,v4&+1&H,v4&+1&H2,v4&+1&H3,v4&+1&H4])"
+            ",$([n+]c[nh]),$([n+]c[nH])]"
+        ),
         distance: float = 3.5,
         include_water: bool = False,
         tolerance_dev_aaa: float = 45,
@@ -594,6 +612,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         tolerance_dev_dpa: float = 45,
         vdwradii: dict[str, float] | None = None,
         vdwradii_preset: Literal["mdanalysis", "rdkit", "csd"] = "csd",
+        ignore_geometry_checks: bool = False,
     ) -> None:
         super().__init__(lig_pattern=acceptor, prot_pattern=donor, distance=distance)
         VdWContact.__init__(self, vdwradii=vdwradii, preset=vdwradii_preset)
@@ -604,6 +623,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         self.tolerance_dev_daa = tolerance_dev_daa
         self.tolerance_dev_apa = tolerance_dev_apa
         self.tolerance_dev_dpa = tolerance_dev_dpa
+        self.ignore_geometry_checks = ignore_geometry_checks
 
     def detect(
         self, lig_res: "Residue", prot_res: "Residue"
@@ -624,6 +644,13 @@ class ImplicitHBAcceptor(Distance, VdWContact):
 
         """
         for interaction_data in super().detect(lig_res, prot_res):
+            # If ignore_geometry_checks is True, skip geometry checks
+            if self.ignore_geometry_checks:
+                yield self.add_vina_hbond_potential(
+                    interaction_data, prot_res=prot_res, lig_res=lig_res
+                )
+                continue
+
             # Check if the interaction including water residues
             if self.check_water_residue(prot_res) or self.check_water_residue(lig_res):
                 # Check if the user wants to include water residues
