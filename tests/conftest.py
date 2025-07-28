@@ -253,4 +253,5 @@ def ihb_asp95a(ihb_protein: Molecule) -> Molecule:
 
 @pytest.fixture(scope="session")
 def ihb_donor_h2o(ihb_protein: Molecule) -> Molecule:
-    return Molecule(ihb_protein["HOH1._"])  # water as a donor
+    # return Molecule(ihb_protein["HOH1._"])  # water as a donor
+    return Molecule(ihb_protein[332])

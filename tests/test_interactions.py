@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from contextlib import nullcontext
 from typing import TYPE_CHECKING, Literal, cast
 
 import MDAnalysis as mda
@@ -20,6 +21,7 @@ lg.setLevel(RDLogger.ERROR)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+    from contextlib import AbstractContextManager
 
     from MDAnalysis.core.groups import AtomGroup
     from MDAnalysis.core.universe import Universe
@@ -560,6 +562,71 @@ class TestInteractions:
         assert (
             next(interaction(ihb_acceptor_tyr167b[0], ihb_ligand[0]), False) == expected
         )
+
+    def test_implicithbacceptor_get_atom_angles(
+        self,
+        ihb_ligand: "Molecule",
+        ihb_donor_h2o: "Molecule",
+    ) -> None:
+        interaction = ImplicitHBAcceptor()
+        with pytest.raises(
+            ValueError,
+            match=(r"No heavy atoms found in residue HOH1._ for atom 'O' at index 0."),
+        ):
+            interaction._get_atom_angles(ihb_donor_h2o[0], 0, ihb_ligand[0], 13)
+
+    @pytest.mark.parametrize(
+        ("good_value", "bad_value", "expected"),
+        [
+            (0, 1, (1, 1)),
+            (-0.7, 0, (0.59, 0.6)),
+            (-0.7, -0.5, (0, 0)),
+        ],
+    )
+    def test_implicithbacceptor_add_vina_hbond_potential(
+        self,
+        ihb_ligand: "Molecule",
+        ihb_acceptor_tyr167b: "Molecule",
+        good_value: float,
+        bad_value: float,
+        expected: tuple[float, float],
+    ) -> None:
+        interaction = ImplicitHBAcceptor()
+        metadata = next(interaction.detect(ihb_acceptor_tyr167b[0], ihb_ligand[0]))
+        metadata = interaction.add_vina_hbond_potential(
+            metadata,
+            lig_res=ihb_acceptor_tyr167b[0],
+            prot_res=ihb_ligand[0],
+            g=good_value,
+            b=bad_value,
+        )
+        assert expected[0] <= metadata["vina_hbond_potential"] <= expected[1]
+
+    @pytest.mark.parametrize(
+        ("smiles", "expected_context"),
+        [
+            ("CC", nullcontext(109.5)),
+            ("C=C", nullcontext(120)),
+            ("C#C", nullcontext(180.0)),
+            (
+                "P(Cl)(Cl)(Cl)(Cl)Cl",
+                pytest.raises(
+                    ValueError, match=r"Unsupported hybridization SP3D for atom \'P\'\."
+                ),
+            ),
+        ],
+    )
+    def test_implicithbacceptor_get_ideal_angle(
+        self,
+        smiles: str,
+        expected_context: "AbstractContextManager",
+    ) -> None:
+        interaction = ImplicitHBAcceptor()
+        mol = Chem.MolFromSmiles(smiles)
+
+        with expected_context as e:
+            ideal_angle = interaction._get_ideal_atom_angle(mol.GetAtomWithIdx(0))
+            assert ideal_angle == e
 
 
 class TestBridgedInteractions:

@@ -650,7 +650,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
                 if self.include_water:
                     # If water residues are included, skip the geometry checks
                     yield self.add_vina_hbond_potential(
-                        interaction_data, prot_res=prot_res, lig_res=lig_res
+                        interaction_data, lig_res=lig_res, prot_res=prot_res
                     )
 
                 # If not, skip water residues
@@ -659,7 +659,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             # If ignore_geometry_checks is True, skip geometry checks
             if self.ignore_geometry_checks:
                 yield self.add_vina_hbond_potential(
-                    interaction_data, prot_res=prot_res, lig_res=lig_res
+                    interaction_data, lig_res=lig_res, prot_res=prot_res
                 )
 
             # For the rest of the interaction, check geometry
@@ -670,7 +670,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             ):
                 # If passed geometry checks, add hydrogen bond potential
                 yield self.add_vina_hbond_potential(
-                    interaction_data, prot_res=prot_res, lig_res=lig_res
+                    interaction_data, lig_res=lig_res, prot_res=prot_res
                 )
 
     def check_geometry(
@@ -779,22 +779,22 @@ class ImplicitHBAcceptor(Distance, VdWContact):
     def add_vina_hbond_potential(
         self,
         interaction_data: dict,
-        prot_res: "Residue",
         lig_res: "Residue",
+        prot_res: "Residue",
         g: float = -0.7,
         b: float = 0.4,
     ) -> dict:
-        """Add hydrogen bond potential (derived from Autodock Vina_) to the interaction
-        metadata.
+        """Add hydrogen bond potential (derived from `Autodock Vina`_) to the
+        interaction metadata.
 
         Parameters
         ----------
         interaction_data : dict
             Metadata for the detected interaction.
-        prot_res : Residue
-            Protein residue.
         lig_res : Residue
             Ligand residue.
+        prot_res : Residue
+            Protein residue.
         g : float, optional
             Parameter to specify where the piecewise linear terms become one (good
             interaction).
@@ -807,7 +807,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         Dict
             Updated metadata with hydrogen bond probability.
 
-        .. _ Autodock Vina: https://github.com/ccsb-scripps/AutoDock-Vina/blob/develop/src/lib/potentials.h#L217
+        .. _Autodock Vina: https://github.com/ccsb-scripps/AutoDock-Vina/blob/develop/src/lib/potentials.h#L217
         """
         # [TODO] need to tune the g and b parameter based on the dataset
 
@@ -876,7 +876,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         ]
         if not nearby_heavy_atoms:
             raise ValueError(
-                f"No heavy atoms found in residue {res.GetName()} "
+                f"No heavy atoms found in residue {res.resid} "
                 f"for atom {res_atom.GetSymbol()!r} at index {res_atom_idx}."
             )
 
