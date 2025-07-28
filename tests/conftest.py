@@ -243,9 +243,9 @@ def ihb_protein() -> Molecule:
 
 @pytest.fixture(scope="session")
 def ihb_acceptor_tyr167b(ihb_protein: Molecule) -> Molecule:
-    return Molecule(ihb_protein["TYR167.B"])  # TYR167.B residue
+    return Molecule(ihb_protein["TYR167.B"])  # residue as an acceptor
 
 
 @pytest.fixture(scope="session")
 def ihb_asp95a(ihb_protein: Molecule) -> Molecule:
-    return Molecule(ihb_protein["ASP95.A"])  # ASP95.A residue
+    return Molecule(ihb_protein["ASP95.A"])  # residue as an acceptor and a donor
