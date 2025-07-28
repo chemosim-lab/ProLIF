@@ -68,6 +68,16 @@ def interaction_qmol(
     )
 
 
+@pytest.fixture(scope="module", params=[False, True])
+def ihb_include_water(request: pytest.FixtureRequest):  # type: ignore
+    return request.param
+
+
+@pytest.fixture(scope="module", params=[False, True])
+def ihb_ignore_geometry_checks(request: pytest.FixtureRequest):  # type: ignore
+    return request.param
+
+
 class TestInteractions:
     @pytest.fixture(scope="class")
     def fingerprint(self) -> Fingerprint:
@@ -481,6 +491,10 @@ class TestInteractions:
 
             if not ihb_ignore_geometry_checks:
                 # Geometry checks are only performed if water is not included
+                assert "donor_atom_angles" in metadata
+                assert "acceptor_atom_angles" in metadata
+                assert "ideal_donor_angle" in metadata
+                assert "ideal_acceptor_angle" in metadata
                 assert "donor_atom_angle_deviation" in metadata
                 assert "acceptor_atom_angle_deviation" in metadata
 
@@ -499,6 +513,53 @@ class TestInteractions:
                     == Chem.HybridizationType.SP2
                 ):
                     assert "donor_plane_angle" in metadata
+
+    @pytest.mark.parametrize(
+        (
+            "tolerance_daa",
+            "tolerance_aaa",
+            "tolerance_dpa",
+            "tolerance_apa",
+            "expected",
+        ),
+        [
+            (0, 45, 45, 90, False),
+            (10, 45, 45, 90, False),
+            (20, 45, 45, 90, False),
+            (30, 45, 45, 90, True),
+            (30, 30, 45, 90, True),
+            (30, 20, 45, 90, True),
+            (30, 10, 45, 90, True),
+            (30, 0, 45, 90, False),
+            (30, 10, 30, 90, True),
+            (30, 10, 20, 90, True),
+            (30, 10, 10, 90, True),
+            (30, 10, 0, 90, False),
+            (30, 10, 10, 45, True),
+            (30, 10, 10, 30, True),
+            (30, 10, 10, 15, True),
+            (30, 10, 10, 0, False),
+        ],
+    )
+    def test_implicithbacceptor_check_geometry_with_diff_tolerance(
+        self,
+        ihb_acceptor_tyr167b: "Molecule",
+        ihb_ligand: "Molecule",
+        tolerance_daa: float,
+        tolerance_aaa: float,
+        tolerance_dpa: float,
+        tolerance_apa: float,
+        expected: bool,
+    ) -> None:
+        interaction = ImplicitHBAcceptor(
+            tolerance_dev_daa=tolerance_daa,
+            tolerance_dev_aaa=tolerance_aaa,
+            tolerance_dev_dpa=tolerance_dpa,
+            tolerance_dev_apa=tolerance_apa,
+        )
+        assert (
+            next(interaction(ihb_acceptor_tyr167b[0], ihb_ligand[0]), False) == expected
+        )
 
 
 class TestBridgedInteractions:

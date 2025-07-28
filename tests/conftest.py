@@ -254,13 +254,3 @@ def ihb_asp95a(ihb_protein: Molecule) -> Molecule:
 @pytest.fixture(scope="session")
 def ihb_donor_h2o(ihb_protein: Molecule) -> Molecule:
     return Molecule(ihb_protein["HOH1._"])  # water as a donor
-
-
-@pytest.fixture(scope="session", params=[False, True])
-def ihb_include_water(request: pytest.FixtureRequest):  # type: ignore
-    return request.param
-
-
-@pytest.fixture(scope="session", params=[False, True])
-def ihb_ignore_geometry_checks(request: pytest.FixtureRequest):  # type: ignore
-    return request.param
