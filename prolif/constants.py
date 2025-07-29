@@ -195,7 +195,7 @@ STANDARD_RESNAME_MAP = {
     "NVAL": "VAL",  # AMBER
     "CVAL": "VAL",  # AMBER
     # HOH
-    **{k: v for k, v in RESNAME_ALIASES.items() if v == "HOH"}
+    **{str(k): str(v) for k, v in RESNAME_ALIASES.items() if v == "HOH"},
 }
 
 # FORMAL_CHARGE_ALIASES: dict mapping residue names to a dict of atom names
