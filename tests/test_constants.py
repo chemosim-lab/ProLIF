@@ -42,7 +42,7 @@ def test_atomname_aliases() -> None:
 def test_standard_resname_map() -> None:
     """Test that STANDARD_RESNAME_MAP contains the expected mappings."""
 
-    assert len(STANDARD_RESNAME_MAP) == 100
+    assert len(STANDARD_RESNAME_MAP) == 106
     assert STANDARD_RESNAME_MAP["ASN1"] == "ASN"
     assert STANDARD_RESNAME_MAP["CYS"] == "CYS"
     assert STANDARD_RESNAME_MAP["CTRP"] == "TRP"
