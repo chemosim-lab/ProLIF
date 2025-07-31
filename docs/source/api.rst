@@ -35,3 +35,8 @@ produced by the package more easily. The documentation for these functions can
 be found in the :ref:`source/modules/utils:Helper functions` section.
 You can also find classes to plot the resulting interaction fingerprints in the
 :ref:`source/modules/plotting:Plotting` section
+
+Typing
+------
+Type aliases that are used throughout the code can be found in the
+:ref:`source/modules/types:Custom types` section.

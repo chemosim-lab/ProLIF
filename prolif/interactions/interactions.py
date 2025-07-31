@@ -69,12 +69,24 @@ class Hydrophobic(Distance):
     .. versionchanged:: 1.1.0
         The initial SMARTS pattern was too broad.
 
+    .. versionchanged:: 2.1.0
+        Properly excluded all carbon linked to nitrogen/oxygen/fluoride from being
+        hydrophobic, previous versions were allowing such carbons if they were aromatic.
+        Fixed patterns taken from RDKit that were not made for mols with explicit H.
     """
 
     def __init__(
         self,
         hydrophobic: str = (
-            "[c,s,Br,I,S&H0&v2,$([D3,D4;#6])&!$([#6]~[#7,#8,#9])&!$([#6X4H0]);+0]"
+            "[c,s,Br,I,S&H0&v2"
+            # equivalent to RDKit's ChainTwoWayAttach with explicit H support
+            ",$([C&R0;$([CH0](=*)=*),$([CH1](=*)-[!#1]),$([CH2](-[!#1])-[!#1])])"
+            # equivalent to RDKit's ThreeWayAttach
+            ",$([C;$([CH0](=*)(-[!#1])-[!#1]),$([CH1](-[!#1])(-[!#1])-[!#1])])"
+            # tButyl
+            ",$([C&D4!R](-[CH3])(-[CH3])-[CH3])"
+            # not carbon connected to N/O/F and not charged
+            ";!$([#6]~[#7,#8,#9]);+0]"
         ),
         distance: float = 4.5,
     ) -> None:
@@ -106,16 +118,22 @@ class HBAcceptor(SingleAngle):
     .. versionchanged:: 2.0.0
         ``angles`` parameter renamed to ``DHA_angle``.
 
+    .. versionchanged:: 2.1.0
+        Removed charged aromatic nitrogen, triazolium, and guanidine/anidine-like from
+        acceptors. Added charged nitrogen from histidine as donor.
+
     """
 
     def __init__(
         self,
         acceptor: str = (
-            "[#7&!$([nX3])&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4&+1]),"
-            "O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O),o+0,"
-            "F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])]"
+            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
+            ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
+            ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
+            ",$([o+0])"
+            ",$([F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])])]"
         ),
-        donor: str = "[$([O,S;+0]),$([N;v3,v4&+1]),n+0]-[H]",
+        donor: str = "[$([O,S,#7;+0]),$([Nv4+1]),$([n+]c[nH])]-[H]",
         distance: float = 3.5,
         DHA_angle: "Angles" = (130, 180),
     ) -> None:

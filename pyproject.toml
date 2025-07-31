@@ -166,7 +166,7 @@ warn_no_return = true
 warn_return_any = true
 warn_unreachable = true
 show_error_context = true
-exclude = "docs/conf.py"
+exclude = "docs/conf.py|build/"
 
 [[tool.mypy.overrides]]
 module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*"]
@@ -229,6 +229,7 @@ select = [
     "I",
 ]
 ignore = [
+    "PLW3201",
     "PLW1514",
     "PTH123",
     "PLR0904",
