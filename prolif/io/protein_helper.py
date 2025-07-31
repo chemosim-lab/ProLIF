@@ -51,7 +51,6 @@ class ProteinHelper:
     -------
     >>> import prolif as plf
     >>> from prolif.io import ProteinHelper
-
     >>> protein_helper = ProteinHelper(templates=[{"ALA": {"SMILES": "CC(C(=O)O)N"}}])
     >>> mol = protein_helper.standardize_protein(input_topology="path/to/protein.pdb")
     >>> plf.display_residues(mol)
@@ -113,7 +112,7 @@ class ProteinHelper:
         >>> protein_helper = ProteinHelper(
                 templates=[{"ALA": {"SMILES": "CC(C(=O)O)N"}}]
             )
-        >>> protein_helper.standardize_protein(
+        >>> mol = protein_helper.standardize_protein(
                "path/to/protein.pdb"
             )
         """
@@ -217,8 +216,8 @@ class ProteinHelper:
         str
             The standard residue name.
 
-        Notes
-        -----
+        Note
+        ----
         This conversion is designed to distinguish residues with
         different possible H-bond donors at side chains, instead of the
         actual protonated states of residues.
@@ -371,15 +370,17 @@ class ProteinHelper:
 
         Note
         ----
-        If the user provides a SMILES template, it will be converted to an RDKit
+        1. If the user provides a SMILES template, it will be converted to an RDKit
         molecule, and the bond orders will be assigned from the template.
 
-        SMILES templates are prioritized over CIF templates.
+        2. SMILES templates are prioritized over CIF templates.
 
-        For CIF templates, any bonds and chiral designation on the input molecule will
-        be removed at the start of the process. This function is adapted from the
-        pdbinf/_pdbinf.py module's assign_pdb_bonds function, which is used to assign
+        3. For CIF templates, any bonds and chiral designation on the input molecule
+        will be removed at the start of the process. This function is adapted from the
+        `pdbinf/_pdbinf.py` module's assign_pdb_bonds function, which is used to assign
         bonds and aromaticity based on the standard amino acid templates.
+
+        Source: https://github.com/OpenFreeEnergy/pdbinf/blob/c0ddf00bd068d7860b2e99b9f03847c890e3efb5/src/pdbinf/_pdbinf.py#L482
         """
         if templates is None:
             templates = [STANDARD_AA]
@@ -453,8 +454,8 @@ def strip_bonds(m: Chem.Mol) -> Chem.Mol:
     rdkit.Chem.Mol
         The modified molecule with all bonds and chiral tags removed.
 
-    Notes
-    -----
+    Note
+    ----
     This function is adapted from the pdbinf/_pdbinf.py module's strip_bonds
     function.
 
@@ -487,8 +488,8 @@ def assign_intra_props(mol: Chem.Mol, reference_block: dict) -> Chem.Mol:
     rdkit.Chem.Mol
         The modified molecule with assigned bonds and aromaticity.
 
-    Notes
-    -----
+    Note
+    ----
     This function is adapted from the pdbinf/_pdbinf.py module's assign_intra_props
     function, which is used to assign bonds and aromaticity based on
     the standard amino acid templates.

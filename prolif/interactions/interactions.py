@@ -854,6 +854,9 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         """Add hydrogen bond potential (derived from `Autodock Vina`_) to the
         interaction metadata.
 
+        .. _Autodock Vina: https://github.com/ccsb-scripps/AutoDock-Vina/blob/develop/src/lib/potentials.h#L217
+
+
         Parameters
         ----------
         interaction_data : dict
@@ -874,7 +877,6 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         Dict
             Updated metadata with hydrogen bond probability.
 
-        .. _Autodock Vina: https://github.com/ccsb-scripps/AutoDock-Vina/blob/develop/src/lib/potentials.h#L217
         """
         # [TODO] need to tune the g and b parameter based on the dataset
 
