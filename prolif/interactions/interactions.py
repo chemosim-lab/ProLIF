@@ -657,18 +657,11 @@ class ImplicitHBAcceptor(Distance, VdWContact):
                 continue
 
             # If ignore_geometry_checks is True, skip geometry checks
-            if self.ignore_geometry_checks:
-                yield self.add_vina_hbond_potential(
-                    interaction_data, lig_res=lig_res, prot_res=prot_res
-                )
-
-            # For the rest of the interaction, check geometry
-            elif self.check_geometry(
+            if self.ignore_geometry_checks or self.check_geometry(
                 interaction_data,
                 lig_res=lig_res,
                 prot_res=prot_res,
             ):
-                # If passed geometry checks, add hydrogen bond potential
                 yield self.add_vina_hbond_potential(
                     interaction_data, lig_res=lig_res, prot_res=prot_res
                 )
