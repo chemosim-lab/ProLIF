@@ -477,8 +477,23 @@ class TestInteractions:
         ) or interaction.check_water_residue(any_other_mol[0]):
             # if the user wants to include water
             if ihb_include_water:
-                assert "donor_atom_angle_deviation" not in metadata
-                assert "acceptor_atom_angle_deviation" not in metadata
+                if (
+                    not interaction.check_water_residue(any_mol[0])
+                    and not ihb_ignore_geometry_checks
+                ):
+                    # if the acceptor is not a water residue
+                    # and geometry checks are not ignored
+                    # acceptor atom angle deviation should be present
+                    assert "acceptor_atom_angle_deviation" in metadata
+
+                if (
+                    not interaction.check_water_residue(any_other_mol[0])
+                    and ihb_ignore_geometry_checks
+                ):
+                    # if the donor is not a water residue
+                    # and geometry checks are not ignored
+                    # donor atom angle deviation should be present
+                    assert "donor_atom_angle_deviation" in metadata
 
                 assert "vina_hbond_potential" in metadata
 
@@ -571,7 +586,10 @@ class TestInteractions:
         interaction = ImplicitHBAcceptor()
         with pytest.raises(
             ValueError,
-            match=(r"No heavy atoms found in residue HOH1._ for atom 'O' at index 0."),
+            match=(
+                r"No nearby heavy atoms found in residue HOH1._ "
+                r"for atom 'O' at index 0."
+            ),
         ):
             interaction._get_atom_angles(ihb_donor_h2o[0], 0, ihb_ligand[0], 13)
 

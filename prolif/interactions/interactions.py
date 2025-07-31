@@ -645,15 +645,49 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         """
         for interaction_data in super().detect(lig_res, prot_res):
             # Check if the interaction including water residues
-            if self.check_water_residue(prot_res) or self.check_water_residue(lig_res):
+            water_in_prot_res = self.check_water_residue(prot_res)
+            water_in_lig_res = self.check_water_residue(lig_res)
+
+            if water_in_prot_res or water_in_lig_res:
                 # Check if the user wants to include water residues
                 if self.include_water:
-                    # If water residues are included, skip the geometry checks
-                    yield self.add_vina_hbond_potential(
-                        interaction_data, lig_res=lig_res, prot_res=prot_res
-                    )
+                    if water_in_prot_res and water_in_lig_res:
+                        # If both residues are water, skip the geometry checks
+                        yield self.add_vina_hbond_potential(
+                            interaction_data, lig_res=lig_res, prot_res=prot_res
+                        )
+                    elif (
+                        # If water is only in protein residue,
+                        # either ignore geometry checks or check geometry on ligand
+                        water_in_prot_res
+                        and (
+                            self.ignore_geometry_checks
+                            or self.check_geometry(
+                                interaction_data,
+                                lig_res=lig_res,
+                                prot_res=prot_res,
+                                on="ligand",
+                            )
+                        )
+                    ) or (
+                        # If water is only in ligand residue,
+                        # either ignore geometry checks or check geometry on protein
+                        water_in_lig_res
+                        and (
+                            self.ignore_geometry_checks
+                            or self.check_geometry(
+                                interaction_data,
+                                lig_res=lig_res,
+                                prot_res=prot_res,
+                                on="protein",
+                            )
+                        )
+                    ):
+                        yield self.add_vina_hbond_potential(
+                            interaction_data, lig_res=lig_res, prot_res=prot_res
+                        )
 
-                # If not, skip water residues
+                # If not to include water (or not fulfill the conditions), skip
                 continue
 
             # If ignore_geometry_checks is True (first condition), skip geometry checks
@@ -663,6 +697,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
                 interaction_data,
                 lig_res=lig_res,
                 prot_res=prot_res,
+                on="both",
             ):
                 yield self.add_vina_hbond_potential(
                     interaction_data, lig_res=lig_res, prot_res=prot_res
@@ -673,6 +708,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         interaction_data: "InteractionMetadata",
         lig_res: "Residue",
         prot_res: "Residue",
+        on: Literal["ligand", "protein", "both"] = "both",
     ) -> bool:
         """Check the geometry of the interaction.
 
@@ -684,6 +720,11 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             Ligand residue.
         prot_res : Residue
             Protein residue.
+        on : Literal["ligand", "protein", "both"]
+            Specifies which residue to check the geometry on. Defaults to "both".
+        debugging : bool, optional
+            If True, additional debugging information will be printed.
+            Defaults to False.
 
         Returns
         -------
@@ -698,75 +739,88 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         prot_atom_idx = interaction_data["indices"]["protein"][0]
         prot_atom = prot_res.GetAtomWithIdx(prot_atom_idx)
 
-        # Check acceptor atom's angle (ligand-centered)
-        ideal_acceptor_atom_angle = IDEAL_ATOM_ANGLES[lig_atom.GetHybridization()]
-        acceptor_atom_angles = self._get_atom_angles(
-            res=lig_res,
-            res_atom_idx=lig_atom_idx,
-            remote_res=prot_res,
-            remote_res_atom_idx=prot_atom_idx,
-        )
-        deviation_aaa = min(
-            abs(each_atom_angle - ideal_acceptor_atom_angle)
-            for each_atom_angle in acceptor_atom_angles
-        )
-        if deviation_aaa > self.tolerance_dev_aaa:
-            return False
-
-        # Check donor atom's angle (protein-centered)
-        ideal_donor_atom_angle = IDEAL_ATOM_ANGLES[prot_atom.GetHybridization()]
-        donor_atom_angles = self._get_atom_angles(
-            res=prot_res,
-            res_atom_idx=prot_atom_idx,
-            remote_res=lig_res,
-            remote_res_atom_idx=lig_atom_idx,
-        )
-        deviation_daa = min(
-            abs(each_atom_angle - ideal_donor_atom_angle)
-            for each_atom_angle in donor_atom_angles
-        )
-        if deviation_daa > self.tolerance_dev_daa:
-            return False
-
-        # Check acceptor plane angle (if applicable, sp2)
+        # Initialize the interaction data
+        ideal_acceptor_atom_angle = None
+        acceptor_atom_angles = None
+        deviation_aaa = None
         acceptor_plane_angle = None
-        if lig_atom.GetHybridization() == HybridizationType.SP2:
-            # Check for acceptor's plane angle (ligand-centered)
-            acceptor_plane_angle = self._get_plane_angle(
+        ideal_donor_atom_angle = None
+        donor_atom_angles = None
+        deviation_daa = None
+        donor_plane_angle = None
+
+        # Check acceptor (ligand-centered)
+        if on in {"both", "ligand"}:
+            # Check acceptor atom's angle
+            ideal_acceptor_atom_angle = IDEAL_ATOM_ANGLES[lig_atom.GetHybridization()]
+            acceptor_atom_angles = self._get_atom_angles(
                 res=lig_res,
                 res_atom_idx=lig_atom_idx,
                 remote_res=prot_res,
                 remote_res_atom_idx=prot_atom_idx,
             )
-            # Ideal acceptor's plane angle is 0 degrees
-            if acceptor_plane_angle > self.tolerance_dev_apa:
+            deviation_aaa = min(
+                abs(each_atom_angle - ideal_acceptor_atom_angle)
+                for each_atom_angle in acceptor_atom_angles
+            )
+            if deviation_aaa > self.tolerance_dev_aaa:
                 return False
 
-        # Check donor plane angle (if applicable, sp2)
-        donor_plane_angle = None
-        if prot_atom.GetHybridization() == HybridizationType.SP2:
-            # Check for donor's plane angle (protein-centered)
-            donor_plane_angle = self._get_plane_angle(
+            # Save geometry features in interaction data
+            interaction_data["ideal_acceptor_angle"] = ideal_acceptor_atom_angle
+            interaction_data["acceptor_atom_angles"] = acceptor_atom_angles
+            interaction_data["acceptor_atom_angle_deviation"] = deviation_aaa
+
+            # Check acceptor plane angle (if applicable, sp2)
+            if lig_atom.GetHybridization() == HybridizationType.SP2:
+                acceptor_plane_angle = self._get_plane_angle(
+                    res=lig_res,
+                    res_atom_idx=lig_atom_idx,
+                    remote_res=prot_res,
+                    remote_res_atom_idx=prot_atom_idx,
+                )
+                # Ideal acceptor's plane angle is 0 degrees
+                if acceptor_plane_angle > self.tolerance_dev_apa:
+                    return False
+
+                # Save geometry features in interaction data
+                interaction_data["acceptor_plane_angle"] = acceptor_plane_angle
+
+        # Check donor atom (protein-centered)
+        if on in {"both", "protein"}:
+            # Check donor atom's angle
+            ideal_donor_atom_angle = IDEAL_ATOM_ANGLES[prot_atom.GetHybridization()]
+            donor_atom_angles = self._get_atom_angles(
                 res=prot_res,
                 res_atom_idx=prot_atom_idx,
                 remote_res=lig_res,
                 remote_res_atom_idx=lig_atom_idx,
             )
-            # Ideal donor's plane angle is 0 degrees
-            if donor_plane_angle > self.tolerance_dev_dpa:
+            deviation_daa = min(
+                abs(each_atom_angle - ideal_donor_atom_angle)
+                for each_atom_angle in donor_atom_angles
+            )
+            if deviation_daa > self.tolerance_dev_daa:
                 return False
 
-        # Save geometry features in interaction data
-        interaction_data["ideal_donor_angle"] = ideal_donor_atom_angle
-        interaction_data["donor_atom_angles"] = donor_atom_angles
-        interaction_data["donor_atom_angle_deviation"] = deviation_daa
-        interaction_data["ideal_acceptor_angle"] = ideal_acceptor_atom_angle
-        interaction_data["acceptor_atom_angles"] = acceptor_atom_angles
-        interaction_data["acceptor_atom_angle_deviation"] = deviation_aaa
-        if donor_plane_angle:
-            interaction_data["donor_plane_angle"] = donor_plane_angle
-        if acceptor_plane_angle:
-            interaction_data["acceptor_plane_angle"] = acceptor_plane_angle
+            # Save geometry features in interaction data
+            interaction_data["ideal_donor_angle"] = ideal_donor_atom_angle
+            interaction_data["donor_atom_angles"] = donor_atom_angles
+            interaction_data["donor_atom_angle_deviation"] = deviation_daa
+
+            # Check donor plane angle (if applicable, sp2)
+            if prot_atom.GetHybridization() == HybridizationType.SP2:
+                donor_plane_angle = self._get_plane_angle(
+                    res=prot_res,
+                    res_atom_idx=prot_atom_idx,
+                    remote_res=lig_res,
+                    remote_res_atom_idx=lig_atom_idx,
+                )
+                # Ideal donor's plane angle is 0 degrees
+                if donor_plane_angle > self.tolerance_dev_dpa:
+                    return False
+
+                interaction_data["donor_plane_angle"] = donor_plane_angle
 
         # Return the result of the geometry checks
         return True
@@ -871,7 +925,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         ]
         if not nearby_heavy_atoms:
             raise ValueError(
-                f"No heavy atoms found in residue {res.resid} "
+                f"No nearby heavy atoms found in residue {res.resid} "
                 f"for atom {res_atom.GetSymbol()!r} at index {res_atom_idx}."
             )
 
