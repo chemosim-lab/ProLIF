@@ -455,6 +455,7 @@ class TestInteractions:
             ("ihb_acceptor_tyr167b", "ihb_ligand"),
             ("ihb_asp95a", "ihb_ligand"),
             ("ihb_ligand", "ihb_donor_h2o"),
+            ("ihb_donor_h2o", "ihb_donor_h2o"),  # self-interaction (hacky test)
         ],
         indirect=["any_mol", "any_other_mol"],
     )
