@@ -12,7 +12,7 @@ import prolif
 from prolif.fingerprint import Fingerprint
 from prolif.interactions import ImplicitHBAcceptor, VdWContact
 from prolif.interactions.base import _INTERACTIONS, Interaction
-from prolif.interactions.constants import VDW_PRESETS
+from prolif.interactions.constants import IDEAL_ATOM_ANGLES, VDW_PRESETS
 from prolif.interactions.utils import get_mapindex
 
 # Disable RDKit warnings
@@ -611,21 +611,20 @@ class TestInteractions:
             (
                 "P(Cl)(Cl)(Cl)(Cl)Cl",
                 pytest.raises(
-                    ValueError, match=r"Unsupported hybridization SP3D for atom \'P\'\."
+                    KeyError, match=r"rdkit.Chem.rdchem.HybridizationType.SP3D"
                 ),
             ),
         ],
     )
-    def test_implicithbacceptor_get_ideal_angle(
+    def test_ideal_atom_angle(
         self,
         smiles: str,
         expected_context: "AbstractContextManager",
     ) -> None:
-        interaction = ImplicitHBAcceptor()
         mol = Chem.MolFromSmiles(smiles)
 
         with expected_context as e:
-            ideal_angle = interaction._get_ideal_atom_angle(mol.GetAtomWithIdx(0))
+            ideal_angle = IDEAL_ATOM_ANGLES[mol.GetAtomWithIdx(0).GetHybridization()]
             assert ideal_angle == e
 
 

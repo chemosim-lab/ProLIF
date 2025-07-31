@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Literal
 
 from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
-from rdkit.Chem.rdchem import Atom, HybridizationType
+from rdkit.Chem.rdchem import HybridizationType
 
 from prolif.constants import RESNAME_ALIASES
 from prolif.interactions.base import (
@@ -27,7 +27,7 @@ from prolif.interactions.base import (
     Interaction,
     SingleAngle,
 )
-from prolif.interactions.constants import VDW_PRESETS
+from prolif.interactions.constants import IDEAL_ATOM_ANGLES, VDW_PRESETS
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 if TYPE_CHECKING:
@@ -656,7 +656,9 @@ class ImplicitHBAcceptor(Distance, VdWContact):
                 # If not, skip water residues
                 continue
 
-            # If ignore_geometry_checks is True, skip geometry checks
+            # If ignore_geometry_checks is True (first condition), skip geometry checks
+            # Or if the geometry checks pass (second condition),
+            # yield the interaction with the hydrogen bond potential
             if self.ignore_geometry_checks or self.check_geometry(
                 interaction_data,
                 lig_res=lig_res,
@@ -697,7 +699,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         prot_atom = prot_res.GetAtomWithIdx(prot_atom_idx)
 
         # Check acceptor atom's angle (ligand-centered)
-        ideal_acceptor_atom_angle = self._get_ideal_atom_angle(lig_atom)
+        ideal_acceptor_atom_angle = IDEAL_ATOM_ANGLES[lig_atom.GetHybridization()]
         acceptor_atom_angles = self._get_atom_angles(
             res=lig_res,
             res_atom_idx=lig_atom_idx,
@@ -712,7 +714,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             return False
 
         # Check donor atom's angle (protein-centered)
-        ideal_donor_atom_angle = self._get_ideal_atom_angle(prot_atom)
+        ideal_donor_atom_angle = IDEAL_ATOM_ANGLES[prot_atom.GetHybridization()]
         donor_atom_angles = self._get_atom_angles(
             res=prot_res,
             res_atom_idx=prot_atom_idx,
@@ -833,8 +835,8 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         bool
             True if the residue is a water molecule, False otherwise.
         """
-        resname = RESNAME_ALIASES.get(res.resid.name, res.resid.name)
-        return bool(resname == "HOH")
+        resname: str = RESNAME_ALIASES.get(res.resid.name, res.resid.name)
+        return resname == "HOH"
 
     def _get_atom_angles(
         self,
@@ -887,35 +889,6 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             angles.append(degrees(angle))
 
         return angles
-
-    def _get_ideal_atom_angle(
-        self,
-        atom: "Atom",
-    ) -> float:
-        """Get the ideal angle for the atom based on its hybridization.
-
-        Parameters
-        ----------
-        atom : Atom
-            The atom for which to get the ideal angle.
-
-        Returns
-        -------
-        float
-            The ideal angle in degrees.
-
-        """
-        if atom.GetHybridization() == HybridizationType.SP3:
-            return 109.5
-        if atom.GetHybridization() == HybridizationType.SP2:
-            return 120.0
-        if atom.GetHybridization() == HybridizationType.SP:
-            return 180.0
-
-        raise ValueError(
-            f"Unsupported hybridization {atom.GetHybridization()} "
-            f"for atom {atom.GetSymbol()!r}."
-        )
 
     def _get_plane_angle(
         self,
