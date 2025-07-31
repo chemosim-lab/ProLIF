@@ -63,3 +63,10 @@ interactions, ignoring backbone interactions and such, you can have a look at th
 tutorial:
 
 :ref:`notebooks/advanced:Advanced usage`
+
+**Implicit hydrogen methods**: If your topology does not contain hydrogen atoms, you can
+still use the implicit hydrogen methods to generate interaction fingerprints. This method is 
+useful for quickly comparing your experimental structure with computational results.
+
+:ref:`notebooks/implicit-hbond:Implicit hydrogen bonds`
+
