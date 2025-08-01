@@ -1,3 +1,12 @@
+"""
+Protein helper functions --- :mod:`prolif.io.protein_helper`
+============================================================
+This module provides helper functions for working with
+protein structures (but not limited to protein structures).
+
+Yu-Yuan (Stuart) Yang, 2025
+"""
+
 import logging
 import warnings
 from pathlib import Path
@@ -24,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 class ProteinHelper:
-    """ProteinHelper is a class to standardize the residue names and fix the bond order
-    when reading the non-standard residues with RDKit for a molecule.
+    """:class:`ProteinHelper` is a class to standardize the residue names and fix the
+    bond orders when reading the non-standard residues with RDKit for a molecule.
 
     Parameters
     ----------
@@ -41,8 +50,8 @@ class ProteinHelper:
     templates : list[dict]
         The templates used for standardizing the protein molecule.
 
-    Notes
-    -----
+    Note
+    ----
     This class is designed to work with ProLIF Molecule instances or PDB files.
     It reads the input topology, standardizes the residue names, and fixes the bond
     orders based on the provided templates or standard amino acid template.
@@ -353,7 +362,7 @@ class ProteinHelper:
     def fix_molecule_bond_orders(
         residue: Residue, templates: list[dict] | None = None
     ) -> Residue:
-        """Fix the bond orders of a molecule.
+        r"""Fix the bond orders of a molecule.
 
         Parameters
         ----------
@@ -370,15 +379,15 @@ class ProteinHelper:
 
         Note
         ----
-        1. If the user provides a SMILES template, it will be converted to an RDKit
+        1\. If the user provides a SMILES template, it will be converted to an RDKit
         molecule, and the bond orders will be assigned from the template.
 
-        2. SMILES templates are prioritized over CIF templates.
+        2\. SMILES templates are prioritized over CIF templates.
 
-        3. For CIF templates, any bonds and chiral designation on the input molecule
+        3\. For CIF templates, any bonds and chiral designation on the input molecule
         will be removed at the start of the process. This function is adapted from the
-        `pdbinf/_pdbinf.py` module's assign_pdb_bonds function, which is used to assign
-        bonds and aromaticity based on the standard amino acid templates.
+        `pdbinf/_pdbinf.py` module's `assign_pdb_bonds` function, which is used to
+        assign bonds and aromaticity based on the standard amino acid templates.
 
         Source: https://github.com/OpenFreeEnergy/pdbinf/blob/c0ddf00bd068d7860b2e99b9f03847c890e3efb5/src/pdbinf/_pdbinf.py#L482
         """
@@ -456,7 +465,7 @@ def strip_bonds(m: Chem.Mol) -> Chem.Mol:
 
     Note
     ----
-    This function is adapted from the pdbinf/_pdbinf.py module's strip_bonds
+    This function is adapted from the `pdbinf/_pdbinf.py` module's `strip_bonds`
     function.
 
     Source: https://github.com/OpenFreeEnergy/pdbinf/blob/c0ddf00bd068d7860b2e99b9f03847c890e3efb5/src/pdbinf/_pdbinf.py#L71
@@ -490,7 +499,7 @@ def assign_intra_props(mol: Chem.Mol, reference_block: dict) -> Chem.Mol:
 
     Note
     ----
-    This function is adapted from the pdbinf/_pdbinf.py module's assign_intra_props
+    This function is adapted from the `pdbinf/_pdbinf.py` module's `assign_intra_props`
     function, which is used to assign bonds and aromaticity based on
     the standard amino acid templates.
 
@@ -592,8 +601,8 @@ def _assign_intra_props_lone_H(em: Chem.RWMol) -> Chem.RWMol:
 
     Note
     ----
-    This function is adapted from the pdbinf/_pdbinf.py module's
-    assign_intra_props function.
+    This function is adapted from the `pdbinf/_pdbinf.py` module's
+    `assign_intra_props` function.
 
     Source: https://github.com/OpenFreeEnergy/pdbinf/blob/c0ddf00bd068d7860b2e99b9f03847c890e3efb5/src/pdbinf/_pdbinf.py#L167
     """
