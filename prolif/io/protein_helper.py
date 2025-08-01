@@ -155,7 +155,13 @@ class ProteinHelper:
 
             # set the standard residue name
             for atom in residue.GetAtoms():
+                # set new residue name for each atom (at residue level)
                 atom.GetPDBResidueInfo().SetResidueName(standardized_resname)
+                # set the new residue name for each atom at the molecule level
+                protein_mol.GetAtomWithIdx(
+                    atom.GetUnsignedProp("mapindex")
+                ).GetPDBResidueInfo().SetResidueName(standardized_resname)
+            # update the residue name in the Residue object
             residue.resid.name = standardized_resname
 
             # before fixing the bond orders: strict check with non-standard residues
