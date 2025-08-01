@@ -1,4 +1,6 @@
 """
+I/O-related helper functions --- :mod:`prolif.io.cif`
+=====================================================
 This module provides a lightweight parser for Crystallographic Information File (CIF)
 format.
 

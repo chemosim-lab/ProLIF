@@ -4,6 +4,7 @@ Constants used by the package for interactions.
 
 from MDAnalysis.topology.tables import vdwradii
 from rdkit.Chem import GetPeriodicTable
+from rdkit.Chem.rdchem import HybridizationType
 
 VDWRADII: dict[str, float] = {
     symbol.capitalize(): radius for symbol, radius in vdwradii.items()
@@ -115,4 +116,10 @@ VDW_PRESETS = {
     "mdanalysis": VDWRADII,
     "rdkit": RDKIT_VDWRADII,
     "csd": CSD_VDWRADII,
+}
+
+IDEAL_ATOM_ANGLES = {
+    HybridizationType.SP3: 109.5,
+    HybridizationType.SP2: 120.0,
+    HybridizationType.SP: 180.0,
 }
