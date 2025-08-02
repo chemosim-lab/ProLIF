@@ -550,7 +550,7 @@ def _filter_by_threshold(grouped_data: dict, threshold: float) -> dict:
 
         if components == "ligand_protein":
             ligand, protein, interaction, atoms = key
-            interaction_key: tuple = (ligand, protein, interaction)
+            interaction_key: tuple = (ligand, protein, interaction, "ligand_protein")
 
             interaction_totals[interaction_key] = (
                 interaction_totals.get(interaction_key, 0) + weight
@@ -566,7 +566,7 @@ def _filter_by_threshold(grouped_data: dict, threshold: float) -> dict:
         elif components in ["ligand_water", "water_protein", "water_water"]:
             node1, node2, interaction, atoms, comp_type = key
 
-            interaction_key = key  # using full key for water interactions
+            interaction_key = (node1, node2, interaction, comp_type)
 
             interaction_totals[interaction_key] = (
                 interaction_totals.get(interaction_key, 0) + weight
@@ -581,20 +581,144 @@ def _filter_by_threshold(grouped_data: dict, threshold: float) -> dict:
 
     # Filter by threshold and keep most occurring atom per interaction
     filtered_data: dict = {}
-    for key, data_item in processed_data.items():
-        components = data_item["components"]
 
-        if components == "ligand_protein":
+    # First, add direct ligand-protein interactions that meet the threshold
+    for key, data_item in processed_data.items():
+        if data_item["components"] == "ligand_protein":
             ligand, protein, interaction, atoms = key
             interaction_key = (ligand, protein, interaction)
-        else:
-            interaction_key = key
+            if interaction_totals[interaction_key] >= threshold:
+                if (
+                    interaction_key not in filtered_data
+                    or data_item["weight"] > filtered_data[interaction_key]["weight"]
+                ):
+                    filtered_data[interaction_key] = data_item
+
+    # Now, process water interactions
+    for key, data_item in processed_data.items():
+        node1, node2, interaction, atoms, comp_type = key
+        interaction_key = (node1, node2, interaction, comp_type)
 
         if interaction_totals[interaction_key] >= threshold:
-            if (
-                interaction_key not in filtered_data
-                or data_item["weight"] > filtered_data[interaction_key]["weight"]
-            ):
-                filtered_data[interaction_key] = data_item
-
+            if check_till_protein(node2, interaction_totals, threshold, comp_type):
+                if (
+                    interaction_key not in filtered_data
+                    or data_item["weight"] > filtered_data[interaction_key]["weight"]
+                ):
+                    filtered_data[interaction_key] = data_item
+        else:
+            # If interaction doesn't meet threshold, remove all the subsequent interactions till protein from processed_data to avoid having disconnected content
+            clean_processed_data(key, processed_data)
     return filtered_data
+
+
+def clean_processed_data(
+    key: tuple, processed_data: dict, visited_keys: set | None = None
+) -> None:
+    """
+    Remove all keys from processed_data that start with the given key.
+
+    This is used to clean up processed_data when an interaction does not meet the threshold.
+    Recursively removes all subsequent interactions in the water bridge chain.
+
+    Parameters:
+    -----------
+    key : tuple
+        The key to process and remove
+    processed_data : dict
+        Dictionary of processed interaction data
+    visited_keys : set, optional
+        Set of keys that have already been visited to prevent infinite recursion
+    """
+    # Initialize visited_keys set if not provided
+    if visited_keys is None:
+        visited_keys = set()
+
+    # Base case: if key doesn't exist in processed_data or has already been visited
+    if processed_data.get(key) is None or key in visited_keys:
+        return
+
+    # Add current key to visited keys to prevent infinite recursion
+    visited_keys.add(key)
+
+    # Mark current interaction as removed by setting weight to -1
+    processed_data[key]["weight"] = -1
+
+    # Extract details from the key
+    node1, node2, interaction, atoms, comp_type = key
+
+    # Find all subsequent interactions depending on the comp_type
+    if comp_type == "ligand_water":
+        water_node = node2
+        for next_key in list(processed_data.keys()):
+            if (
+                processed_data.get(next_key) is None
+                or processed_data[next_key]["weight"] <= 0
+            ):
+                continue  # Skip already removed interactions
+
+            next_n1, next_n2, _, _, next_type = next_key
+
+            # Check if this water node is involved in subsequent interactions
+            if (next_type == "water_protein" and next_n1 == water_node) or (
+                next_type == "water_water" and (next_n1 == water_node)
+            ):
+                clean_processed_data(next_key, processed_data, visited_keys)
+
+    elif comp_type == "water_water":
+        water1, water2 = node1, node2
+        for next_key in list(processed_data.keys()):
+            if (
+                processed_data.get(next_key) is None
+                or processed_data[next_key]["weight"] <= 0
+            ):
+                continue  # Skip already removed interactions
+
+            next_n1, next_n2, _, _, next_type = next_key
+
+            # Check if either water node is involved in subsequent interactions
+            if next_n1 in [water1, water2]:
+                clean_processed_data(next_key, processed_data, visited_keys)
+
+
+def check_till_protein(
+    node: str, interaction_totals: dict, threshold: float, comp_type: str
+) -> bool:
+    """
+    Check if the node is valid for inclusion in the filtered data.
+
+    For water nodes, performs breadth-first search to determine if there's a path
+    to any protein node through interactions meeting the threshold.
+    """
+    # Protein nodes are always valid
+    if comp_type == "water_protein":
+        return True
+
+    # breadth-first search to find path to protein
+    visited = set()
+    queue = [(node, comp_type)]
+
+    while queue:
+        current_node, current_type = queue.pop(0)
+
+        if current_node in visited:
+            continue
+
+        visited.add(current_node)
+
+        # Check if this node is in any interaction that meets threshold
+        for key, total in interaction_totals.items():
+            if total < threshold:
+                continue
+
+            # If this node appears as first element in any interaction
+            if key[0] == current_node:
+                # If connected to protein, we're done
+                if key[3] == "water_protein":
+                    return True
+                # Otherwise, add connected node to queue
+                if key[3] in ["water_water", "ligand_water"]:
+                    queue.append((key[1], key[3]))
+
+    # If we've checked all connections and didn't find a path to protein
+    return False
