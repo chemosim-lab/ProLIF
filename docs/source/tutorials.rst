@@ -71,5 +71,5 @@ tutorial:
 still use the implicit hydrogen methods to generate interaction fingerprints. This method is 
 useful for quickly comparing your experimental structure with computational results.
 
-- :ref:`notebooks/implicit-hbond:Implicit-hydrogen bonds`
+- :ref:`notebooks/implicit-hbond:Implicit hydrogen bond interaction`
 
