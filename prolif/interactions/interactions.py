@@ -624,10 +624,10 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         ),
         distance: float = 3.5,
         include_water: bool = False,
-        tolerance_dev_aaa: float = 45,
-        tolerance_dev_daa: float = 45,
+        tolerance_dev_aaa: float = 90,
+        tolerance_dev_daa: float = 25,
         tolerance_dev_apa: float = 90,
-        tolerance_dev_dpa: float = 45,
+        tolerance_dev_dpa: float = 30,
         vdwradii: dict[str, float] | None = None,
         vdwradii_preset: Literal["mdanalysis", "rdkit", "csd"] = "csd",
         ignore_geometry_checks: bool = False,
@@ -661,20 +661,22 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             Metadata for the detected interaction.
 
         """
-        for interaction_data in super().detect(lig_res, prot_res):
-            # Check if the interaction including water residues
-            water_in_prot_res = self.check_water_residue(prot_res)
-            water_in_lig_res = self.check_water_residue(lig_res)
+        # Check if the interaction including water residues
+        water_in_prot_res = self.check_water_residue(prot_res)
+        water_in_lig_res = self.check_water_residue(lig_res)
 
-            if water_in_prot_res or water_in_lig_res:
+        for interaction_data in super().detect(lig_res, prot_res):
+            if (
+                # If the interaction involves water residues
+                (water_in_prot_res or water_in_lig_res)
                 # Check if the user wants to include water residues
-                if self.include_water:
-                    if water_in_prot_res and water_in_lig_res:
+                and self.include_water
+                and (
+                    (
                         # If both residues are water, skip the geometry checks
-                        yield self.add_vina_hbond_potential(
-                            interaction_data, lig_res=lig_res, prot_res=prot_res
-                        )
-                    elif (
+                        water_in_prot_res and water_in_lig_res
+                    )
+                    or (
                         # If water is only in protein residue,
                         # either ignore geometry checks or check geometry on ligand
                         water_in_prot_res
@@ -687,7 +689,8 @@ class ImplicitHBAcceptor(Distance, VdWContact):
                                 on="ligand",
                             )
                         )
-                    ) or (
+                    )
+                    or (
                         # If water is only in ligand residue,
                         # either ignore geometry checks or check geometry on protein
                         water_in_lig_res
@@ -700,22 +703,22 @@ class ImplicitHBAcceptor(Distance, VdWContact):
                                 on="protein",
                             )
                         )
-                    ):
-                        yield self.add_vina_hbond_potential(
-                            interaction_data, lig_res=lig_res, prot_res=prot_res
-                        )
-
-                # If not to include water (or not fulfill the conditions), skip
-                continue
-
-            # If ignore_geometry_checks is True (first condition), skip geometry checks
-            # Or if the geometry checks pass (second condition),
-            # yield the interaction with the hydrogen bond potential
-            if self.ignore_geometry_checks or self.check_geometry(
-                interaction_data,
-                lig_res=lig_res,
-                prot_res=prot_res,
-                on="both",
+                    )
+                )
+            ) or (
+                # If the interaction not involves water residues:
+                (not water_in_prot_res and not water_in_lig_res)
+                and (
+                    # either skip geometry checks (first condition)
+                    # or pass the geometry checks (second condition)
+                    self.ignore_geometry_checks
+                    or self.check_geometry(
+                        interaction_data,
+                        lig_res=lig_res,
+                        prot_res=prot_res,
+                        on="both",
+                    )
+                )
             ):
                 yield self.add_vina_hbond_potential(
                     interaction_data, lig_res=lig_res, prot_res=prot_res
@@ -740,9 +743,6 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             Protein residue.
         on : Literal["ligand", "protein", "both"]
             Specifies which residue to check the geometry on. Defaults to "both".
-        debugging : bool, optional
-            If True, additional debugging information will be printed.
-            Defaults to False.
 
         Returns
         -------
