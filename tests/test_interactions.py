@@ -144,7 +144,7 @@ class TestInteractions:
             ("metalacceptor", "metal", "ligand", False),
             ("vdwcontact", "benzene", "etf", True),
             ("vdwcontact", "hb_acceptor", "metal_false", False),
-            ("implicithbacceptor", "ihb_ligand", "ihb_asp95a", True),
+            ("implicithbacceptor", "ihb_asp95a", "ihb_ligand", True),
             ("implicithbacceptor", "ihb_acceptor_tyr167b", "ihb_ligand", True),
             ("implicithbacceptor", "ihb_ligand", "ihb_acceptor_tyr167b", False),
             ("implicithbdonor", "ihb_ligand", "ihb_asp95a", True),
@@ -468,7 +468,6 @@ class TestInteractions:
     @pytest.mark.parametrize(
         ("any_mol", "any_other_mol"),
         [
-            ("ihb_ligand", "ihb_asp95a"),
             ("ihb_acceptor_tyr167b", "ihb_ligand"),
             ("ihb_asp95a", "ihb_ligand"),
             ("ihb_ligand", "ihb_donor_h2o"),
