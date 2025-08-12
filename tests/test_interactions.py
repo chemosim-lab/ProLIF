@@ -626,14 +626,15 @@ class TestInteractions:
         bad_value: float,
         expected: tuple[float, float],
     ) -> None:
-        interaction = ImplicitHBAcceptor()
+        interaction = ImplicitHBAcceptor(
+            vina_hbond_potential_b=bad_value,
+            vina_hbond_potential_g=good_value,
+        )
         metadata = next(interaction.detect(ihb_acceptor_tyr167b[0], ihb_ligand[0]))
         metadata = interaction.add_vina_hbond_potential(
             metadata,
             lig_res=ihb_acceptor_tyr167b[0],
             prot_res=ihb_ligand[0],
-            g=good_value,
-            b=bad_value,
         )
         assert expected[0] <= metadata["vina_hbond_potential"] <= expected[1]
 

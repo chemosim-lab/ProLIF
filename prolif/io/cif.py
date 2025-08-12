@@ -17,6 +17,8 @@ import pandas as pd
 def _block_decompose(data_block: list) -> tuple:
     """
     Decomposes a CIF data block into decriptive information and tables.
+
+    .. versionadded:: 2.1.0
     """
     descriptions: list[str] = []
     data_tables: list[list] = []
@@ -53,6 +55,7 @@ def cif_parser_lite(cif_string: str) -> dict:
     cif_string : str
         The CIF string to parse.
 
+    .. versionadded:: 2.1.0
     """
     # Split the CIF string into blocks based on 'data_' lines
     data_blocks = {}
@@ -116,6 +119,8 @@ def cif_template_reader(cif_filepath: Path | str) -> dict:
     -------
     dict
         A dictionary containing the parsed data blocks.
+
+    .. versionadded:: 2.1.0
     """
     cif_string = Path(cif_filepath).read_text()
 

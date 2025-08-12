@@ -601,10 +601,18 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         Preset for van der Waals radii (to calculate `vina_hbond_potential`). Defaults
         to "csd". The presets are defined in
         :mod:`prolif.interactions.constants.VDW_PRESETS`.
+    vina_hbond_potential_g : float
+        H-bond potential to indicate the good distance of forming a hydrogen bond
+        (derived from AutoDock Vina's H-bond terms).
+    vina_hbond_potential_b : float
+        H-bond potential to indicate the bad distance of forming a hydrogen bond
+        (derived from AutoDock Vina's H-bond terms).
     ignore_geometry_checks : bool
         If True, the geometry checks for the interaction will be skipped. This is useful
         for cases where the geometry is not relevant or when the user wants to skip the
         geometry checks for performance reasons. Defaults to False.
+
+    .. versionadded:: 2.1.0
     """
 
     def __init__(
@@ -630,6 +638,8 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         tolerance_dev_dpa: float = 30,
         vdwradii: dict[str, float] | None = None,
         vdwradii_preset: Literal["mdanalysis", "rdkit", "csd"] = "csd",
+        vina_hbond_potential_g: float = -0.425,
+        vina_hbond_potential_b: float = 0.565,
         ignore_geometry_checks: bool = False,
     ) -> None:
         super().__init__(lig_pattern=acceptor, prot_pattern=donor, distance=distance)
@@ -641,6 +651,11 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         self.tolerance_dev_daa = tolerance_dev_daa
         self.tolerance_dev_apa = tolerance_dev_apa
         self.tolerance_dev_dpa = tolerance_dev_dpa
+
+        # Specify where the piecewise linear terms become one (good interaction)
+        self.vhp_g = vina_hbond_potential_g
+        # Specify where the piecewise linear terms become zero (bad interaction)
+        self.vhp_b = vina_hbond_potential_b
         self.ignore_geometry_checks = ignore_geometry_checks
 
     def detect(
@@ -848,8 +863,6 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         interaction_data: dict,
         lig_res: "Residue",
         prot_res: "Residue",
-        g: float = -0.7,
-        b: float = 0.4,
     ) -> dict:
         """Add hydrogen bond potential (derived from `Autodock Vina`_) to the
         interaction metadata.
@@ -865,12 +878,6 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             Ligand residue.
         prot_res : Residue
             Protein residue.
-        g : float, optional
-            Parameter to specify where the piecewise linear terms become one (good
-            interaction).
-        b : float, optional
-            Parameter to specify where the piecewise linear terms become zero (bad
-            interaction).
 
         Returns
         -------
@@ -878,22 +885,21 @@ class ImplicitHBAcceptor(Distance, VdWContact):
             Updated metadata with hydrogen bond probability.
 
         """
-        # [TODO] need to tune the g and b parameter based on the dataset
-
         # Hbond probability is based on the Autodock Vina Hbond interaction term
         lig_atom = lig_res.GetAtomWithIdx(interaction_data["indices"]["ligand"][0])
         prot_atom = prot_res.GetAtomWithIdx(interaction_data["indices"]["protein"][0])
         vdw_sum = self._get_radii_sum(lig_atom.GetSymbol(), prot_atom.GetSymbol())
         d_diff = interaction_data["distance"] - vdw_sum
 
-        if d_diff <= g:
+        if d_diff <= self.vhp_g:
             interaction_data["vina_hbond_potential"] = 1.0
-        elif d_diff >= b:
+        elif d_diff >= self.vhp_b:
             interaction_data["vina_hbond_potential"] = 0.0
         else:
             # Piecewise linear function for the hydrogen bond potential
-            interaction_data["vina_hbond_potential"] = (d_diff - b) / (g - b)
-
+            interaction_data["vina_hbond_potential"] = (d_diff - self.vhp_b) / (
+                self.vhp_g - self.vhp_b
+            )
         return interaction_data
 
     def check_water_residue(self, res: "Residue") -> bool:

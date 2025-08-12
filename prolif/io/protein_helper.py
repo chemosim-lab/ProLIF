@@ -64,6 +64,7 @@ class ProteinHelper:
     >>> mol = protein_helper.standardize_protein(input_topology="path/to/protein.pdb")
     >>> plf.display_residues(mol)
 
+    .. versionadded:: 2.1.0
     """
 
     def __init__(self, templates: list[dict] | dict | None = None):
