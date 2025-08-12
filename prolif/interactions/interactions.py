@@ -568,6 +568,8 @@ class VdWContact(Interaction):
 class ImplicitHBAcceptor(Distance, VdWContact):
     """Implicit Hbond interaction between a ligand (acceptor) and a residue (donor).
 
+    .. versionadded:: 2.1.0
+
     Parameters
     ----------
     acceptor : str
@@ -612,7 +614,6 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         for cases where the geometry is not relevant or when the user wants to skip the
         geometry checks for performance reasons. Defaults to False.
 
-    .. versionadded:: 2.1.0
     """
 
     def __init__(

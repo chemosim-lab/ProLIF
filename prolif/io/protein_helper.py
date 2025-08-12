@@ -36,6 +36,8 @@ class ProteinHelper:
     """:class:`ProteinHelper` is a class to standardize the residue names and fix the
     bond orders when reading the non-standard residues with RDKit for a molecule.
 
+    .. versionadded:: 2.1.0
+
     Parameters
     ----------
     templates : list[dict] or dict or None, optional
@@ -64,7 +66,6 @@ class ProteinHelper:
     >>> mol = protein_helper.standardize_protein(input_topology="path/to/protein.pdb")
     >>> plf.display_residues(mol)
 
-    .. versionadded:: 2.1.0
     """
 
     def __init__(self, templates: list[dict] | dict | None = None):

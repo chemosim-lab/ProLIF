@@ -50,12 +50,13 @@ def cif_parser_lite(cif_string: str) -> dict:
     """
     Parses a CIF string and returns a dictionary of data blocks.
 
+    .. versionadded:: 2.1.0
+
     Parameters
     ----------
     cif_string : str
         The CIF string to parse.
 
-    .. versionadded:: 2.1.0
     """
     # Split the CIF string into blocks based on 'data_' lines
     data_blocks = {}
@@ -110,6 +111,8 @@ def cif_template_reader(cif_filepath: Path | str) -> dict:
     """
     Reads a CIF file and returns a dictionary of data blocks.
 
+    .. versionadded:: 2.1.0
+
     Parameters
     ----------
     cif_filepath : str
@@ -120,7 +123,6 @@ def cif_template_reader(cif_filepath: Path | str) -> dict:
     dict
         A dictionary containing the parsed data blocks.
 
-    .. versionadded:: 2.1.0
     """
     cif_string = Path(cif_filepath).read_text()
 
