@@ -128,11 +128,11 @@ class ProteinHelper:
             )
 
         .. important::
-        If your input for `standardize_protein` is a :class:`prolif.Molecule`, it will modify
-        your original molecule in place. Your residue names will be updated to the
-        standardized names and residue's bond orders will be fixed to the corresponding
-        protonated states.
-        ```
+            If your input for `standardize_protein` is a :class:`prolif.Molecule`, it
+            will modify your original molecule in place. Your residue names will be
+            updated to the standardized names and residue's bond orders will be fixed
+            to the corresponding protonated states.
+
         """
 
         # read as prolif molecule

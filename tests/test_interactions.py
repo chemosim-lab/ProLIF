@@ -551,28 +551,18 @@ class TestInteractions:
     @pytest.mark.parametrize(
         (
             "tolerance_daa",
-            "tolerance_aaa",
             "tolerance_dpa",
-            "tolerance_apa",
             "expected",
         ),
         [
-            (0, 45, 45, 90, False),
-            (10, 45, 45, 90, False),
-            (20, 45, 45, 90, False),
-            (30, 45, 45, 90, True),
-            (30, 30, 45, 90, True),
-            (30, 20, 45, 90, True),
-            (30, 10, 45, 90, True),
-            (30, 0, 45, 90, False),
-            (30, 10, 30, 90, True),
-            (30, 10, 20, 90, True),
-            (30, 10, 10, 90, True),
-            (30, 10, 0, 90, False),
-            (30, 10, 10, 45, True),
-            (30, 10, 10, 30, True),
-            (30, 10, 10, 15, True),
-            (30, 10, 10, 0, False),
+            (0, 45, False),
+            (10, 45, False),
+            (20, 45, False),
+            (30, 45, True),
+            (30, 30, True),
+            (30, 20, True),
+            (30, 10, True),
+            (30, 0, False),
         ],
     )
     def test_implicithbacceptor_check_geometry_with_diff_tolerance(
@@ -580,16 +570,12 @@ class TestInteractions:
         ihb_acceptor_tyr167b: "Molecule",
         ihb_ligand: "Molecule",
         tolerance_daa: float,
-        tolerance_aaa: float,
         tolerance_dpa: float,
-        tolerance_apa: float,
         expected: bool,
     ) -> None:
         interaction = ImplicitHBAcceptor(
             tolerance_dev_daa=tolerance_daa,
-            tolerance_dev_aaa=tolerance_aaa,
             tolerance_dev_dpa=tolerance_dpa,
-            tolerance_dev_apa=tolerance_apa,
         )
         assert (
             next(interaction(ihb_acceptor_tyr167b[0], ihb_ligand[0]), False) == expected

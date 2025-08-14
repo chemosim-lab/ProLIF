@@ -580,16 +580,8 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         Distance threshold between the acceptor and donor atoms.
     include_water : bool
         Whether to include water residues in the detection of interactions.
-    tolerance_dev_aaa : float
-        Tolerance for the deviation from the ideal acceptor atom's angle (degrees).
-        If the deviation is larger than this value, the interaction will not be
-        considered valid (geometry checks).
     tolerance_dev_daa : float
         Tolerance for the deviation from the ideal donor atom's angle (degrees).
-        If the deviation is larger than this value, the interaction will not be
-        considered valid (geometry checks).
-    tolerance_dev_apa : float
-        Tolerance for the deviation from the ideal acceptor plane angle (degrees).
         If the deviation is larger than this value, the interaction will not be
         considered valid (geometry checks).
     tolerance_dev_dpa : float
@@ -628,9 +620,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         ),
         distance: float = 3.5,
         include_water: bool = False,
-        tolerance_dev_aaa: float = 90,
         tolerance_dev_daa: float = 25,
-        tolerance_dev_apa: float = 90,
         tolerance_dev_dpa: float = 30,
         vina_potential_max: float = -0.425,
         vina_potential_min: float = 0.565,
@@ -641,9 +631,9 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         self.include_water = include_water
         self.acceptor = acceptor
         self.donor = donor
-        self.tolerance_dev_aaa = tolerance_dev_aaa
+        self.tolerance_dev_aaa = 90  # tolerance deviation for acceptor atom angle
         self.tolerance_dev_daa = tolerance_dev_daa
-        self.tolerance_dev_apa = tolerance_dev_apa
+        self.tolerance_dev_apa = 90  # tolerance deviation for acceptor plane angle
         self.tolerance_dev_dpa = tolerance_dev_dpa
 
         # Specify where the piecewise linear terms become one (good interaction)
