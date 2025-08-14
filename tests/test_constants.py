@@ -1,6 +1,6 @@
 import pandas as pd
 
-from prolif.constants import (
+from prolif.io.constants import (
     AMBER_POOL,
     ATOMNAME_ALIASES,
     CHARMM_POOL,

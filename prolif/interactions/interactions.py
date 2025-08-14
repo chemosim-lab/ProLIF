@@ -19,7 +19,6 @@ from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
 from rdkit.Chem.rdchem import HybridizationType
 
-from prolif.constants import RESNAME_ALIASES
 from prolif.interactions.base import (
     BasePiStacking,
     Distance,
@@ -28,6 +27,7 @@ from prolif.interactions.base import (
     SingleAngle,
 )
 from prolif.interactions.constants import IDEAL_ATOM_ANGLES, VDW_PRESETS
+from prolif.io.constants import RESNAME_ALIASES
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 if TYPE_CHECKING:
@@ -596,19 +596,14 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         Tolerance for the deviation from the ideal donor plane angle (degrees).
         If the deviation is larger than this value, the interaction will not be
         considered valid (geometry checks).
-    vdwradii : dict[str, float] | None
-        Custom van der Waals radii for elements, if not provided, the default preset
-        will be used (to calculate `vina_hbond_potential`).
-    vdwradii_preset : Literal["mdanalysis", "rdkit", "csd"]
-        Preset for van der Waals radii (to calculate `vina_hbond_potential`). Defaults
-        to "csd". The presets are defined in
-        :mod:`prolif.interactions.constants.VDW_PRESETS`.
-    vina_hbond_potential_g : float
-        H-bond potential to indicate the good distance of forming a hydrogen bond
-        (derived from AutoDock Vina's H-bond terms).
-    vina_hbond_potential_b : float
-        H-bond potential to indicate the bad distance of forming a hydrogen bond
-        (derived from AutoDock Vina's H-bond terms).
+    vina_potential_max : float
+        Distance (calculated as the donor-acceptor distance minus the sum of
+        van der Waals radii) beyond which the piecewise linear potential term reaches
+        its maximum value (1.0).
+    vina_potential_min : float
+        Distance (calculated as the donor-acceptor distance minus the sum of
+        van der Waals radii) beyond which the piecewise linear potential term reaches
+        its minimum value (0.0).
     ignore_geometry_checks : bool
         If True, the geometry checks for the interaction will be skipped. This is useful
         for cases where the geometry is not relevant or when the user wants to skip the
@@ -637,14 +632,12 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         tolerance_dev_daa: float = 25,
         tolerance_dev_apa: float = 90,
         tolerance_dev_dpa: float = 30,
-        vdwradii: dict[str, float] | None = None,
-        vdwradii_preset: Literal["mdanalysis", "rdkit", "csd"] = "csd",
-        vina_hbond_potential_g: float = -0.425,
-        vina_hbond_potential_b: float = 0.565,
+        vina_potential_max: float = -0.425,
+        vina_potential_min: float = 0.565,
         ignore_geometry_checks: bool = False,
     ) -> None:
         super().__init__(lig_pattern=acceptor, prot_pattern=donor, distance=distance)
-        VdWContact.__init__(self, vdwradii=vdwradii, preset=vdwradii_preset)
+        VdWContact.__init__(self, preset="csd")
         self.include_water = include_water
         self.acceptor = acceptor
         self.donor = donor
@@ -654,9 +647,9 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         self.tolerance_dev_dpa = tolerance_dev_dpa
 
         # Specify where the piecewise linear terms become one (good interaction)
-        self.vhp_g = vina_hbond_potential_g
+        self.vina_p_max = vina_potential_max
         # Specify where the piecewise linear terms become zero (bad interaction)
-        self.vhp_b = vina_hbond_potential_b
+        self.vina_p_min = vina_potential_min
         self.ignore_geometry_checks = ignore_geometry_checks
 
     def detect(
@@ -892,14 +885,14 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         vdw_sum = self._get_radii_sum(lig_atom.GetSymbol(), prot_atom.GetSymbol())
         d_diff = interaction_data["distance"] - vdw_sum
 
-        if d_diff <= self.vhp_g:
+        if d_diff <= self.vina_p_max:
             interaction_data["vina_hbond_potential"] = 1.0
-        elif d_diff >= self.vhp_b:
+        elif d_diff >= self.vina_p_min:
             interaction_data["vina_hbond_potential"] = 0.0
         else:
             # Piecewise linear function for the hydrogen bond potential
-            interaction_data["vina_hbond_potential"] = (d_diff - self.vhp_b) / (
-                self.vhp_g - self.vhp_b
+            interaction_data["vina_hbond_potential"] = (d_diff - self.vina_p_min) / (
+                self.vina_p_max - self.vina_p_min
             )
         return interaction_data
 

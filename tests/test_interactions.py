@@ -627,8 +627,8 @@ class TestInteractions:
         expected: tuple[float, float],
     ) -> None:
         interaction = ImplicitHBAcceptor(
-            vina_hbond_potential_b=bad_value,
-            vina_hbond_potential_g=good_value,
+            vina_potential_min=bad_value,
+            vina_potential_max=good_value,
         )
         metadata = next(interaction.detect(ihb_acceptor_tyr167b[0], ihb_ligand[0]))
         metadata = interaction.add_vina_hbond_potential(

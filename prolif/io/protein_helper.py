@@ -13,7 +13,7 @@ from pathlib import Path
 
 from rdkit import Chem
 
-from prolif.constants import (
+from prolif.io.constants import (
     AMBER_POOL,
     ATOMNAME_ALIASES,
     CHARMM_POOL,
@@ -128,7 +128,7 @@ class ProteinHelper:
             )
 
         .. important::
-        If your input for `standardize_protein` is a `prolif.Molecule`, it will modify
+        If your input for `standardize_protein` is a :class:`prolif.Molecule`, it will modify
         your original molecule in place. Your residue names will be updated to the
         standardized names and residue's bond orders will be fixed to the corresponding
         protonated states.
