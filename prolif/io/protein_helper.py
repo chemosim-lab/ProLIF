@@ -127,7 +127,7 @@ class ProteinHelper:
                "path/to/protein.pdb"
             )
 
-        ```{important}
+        .. important::
         If your input for `standardize_protein` is a `prolif.Molecule`, it will modify
         your original molecule in place. Your residue names will be updated to the
         standardized names and residue's bond orders will be fixed to the corresponding
