@@ -1,3 +1,4 @@
+from collections import defaultdict, deque
 from typing import TYPE_CHECKING, Any, Literal
 
 import networkx as nx
@@ -6,6 +7,7 @@ from rdkit import Chem
 
 from prolif.exceptions import RunRequiredError
 from prolif.plotting.utils import metadata_iterator
+from prolif.residue import ResidueId
 
 if TYPE_CHECKING:
     from prolif.fingerprint import Fingerprint
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
 _BRIDGED_INTERACTIONS: dict[str, str] = {"WaterBridge": "water_residues"}
 
 # Global variable to store maximum order from water bridge interactions
-_MAX_ORDER: int = 1
+_MAX_BRIDGE_ORDER: int = 1
 
 
 def fp_to_networkx(
@@ -64,12 +66,12 @@ def fp_to_networkx(
 
 def _get_records(ifp: "IFP", all_metadata: bool) -> list[dict[str, Any]]:
     """Extract interaction records from fingerprint data."""
-    global _MAX_ORDER
+    global _MAX_BRIDGE_ORDER
     records: list[dict[str, Any]] = []
     max_order = 0
     for (lig_resid, prot_resid), int_data in ifp.items():
         # get max order from water bridge interactions
-        if int_data["WaterBridge"]:
+        if int_data.get("WaterBridge"):
             curr_order = int_data["WaterBridge"][0]["order"]
             max_order = max(max_order, curr_order)
 
@@ -91,7 +93,7 @@ def _get_records(ifp: "IFP", all_metadata: bool) -> list[dict[str, Any]]:
                     )
 
     # Update global max_order
-    _MAX_ORDER = max_order
+    _MAX_BRIDGE_ORDER = max_order
     return records
 
 
@@ -106,43 +108,35 @@ def _process_bridged_interaction(
         _, src, dest = distlabel.split("_")
 
         if src == "ligand":
-            components: str = "ligand_water"
-            source_id: str = str(lig_resid)
-            atoms: tuple = metadata["parent_indices"]["ligand"]
             records.append(
                 {
-                    "ligand": source_id,
-                    "water": dest,
+                    "from": str(lig_resid),  # ligand
+                    "to": dest,  # water
                     "interaction": int_name,
-                    "components": components,
-                    "atoms": atoms,
+                    "components": "ligand_water",
+                    "atoms": metadata["parent_indices"]["ligand"],
                     "distance": metadata[distlabel],
                 }
             )
         elif dest == "protein":
-            components = "water_protein"
-            dest_id: str = str(prot_resid)
-            atoms = ()
             records.append(
                 {
-                    "water": src,
-                    "protein": dest_id,
+                    "from": src,  # water
+                    "to": str(prot_resid),  # protein
                     "interaction": int_name,
-                    "components": components,
-                    "atoms": atoms,
+                    "components": "water_protein",
+                    "atoms": (),
                     "distance": metadata[distlabel],
                 }
             )
         else:
-            components = "water_water"
-            atoms = ()
             records.append(
                 {
-                    "water1": src,
-                    "water2": dest,
+                    "from": src,  # water
+                    "to": dest,  # water
                     "interaction": int_name,
-                    "components": components,
-                    "atoms": atoms,
+                    "components": "water_water",
+                    "atoms": (),
                     "distance": metadata[distlabel],
                 }
             )
@@ -155,8 +149,8 @@ def _process_standard_interaction(
 ) -> dict[str, Any]:
     """Process standard ligand-protein interactions."""
     return {
-        "ligand": str(lig_resid),
-        "protein": str(prot_resid),
+        "from": str(lig_resid),
+        "to": str(prot_resid),
         "interaction": int_name,
         "components": "ligand_protein",
         "atoms": metadata["parent_indices"]["ligand"],
@@ -184,29 +178,35 @@ def _make_frame_graph_from_fp(
         return graph
 
     # Add ligand structure
-    ligand_id: str = records[0]["ligand"]
-    _add_ligand_nodes_and_bonds(graph, ligand_mol, ligand_id, molsize)
+    _add_ligand_nodes_and_bonds(graph, ligand_mol, molsize)
 
     # Add interactions
     for record in records:
         components: str = record["components"]
         lig_indices: tuple = record["atoms"]
 
-        if components == "ligand_protein":
+        if components in ["ligand_protein", "ligand_water"]:
+            target_config = {
+                "ligand_protein": {"node_type": "protein", "node_id_attr": "residue"},
+                "ligand_water": {"node_type": "water", "node_id_attr": "water_id"},
+            }[components]
+
             # Standard ligand-protein interaction
-            protein_node = record["protein"]
+            node = record["to"]
 
             # Add protein node if it doesn't exist
-            if not graph.has_node(protein_node) and protein_node:
+            if not graph.has_node(node) and node:
                 graph.add_node(
-                    protein_node, node_type="protein", residue=record["protein"]
+                    node,
+                    node_type=target_config["node_type"],
+                    **{target_config["node_id_attr"]: node},
                 )
 
             # Add edges for each ligand atom involved in the interaction
             for idx in lig_indices:
                 graph.add_edge(
                     idx,
-                    protein_node,
+                    node,
                     edge_type="interaction",
                     interaction=record["interaction"],
                     weight=record.get("weight", 1),
@@ -215,69 +215,39 @@ def _make_frame_graph_from_fp(
                     weight_spring_layout=10 / record["distance"],
                 )
 
-        elif components == "ligand_water":
-            # Ligand-water interaction
-            water_node: str = record["water"]
+        elif components in ["water_protein", "water_water"]:
+            target_config = {
+                "water_protein": {
+                    "node2_type": "protein",
+                    "node2_id_attr": "residue",
+                },
+                "water_water": {
+                    "node2_type": "water",
+                    "node2_id_attr": "water_id",
+                },
+            }[components]
+
+            # Get nodes from record using config
+            node1 = record["from"]
+            node2 = record["to"]
 
             # Add water node if it doesn't exist
-            if not graph.has_node(water_node) and water_node:
-                graph.add_node(water_node, node_type="water", water_id=water_node)
+            if not graph.has_node(node1) and node1:
+                graph.add_node(node1, node_type="water", water_id=node1)
 
-            # Add edges for each ligand atom involved in the interaction
-            for idx in lig_indices:
-                graph.add_edge(
-                    idx,
-                    water_node,
-                    edge_type="interaction",
-                    interaction=record["interaction"],
-                    weight=1,
-                    distance=record["distance"],
-                    components=record["components"],
-                    weight_spring_layout=10 / record["distance"],
+            # Add second node if it doesn't exist
+            if not graph.has_node(node2) and node2:
+                graph.add_node(
+                    node2,
+                    node_type=target_config["node2_type"],
+                    **{target_config["node2_id_attr"]: node2},
                 )
 
-        elif components == "water_protein":
-            # Water-protein interaction
-            water_node = record["water"]
-            protein_node = record["protein"]
-
-            # Add water node if it doesn't exist
-            if not graph.has_node(water_node) and water_node:
-                graph.add_node(water_node, node_type="water", water_id=water_node)
-
-            # Add protein node if it doesn't exist
-            if not graph.has_node(protein_node) and protein_node:
-                graph.add_node(protein_node, node_type="protein", residue=protein_node)
-
-            # Add edge between water and protein
-            graph.add_edge(
-                water_node,
-                protein_node,
-                edge_type="interaction",
-                interaction=record["interaction"],
-                weight=1,
-                distance=record["distance"],
-                components=record["components"],
-                weight_spring_layout=10 / record["distance"],
-            )
-
-        elif components == "water_water":
-            # Water-water interaction
-            water1_node = record["water1"]
-            water2_node = record["water2"]
-
-            # Add water nodes if they don't exist
-            if not graph.has_node(water1_node) and water1_node:
-                graph.add_node(water1_node, node_type="water", water_id=water1_node)
-
-            if not graph.has_node(water2_node) and water2_node:
-                graph.add_node(water2_node, node_type="water", water_id=water2_node)
-
-            # Add edge between water molecules
-            if water1_node and water2_node:
+            # Add edge
+            if node1 and node2:
                 graph.add_edge(
-                    water1_node,
-                    water2_node,
+                    node1,
+                    node2,
                     edge_type="interaction",
                     interaction=record["interaction"],
                     weight=1,
@@ -293,7 +263,7 @@ def _make_frame_graph_from_fp(
 
 
 def _add_ligand_nodes_and_bonds(
-    graph: nx.Graph, ligand_mol: Chem.Mol, ligand_id: str, molsize: int
+    graph: nx.Graph, ligand_mol: Chem.Mol, molsize: int
 ) -> None:
     """Add ligand atoms and bonds to the graph."""
     # Get ligand coordinates from the conformer
@@ -303,6 +273,7 @@ def _add_ligand_nodes_and_bonds(
     for atom in ligand_mol.GetAtoms():
         idx = atom.GetIdx()
         pos = conformer.GetAtomPosition(idx) * molsize
+        ligand_id = str(ResidueId.from_atom(atom))
         graph.add_node(
             idx,
             node_type="ligand",
@@ -346,8 +317,7 @@ def _make_agg_graph_from_fp(
         return graph
 
     # Add ligand structure
-    ligand_id: str = all_records[0]["ligand"]
-    _add_ligand_nodes_and_bonds(graph, ligand_mol, ligand_id, molsize)
+    _add_ligand_nodes_and_bonds(graph, ligand_mol, molsize)
 
     # Aggregate and filter data
     grouped_data: dict = _aggregate_interaction_data(all_records)
@@ -355,160 +325,89 @@ def _make_agg_graph_from_fp(
 
     # Convert filtered data to records format for edge creation
     filtered_records: list[dict[str, Any]] = []
-    for interaction_key, data_item in filtered_data.items():
-        components: str = data_item["components"]
+    for key, data_item in filtered_data.items():
+        filtered_records.append(
+            {
+                "from": key[0],
+                "to": key[1],
+                "interaction": key[2],
+                "atoms": key[3],
+                "weight": data_item["weight"],
+                "distance": data_item["distance"],
+                "components": key[4],
+            }
+        )
 
-        if components == "ligand_protein":
-            ligand, protein, interaction = interaction_key
-            filtered_records.append(
-                {
-                    "ligand": ligand,
-                    "protein": protein,
-                    "interaction": interaction,
-                    "atoms": data_item["atoms"],
-                    "weight": data_item["weight"],
-                    "distance": data_item["distance"],
-                    "components": data_item["components"],
-                }
-            )
-        elif components == "ligand_water":
-            # Reconstruct ligand-water record
-            filtered_records.append(
-                {
-                    "ligand": interaction_key[0],
-                    "water": interaction_key[1],
-                    "interaction": interaction_key[2],
-                    "atoms": data_item["atoms"],
-                    "weight": data_item["weight"],
-                    "distance": data_item["distance"],
-                    "components": data_item["components"],
-                }
-            )
-        elif components == "water_protein":
-            # Reconstruct water-protein record
-            filtered_records.append(
-                {
-                    "water": interaction_key[0],
-                    "protein": interaction_key[1],
-                    "interaction": interaction_key[2],
-                    "atoms": data_item["atoms"],
-                    "weight": data_item["weight"],
-                    "distance": data_item["distance"],
-                    "components": data_item["components"],
-                }
-            )
-        elif components == "water_water":
-            # Reconstruct water-water record
-            filtered_records.append(
-                {
-                    "water1": interaction_key[0],
-                    "water2": interaction_key[1],
-                    "interaction": interaction_key[2],
-                    "atoms": data_item["atoms"],
-                    "weight": data_item["weight"],
-                    "distance": data_item["distance"],
-                    "components": data_item["components"],
-                }
-            )
     # Add interactions
     for record in filtered_records:
         components = record["components"]
 
-        if components == "ligand_protein":
-            # Standard ligand-protein interaction
-            protein_node = record["protein"]
+        if components in ["ligand_protein", "ligand_water"]:
+            target_config = {
+                "ligand_protein": {"node_type": "protein", "node_id_attr": "residue"},
+                "ligand_water": {"node_type": "water", "node_id_attr": "water_id"},
+            }[components]
+            node = record["to"]
             lig_indices = record["atoms"]
 
-            # Add protein node if it doesn't exist
-            if not graph.has_node(protein_node) and protein_node:
+            # Add node if it doesn't exist
+            if not graph.has_node(node) and node:
                 graph.add_node(
-                    protein_node, node_type="protein", residue=record["protein"]
+                    node,
+                    node_type=target_config["node_type"],
+                    **{target_config["node_id_attr"]: node},
                 )
 
             # Add edges for each ligand atom involved in the interaction
             for idx in lig_indices:
                 graph.add_edge(
                     idx,
-                    protein_node,
+                    node,
                     edge_type="interaction",
                     interaction=record["interaction"],
-                    weight=record.get("weight"),
+                    weight=record["weight"],
                     distance=record["distance"],
                     components=record["components"],
                     weight_spring_layout=10 / record["distance"],
                 )
 
-        elif components == "ligand_water":
-            # Ligand-water interaction
-            water_node = record.get("water", "")
-            lig_indices = record["atoms"]
+        elif components in ["water_protein", "water_water"]:
+            target_config = {
+                "water_protein": {
+                    "node2_type": "protein",
+                    "node2_id_attr": "residue",
+                },
+                "water_water": {
+                    "node2_type": "water",
+                    "node2_id_attr": "water_id",
+                },
+            }[components]
+            node1 = record["from"]
+            node2 = record["to"]
 
-            # Add water node if it doesn't exist
-            if not graph.has_node(water_node) and water_node:
-                graph.add_node(water_node, node_type="water", water_id=water_node)
-
-            # Add edges for each ligand atom involved in the interaction
-            for idx in lig_indices:
-                graph.add_edge(
-                    idx,
-                    water_node,
-                    edge_type="interaction",
-                    interaction=record["interaction"],
-                    weight=record.get("weight"),
-                    distance=record["distance"],
-                    components=record["components"],
-                    weight_spring_layout=10 / record["distance"],
-                )
-
-        elif components == "water_protein":
-            # Water-protein interaction
-            water_node = record.get("water", "")
-            protein_node = record["protein"]
-
-            # Add water node if it doesn't exist
-            if not graph.has_node(water_node) and water_node:
-                graph.add_node(water_node, node_type="water", water_id=water_node)
+            # Add node1 if it doesn't exist
+            if not graph.has_node(node1) and node1:
+                graph.add_node(node1, node_type="water", water_id=node1)
 
             # Add protein node if it doesn't exist
-            if not graph.has_node(protein_node) and protein_node:
-                graph.add_node(protein_node, node_type="protein", residue=protein_node)
+            if not graph.has_node(node2) and node2:
+                graph.add_node(
+                    node2,
+                    node_type="protein",
+                    **{target_config["node2_id_attr"]: node2},
+                )
 
             # Add edge between water and protein
             graph.add_edge(
-                water_node,
-                protein_node,
+                node1,
+                node2,
                 edge_type="interaction",
                 interaction=record["interaction"],
-                weight=record.get("weight"),
+                weight=record["weight"],
                 distance=record["distance"],
                 components=record["components"],
                 weight_spring_layout=10 / record["distance"],
             )
-
-        elif components == "water_water":
-            # Water-water interaction
-            water1_node: str | None = record.get("water1")
-            water2_node: str | None = record.get("water2")
-
-            # Add water nodes if they don't exist
-            if not graph.has_node(water1_node) and water1_node:
-                graph.add_node(water1_node, node_type="water", water_id=water1_node)
-
-            if not graph.has_node(water2_node) and water2_node:
-                graph.add_node(water2_node, node_type="water", water_id=water2_node)
-
-            # Add edge between water molecules
-            if water1_node and water2_node:
-                graph.add_edge(
-                    water1_node,
-                    water2_node,
-                    edge_type="interaction",
-                    interaction=record["interaction"],
-                    weight=record.get("weight"),
-                    distance=record["distance"],
-                    components=record["components"],
-                    weight_spring_layout=10 / record["distance"],
-                )
 
     # Calculate coordinates for all nodes
     graph = calculate_coordinates(graph, ligand_mol, molsize)
@@ -521,51 +420,18 @@ def _aggregate_interaction_data(records: list[dict[str, Any]]) -> dict:
     grouped_data: dict = {}
 
     for record in records:
-        components: str = record["components"]
-
-        if components == "ligand_protein":
-            # Standard ligand-protein interaction
-            key: tuple = (
-                record["ligand"],
-                record["protein"],
-                record["interaction"],
-                tuple(record["atoms"]),
-            )
-        elif components == "ligand_water":
-            # Ligand-water interaction
-            key = (
-                record["ligand"],
-                record.get("water", ""),
-                record["interaction"],
-                tuple(record["atoms"]),
-                "ligand_water",
-            )
-        elif components == "water_protein":
-            # Water-protein interaction
-            key = (
-                record.get("water", ""),
-                record["protein"],
-                record["interaction"],
-                tuple(record["atoms"]),
-                "water_protein",
-            )
-        elif components == "water_water":
-            # Water-water interaction
-            key = (
-                record.get("water1", ""),
-                record.get("water2", ""),
-                record["interaction"],
-                tuple(record["atoms"]),
-                "water_water",
-            )
-        else:
-            continue  # skip unknown component types
+        key: tuple = (
+            record["from"],
+            record["to"],
+            record["interaction"],
+            tuple(record["atoms"]),
+            record["components"],
+        )
 
         if key not in grouped_data:
             grouped_data[key] = {
                 "weight": 0,
                 "distances": [],
-                "components": record["components"],
             }
 
         grouped_data[key]["weight"] += 1
@@ -577,79 +443,61 @@ def _aggregate_interaction_data(records: list[dict[str, Any]]) -> dict:
 def _filter_by_threshold(grouped_data: dict, threshold: float) -> dict:
     """Filter interactions by occurrence threshold."""
     # Calculate interaction totals for different component types
-    interaction_totals: dict = {}
+    interaction_totals: defaultdict[tuple[Any, ...], int] = defaultdict(int)
     processed_data: dict = {}
 
     for key, data_item in grouped_data.items():
-        components: str = data_item["components"]
         avg_distance: float = sum(data_item["distances"]) / len(data_item["distances"])
         weight: int = data_item["weight"]
 
-        if components == "ligand_protein":
-            ligand, protein, interaction, atoms = key
-            interaction_key: tuple = (ligand, protein, interaction, "ligand_protein")
+        interaction_totals[key] += weight
 
-            interaction_totals[interaction_key] = (
-                interaction_totals.get(interaction_key, 0) + weight
-            )
-
-            processed_data[key] = {
-                "weight": weight,
-                "distance": avg_distance,
-                "components": data_item["components"],
-                "atoms": atoms,
-            }
-
-        elif components in ["ligand_water", "water_protein", "water_water"]:
-            node1, node2, interaction, atoms, comp_type = key
-
-            interaction_key = (node1, node2, interaction, comp_type)
-
-            interaction_totals[interaction_key] = (
-                interaction_totals.get(interaction_key, 0) + weight
-            )
-
-            processed_data[key] = {
-                "weight": weight,
-                "distance": avg_distance,
-                "components": data_item["components"],
-                "atoms": atoms,
-            }
+        processed_data[key] = {
+            "weight": weight,
+            "distance": avg_distance,
+            "components": key[4],  # extract components from the key
+            "atoms": key[3],  # extract atoms from the key
+        }
 
     # Filter by threshold and keep most occurring atom per interaction
     filtered_data: dict = {}
 
     # First, add direct ligand-protein interactions that meet the threshold
     for key, data_item in processed_data.items():
-        if data_item["components"] == "ligand_protein":
-            ligand, protein, interaction, atoms = key
-            interaction_key = (ligand, protein, interaction)
-            if interaction_totals[interaction_key] >= threshold:
-                if (
-                    interaction_key not in filtered_data
-                    or data_item["weight"] > filtered_data[interaction_key]["weight"]
-                ):
-                    filtered_data[interaction_key] = data_item
+        if (
+            key[4] == "ligand_protein"
+            and (interaction_totals[key] >= threshold)
+            and (
+                key not in filtered_data
+                or data_item["weight"] > filtered_data[key]["weight"]
+            )
+        ):
+            filtered_data[key] = data_item
 
     # Now, process water interactions
     for key, data_item in processed_data.items():
-        node1, node2, interaction, atoms, comp_type = key
-        interaction_key = (node1, node2, interaction, comp_type)
-
-        if interaction_totals[interaction_key] >= threshold:
-            if check_till_protein(node2, interaction_totals, threshold, comp_type):
-                if (
-                    interaction_key not in filtered_data
-                    or data_item["weight"] > filtered_data[interaction_key]["weight"]
-                ):
-                    filtered_data[interaction_key] = data_item
-        else:
-            # If interaction doesn't meet threshold, remove all the subsequent interactions till protein from processed_data to avoid having disconnected content
-            clean_processed_data(key, processed_data)
+        if key[4] != "ligand_protein":
+            if (
+                (interaction_totals[key] >= threshold)
+                and (
+                    _in_path_to_protein_above_threshold(
+                        key[1], interaction_totals, threshold, key[4]
+                    )
+                )
+                and (
+                    key not in filtered_data
+                    or data_item["weight"] > filtered_data[key]["weight"]
+                )
+            ):
+                filtered_data[key] = data_item
+            else:
+                # If interaction doesn't meet threshold,
+                # remove all the subsequent interactions till protein from processed_data to avoid having disconnected content
+                _clean_processed_data(key, processed_data)
     return filtered_data
 
 
-def clean_processed_data(
+def _clean_processed_data(
     key: tuple, processed_data: dict, visited_keys: set | None = None
 ) -> None:
     """
@@ -687,7 +535,7 @@ def clean_processed_data(
     # Find all subsequent interactions depending on the comp_type
     if comp_type == "ligand_water":
         water_node = node2
-        for next_key in list(processed_data.keys()):
+        for next_key in processed_data:
             if (
                 processed_data.get(next_key) is None
                 or processed_data[next_key]["weight"] <= 0
@@ -700,11 +548,11 @@ def clean_processed_data(
             if (next_type == "water_protein" and next_n1 == water_node) or (
                 next_type == "water_water" and (next_n1 == water_node)
             ):
-                clean_processed_data(next_key, processed_data, visited_keys)
+                _clean_processed_data(next_key, processed_data, visited_keys)
 
     elif comp_type == "water_water":
         water1, water2 = node1, node2
-        for next_key in list(processed_data.keys()):
+        for next_key in processed_data:
             if (
                 processed_data.get(next_key) is None
                 or processed_data[next_key]["weight"] <= 0
@@ -715,10 +563,10 @@ def clean_processed_data(
 
             # Check if either water node is involved in subsequent interactions
             if next_n1 in [water1, water2]:
-                clean_processed_data(next_key, processed_data, visited_keys)
+                _clean_processed_data(next_key, processed_data, visited_keys)
 
 
-def check_till_protein(
+def _in_path_to_protein_above_threshold(
     node: str, interaction_totals: dict, threshold: float, comp_type: str
 ) -> bool:
     """
@@ -733,10 +581,10 @@ def check_till_protein(
 
     # breadth-first search to find path to protein
     visited = set()
-    queue = [(node, comp_type)]
+    queue = deque([(node, comp_type)])
 
     while queue:
-        current_node, current_type = queue.pop(0)
+        current_node, current_type = queue.popleft()
 
         if current_node in visited:
             continue
@@ -790,15 +638,18 @@ def calculate_coordinates(
     conformer = ligand_mol.GetConformer()
 
     # Separate nodes by type
-    ligand_nodes = [
-        n for n, d in graph.nodes(data=True) if d.get("node_type") == "ligand"
-    ]
-    water_nodes = [
-        n for n, d in graph.nodes(data=True) if d.get("node_type") == "water"
-    ]
-    protein_nodes = [
-        n for n, d in graph.nodes(data=True) if d.get("node_type") == "protein"
-    ]
+    ligand_nodes = []
+    water_nodes = []
+    protein_nodes = []
+    for n, d in graph.nodes(data=True):
+        if d.get("node_type") == "ligand":
+            ligand_nodes.append(n)
+        elif d.get("node_type") == "water":
+            water_nodes.append(n)
+        elif d.get("node_type") == "protein":
+            protein_nodes.append(n)
+        else:
+            continue
 
     # Calculate ligand center and dimensions
     ligand_coords = np.array(
@@ -895,8 +746,8 @@ def _calculate_initial_positions(
 
     # Use global max_order from _get_records
     # This avoids the need to calculate max_order again from the graph structure
-    global _MAX_ORDER
-    max_order = _MAX_ORDER
+    global _MAX_BRIDGE_ORDER
+    max_order = _MAX_BRIDGE_ORDER
 
     # Create layers for positioning
     layers = _create_layers(graph, ligand_nodes, water_nodes, protein_nodes, max_order)
@@ -970,11 +821,14 @@ def _create_layers(
             remaining_nodes
         ):  # Convert to list to avoid modification during iteration
             # Check if this node is connected to any node in previous layers
-            connected_to_previous = False
-            for neighbor in graph.neighbors(node):
-                if neighbor in visited_nodes:
-                    connected_to_previous = True
-                    break
+            connected_to_previous = next(
+                (
+                    True
+                    for neighbor in graph.neighbors(node)
+                    if neighbor in visited_nodes
+                ),
+                False,
+            )
 
             if connected_to_previous:
                 current_layer.append(node)
@@ -990,7 +844,7 @@ def _create_layers(
 
     # Add any remaining unconnected nodes to the last layer
     if remaining_nodes:
-        last_layer = max(layers.keys()) + 1 if layers else 1
+        last_layer = max(layers) + 1 if layers else 1
         layers[last_layer] = list(remaining_nodes)
 
     return layers
