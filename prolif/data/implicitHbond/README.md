@@ -1,4 +1,4 @@
-The example `1s2g__1__1.A_2.C__1.D` is originally from PLINDER tutorial dataset.
+The example is originally from PLINDER tutorial dataset `1s2g__1__1.A_2.C__1.D`.
 
 Raw file from PLINDER:
 * `ligand_files/1.D.sdf`

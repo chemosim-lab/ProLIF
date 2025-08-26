@@ -1,4 +1,6 @@
 """
+I/O-related helper functions --- :mod:`prolif.io.cif`
+=====================================================
 This module provides a lightweight parser for Crystallographic Information File (CIF)
 format.
 
@@ -15,6 +17,8 @@ import pandas as pd
 def _block_decompose(data_block: list) -> tuple:
     """
     Decomposes a CIF data block into decriptive information and tables.
+
+    .. versionadded:: 2.1.0
     """
     descriptions: list[str] = []
     data_tables: list[list] = []
@@ -45,6 +49,8 @@ def _block_decompose(data_block: list) -> tuple:
 def cif_parser_lite(cif_string: str) -> dict:
     """
     Parses a CIF string and returns a dictionary of data blocks.
+
+    .. versionadded:: 2.1.0
 
     Parameters
     ----------
@@ -105,6 +111,8 @@ def cif_template_reader(cif_filepath: Path | str) -> dict:
     """
     Reads a CIF file and returns a dictionary of data blocks.
 
+    .. versionadded:: 2.1.0
+
     Parameters
     ----------
     cif_filepath : str
@@ -114,6 +122,7 @@ def cif_template_reader(cif_filepath: Path | str) -> dict:
     -------
     dict
         A dictionary containing the parsed data blocks.
+
     """
     cif_string = Path(cif_filepath).read_text()
 

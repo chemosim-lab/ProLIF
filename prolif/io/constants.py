@@ -194,6 +194,8 @@ STANDARD_RESNAME_MAP = {
     "VAL": "VAL",  # Common name
     "NVAL": "VAL",  # AMBER
     "CVAL": "VAL",  # AMBER
+    # HOH
+    **{str(k): str(v) for k, v in RESNAME_ALIASES.items() if v == "HOH"},
 }
 
 # FORMAL_CHARGE_ALIASES: dict mapping residue names to a dict of atom names

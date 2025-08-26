@@ -12,11 +12,12 @@ Note that some of the SMARTS patterns used in the interaction classes are inspir
 
 from collections.abc import Iterator
 from itertools import product
-from math import degrees, radians
+from math import degrees, pi, radians
 from typing import TYPE_CHECKING, Literal
 
 from rdkit import Geometry
 from rdkit.Chem import MolFromSmarts
+from rdkit.Chem.rdchem import HybridizationType
 
 from prolif.interactions.base import (
     BasePiStacking,
@@ -25,7 +26,8 @@ from prolif.interactions.base import (
     Interaction,
     SingleAngle,
 )
-from prolif.interactions.constants import VDW_PRESETS, VDWRADII  # noqa
+from prolif.interactions.constants import IDEAL_ATOM_ANGLES, VDW_PRESETS
+from prolif.io.constants import RESNAME_ALIASES
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
 if TYPE_CHECKING:
@@ -41,6 +43,8 @@ __all__ = [
     "HBAcceptor",
     "HBDonor",
     "Hydrophobic",
+    "ImplicitHBAcceptor",
+    "ImplicitHBDonor",
     "MetalAcceptor",
     "MetalDonor",
     "PiCation",
@@ -559,3 +563,465 @@ class VdWContact(Interaction):
                     (ra.GetIdx(),),
                     distance=dist,
                 )
+
+
+class ImplicitHBAcceptor(Distance, VdWContact):
+    """Implicit Hbond interaction between a ligand (acceptor) and a residue (donor).
+
+    .. versionadded:: 2.1.0
+
+    Parameters
+    ----------
+    acceptor : str
+        SMARTS for ``[Acceptor]``.
+    donor : str
+        SMARTS for ``[Donor]-[Implicit Hydrogen]``.
+    distance : float
+        Distance threshold between the acceptor and donor atoms.
+    include_water : bool
+        Whether to include water residues in the detection of interactions.
+    tolerance_dev_daa : float
+        Tolerance for the deviation from the ideal donor atom's angle (degrees).
+        If the deviation is larger than this value, the interaction will not be
+        considered valid (geometry checks).
+    tolerance_dev_dpa : float
+        Tolerance for the deviation from the ideal donor plane angle (degrees).
+        If the deviation is larger than this value, the interaction will not be
+        considered valid (geometry checks).
+    vina_potential_max : float
+        Distance (calculated as the donor-acceptor distance minus the sum of
+        van der Waals radii) beyond which the piecewise linear potential term reaches
+        its maximum value (1.0).
+    vina_potential_min : float
+        Distance (calculated as the donor-acceptor distance minus the sum of
+        van der Waals radii) beyond which the piecewise linear potential term reaches
+        its minimum value (0.0).
+    ignore_geometry_checks : bool
+        If True, the geometry checks for the interaction will be skipped. This is useful
+        for cases where the geometry is not relevant or when the user wants to skip the
+        geometry checks for performance reasons. Defaults to False.
+
+    """
+
+    def __init__(
+        self,
+        acceptor: str = (
+            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
+            ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
+            ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
+            ",$([o+0])"
+            ",$([F&$(F-[#6])&!$(F-[#6][F,Cl,Br,I])])]"
+        ),
+        donor: str = (
+            # implicit or explicit hydrogen bond donors
+            "[$([O,S,#7;+0&h,+0&H,+0&H2,+0H3])"
+            ",$([N;v4&+1&h,v4&+1&H,v4&+1&H2,v4&+1&H3,v4&+1&H4])"
+            ",$([n+]c[nh]),$([n+]c[nH])]"
+        ),
+        distance: float = 3.5,
+        include_water: bool = False,
+        tolerance_dev_daa: float = 25,
+        tolerance_dev_dpa: float = 30,
+        vina_potential_max: float = -0.425,
+        vina_potential_min: float = 0.565,
+        ignore_geometry_checks: bool = False,
+    ) -> None:
+        super().__init__(lig_pattern=acceptor, prot_pattern=donor, distance=distance)
+        VdWContact.__init__(self, preset="csd")
+        self.include_water = include_water
+        self.acceptor = acceptor
+        self.donor = donor
+        self.tolerance_dev_aaa = 90  # tolerance deviation for acceptor atom angle
+        self.tolerance_dev_daa = tolerance_dev_daa
+        self.tolerance_dev_apa = 90  # tolerance deviation for acceptor plane angle
+        self.tolerance_dev_dpa = tolerance_dev_dpa
+
+        # Specify where the piecewise linear terms become one (good interaction)
+        self.vina_p_max = vina_potential_max
+        # Specify where the piecewise linear terms become zero (bad interaction)
+        self.vina_p_min = vina_potential_min
+        self.ignore_geometry_checks = ignore_geometry_checks
+
+    def detect(
+        self, lig_res: "Residue", prot_res: "Residue"
+    ) -> Iterator["InteractionMetadata"]:
+        """Detect implicit hydrogen bond acceptor interactions.
+
+        Parameters
+        ----------
+        lig_res : Residue
+            Ligand residue.
+        prot_res : Residue
+            Protein residue.
+
+        Yields
+        ------
+        InteractionMetadata
+            Metadata for the detected interaction.
+
+        """
+        # Check if the interaction including water residues
+        water_in_prot_res = self.check_water_residue(prot_res)
+        water_in_lig_res = self.check_water_residue(lig_res)
+
+        for interaction_data in super().detect(lig_res, prot_res):
+            if (
+                # If the interaction involves water residues
+                (water_in_prot_res or water_in_lig_res)
+                # Check if the user wants to include water residues
+                and self.include_water
+                and (
+                    (
+                        # If both residues are water, skip the geometry checks
+                        water_in_prot_res and water_in_lig_res
+                    )
+                    or (
+                        # If water is only in protein residue,
+                        # either ignore geometry checks or check geometry on ligand
+                        water_in_prot_res
+                        and (
+                            self.ignore_geometry_checks
+                            or self.check_geometry(
+                                interaction_data,
+                                lig_res=lig_res,
+                                prot_res=prot_res,
+                                on="ligand",
+                            )
+                        )
+                    )
+                    or (
+                        # If water is only in ligand residue,
+                        # either ignore geometry checks or check geometry on protein
+                        water_in_lig_res
+                        and (
+                            self.ignore_geometry_checks
+                            or self.check_geometry(
+                                interaction_data,
+                                lig_res=lig_res,
+                                prot_res=prot_res,
+                                on="protein",
+                            )
+                        )
+                    )
+                )
+            ) or (
+                # If the interaction not involves water residues:
+                (not water_in_prot_res and not water_in_lig_res)
+                and (
+                    # either skip geometry checks (first condition)
+                    # or pass the geometry checks (second condition)
+                    self.ignore_geometry_checks
+                    or self.check_geometry(
+                        interaction_data,
+                        lig_res=lig_res,
+                        prot_res=prot_res,
+                        on="both",
+                    )
+                )
+            ):
+                yield self.add_vina_hbond_potential(
+                    interaction_data, lig_res=lig_res, prot_res=prot_res
+                )
+
+    def check_geometry(
+        self,
+        interaction_data: "InteractionMetadata",
+        lig_res: "Residue",
+        prot_res: "Residue",
+        on: Literal["ligand", "protein", "both"] = "both",
+    ) -> bool:
+        """Check the geometry of the interaction.
+
+        Parameters
+        ----------
+        interaction_data : InteractionMetadata
+            Metadata for the detected interaction.
+        lig_res : Residue
+            Ligand residue.
+        prot_res : Residue
+            Protein residue.
+        on : Literal["ligand", "protein", "both"]
+            Specifies which residue to check the geometry on. Defaults to "both".
+
+        Returns
+        -------
+        bool
+            True if the geometry is valid, False otherwise.
+
+        """
+
+        # Get the atoms involved in the interaction
+        lig_atom_idx = interaction_data["indices"]["ligand"][0]
+        lig_atom = lig_res.GetAtomWithIdx(lig_atom_idx)
+        prot_atom_idx = interaction_data["indices"]["protein"][0]
+        prot_atom = prot_res.GetAtomWithIdx(prot_atom_idx)
+
+        # Initialize the interaction data
+        ideal_acceptor_atom_angle = None
+        acceptor_atom_angles = None
+        deviation_aaa = None
+        acceptor_plane_angle = None
+        ideal_donor_atom_angle = None
+        donor_atom_angles = None
+        deviation_daa = None
+        donor_plane_angle = None
+
+        # Check acceptor (ligand-centered)
+        if on in {"both", "ligand"}:
+            # Check acceptor atom's angle
+            ideal_acceptor_atom_angle = IDEAL_ATOM_ANGLES[lig_atom.GetHybridization()]
+            acceptor_atom_angles = self._get_atom_angles(
+                res=lig_res,
+                res_atom_idx=lig_atom_idx,
+                remote_res=prot_res,
+                remote_res_atom_idx=prot_atom_idx,
+            )
+            deviation_aaa = min(
+                abs(each_atom_angle - ideal_acceptor_atom_angle)
+                for each_atom_angle in acceptor_atom_angles
+            )
+            if deviation_aaa > self.tolerance_dev_aaa:
+                return False
+
+            # Save geometry features in interaction data
+            interaction_data["ideal_acceptor_angle"] = ideal_acceptor_atom_angle
+            interaction_data["acceptor_atom_angles"] = acceptor_atom_angles
+            interaction_data["acceptor_atom_angle_deviation"] = deviation_aaa
+
+            # Check acceptor plane angle (if applicable, sp2)
+            if lig_atom.GetHybridization() == HybridizationType.SP2:
+                acceptor_plane_angle = self._get_plane_angle(
+                    res=lig_res,
+                    res_atom_idx=lig_atom_idx,
+                    remote_res=prot_res,
+                    remote_res_atom_idx=prot_atom_idx,
+                )
+                # Ideal acceptor's plane angle is 0 degrees
+                if acceptor_plane_angle > self.tolerance_dev_apa:
+                    return False
+
+                # Save geometry features in interaction data
+                interaction_data["acceptor_plane_angle"] = acceptor_plane_angle
+
+        # Check donor atom (protein-centered)
+        if on in {"both", "protein"}:
+            # Check donor atom's angle
+            ideal_donor_atom_angle = IDEAL_ATOM_ANGLES[prot_atom.GetHybridization()]
+            donor_atom_angles = self._get_atom_angles(
+                res=prot_res,
+                res_atom_idx=prot_atom_idx,
+                remote_res=lig_res,
+                remote_res_atom_idx=lig_atom_idx,
+            )
+            deviation_daa = min(
+                abs(each_atom_angle - ideal_donor_atom_angle)
+                for each_atom_angle in donor_atom_angles
+            )
+            if deviation_daa > self.tolerance_dev_daa:
+                return False
+
+            # Save geometry features in interaction data
+            interaction_data["ideal_donor_angle"] = ideal_donor_atom_angle
+            interaction_data["donor_atom_angles"] = donor_atom_angles
+            interaction_data["donor_atom_angle_deviation"] = deviation_daa
+
+            # Check donor plane angle (if applicable, sp2)
+            if prot_atom.GetHybridization() == HybridizationType.SP2:
+                donor_plane_angle = self._get_plane_angle(
+                    res=prot_res,
+                    res_atom_idx=prot_atom_idx,
+                    remote_res=lig_res,
+                    remote_res_atom_idx=lig_atom_idx,
+                )
+                # Ideal donor's plane angle is 0 degrees
+                if donor_plane_angle > self.tolerance_dev_dpa:
+                    return False
+
+                interaction_data["donor_plane_angle"] = donor_plane_angle
+
+        # Return the result of the geometry checks
+        return True
+
+    def add_vina_hbond_potential(
+        self,
+        interaction_data: dict,
+        lig_res: "Residue",
+        prot_res: "Residue",
+    ) -> dict:
+        """Add hydrogen bond potential (derived from `Autodock Vina`_) to the
+        interaction metadata.
+
+        .. _Autodock Vina: https://github.com/ccsb-scripps/AutoDock-Vina/blob/develop/src/lib/potentials.h#L217
+
+
+        Parameters
+        ----------
+        interaction_data : dict
+            Metadata for the detected interaction.
+        lig_res : Residue
+            Ligand residue.
+        prot_res : Residue
+            Protein residue.
+
+        Returns
+        -------
+        Dict
+            Updated metadata with hydrogen bond probability.
+
+        """
+        # Hbond probability is based on the Autodock Vina Hbond interaction term
+        lig_atom = lig_res.GetAtomWithIdx(interaction_data["indices"]["ligand"][0])
+        prot_atom = prot_res.GetAtomWithIdx(interaction_data["indices"]["protein"][0])
+        vdw_sum = self._get_radii_sum(lig_atom.GetSymbol(), prot_atom.GetSymbol())
+        d_diff = interaction_data["distance"] - vdw_sum
+
+        if d_diff <= self.vina_p_max:
+            interaction_data["vina_hbond_potential"] = 1.0
+        elif d_diff >= self.vina_p_min:
+            interaction_data["vina_hbond_potential"] = 0.0
+        else:
+            # Piecewise linear function for the hydrogen bond potential
+            interaction_data["vina_hbond_potential"] = (d_diff - self.vina_p_min) / (
+                self.vina_p_max - self.vina_p_min
+            )
+        return interaction_data
+
+    def check_water_residue(self, res: "Residue") -> bool:
+        """Check if the residue is a water molecule.
+
+        Parameters
+        ----------
+        res : Residue
+            The residue to check.
+
+        Returns
+        -------
+        bool
+            True if the residue is a water molecule, False otherwise.
+        """
+        resname: str = RESNAME_ALIASES.get(res.resid.name, res.resid.name)
+        return resname == "HOH"
+
+    def _get_atom_angles(
+        self,
+        res: "Residue",
+        res_atom_idx: int,
+        remote_res: "Residue",
+        remote_res_atom_idx: int,
+    ) -> list[float]:
+        """Get the angle of the atom in the residue (relative to the far atom).
+        The angle is defined as follows:
+        [nearby heavy atom]-[res_atom] ... [remote_res_atom]
+
+        Parameters
+        ----------
+        res : Residue
+            The residue containing the atom.
+        res_atom_idx : int
+            The index of the atom in the residue.
+        remote_res : Residue
+            The remote residue containing the far atom.
+        remote_res_atom_idx : int
+            The index of the far atom in the remote residue.
+
+        Returns
+        -------
+        float
+            The angle in degrees."""
+
+        res_atom = res.GetAtomWithIdx(res_atom_idx)
+        nearby_heavy_atoms = [
+            atom for atom in res_atom.GetNeighbors() if atom.GetAtomicNum() != 1
+        ]
+        if not nearby_heavy_atoms:
+            raise ValueError(
+                f"No nearby heavy atoms found in residue {res.resid} "
+                f"for atom {res_atom.GetSymbol()!r} at index {res_atom_idx}."
+            )
+
+        angles = []
+        for nearby_heavy_atom in nearby_heavy_atoms:
+            # Get the coordinates of the atoms
+            nearby_coords = Geometry.Point3D(*res.xyz[nearby_heavy_atom.GetIdx()])
+            res_atom_coords = Geometry.Point3D(*res.xyz[res_atom_idx])
+            far_atom_coords = Geometry.Point3D(*remote_res.xyz[remote_res_atom_idx])
+
+            # Calculate the angle
+            res2nearby = res_atom_coords.DirectionVector(nearby_coords)
+            res2far = res_atom_coords.DirectionVector(far_atom_coords)
+            angle = res2nearby.AngleTo(res2far)
+            angles.append(degrees(angle))
+
+        return angles
+
+    def _get_plane_angle(
+        self,
+        res: "Residue",
+        res_atom_idx: int,
+        remote_res: "Residue",
+        remote_res_atom_idx: int,
+    ) -> float:
+        """Get the plane angle of the sp2 atom in the residue
+        (relative to the far atom).
+
+        Parameters
+        ----------
+        res : Residue
+            The residue containing the atom.
+        res_atom_idx : int
+            The index of the atom in the residue.
+        remote_res : Residue
+            The remote residue containing the far atom.
+        remote_res_atom_idx : int
+            The index of the far atom in the remote residue.
+
+        Returns
+        -------
+        float
+            The angle in degrees.
+        """
+        res_atom = res.GetAtomWithIdx(res_atom_idx)
+        nearby_heavy_atoms = [
+            atom for atom in res_atom.GetNeighbors() if atom.GetAtomicNum() != 1
+        ]
+        # If there are less than 2 nearby heavy atoms, we cannot calculate the plane.
+        # We will need to extend the search of nearby atoms.
+        if len(nearby_heavy_atoms) < 2:
+            nearby_nearby_atoms = []
+            for each_atom in nearby_heavy_atoms:
+                nearby_nearby_atoms.extend(
+                    [
+                        nearby_nearby_atom
+                        for nearby_nearby_atom in each_atom.GetNeighbors()
+                        if nearby_nearby_atom.GetAtomicNum() != 1
+                        and nearby_nearby_atom.GetIdx() != res_atom_idx
+                    ]
+                )
+            nearby_heavy_atoms.extend(nearby_nearby_atoms)
+
+        # Get the coordinates of the atoms
+        nearby_atom_1_idx = nearby_heavy_atoms[0].GetIdx()
+        nearby_atom_2_idx = nearby_heavy_atoms[1].GetIdx()
+        res_atom_coords = Geometry.Point3D(*res.xyz[res_atom_idx])
+        nearby_atom_1_coords = Geometry.Point3D(*res.xyz[nearby_atom_1_idx])
+        nearby_atom_2_coords = Geometry.Point3D(*res.xyz[nearby_atom_2_idx])
+        remote_atom_coords = Geometry.Point3D(*remote_res.xyz[remote_res_atom_idx])
+
+        # Calculate the normal vector of the plane
+        atom2nearby_1 = res_atom_coords.DirectionVector(nearby_atom_1_coords)
+        atom2nearby_2 = res_atom_coords.DirectionVector(nearby_atom_2_coords)
+        normal_vector = atom2nearby_1.CrossProduct(atom2nearby_2)
+
+        # Calculate the angle between the normal vector and
+        # the vector to the remote atom
+        atom2remote_atom = res_atom_coords.DirectionVector(remote_atom_coords)
+        angle = normal_vector.AngleTo(atom2remote_atom)
+
+        # Convert it to plane angle in degrees
+        return abs(degrees(angle - pi / 2))
+
+
+ImplicitHBDonor = ImplicitHBAcceptor.invert_role(
+    "ImplicitHBDonor",
+    "Implicit Hbond interaction between a ligand (donor) and a residue (acceptor)",
+)
