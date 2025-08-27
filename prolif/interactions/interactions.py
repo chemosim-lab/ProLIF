@@ -631,9 +631,9 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         self.include_water = include_water
         self.acceptor = acceptor
         self.donor = donor
-        self.tolerance_dev_aaa = 90  # tolerance deviation for acceptor atom angle
+        self.tolerance_dev_aaa = 90.0  # tolerance deviation for acceptor atom angle
         self.tolerance_dev_daa = tolerance_dev_daa
-        self.tolerance_dev_apa = 90  # tolerance deviation for acceptor plane angle
+        self.tolerance_dev_apa = 90.0  # tolerance deviation for acceptor plane angle
         self.tolerance_dev_dpa = tolerance_dev_dpa
 
         # Specify where the piecewise linear terms become one (good interaction)
