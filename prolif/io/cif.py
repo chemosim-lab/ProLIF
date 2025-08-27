@@ -99,7 +99,13 @@ def cif_parser_lite(cif_string: str) -> dict:
                 else:
                     # data line
                     # Use shlex.split to respect quoted strings
-                    data.append(shlex.split(each_line))
+                    row = [
+                        item.strip('"')
+                        if item.startswith('"') and item.endswith('"')
+                        else item
+                        for item in shlex.split(each_line, posix=False)
+                    ]
+                    data.append(row)
 
             table = pd.DataFrame(data, columns=header)
             cif_dict[block_name][table_name] = table
