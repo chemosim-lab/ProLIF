@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Unpin the `numpy` version (PR #306 by @maabuu).
 - `Hydrophobic` SMARTS pattern now excludes all carbon linked to
   nitrogen/oxygen/fluoride from being hydrophobic, previous versions were allowing such
   carbons if they were aromatic.
