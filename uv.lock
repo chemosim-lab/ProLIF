@@ -2093,7 +2093,7 @@ requires-dist = [
     { name = "mdanalysis", marker = "python_full_version >= '3.13'", specifier = ">=2.7.0,<3" },
     { name = "multiprocess" },
     { name = "networkx", specifier = ">=2.5.0" },
-    { name = "numpy", specifier = ">=1.13.3,<2" },
+    { name = "numpy", specifier = ">=1.13.3" },
     { name = "pandas", specifier = ">=1.1.0" },
     { name = "prolif", extras = ["plots"], marker = "extra == 'tutorials'" },
     { name = "py3dmol", marker = "extra == 'plots'" },
