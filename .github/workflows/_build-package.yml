@@ -35,13 +35,15 @@ jobs:
     - name: Setup UV
       uses: astral-sh/setup-uv@v7
 
-    - name: Identify version
+    - name: Adjust version based on tag
       run: |
-        echo "PROLIF_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+          TAG=${GITHUB_REF#refs/*/}
+          sed -i -e "s/0.0.0/${TAG#v}/" pyproject.toml
+        fi
 
     - name: Build package
       run: |
-        sed -i -e "s/0.0.0/${PROLIF_VERSION}/" pyproject.toml
         uv build
     
     - name: List output
