@@ -1,8 +1,11 @@
 name: build
 on:
-  release:
-    types: [released]
-  workflow_dispatch:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-?rc[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-?[ab][0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+.post[0-9]+"
 
 defaults:
   run:
@@ -13,7 +16,6 @@ jobs:
     name: Build package
     uses: ./.github/workflows/_build-package.yml
     with:
-      check-prerelease: ${{ github.event_name == 'workflow_dispatch' }}
       cache-package: true
       upload-package: true
       test-files: true
