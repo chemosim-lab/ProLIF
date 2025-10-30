@@ -71,7 +71,7 @@ type-check = [
     "types-networkx",
 ]
 dev = [
-    "ruff==0.11.2",
+    "ruff==0.11.2",  # keep synced with formatting_linting.yml
     "black[jupyter]",
     "poethepoet>=0.33.0",
     { include-group = "tests" },
