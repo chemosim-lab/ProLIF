@@ -40,6 +40,7 @@ jobs:
         if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
           TAG=${GITHUB_REF#refs/*/}
           sed -i -e "s/0.0.0/${TAG#v}/" pyproject.toml
+          echo "Version detected as ${TAG#v}"
         fi
 
     - name: Build package
@@ -74,7 +75,7 @@ jobs:
         path: |
           dist/prolif-*.whl
           dist/prolif-*.tar.gz
-        key: prolif-${{ runner.os }}-${{ github.sha }}
+        key: prolif-${{ runner.os }}-${{ github.sha }}-${{ github.ref_type }}
 
     - name: Expose package as artifact
       if: inputs.upload-package
@@ -114,7 +115,7 @@ jobs:
         path: |
           dist/prolif-*.whl
           dist/prolif-*.tar.gz
-        key: prolif-${{ runner.os }}-${{ github.sha }}
+        key: prolif-${{ runner.os }}-${{ github.sha }}-${{ github.ref_type }}
     
     - name: Install from tar.gz
       run: |

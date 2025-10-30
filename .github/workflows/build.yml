@@ -24,7 +24,9 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
+    needs: [build]
     steps:
+
     - name: Retrieve cached package
       uses: actions/cache/restore@v3
       id: cache-prolif
@@ -32,7 +34,12 @@ jobs:
         path: |
           dist/prolif-*.whl
           dist/prolif-*.tar.gz
-        key: prolif-${{ runner.os }}-${{ github.sha }}
+        key: prolif-${{ runner.os }}-${{ github.sha }}-${{ github.ref_type }}
+        fail-on-cache-miss: true
+
+    - name: List output
+      run: |
+        ls -lah dist/*
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
