@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ResidueGroup` resnumbers are now declared as uint32 instead of uint16 (PR #315,
+  Issue #313).
 - SMARTS pattern for `Hydrophobic` were not matching as expected due to the presence of
   explicit hydrogens in the molecules. The SMARTS have been rewritten to account for
   this.
