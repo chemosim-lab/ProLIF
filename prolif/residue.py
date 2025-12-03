@@ -218,7 +218,7 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
             self.chain = np.array([], dtype=object)
         else:
             self.name = np.asarray(name, dtype=object)
-            self.number = np.asarray(number, dtype=np.uint16)
+            self.number = np.asarray(number, dtype=np.uint32)
             self.chain = np.asarray(chain, dtype=object)
         super().__init__([(r.resid, r) for r in self._residues])
 

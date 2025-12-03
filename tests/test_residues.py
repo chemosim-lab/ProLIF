@@ -269,3 +269,18 @@ class TestResidueGroup:
         rg = protein_mol.residues
         sel = rg.select((rg.name == "TYR") & (rg.number == 38))[0]
         assert sel.resid is rg["TYR38.A"].resid
+
+    def test_resnumber_max_value(self) -> None:
+        resnums = [0, 65535, 92805, 999999]
+        residues = []
+        for resnum in resnums:
+            mi = Chem.AtomPDBResidueInfo()
+            mi.SetResidueName("ALA")
+            mi.SetResidueNumber(resnum)
+            mi.SetChainId("A")
+            mol = Chem.MolFromSequence("A")
+            for atom in mol.GetAtoms():
+                atom.SetMonomerInfo(mi)
+            residues.append(Residue(mol))
+        rg = ResidueGroup(residues)
+        assert rg.number[-1] == 999999
