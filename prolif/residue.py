@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from prolif.typeshed import ResidueKey
 
 _RE_RESID = re.compile(
-    r"(TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?(\d*)\.?([A-Z\d]{1,2})?"
+    r"(TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?(\d*)\.?([A-Z_\d]{1,2})?"
 )
 
 
