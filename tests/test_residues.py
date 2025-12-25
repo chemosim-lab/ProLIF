@@ -133,6 +133,7 @@ class TestResidueId:
             ("K  123.A", ("K", 123, "A")),
             ("MN123.A", ("MN", 123, "A")),
             ("MN 123.A", ("MN", 123, "A")),
+            ("HOH7._", ("HOH", 7, "_"))
         ],
     )
     def test_from_string(
