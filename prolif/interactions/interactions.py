@@ -218,8 +218,8 @@ class Cationic(Distance):
 
     def __init__(
         self,
-        cation: str = "[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
-        anion: str = "[-{1-},$(O=[C,S,P]-[O-])]",
+        cation: str = "[+{1-}!$(*~[*-]),$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
+        anion: str = "[-{1-}!$(*~[*+]),$(O=[C,S,P]-[O-])]",
         distance: float = 4.5,
     ) -> None:
         super().__init__(lig_pattern=cation, prot_pattern=anion, distance=distance)
@@ -257,7 +257,7 @@ class CationPi(Interaction):
 
     def __init__(
         self,
-        cation: str = "[+{1-},$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
+        cation: str = "[+{1-}!$(*~[*-]),$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
         pi_ring: tuple[str, ...] = (
             "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
             "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
