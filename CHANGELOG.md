@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `split_molecule` to split a molecule into components based on a predicate
+  function.
 - Added `select_over_trajectory` to easily make AtomGroup distance-based selections
   (including recursive selections) over the whole trajectory rather than just the first
   frame. This helps making optimised selections when a protein is highly flexible
