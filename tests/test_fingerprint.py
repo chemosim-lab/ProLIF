@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def dummy_cls(cleanup_dummy: "Iterator[None]") -> type[Interaction]:  # noqa: ARG001
+def dummy_cls(cleanup_dummy: "Iterator[None]") -> type[Interaction]:
     class Dummy(Interaction):
         def detect(
             self, res1: "Molecule", res2: "Molecule"
