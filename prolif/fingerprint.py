@@ -32,7 +32,6 @@ from inspect import signature
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast, overload
 
 import dill
-import multiprocess as mp
 import numpy as np
 from MDAnalysis import AtomGroup
 from MDAnalysis.converters.RDKit import atomgroup_to_mol, set_converter_cache_size
@@ -47,7 +46,7 @@ from prolif.interactions.base import (
     _INTERACTIONS,
 )
 from prolif.molecule import Molecule
-from prolif.parallel import MolIterablePool, TrajectoryPool
+from prolif.parallel import MolIterablePool, TrajectoryPoolQueue
 from prolif.plotting.utils import IS_NOTEBOOK
 from prolif.utils import (
     get_residues_near_ligand,
@@ -652,6 +651,7 @@ class Fingerprint:
                 converter_kwargs=converter_kwargs,
                 progress=progress,
                 use_segid=self.use_segid,
+                n_jobs=n_jobs,
             )
         return self
 
@@ -704,8 +704,13 @@ class Fingerprint:
         n_jobs: int | None,
         **kwargs: Any,
     ) -> "IFPResults":
-        """Parallel implementation of :meth:`~Fingerprint.run`"""
-        n_chunks = n_jobs or cast(int, mp.cpu_count())
+        """Parallel implementation of :meth:`~Fingerprint.run`
+
+        Uses a producer-consumer pattern where the main thread converts frames to
+        Molecule objects and enqueues them for worker processes. This avoids pickling
+        MDAnalysis Universe and AtomGroup objects which is the main bottleneck.
+        """
+        # Handle different trajectory types to get frame count
         try:
             n_frames = traj.n_frames
         except AttributeError:
@@ -715,12 +720,10 @@ class Fingerprint:
                 and hasattr(traj, "step")
             ):
                 # sliced trajectory
-                frames: Sequence[int] = range(traj.start, traj.stop, traj.step)
-                traj = lig.universe.trajectory
+                n_frames = len(range(traj.start, traj.stop, traj.step))
             elif hasattr(traj, "_frames"):
                 # trajectory indices
-                frames = traj._frames
-                traj = lig.universe.trajectory
+                n_frames = len(traj._frames)
             elif hasattr(traj, "frame"):
                 # single trajectory frame, no need to run in parallel
                 return self._run_serial(
@@ -731,22 +734,18 @@ class Fingerprint:
                     converter_kwargs=converter_kwargs,
                     progress=progress,
                 )
-        else:
-            frames = range(n_frames)
-        chunks = np.array_split(frames, n_chunks)
-        args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
-        ifp: "IFPResults" = {}
+            else:
+                n_frames = None
 
-        with TrajectoryPool(
+        with TrajectoryPoolQueue(
             n_jobs,
             fingerprint=self,
             residues=residues,
-            tqdm_kwargs={"total": len(frames), "disable": not progress, **kwargs},
+            tqdm_kwargs={"total": n_frames, "disable": not progress, **kwargs},
             rdkitconverter_kwargs=converter_kwargs,
             use_segid=self.use_segid or False,
         ) as pool:
-            for ifp_data_chunk in pool.process(args_iterable):
-                ifp.update(ifp_data_chunk)
+            ifp = pool.process(traj, lig, prot)
 
         return ifp
 

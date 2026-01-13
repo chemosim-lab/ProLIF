@@ -333,3 +333,147 @@ class MolIterablePool:
     def __exit__(self, *exc: Any) -> None:
         """Resets RDKit's default pickled properties"""
         PICKLE_HANDLER.reset()
+
+
+class TrajectoryPoolQueue:
+    """Queue-based process pool for IFP analysis on an MD trajectory.
+
+    This implementation uses a producer-consumer pattern where:
+    - A producer thread iterates over the trajectory and converts frames to Molecules
+    - Worker processes consume Molecule pairs from a queue and compute fingerprints
+    - This avoids pickling MDAnalysis objects, which is the bottleneck in TrajectoryPool
+
+    Must be used in a ``with`` statement.
+
+    Parameters
+    ----------
+    n_processes : int | None
+        Max number of worker processes
+    fingerprint : prolif.fingerprint.Fingerprint
+        Fingerprint instance used to generate the IFP
+    residues : list, optional
+        List of protein residues considered for the IFP
+    tqdm_kwargs : dict
+        Parameters for the :class:`~tqdm.std.tqdm` progress bar
+    rdkitconverter_kwargs : tuple[dict, dict]
+        Parameters for the :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
+        from MDAnalysis: the first for the ligand, and the second for the protein
+    use_segid: bool
+        Use the segment number rather than the chain identifier as a chain.
+
+    .. versionadded:: 2.2.0
+    """
+
+    fp: ClassVar["Fingerprint"]
+    residues: ClassVar["ResidueSelection"]
+
+    def __init__(
+        self,
+        n_processes: int | None,
+        fingerprint: "Fingerprint",
+        residues: "ResidueSelection",
+        tqdm_kwargs: dict,
+        rdkitconverter_kwargs: tuple[dict, dict],
+        use_segid: bool,
+    ) -> None:
+        self.n_processes = n_processes
+        self.tqdm_kwargs = tqdm_kwargs
+        self.converter_kwargs = rdkitconverter_kwargs
+        self.use_segid = use_segid
+        self.pool = cast(
+            "BuiltinPool",
+            Pool(
+                n_processes,
+                initializer=self.initializer,
+                initargs=(fingerprint, residues),
+            ),
+        )
+
+    @classmethod
+    def initializer(
+        cls,
+        fingerprint: "Fingerprint",
+        residues: "ResidueSelection",
+    ) -> None:
+        """Initializer classmethod passed to the pool so that each child process can
+        access these objects without copying them."""
+        cls.fp = fingerprint
+        cls.residues = residues
+
+    @classmethod
+    def executor(cls, args: tuple[int, Molecule, Molecule]) -> tuple[int, "IFP"]:
+        """Classmethod executed by each child process on a single frame.
+
+        Parameters
+        ----------
+        args : tuple[int, Molecule, Molecule]
+            Tuple of (frame_number, ligand_mol, protein_mol)
+
+        Returns
+        -------
+        result : tuple[int, prolif.ifp.IFP]
+            Tuple of (frame_number, IFP data)
+        """
+        frame, lig_mol, prot_mol = args
+        data = cls.fp.generate(
+            lig_mol,
+            prot_mol,
+            residues=cls.residues,
+            metadata=True,
+        )
+        return frame, data
+
+    def process(
+        self,
+        traj: "Trajectory",
+        lig: "MDAObject",
+        prot: "MDAObject",
+    ) -> "IFPResults":
+        """Process the trajectory using a producer-consumer pattern.
+
+        Parameters
+        ----------
+        traj : Trajectory
+            MDAnalysis trajectory or sliced trajectory
+        lig : MDAObject
+            Ligand AtomGroup
+        prot : MDAObject
+            Protein AtomGroup
+
+        Returns
+        -------
+        ifp : dict[int, prolif.ifp.IFP]
+            A dictionary of :class:`~prolif.ifp.IFP` indexed by frame number
+        """
+
+        def frame_generator() -> Iterable[tuple[int, Molecule, Molecule]]:
+            """Generator that yields (frame, lig_mol, prot_mol) tuples."""
+            for ts in traj:
+                lig_mol = Molecule.from_mda(
+                    lig, use_segid=self.use_segid, **self.converter_kwargs[0]
+                )
+                prot_mol = Molecule.from_mda(
+                    prot, use_segid=self.use_segid, **self.converter_kwargs[1]
+                )
+                yield int(ts.frame), lig_mol, prot_mol
+
+        ifp: "IFPResults" = {}
+        # Use imap to stream results as they complete
+        results = self.pool.imap_unordered(self.executor, frame_generator())
+        pbar = tqdm(results, **self.tqdm_kwargs)
+
+        for frame, data in pbar:
+            ifp[frame] = data
+
+        return ifp
+
+    def __enter__(self) -> "TrajectoryPoolQueue":
+        """Sets up RDKit pickle properties."""
+        PICKLE_HANDLER.set()
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        """Cleanup pool and reset RDKit pickle properties."""
+        self.pool.close()
+        self.pool.join()
+        PICKLE_HANDLER.reset()
