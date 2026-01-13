@@ -32,6 +32,7 @@ from inspect import signature
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast, overload
 
 import dill
+import multiprocess as mp
 import numpy as np
 from MDAnalysis import AtomGroup
 from MDAnalysis.converters.RDKit import atomgroup_to_mol, set_converter_cache_size
@@ -46,7 +47,7 @@ from prolif.interactions.base import (
     _INTERACTIONS,
 )
 from prolif.molecule import Molecule
-from prolif.parallel import MolIterablePool, TrajectoryPoolQueue
+from prolif.parallel import MolIterablePool, TrajectoryPool, TrajectoryPoolQueue
 from prolif.plotting.utils import IS_NOTEBOOK
 from prolif.utils import (
     get_residues_near_ligand,
@@ -519,6 +520,7 @@ class Fingerprint:
         converter_kwargs: tuple[dict, dict] | None = None,
         progress: bool = True,
         n_jobs: int | None = None,
+        parallel_strategy: Literal["chunk", "queue"] | None = None,
     ) -> "Fingerprint":
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
@@ -549,6 +551,17 @@ class Fingerprint:
             Number of processes to run in parallel. If ``n_jobs=None``, the
             analysis will use all available CPU threads, while if ``n_jobs=1``,
             the analysis will run in serial.
+        parallel_strategy : {"chunk", "queue"}, optional
+            Strategy for parallel execution:
+
+            - ``"chunk"``: Split trajectory into chunks and distribute to workers.
+              Each worker pickles the full MDAnalysis objects once per chunk.
+              Scales better for standard interactions with many frames.
+            - ``"queue"``: Main thread converts frames to Molecules and enqueues
+              them for workers. Avoids repeated MDAnalysis pickling overhead.
+              Better for water bridge analysis or when pickling is expensive.
+            - ``None``: Defaults to ``"chunk"`` for standard interactions and
+            ``"queue"`` for bridged interactions.
 
         Raises
         ------
@@ -595,6 +608,9 @@ class Fingerprint:
         .. versionchanged:: 2.1.0
             Added `use_segid`.
 
+        .. versionchanged:: 2.2.0
+            Added `parallel_strategy` parameter.
+
         """  # noqa: E501
         if n_jobs is not None and n_jobs < 1:
             raise ValueError("n_jobs must be > 0 or None")
@@ -639,6 +655,7 @@ class Fingerprint:
                     converter_kwargs=converter_kwargs,
                     progress=progress,
                     n_jobs=n_jobs,
+                    parallel_strategy=parallel_strategy or "chunk",
                 )
             self.ifp = ifp
 
@@ -652,6 +669,7 @@ class Fingerprint:
                 progress=progress,
                 use_segid=self.use_segid,
                 n_jobs=n_jobs,
+                parallel_strategy=parallel_strategy or "queue",
             )
         return self
 
@@ -702,15 +720,12 @@ class Fingerprint:
         converter_kwargs: tuple[dict, dict],
         progress: bool,
         n_jobs: int | None,
+        parallel_strategy: Literal["chunk", "queue"],
         **kwargs: Any,
     ) -> "IFPResults":
-        """Parallel implementation of :meth:`~Fingerprint.run`
-
-        Uses a producer-consumer pattern where the main thread converts frames to
-        Molecule objects and enqueues them for worker processes. This avoids pickling
-        MDAnalysis Universe and AtomGroup objects which is the main bottleneck.
-        """
-        # Handle different trajectory types to get frame count
+        """Parallel implementation of :meth:`~Fingerprint.run`"""
+        # Handle different trajectory types to get frame info
+        n_chunks = n_jobs or cast(int, mp.cpu_count())
         try:
             n_frames = traj.n_frames
         except AttributeError:
@@ -720,10 +735,14 @@ class Fingerprint:
                 and hasattr(traj, "step")
             ):
                 # sliced trajectory
-                n_frames = len(range(traj.start, traj.stop, traj.step))
+                frames: Sequence[int] = range(traj.start, traj.stop, traj.step)
+                if parallel_strategy == "chunk":
+                    traj = lig.universe.trajectory
             elif hasattr(traj, "_frames"):
                 # trajectory indices
-                n_frames = len(traj._frames)
+                frames = traj._frames
+                if parallel_strategy == "chunk":
+                    traj = lig.universe.trajectory
             elif hasattr(traj, "frame"):
                 # single trajectory frame, no need to run in parallel
                 return self._run_serial(
@@ -735,17 +754,39 @@ class Fingerprint:
                     progress=progress,
                 )
             else:
-                n_frames = None
+                frames = []
+        else:
+            frames = range(n_frames)
 
-        with TrajectoryPoolQueue(
-            n_jobs,
-            fingerprint=self,
-            residues=residues,
-            tqdm_kwargs={"total": n_frames, "disable": not progress, **kwargs},
-            rdkitconverter_kwargs=converter_kwargs,
-            use_segid=self.use_segid or False,
-        ) as pool:
-            ifp = pool.process(traj, lig, prot)
+        n_frames = len(frames)
+        tqdm_kwargs = {"total": n_frames, "disable": not progress, **kwargs}
+
+        if parallel_strategy == "queue":
+            with TrajectoryPoolQueue(
+                n_jobs,
+                fingerprint=self,
+                residues=residues,
+                tqdm_kwargs=tqdm_kwargs,
+                rdkitconverter_kwargs=converter_kwargs,
+                use_segid=self.use_segid or False,
+            ) as pool:
+                return pool.process(traj, lig, prot)
+        else:
+            # chunk strategy (default)
+            chunks = np.array_split(frames, n_chunks)
+            args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
+            ifp: "IFPResults" = {}
+
+            with TrajectoryPool(
+                n_jobs,
+                fingerprint=self,
+                residues=residues,
+                tqdm_kwargs=tqdm_kwargs,
+                rdkitconverter_kwargs=converter_kwargs,
+                use_segid=self.use_segid or False,
+            ) as pool:
+                for ifp_data_chunk in pool.process(args_iterable):
+                    ifp.update(ifp_data_chunk)
 
         return ifp
 

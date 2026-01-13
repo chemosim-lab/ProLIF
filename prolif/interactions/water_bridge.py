@@ -121,10 +121,15 @@ class WaterBridge(BridgedInteraction):
         """  # noqa: E501
         water_obj = cast("MDAObject", self.water)
         n_jobs = self.kwargs.pop("n_jobs", None)
+        parallel_strategy = self.kwargs.pop("parallel_strategy", "queue")
         runner = (
             self.water_fp._run_serial
             if n_jobs == 1
-            else partial(self.water_fp._run_parallel, n_jobs=n_jobs)
+            else partial(
+                self.water_fp._run_parallel,
+                n_jobs=n_jobs,
+                parallel_strategy=parallel_strategy,
+            )
         )
         # Run analysis for ligand-water and water-protein interactions
         lig_water_ifp: dict[int, IFP] = runner(
