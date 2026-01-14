@@ -9,6 +9,20 @@ combined to identify water-bridged interactions using a graph-based approach.
 
 .. versionadded:: 2.1.0
 
+Notes
+-----
+WaterBridge relies on MDAnalysis residue handling to uniquely identify
+individual water molecules.
+
+Due to the 4-digit limitation of residue numbering in the PDB format,
+multiple water molecules may appear to share the same residue number
+(e.g., ``resid 1917``). MDAnalysis internally guarantees unique residue
+identities when parsing PDB files (e.g., by offsetting residue indices).
+
+As a result, WaterBridge correctly treats each water molecule as a
+distinct residue, and users do not need to manually deduplicate water
+residues when using MDAnalysis-supported formats
+
 """
 
 import itertools as it
