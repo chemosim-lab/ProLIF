@@ -25,14 +25,12 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
 
 """
 
-import os
 import warnings
 from collections.abc import Iterable, Sequence, Sized
 from inspect import signature
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast, overload
 
 import dill
-import multiprocess as mp
 import numpy as np
 from MDAnalysis import AtomGroup
 from MDAnalysis.converters.RDKit import atomgroup_to_mol, set_converter_cache_size
@@ -47,7 +45,12 @@ from prolif.interactions.base import (
     _INTERACTIONS,
 )
 from prolif.molecule import Molecule
-from prolif.parallel import MolIterablePool, TrajectoryPool, TrajectoryPoolQueue
+from prolif.parallel import (
+    MolIterablePool,
+    TrajectoryPool,
+    TrajectoryPoolQueue,
+    get_n_jobs,
+)
 from prolif.plotting.utils import IS_NOTEBOOK
 from prolif.utils import (
     get_residues_near_ligand,
@@ -548,9 +551,9 @@ class Fingerprint:
         progress : bool
             Display a :class:`~tqdm.std.tqdm` progressbar while running the calculation
         n_jobs : int or None
-            Number of processes to run in parallel. If ``n_jobs=None``, the
-            analysis will use all available CPU threads, while if ``n_jobs=1``,
-            the analysis will run in serial.
+            Number of processes to run in parallel. If ``n_jobs=1``, the analysis
+            will run in serial. If ``n_jobs=None``, see
+            :func:`~prolif.parallel.get_n_jobs` for the default behavior.
         parallel_strategy : {"chunk", "queue"}, optional
             Strategy for parallel execution:
 
@@ -606,18 +609,15 @@ class Fingerprint:
             atom indices.
 
         .. versionchanged:: 2.1.0
-            Added `use_segid`.
-
-        .. versionchanged:: 2.2.0
-            Added `parallel_strategy` parameter.
+            Added ``use_segid``, ``parallel_strategy`` parameter and changed the
+            default behavior of ``n_jobs=None``.
 
         """  # noqa: E501
-        if n_jobs is not None and n_jobs < 1:
-            raise ValueError("n_jobs must be > 0 or None")
         if converter_kwargs is not None and len(converter_kwargs) != 2:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
 
         # setup defaults
+        n_jobs = get_n_jobs(n_jobs)
         converter_kwargs = converter_kwargs or ({}, {})
         if (
             self.bridged_interactions
@@ -625,8 +625,6 @@ class Fingerprint:
             and maxsize <= 2
         ):
             set_converter_cache_size(2 + len(self.bridged_interactions))
-        if n_jobs is None:
-            n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
         if self.use_segid is None:
             self.use_segid = self._use_segid(lig, prot)
         if residues == "all":
@@ -725,7 +723,6 @@ class Fingerprint:
     ) -> "IFPResults":
         """Parallel implementation of :meth:`~Fingerprint.run`"""
         # Handle different trajectory types to get frame info
-        n_chunks = n_jobs or cast(int, mp.cpu_count())
         try:
             n_frames = traj.n_frames
         except AttributeError:
@@ -771,22 +768,23 @@ class Fingerprint:
                 use_segid=self.use_segid or False,
             ) as pool:
                 return pool.process(traj, lig, prot)
-        else:
-            # chunk strategy (default)
-            chunks = np.array_split(frames, n_chunks)
-            args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
-            ifp: "IFPResults" = {}
 
-            with TrajectoryPool(
-                n_jobs,
-                fingerprint=self,
-                residues=residues,
-                tqdm_kwargs=tqdm_kwargs,
-                rdkitconverter_kwargs=converter_kwargs,
-                use_segid=self.use_segid or False,
-            ) as pool:
-                for ifp_data_chunk in pool.process(args_iterable):
-                    ifp.update(ifp_data_chunk)
+        # chunk strategy (default)
+        n_chunks = n_jobs = n_jobs or 1
+        chunks = np.array_split(frames, n_chunks)
+        args_iterable = [(traj, lig, prot, chunk) for chunk in chunks]
+        ifp: "IFPResults" = {}
+
+        with TrajectoryPool(
+            n_jobs,
+            fingerprint=self,
+            residues=residues,
+            tqdm_kwargs=tqdm_kwargs,
+            rdkitconverter_kwargs=converter_kwargs,
+            use_segid=self.use_segid or False,
+        ) as pool:
+            for ifp_data_chunk in pool.process(args_iterable):
+                ifp.update(ifp_data_chunk)
 
         return ifp
 
@@ -819,9 +817,9 @@ class Fingerprint:
         progress : bool
             Display a :class:`~tqdm.std.tqdm` progressbar while running the calculation
         n_jobs : int or None
-            Number of processes to run in parallel. If ``n_jobs=None``, the
-            analysis will use all available CPU threads, while if ``n_jobs=1``,
-            the analysis will run in serial.
+            Number of processes to run in parallel. If ``n_jobs=1``, the
+            calculation will run in serial. If ``n_jobs=None``, see
+            :func:`~prolif.parallel.get_n_jobs` for the default behavior.
 
         Raises
         ------
@@ -860,13 +858,13 @@ class Fingerprint:
             dictionary containing more complete interaction metadata instead of just
             atom indices.
 
+        .. versionchanged:: 2.1.0
+            Changed the default behavior of ``n_jobs=None``.
+
         """
-        if n_jobs is not None and n_jobs < 1:
-            raise ValueError("n_jobs must be > 0 or None")
         if residues == "all":
             residues = list(prot_mol.residues)
-        if n_jobs is None:
-            n_jobs = int(os.environ.get("PROLIF_N_JOBS", "0")) or None
+        n_jobs = get_n_jobs(n_jobs)
 
         if self.interactions:
             if n_jobs == 1:

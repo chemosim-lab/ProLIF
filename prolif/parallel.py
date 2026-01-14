@@ -8,12 +8,14 @@ in :meth:`~prolif.fingerprint.Fingerprint.run` and
 :meth:`~prolif.fingerprint.Fingerprint.run_from_iterable` respectively.
 """
 
+import os
 from collections.abc import Iterable
 from ctypes import c_uint32
 from threading import Event, Thread
 from time import sleep
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
+import psutil
 from multiprocess import Value
 from multiprocess.pool import Pool
 from tqdm.auto import tqdm
@@ -30,6 +32,31 @@ if TYPE_CHECKING:
     from prolif.fingerprint import Fingerprint
     from prolif.ifp import IFP
     from prolif.typeshed import IFPResults, MDAObject, ResidueSelection, Trajectory
+
+PROLIF_MAX_JOBS = int(os.getenv("PROLIF_MAX_JOBS", "10"))
+"""
+Limits the max number of processes (unless the number of jobs is specified by the
+user directly) to avoid oversubscription as IO tends to be the bottleneck.
+"""
+
+
+def get_n_jobs(n_jobs: int | None = None) -> int | None:
+    """Get the number of parallel jobs to use.
+
+    Prioritizes the ``n_jobs`` parameter, then the ``PROLIF_N_JOBS`` environment
+    variable, then the minimum between the number of logical cores and
+    :const:`PROLIF_MAX_JOBS` (8 by default), finally ``None`` if
+    :func:`psutil.cpu_count` couldn't retrieve the number of logical cores.
+    """
+    if n_jobs is not None:
+        if n_jobs < 1:
+            raise ValueError("n_jobs must be > 0 or None")
+        return n_jobs
+    if env_n_jobs := os.getenv("PROLIF_N_JOBS"):
+        return int(env_n_jobs)
+    if n_logical_cores := psutil.cpu_count():
+        return min(n_logical_cores, PROLIF_MAX_JOBS)
+    return None
 
 
 class Progress:

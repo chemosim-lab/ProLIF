@@ -38,6 +38,7 @@ dependencies = [
     "tqdm",
     "multiprocess",
     "dill",
+    "psutil",
 ]
 
 [project.optional-dependencies]
@@ -69,6 +70,7 @@ type-check = [
     "types-setuptools",
     "scipy-stubs",
     "types-networkx",
+    "types-psutil",
 ]
 dev = [
     "ruff==0.11.2",                   # keep synced with formatting_linting.yml
