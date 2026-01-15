@@ -191,19 +191,25 @@ class WaterBridge(BridgedInteraction):
         prot_mol : prolif.molecule.Molecule
             The protein
         """
+        n_jobs = self.kwargs.pop("n_jobs", None)
+        runner = (
+            self.water_fp._run_iter_serial
+            if n_jobs == 1
+            else partial(self.water_fp._run_iter_parallel, n_jobs=n_jobs)
+        )
         water_obj = cast("Molecule", self.water)
         # Run analysis for ligand-water and water-protein interactions
-        lig_water_ifp: "IFPResults" = self.water_fp._run_iter_serial(
+        lig_water_ifp: "IFPResults" = runner(
             lig_iterable, water_obj, residues=None, **self.kwargs
         )
-        water_prot_ifp: "IFPResults" = self.water_fp._run_iter_serial(
+        water_prot_ifp: "IFPResults" = runner(
             [water_obj], prot_mol, residues=self.residues, **self.kwargs
         )
         ifp_wp = water_prot_ifp[0]  # Water → Protein
 
         if self.order >= 2:
             # Run water-water interaction analysis
-            water_ifp: "IFPResults" = self.water_fp._run_iter_serial(
+            water_ifp: "IFPResults" = runner(
                 [water_obj], water_obj, residues=None, **self.kwargs
             )
             ifp_ww: IFP | None = water_ifp[0]  # WaterX -> WaterY
