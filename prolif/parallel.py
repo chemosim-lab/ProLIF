@@ -13,8 +13,9 @@ from collections.abc import Iterable
 from ctypes import c_uint32
 from threading import Event, Thread
 from time import sleep
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
+import dill
 import psutil
 from multiprocess import Value
 from multiprocess.pool import Pool
@@ -33,10 +34,17 @@ if TYPE_CHECKING:
     from prolif.ifp import IFP
     from prolif.typeshed import IFPResults, MDAObject, ResidueSelection, Trajectory
 
-PROLIF_MAX_JOBS = int(os.getenv("PROLIF_MAX_JOBS", "10"))
+MAX_JOBS = int(os.getenv("PROLIF_MAX_JOBS", "10"))
 """
 Limits the max number of processes (unless the number of jobs is specified by the
 user directly) to avoid oversubscription as IO tends to be the bottleneck.
+"""
+
+MDA_PARALLEL_STRATEGY_THRESHOLD: int = 300_000
+"""
+Threshold used to determine the parallel strategy for MDAnalysis trajectories.
+If the pickled trajectory object is larger than this threshold, ``queue`` is used,
+otherwise ``chunk``.
 """
 
 
@@ -55,8 +63,22 @@ def get_n_jobs(n_jobs: int | None = None) -> int | None:
     if env_n_jobs := os.getenv("PROLIF_N_JOBS"):
         return int(env_n_jobs)
     if n_logical_cores := psutil.cpu_count():
-        return min(n_logical_cores, PROLIF_MAX_JOBS)
+        return min(n_logical_cores, MAX_JOBS)
     return None
+
+
+def get_mda_parallel_strategy(
+    strategy: Literal["chunk", "queue"] | None, traj: "Trajectory"
+) -> Literal["chunk", "queue"]:
+    """
+    Get the parallel strategy to use for MDAnalysis based on how large the trajectory
+    object is. For small objects, ``chunk`` is faster, while ``queue`` is faster for
+    large objects.
+    """
+    if strategy is not None:
+        return strategy
+    pkl_size = len(dill.dumps(traj))
+    return "queue" if pkl_size > MDA_PARALLEL_STRATEGY_THRESHOLD else "chunk"
 
 
 class Progress:

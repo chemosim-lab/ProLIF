@@ -49,6 +49,7 @@ from prolif.parallel import (
     MolIterablePool,
     TrajectoryPool,
     TrajectoryPoolQueue,
+    get_mda_parallel_strategy,
     get_n_jobs,
 )
 from prolif.plotting.utils import IS_NOTEBOOK
@@ -559,12 +560,13 @@ class Fingerprint:
 
             - ``"chunk"``: Split trajectory into chunks and distribute to workers.
               Each worker pickles the full MDAnalysis objects once per chunk.
-              Scales better for standard interactions with many frames.
+              Scales better for small trajectories.
             - ``"queue"``: Main thread converts frames to Molecules and enqueues
               them for workers. Avoids repeated MDAnalysis pickling overhead.
-              Better for water bridge analysis or when pickling is expensive.
-            - ``None``: Defaults to ``"chunk"`` for standard interactions and
-            ``"queue"`` for bridged interactions.
+              Better when pickling is expensive, e.g. large trajectories with many
+              atoms.
+            - ``None``: See :func:`~prolif.parallel.get_mda_parallel_strategy` for
+              the default behavior.
 
         Raises
         ------
@@ -618,6 +620,7 @@ class Fingerprint:
 
         # setup defaults
         n_jobs = get_n_jobs(n_jobs)
+        parallel_strategy = get_mda_parallel_strategy(parallel_strategy, traj)
         converter_kwargs = converter_kwargs or ({}, {})
         if (
             self.bridged_interactions
@@ -653,7 +656,7 @@ class Fingerprint:
                     converter_kwargs=converter_kwargs,
                     progress=progress,
                     n_jobs=n_jobs,
-                    parallel_strategy=parallel_strategy or "chunk",
+                    parallel_strategy=parallel_strategy,
                 )
             self.ifp = ifp
 
@@ -667,7 +670,7 @@ class Fingerprint:
                 progress=progress,
                 use_segid=self.use_segid,
                 n_jobs=n_jobs,
-                parallel_strategy=parallel_strategy or "queue",
+                parallel_strategy=parallel_strategy,
             )
         return self
 
