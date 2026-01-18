@@ -1,5 +1,5 @@
-from typing import TYPE_CHECKING
-from unittest.mock import Mock
+from typing import TYPE_CHECKING, Literal
+from unittest.mock import Mock, patch
 
 import MDAnalysis as mda
 import numpy as np
@@ -12,6 +12,7 @@ from prolif.datafiles import datapath
 from prolif.fingerprint import DEFAULT_INTERACTIONS, Fingerprint
 from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.molecule import sdf_supplier
+from prolif.parallel import TrajectoryPool, TrajectoryPoolQueue
 from prolif.residue import ResidueId
 
 if TYPE_CHECKING:
@@ -368,24 +369,35 @@ class TestFingerprint:
         assert hasattr(fp_unpkl, "dummy")
         assert callable(fp_unpkl.dummy)
 
+    @pytest.mark.parametrize(
+        ("strategy", "pool_cls"),
+        [("chunk", TrajectoryPool), ("queue", TrajectoryPoolQueue)],
+    )
     def test_run_multiproc_serial_same(
         self,
         fp: Fingerprint,
         u: mda.Universe,
         ligand_ag: "AtomGroup",
         protein_ag: "AtomGroup",
+        strategy: Literal["queue", "chunk"],
+        pool_cls: type,
     ) -> None:
         fp.run(u.trajectory[0:100:10], ligand_ag, protein_ag, n_jobs=1, progress=False)
         serial = fp.to_dataframe()
-        fp.run(
-            u.trajectory[0:100:10],
-            ligand_ag,
-            protein_ag,
-            n_jobs=None,
-            progress=False,
-        )
-        multi = fp.to_dataframe()
-        assert serial.equals(multi)
+
+        target = f"prolif.fingerprint.{pool_cls.__name__}"
+        with patch(target, wraps=pool_cls) as mocked_pool:
+            fp.run(
+                u.trajectory[0:100:10],
+                ligand_ag,
+                protein_ag,
+                n_jobs=2,
+                progress=False,
+                parallel_strategy=strategy,
+            )
+            multi = fp.to_dataframe()
+            assert serial.equals(multi)
+            mocked_pool.assert_called()
 
     def test_run_multiproc_on_single_frame_runs_serial(
         self,

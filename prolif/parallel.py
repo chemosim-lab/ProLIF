@@ -508,7 +508,7 @@ class TrajectoryPoolQueue:
 
         ifp: "IFPResults" = {}
         # Use imap to stream results as they complete
-        results = self.pool.imap_unordered(self.executor, frame_generator())
+        results = self.pool.imap(self.executor, frame_generator())
         pbar = tqdm(results, **self.tqdm_kwargs)
 
         for frame, data in pbar:
