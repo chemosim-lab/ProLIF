@@ -55,10 +55,6 @@ class WaterBridge(BridgedInteraction):
     count : bool
         Whether to generate a count fingerprint or just a binary one.
 
-    Notes
-    -----
-    This analysis currently only runs in serial.
-
     .. versionadded:: 2.1.0
     """
 
