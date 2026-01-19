@@ -2,10 +2,42 @@
 Generating an IFP in parallel --- :mod:`prolif.parallel`
 ========================================================
 
-This module provides two classes, :class:`TrajectoryPool` and :class:`MolIterablePool`
-to execute the analysis in parallel. These are used in the parallel implementation used
-in :meth:`~prolif.fingerprint.Fingerprint.run` and
-:meth:`~prolif.fingerprint.Fingerprint.run_from_iterable` respectively.
+This module provides classes that handle parallel processing for the
+:meth:`~prolif.fingerprint.Fingerprint.run_from_iterable` and
+:meth:`~prolif.fingerprint.Fingerprint.run` methods.
+
+For :meth:`~prolif.fingerprint.Fingerprint.run_from_iterable`, parallel execution is
+handled by :class:`MolIterablePool`.
+For :meth:`~prolif.fingerprint.Fingerprint.run`, the analysis is performed on a
+trajectory and 2 strategies are available, handled by :class:`TrajectoryPool` (chunk
+strategy) or :class:`TrajectoryPoolQueue` (queue strategy):
+
+- ``chunk``: splits the trajectory into chunks and distributes one chunk per worker
+  process. This strategy requires pickling the trajectory object on each worker, so
+  performance scales poorly if the trajectory object is large (e.g. contains complex
+  topology information). However, for simple objects it offers better scaling as
+  each worker can efficiently iterate through its assigned chunk.
+
+- ``queue``: the main process iterates through the trajectory and converts frames into
+  lightweight RDKit molecules, which are then put into a queue consumed by worker
+  processes. This strategy avoids the overhead of pickling large trajectory objects,
+  but the main process can become a bottleneck if frame conversion is slow.
+
+By default, the strategy is automatically chosen based on the estimated pickle size of
+the trajectory object: if it exceeds
+:const:`prolif.parallel.MDA_PARALLEL_STRATEGY_THRESHOLD` (300 kB), the ``queue``
+strategy is used, otherwise ``chunk``.
+
+This behavior can be overridden by passing ``parallel_strategy="chunk"`` or
+``parallel_strategy="queue"`` to :meth:`~prolif.fingerprint.Fingerprint.run`.
+
+Because processing each frame and converting the topology to RDKit molecules with 3D
+information can be quite slow and the main bottleneck of parallel processing, by default
+the number of logical cores is capped at :const:`prolif.parallel.MAX_JOBS`
+(``PROLIF_MAX_JOBS`` env variable) when the analysis is performed on a trajectory. No
+capping is done if an explicit number of cores is passed through the ``n_jobs``
+parameter or the ``PROLIF_N_JOBS`` env variable.
+
 """
 
 import os
