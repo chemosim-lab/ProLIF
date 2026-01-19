@@ -7,6 +7,7 @@ This module provides classes that handle parallel processing for the
 :meth:`~prolif.fingerprint.Fingerprint.run` methods.
 
 .. admonition:: TL;DR for MD trajectories
+
     For trajectories, ProLIF has some quite basic heuristics to decide between two
     parallelization strategies, ``chunk`` and ``queue``, as well as the maximum number
     of cores to use. You can override this by specifying the ``parallel_strategy``
