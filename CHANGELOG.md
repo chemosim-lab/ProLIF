@@ -4,10 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-01-20
 
 ### Added
 
+- Added a new `queue` parallelization strategy for trajectories, alongside the
+  existing `chunk` strategy, and some simple heuristics to decide
+  between the two. Users can also force the usage of one strategy or the other
+  through the `parallel_strategy` parameter.
 - Added `split_molecule` to split a molecule into components based on a predicate
   function.
 - Added `select_over_trajectory` to easily make AtomGroup distance-based selections
@@ -66,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- For trajectory analysis, unless a number of jobs is specified through `n_jobs`
+  in `Fingerprint.run`, ProLIF will now use up to a maximum of 10 processes instead of
+  all available cores. The cap can be modified through the `PROLIF_MAX_N_JOBS`
+  environment variable.
+- `Fingerprint.run` now exposes a `parallel_strategy` parameter (`chunk`, `queue`, or
+  `None`).
 - Unpin the `numpy` version (PR #306 by @maabuu).
 - `Hydrophobic` SMARTS pattern now excludes all carbon linked to
   nitrogen/oxygen/fluoride from being hydrophobic, previous versions were allowing such

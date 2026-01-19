@@ -450,7 +450,7 @@ class TrajectoryPoolQueue:
     use_segid: bool
         Use the segment number rather than the chain identifier as a chain.
 
-    .. versionadded:: 2.2.0
+    .. versionadded:: 2.1.0
     """
 
     fp: ClassVar["Fingerprint"]
