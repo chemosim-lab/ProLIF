@@ -6,6 +6,14 @@ This module provides classes that handle parallel processing for the
 :meth:`~prolif.fingerprint.Fingerprint.run_from_iterable` and
 :meth:`~prolif.fingerprint.Fingerprint.run` methods.
 
+.. admonition:: TL;DR for MD trajectories
+    For trajectories, ProLIF has some quite basic heuristics to decide between two
+    parallelization strategies, ``chunk`` and ``queue``, as well as the maximum number
+    of cores to use. You can override this by specifying the ``parallel_strategy``
+    and ``n_jobs`` parameters to :meth:`~prolif.fingerprint.Fingerprint.run`. We
+    encourage users to benchmark these on their specific system to optimize the
+    performance of their analysis.
+
 For :meth:`~prolif.fingerprint.Fingerprint.run_from_iterable`, parallel execution is
 handled by :class:`MolIterablePool`.
 For :meth:`~prolif.fingerprint.Fingerprint.run`, the analysis is performed on a
@@ -26,10 +34,10 @@ strategy) or :class:`TrajectoryPoolQueue` (queue strategy):
 By default, the strategy is automatically chosen based on the estimated pickle size of
 the trajectory object: if it exceeds
 :const:`prolif.parallel.MDA_PARALLEL_STRATEGY_THRESHOLD` (300 kB), the ``queue``
-strategy is used, otherwise ``chunk``.
-
-This behavior can be overridden by passing ``parallel_strategy="chunk"`` or
-``parallel_strategy="queue"`` to :meth:`~prolif.fingerprint.Fingerprint.run`.
+strategy is used, otherwise ``chunk``. This is a pretty rough heuristic and might not
+always be optimal, so you can override it by passing an explicit
+``parallel_strategy='chunk'`` or ``parallel_strategy='queue'`` to
+:meth:`~prolif.fingerprint.Fingerprint.run`.
 
 Because processing each frame and converting the topology to RDKit molecules with 3D
 information can be quite slow and the main bottleneck of parallel processing, by default
