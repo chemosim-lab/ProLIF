@@ -38,6 +38,7 @@ dependencies = [
     "tqdm",
     "multiprocess",
     "dill",
+    "psutil",
 ]
 
 [project.optional-dependencies]
@@ -69,9 +70,10 @@ type-check = [
     "types-setuptools",
     "scipy-stubs",
     "types-networkx",
+    "types-psutil",
 ]
 dev = [
-    "ruff==0.11.2",  # keep synced with formatting_linting.yml
+    "ruff==0.11.2",                   # keep synced with formatting_linting.yml
     "black[jupyter]",
     "poethepoet>=0.33.0",
     { include-group = "tests" },
@@ -132,7 +134,9 @@ sequence = [{ ref = "format" }, { ref = "lint" }]
 [tool.poe.tasks.type-check]
 help = "Run mypy to check type hints across the codebase"
 cmd = "mypy ${FILE_PATHS}"
-args = [{ name = "FILE_PATHS", positional = true, multiple = true, default = "." }]
+args = [
+    { name = "FILE_PATHS", positional = true, multiple = true, default = "." },
+]
 
 [tool.poe.tasks.test]
 help = "Runs the test suite"
@@ -144,7 +148,12 @@ cmd = "sphinx-build -M html docs/ docs/_build/"
 
 [tool.poe.tasks.check]
 help = "Runs all of the checks"
-sequence = [{ ref = "style-check" }, { ref = "type-check" }, { ref = "test" }, { ref = "docs" }]
+sequence = [
+    { ref = "style-check" },
+    { ref = "type-check" },
+    { ref = "test" },
+    { ref = "docs" },
+]
 
 [tool.mypy]
 python_version = "3.10"
@@ -240,6 +249,9 @@ ignore = [
     "COM812",
     "UP037",
 ]
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["ARG001"]
 
 [tool.isort]
 profile = "black"
@@ -256,6 +268,4 @@ exclude_also = [
     "if .*TYPE_CHECKING:",
     "@.*abstractmethod",
 ]
-omit = [
-    "prolif/typeshed.py",
-]
+omit = ["prolif/typeshed.py"]
