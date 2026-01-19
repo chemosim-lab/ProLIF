@@ -36,7 +36,7 @@ class TestGetNJobs:
     def test_cpu_count_used_when_no_env(self) -> None:
         """When n_jobs and env are not set, use cpu_count (capped at MAX_JOBS)."""
         with patch("prolif.parallel.psutil.cpu_count", return_value=16):
-            assert get_n_jobs() == MAX_JOBS
+            assert get_n_jobs(capped=True) == MAX_JOBS
 
     def test_returns_none_when_cpu_count_fails(self) -> None:
         """When cpu_count returns None, get_n_jobs returns None."""

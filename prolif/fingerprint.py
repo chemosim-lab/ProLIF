@@ -619,7 +619,7 @@ class Fingerprint:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
 
         # setup defaults
-        n_jobs = get_n_jobs(n_jobs)
+        n_jobs = get_n_jobs(n_jobs, capped=True)
         parallel_strategy = get_mda_parallel_strategy(parallel_strategy, traj)
         converter_kwargs = converter_kwargs or ({}, {})
         if (
@@ -867,7 +867,7 @@ class Fingerprint:
         """
         if residues == "all":
             residues = list(prot_mol.residues)
-        n_jobs = get_n_jobs(n_jobs)
+        n_jobs = get_n_jobs(n_jobs, capped=False)
 
         if self.interactions:
             if n_jobs == 1:

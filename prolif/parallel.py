@@ -48,13 +48,13 @@ otherwise ``chunk``.
 """
 
 
-def get_n_jobs(n_jobs: int | None = None) -> int | None:
+def get_n_jobs(n_jobs: int | None = None, capped: bool = False) -> int | None:
     """Get the number of parallel jobs to use.
 
     Prioritizes the ``n_jobs`` parameter, then the ``PROLIF_N_JOBS`` environment
-    variable, then the minimum between the number of logical cores and
-    :const:`PROLIF_MAX_JOBS` (8 by default), finally ``None`` if
-    :func:`psutil.cpu_count` couldn't retrieve the number of logical cores.
+    variable, then the number of logical cores (capped to :const:`PROLIF_MAX_JOBS` (10
+    by default) if ``capped=True``), finally ``None`` if :func:`psutil.cpu_count`
+    couldn't retrieve the number of logical cores.
     """
     if n_jobs is not None:
         if n_jobs < 1:
@@ -63,7 +63,7 @@ def get_n_jobs(n_jobs: int | None = None) -> int | None:
     if env_n_jobs := os.getenv("PROLIF_N_JOBS"):
         return int(env_n_jobs)
     if n_logical_cores := psutil.cpu_count():
-        return min(n_logical_cores, MAX_JOBS)
+        return min(n_logical_cores, MAX_JOBS) if capped else n_logical_cores
     return None
 
 
