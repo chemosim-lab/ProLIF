@@ -79,6 +79,8 @@ class LigNetwork:
     carbon : float
         Size of the carbon atom dots on the depiction. Use `0` to hide the
         carbon dots
+    use_segid : bool
+        If ``True``, uses the segment ID as the chain identifier of residues.
 
     Attributes
     ----------
@@ -213,10 +215,12 @@ class LigNetwork:
         molsize: int = 35,
         rotation: float = 0,
         carbon: float = 0.16,
+        use_segid: bool = False,
     ) -> None:
         self.df = df
         self._ligand_resids = {
-            str(ResidueId.from_atom(atom)) for atom in lig_mol.GetAtoms()
+            str(ResidueId.from_atom(atom, use_segid=use_segid))
+            for atom in lig_mol.GetAtoms()
         }
         self._interacting_atoms: set[int] = {
             atom for atoms in df.index.get_level_values("atoms") for atom in atoms
@@ -333,6 +337,7 @@ class LigNetwork:
                 "Please run the fingerprint analysis before attempting to display"
                 " results.",
             )
+        kwargs.setdefault("use_segid", fp.use_segid or False)
         if kind == "frame":
             df = cls._make_frame_df_from_fp(fp, frame=frame, display_all=display_all)
             return cls(df, ligand_mol, **kwargs)

@@ -1,6 +1,7 @@
 from functools import partial
 from html import escape
 from typing import TYPE_CHECKING, cast
+from unittest.mock import patch
 
 import MDAnalysis as mda
 import pytest
@@ -67,6 +68,24 @@ class TestLigNetwork:
         assert "PHE331.B" in view._iframe
 
     def test_kwargs(self, get_ligplot: partial[LigNetwork]) -> None:
+        with patch(
+            "prolif.plotting.network.lignetwork.LigNetwork.__init__", return_value=None
+        ) as mock:
+            get_ligplot(
+                kekulize=True,
+                use_coordinates=True,
+                flatten_coordinates=False,
+                rotation=42,
+                carbon=0,
+            )
+            assert mock.call_count == 1
+            kwargs = mock.call_args_list[0].kwargs
+            assert kwargs["kekulize"] is True
+            assert kwargs["use_coordinates"] is True
+            assert kwargs["flatten_coordinates"] is False
+            assert kwargs["rotation"] == 42
+            assert kwargs["carbon"] == 0
+            assert kwargs["use_segid"] is False
         net = get_ligplot(
             kekulize=True,
             use_coordinates=True,
