@@ -369,7 +369,12 @@ class pdbqt_supplier(Sequence[Molecule]):
         mol = rwmol.GetMol()
         # sanitize
         mol.UpdatePropertyCache()
-        Chem.SanitizeMol(mol)
+        Chem.SanitizeMol(
+            mol,
+            sanitizeOps=Chem.SanitizeFlags.SANITIZE_ALL
+            ^ Chem.SanitizeFlags.SANITIZE_KEKULIZE
+        )
+
         return mol
 
     def __len__(self) -> int:
