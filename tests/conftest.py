@@ -29,6 +29,14 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         pytest.exit(
             f"Example Vina data files are not accessible: {vina_path!s} does not exist",
         )
+
+    implicit_hbond_path = datapath / "implicitHbond"
+    if not implicit_hbond_path.exists():
+        pytest.exit(
+            "Example implicit Hbond data files are not accessible: "
+            f"{implicit_hbond_path!s} does not exist",
+        )
+
     # ugly patch to add Mixin class as attribute to pytest so that we don't have to
     # worry about relative imports in the test codebase
     pytest.BaseTestMixinRDKitMol = BaseTestMixinRDKitMol  # type: ignore[attr-defined]
@@ -219,3 +227,31 @@ class BaseTestMixinRDKitMol:
     def test_xyz(self, mol: "BaseRDKitMol") -> None:
         expected = mol.GetConformer().GetPositions()
         assert_array_almost_equal(mol.xyz, expected)
+
+
+@pytest.fixture(scope="session")
+def ihb_ligand() -> Molecule:
+    path = str(datapath / "implicitHbond" / "1.D.sdf")
+    return sdf_supplier(path)[0]
+
+
+@pytest.fixture(scope="session")
+def ihb_protein() -> Molecule:
+    path = str(datapath / "implicitHbond" / "receptor.pdb")
+    return Molecule.from_rdkit(Chem.MolFromPDBFile(path))
+
+
+@pytest.fixture(scope="session")
+def ihb_acceptor_tyr167b(ihb_protein: Molecule) -> Molecule:
+    return Molecule(ihb_protein["TYR167.B"])  # residue as an acceptor
+
+
+@pytest.fixture(scope="session")
+def ihb_asp95a(ihb_protein: Molecule) -> Molecule:
+    return Molecule(ihb_protein["ASP95.A"])  # residue as an acceptor and a donor
+
+
+@pytest.fixture(scope="session")
+def ihb_donor_h2o(ihb_protein: Molecule) -> Molecule:
+    # return Molecule(ihb_protein["HOH1._"])  # water as a donor
+    return Molecule(ihb_protein[332])
