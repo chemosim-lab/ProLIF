@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from prolif.molecule import BaseRDKitMol
 
 
-def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: ARG001
+def pytest_sessionstart(session: pytest.Session) -> None:
     if not datapath.exists():
         pytest.exit(
             f"Example data files are not accessible: {datapath!s} does not exist",

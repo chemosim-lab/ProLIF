@@ -9,11 +9,26 @@ combined to identify water-bridged interactions using a graph-based approach.
 
 .. versionadded:: 2.1.0
 
+Notes
+-----
+WaterBridge relies on MDAnalysis residue handling to uniquely identify
+individual water molecules.
+
+Due to the 4-digit limitation of residue numbering in the PDB format,
+multiple water molecules may appear to share the same residue number
+(e.g., ``resid 1917``). MDAnalysis internally guarantees unique residue
+identities when parsing PDB files (e.g., by offsetting residue indices).
+
+As a result, WaterBridge correctly treats each water molecule as a
+distinct residue, and users do not need to manually deduplicate water
+residues when using MDAnalysis-supported formats
+
 """
 
 import itertools as it
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
+from functools import partial
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import networkx as nx
@@ -54,10 +69,6 @@ class WaterBridge(BridgedInteraction):
     count : bool
         Whether to generate a count fingerprint or just a binary one.
 
-    Notes
-    -----
-    This analysis currently only runs in serial.
-
     .. versionadded:: 2.1.0
     """
 
@@ -96,7 +107,6 @@ class WaterBridge(BridgedInteraction):
 
     def setup(self, ifp_store: Optional["IFPResults"] = None, **kwargs: Any) -> None:
         super().setup(ifp_store=ifp_store, **kwargs)
-        self.kwargs.pop("n_jobs", None)
         self.residues = self.kwargs.pop("residues", None)
         self.converter_kwargs = self.kwargs.pop("converter_kwargs", ({}, {}))
         self.water_fp.use_segid = self.kwargs.pop("use_segid", False)
@@ -120,8 +130,19 @@ class WaterBridge(BridgedInteraction):
             An MDAnalysis AtomGroup for the protein (with multiple residues)
         """  # noqa: E501
         water_obj = cast("MDAObject", self.water)
+        n_jobs = self.kwargs.pop("n_jobs", None)
+        parallel_strategy = self.kwargs.pop("parallel_strategy", "queue")
+        runner = (
+            self.water_fp._run_serial
+            if n_jobs == 1
+            else partial(
+                self.water_fp._run_parallel,
+                n_jobs=n_jobs,
+                parallel_strategy=parallel_strategy,
+            )
+        )
         # Run analysis for ligand-water and water-protein interactions
-        lig_water_ifp: dict[int, IFP] = self.water_fp._run_serial(
+        lig_water_ifp: dict[int, IFP] = runner(
             traj,
             lig,
             water_obj,
@@ -130,7 +151,7 @@ class WaterBridge(BridgedInteraction):
             **self.kwargs,
             desc="Ligand-Water",
         )
-        water_prot_ifp: dict[int, IFP] = self.water_fp._run_serial(
+        water_prot_ifp: dict[int, IFP] = runner(
             traj,
             water_obj,
             prot,
@@ -141,7 +162,7 @@ class WaterBridge(BridgedInteraction):
         )
         if self.order >= 2:
             # Run water-water interaction analysis
-            water_ifp: dict[int, IFP] | None = self.water_fp._run_serial(
+            water_ifp: dict[int, IFP] | None = runner(
                 traj,
                 water_obj,
                 water_obj,
@@ -180,19 +201,25 @@ class WaterBridge(BridgedInteraction):
         prot_mol : prolif.molecule.Molecule
             The protein
         """
+        n_jobs = self.kwargs.pop("n_jobs", None)
+        runner = (
+            self.water_fp._run_iter_serial
+            if n_jobs == 1
+            else partial(self.water_fp._run_iter_parallel, n_jobs=n_jobs)
+        )
         water_obj = cast("Molecule", self.water)
         # Run analysis for ligand-water and water-protein interactions
-        lig_water_ifp: "IFPResults" = self.water_fp._run_iter_serial(
+        lig_water_ifp: "IFPResults" = runner(
             lig_iterable, water_obj, residues=None, **self.kwargs
         )
-        water_prot_ifp: "IFPResults" = self.water_fp._run_iter_serial(
+        water_prot_ifp: "IFPResults" = runner(
             [water_obj], prot_mol, residues=self.residues, **self.kwargs
         )
         ifp_wp = water_prot_ifp[0]  # Water → Protein
 
         if self.order >= 2:
             # Run water-water interaction analysis
-            water_ifp: "IFPResults" = self.water_fp._run_iter_serial(
+            water_ifp: "IFPResults" = runner(
                 [water_obj], water_obj, residues=None, **self.kwargs
             )
             ifp_ww: IFP | None = water_ifp[0]  # WaterX -> WaterY

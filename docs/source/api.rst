@@ -36,6 +36,16 @@ be found in the :ref:`source/modules/utils:Helper functions` section.
 You can also find classes to plot the resulting interaction fingerprints in the
 :ref:`source/modules/plotting:Plotting` section
 
+Parallel processing
+-------------------
+
+By default, ProLIF parallelizes the computation of interaction fingerprints using the
+:mod:`multiprocess` module. The number of parallel jobs can be controlled by
+the ``n_jobs`` parameter, which can be set to an integer or ``None`` to use the
+number of logical cores. For more information on the different strategies available
+and how to use them, please refer to the
+:ref:`source/modules/parallel:Parallel processing` section.
+
 Typing
 ------
 Type aliases that are used throughout the code can be found in the
