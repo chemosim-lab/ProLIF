@@ -402,9 +402,10 @@ def analyze_trajectory(
     )
     F = int(lig_f.shape[0])
 
+    lig_res_for_smarts = list(lig_mol.residues.values())[0]
     lig_masks, res_actor_masks = build_actor_masks(lig_mol, residues)
     angle_idx = build_angle_indices(lig_ag, residue_ags)
-    ring_idx = build_ring_cation_indices(lig_mol, residues)
+    ring_idx = build_ring_cation_indices(lig_res_for_smarts, residues)
     vdw_radii = build_vdw_radii(
         lig_mol, residues, lig_ag=lig_ag, residue_ags=residue_ags, use_real=True
     )
@@ -457,6 +458,7 @@ def analyze_trajectory(
             angle_idx,
             ring_idx,
             vdw_radii,
+            vicinity_cutoff=cutoff,
         )
 
     np_results = {k: np.asarray(v) for k, v in results.items()}
@@ -532,6 +534,7 @@ def analyze_frame(
         angle_idx,
         ring_idx,
         vdw_radii,
+        vicinity_cutoff=cutoff,
     )
 
     output = {}

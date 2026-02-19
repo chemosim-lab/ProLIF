@@ -807,12 +807,19 @@ def has_interactions_frames(
     angle_idx: dict,
     ring_idx: dict,
     vdw_radii: tuple,
+    vicinity_cutoff: float = 6.0,
 ) -> dict[str, jnp.ndarray]:
     """Evaluate nine interactions across frames and residues, returning booleans.
 
     Returns a mapping name → (F, R) boolean arrays for:
     Hydrophobic, Cationic, Anionic, VdWContact, HBAcceptor, HBDonor,
     PiStacking, CationPi, PiCation.
+
+    Args:
+        vicinity_cutoff: Per-frame minimum atom-atom distance cutoff. Any
+            (frame, residue) pair where the closest atom-atom distance exceeds
+            this value is masked to False, matching ProLIF's vicinity_cutoff
+            behaviour. Defaults to 6.0 to match ProLIF's default.
     """
     F = int(lig_f.shape[0])
     R = int(res_f.shape[1]) if res_f.ndim == 4 else 0
@@ -916,6 +923,12 @@ def has_interactions_frames(
         else:
             ps_out.append(jnp.zeros((F,), dtype=bool))
     results['PiStacking'] = jnp.stack(ps_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+
+    if R and vicinity_cutoff is not None:
+        masked_d = jnp.where(res_valid_mask[None, :, None, :], d, jnp.inf)
+        min_dist = masked_d.min(axis=(2, 3))
+        vicinity_mask = min_dist <= vicinity_cutoff
+        results = {k: v & vicinity_mask for k, v in results.items()}
 
     return results
 
