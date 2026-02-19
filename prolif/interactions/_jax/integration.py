@@ -7,21 +7,22 @@ This module provides JAX-accelerated versions of ProLIF interactions that:
 
 """
 
+from collections.abc import Iterator
 from itertools import product
-from math import radians, degrees
-from typing import Iterator
+from typing import Any
 
 import jax.numpy as jnp
 from rdkit.Geometry import Point3D
 
-from prolif.interactions.base import Distance, SingleAngle, DoubleAngle, BasePiStacking
+from prolif.interactions.base import BasePiStacking, Distance, DoubleAngle, SingleAngle
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
-from .primitives import pairwise_distances, angle_at_vertex, angle_between_vectors
+
+from .primitives import pairwise_distances
 
 
 def compute_distances_batch(
-    lig_coords,
-    prot_coords,
+    lig_coords: Any,
+    prot_coords: Any,
 ) -> jnp.ndarray:
     """Compute pairwise distances between two atom sets using JAX.
 
@@ -44,7 +45,12 @@ class JAXDistanceMixin:
     while still using ProLIF's SMARTS matching.
     """
 
-    def detect(self, lig_res, prot_res) -> Iterator:
+    lig_pattern: Any
+    prot_pattern: Any
+    distance: float
+    metadata: Any
+
+    def detect(self, lig_res: Any, prot_res: Any) -> Iterator[Any]:
         """Detect interactions using JAX-accelerated distance calculation."""
         lig_matches = lig_res.GetSubstructMatches(self.lig_pattern)
         prot_matches = prot_res.GetSubstructMatches(self.prot_pattern)
@@ -75,10 +81,10 @@ class JAXDistanceMixin:
 
 
 def detect_distance_batch(
-    interaction,
-    lig_res,
-    residues: list,
-) -> list[list[dict]]:
+    interaction: Any,
+    lig_res: Any,
+    residues: list[Any],
+) -> list[list[dict[str, Any]]]:
     """Batch detect Distance interactions across multiple residues.
 
     This is the main entry point for JAX-accelerated interaction detection.
@@ -135,41 +141,46 @@ def detect_distance_batch(
     return results
 
 
-def _is_inverted_interaction(interaction) -> bool:
+def _is_inverted_interaction(interaction: Any) -> bool:
     """Check if an interaction was created with invert_role."""
     name = type(interaction).__name__
-    return name in ('HBDonor', 'XBDonor', 'Anionic', 'PiCation', 'MetalAcceptor')
+    return name in {"HBDonor", "XBDonor", "Anionic", "PiCation", "MetalAcceptor"}
 
 
-def _get_interaction_type(interaction) -> str:
+def _get_interaction_type(interaction: Any) -> str:
     """Determine the base type of an interaction."""
     cls = type(interaction)
     name = cls.__name__
 
-    if name == 'VdWContact':
-        return 'vdwcontact'
-    if name == 'PiStacking':
-        return 'pistacking_composite'
-    if name in ('FaceToFace', 'EdgeToFace'):
-        return 'pistacking'
-    if name in ('CationPi', 'PiCation'):
-        return 'cationpi'
+    if name == "VdWContact":
+        return "vdwcontact"
+    if name == "PiStacking":
+        return "pistacking_composite"
+    if name in {"FaceToFace", "EdgeToFace"}:
+        return "pistacking"
+    if name in {"CationPi", "PiCation"}:
+        return "cationpi"
 
     if isinstance(interaction, BasePiStacking):
-        return 'pistacking'
-    if hasattr(interaction, 'pi_ring') and hasattr(interaction, 'cation'):
-        return 'cationpi'
+        return "pistacking"
+    if hasattr(interaction, "pi_ring") and hasattr(interaction, "cation"):
+        return "cationpi"
     if isinstance(interaction, DoubleAngle):
-        return 'doubleangle'
+        return "doubleangle"
     if isinstance(interaction, SingleAngle):
-        return 'singleangle'
+        return "singleangle"
     if isinstance(interaction, Distance):
-        return 'distance'
+        return "distance"
 
-    return 'distance'
+    return "distance"
 
 
-def _has_distance_interaction(interaction, lig_res, residues, is_inverted) -> list[bool]:
+def _has_distance_interaction(
+    interaction: Any,
+    lig_res: Any,
+    residues: list[Any],
+    is_inverted: bool,
+) -> list[bool]:
     """Check Distance-based interactions."""
     if is_inverted:
         lig_pattern = interaction.prot_pattern
@@ -200,7 +211,12 @@ def _has_distance_interaction(interaction, lig_res, residues, is_inverted) -> li
     return results
 
 
-def _has_singleangle_interaction(interaction, lig_res, residues, is_inverted) -> list[bool]:
+def _has_singleangle_interaction(
+    interaction: Any,
+    lig_res: Any,
+    residues: list[Any],
+    is_inverted: bool,
+) -> list[bool]:
     """Check SingleAngle-based interactions (HBAcceptor, HBDonor).
 
     For SingleAngle:
@@ -245,7 +261,12 @@ def _has_singleangle_interaction(interaction, lig_res, residues, is_inverted) ->
     return results
 
 
-def _has_doubleangle_interaction(interaction, lig_res, residues, is_inverted) -> list[bool]:
+def _has_doubleangle_interaction(
+    interaction: Any,
+    lig_res: Any,
+    residues: list[Any],
+    is_inverted: bool,
+) -> list[bool]:
     """Check DoubleAngle-based interactions (XBAcceptor, XBDonor).
 
     For DoubleAngle:
@@ -293,7 +314,12 @@ def _has_doubleangle_interaction(interaction, lig_res, residues, is_inverted) ->
     return results
 
 
-def _has_cationpi_interaction(interaction, lig_res, residues, is_inverted) -> list[bool]:
+def _has_cationpi_interaction(
+    interaction: Any,
+    lig_res: Any,
+    residues: list[Any],
+    is_inverted: bool,
+) -> list[bool]:
     """Check CationPi/PiCation interactions."""
     results = []
     for res in residues:
@@ -332,7 +358,12 @@ def _has_cationpi_interaction(interaction, lig_res, residues, is_inverted) -> li
     return results
 
 
-def _has_pistacking_interaction(interaction, lig_res, residues, is_inverted) -> list[bool]:
+def _has_pistacking_interaction(
+    interaction: Any,
+    lig_res: Any,
+    residues: list[Any],
+    _is_inverted: bool,
+) -> list[bool]:
     """Check PiStacking interactions (FaceToFace, EdgeToFace, PiStacking)."""
     results = []
     for res in residues:
@@ -358,7 +389,9 @@ def _has_pistacking_interaction(interaction, lig_res, residues, is_inverted) -> 
                 res_normal = get_ring_normal_vector(res_centroid, res_pi_coords)
                 plane_angle = lig_normal.AngleTo(res_normal)
 
-                if not angle_between_limits(plane_angle, *interaction.plane_angle, ring=True):
+                if not angle_between_limits(
+                    plane_angle, *interaction.plane_angle, ring=True
+                ):
                     continue
 
                 c1c2 = lig_centroid.DirectionVector(res_centroid)
@@ -366,9 +399,10 @@ def _has_pistacking_interaction(interaction, lig_res, residues, is_inverted) -> 
                 n1c1c2 = lig_normal.AngleTo(c1c2)
                 n2c2c1 = res_normal.AngleTo(c2c1)
 
-                ncc_ok = (
-                    angle_between_limits(n1c1c2, *interaction.normal_to_centroid_angle, ring=True) or
-                    angle_between_limits(n2c2c1, *interaction.normal_to_centroid_angle, ring=True)
+                ncc_ok = angle_between_limits(
+                    n1c1c2, *interaction.normal_to_centroid_angle, ring=True
+                ) or angle_between_limits(
+                    n2c2c1, *interaction.normal_to_centroid_angle, ring=True
                 )
 
                 if ncc_ok:
@@ -379,7 +413,7 @@ def _has_pistacking_interaction(interaction, lig_res, residues, is_inverted) -> 
                         if intersect is not None:
                             intersect_dist = min(
                                 lig_centroid.Distance(intersect),
-                                res_centroid.Distance(intersect)
+                                res_centroid.Distance(intersect),
                             )
                             if intersect_dist <= interaction.intersect_radius:
                                 found = True
@@ -394,23 +428,35 @@ def _has_pistacking_interaction(interaction, lig_res, residues, is_inverted) -> 
     return results
 
 
-def _has_pistacking_composite(interaction, lig_res, residues) -> list[bool]:
+def _has_pistacking_composite(
+    interaction: Any,
+    lig_res: Any,
+    residues: list[Any],
+) -> list[bool]:
     """Check PiStacking which is FaceToFace OR EdgeToFace."""
     ftf_results = _has_pistacking_interaction(interaction.ftf, lig_res, residues, False)
     etf_results = _has_pistacking_interaction(interaction.etf, lig_res, residues, False)
-    return [f or e for f, e in zip(ftf_results, etf_results)]
+    return [f or e for f, e in zip(ftf_results, etf_results, strict=False)]
 
 
-def _has_vdwcontact_interaction(interaction, lig_res, residues) -> list[bool]:
+def _has_vdwcontact_interaction(
+    interaction: Any,
+    lig_res: Any,
+    residues: list[Any],
+) -> list[bool]:
     """Check VdWContact interactions (all atoms, based on VdW radii)."""
     lig_coords = lig_res.xyz
-    lig_elements = [lig_res.GetAtomWithIdx(i).GetSymbol() for i in range(lig_res.GetNumAtoms())]
+    lig_elements = [
+        lig_res.GetAtomWithIdx(i).GetSymbol() for i in range(lig_res.GetNumAtoms())
+    ]
     lig_radii = jnp.array([interaction.vdwradii.get(e, 1.7) for e in lig_elements])
 
     results = []
     for res in residues:
         res_coords = res.xyz
-        res_elements = [res.GetAtomWithIdx(i).GetSymbol() for i in range(res.GetNumAtoms())]
+        res_elements = [
+            res.GetAtomWithIdx(i).GetSymbol() for i in range(res.GetNumAtoms())
+        ]
         res_radii = jnp.array([interaction.vdwradii.get(e, 1.7) for e in res_elements])
 
         distances = compute_distances_batch(lig_coords, res_coords)
@@ -422,9 +468,9 @@ def _has_vdwcontact_interaction(interaction, lig_res, residues) -> list[bool]:
 
 
 def has_interaction_batch(
-    interaction,
-    lig_res,
-    residues: list,
+    interaction: Any,
+    lig_res: Any,
+    residues: list[Any],
 ) -> list[bool]:
     """Check if interaction exists for each residue (boolean result).
 
@@ -439,19 +485,18 @@ def has_interaction_batch(
     is_inverted = _is_inverted_interaction(interaction)
     itype = _get_interaction_type(interaction)
 
-    if itype == 'distance':
+    if itype == "distance":
         return _has_distance_interaction(interaction, lig_res, residues, is_inverted)
-    elif itype == 'singleangle':
+    if itype == "singleangle":
         return _has_singleangle_interaction(interaction, lig_res, residues, is_inverted)
-    elif itype == 'doubleangle':
+    if itype == "doubleangle":
         return _has_doubleangle_interaction(interaction, lig_res, residues, is_inverted)
-    elif itype == 'cationpi':
+    if itype == "cationpi":
         return _has_cationpi_interaction(interaction, lig_res, residues, is_inverted)
-    elif itype == 'pistacking':
+    if itype == "pistacking":
         return _has_pistacking_interaction(interaction, lig_res, residues, is_inverted)
-    elif itype == 'pistacking_composite':
+    if itype == "pistacking_composite":
         return _has_pistacking_composite(interaction, lig_res, residues)
-    elif itype == 'vdwcontact':
+    if itype == "vdwcontact":
         return _has_vdwcontact_interaction(interaction, lig_res, residues)
-    else:
-        return _has_distance_interaction(interaction, lig_res, residues, is_inverted)
+    return _has_distance_interaction(interaction, lig_res, residues, is_inverted)

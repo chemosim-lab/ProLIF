@@ -252,6 +252,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["ARG001"]
+"benchmarks/*" = ["E501", "F841", "FURB113", "RUF059", "SIM105", "SIM108", "SIM113", "T201"]
 
 [tool.isort]
 profile = "black"

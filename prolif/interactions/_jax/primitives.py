@@ -6,6 +6,8 @@ geometric operations used in interaction fingerprinting. All functions
 are designed to work with batched inputs and can be JIT-compiled.
 """
 
+from typing import cast
+
 import jax.numpy as jnp
 from jax.ops import segment_sum
 
@@ -22,7 +24,7 @@ def pairwise_distances(coords1: jnp.ndarray, coords2: jnp.ndarray) -> jnp.ndarra
         between coords1[i] and coords2[j].
     """
     diff = coords1[:, None, :] - coords2[None, :, :]
-    return jnp.linalg.norm(diff, axis=-1)
+    return cast(jnp.ndarray, jnp.linalg.norm(diff, axis=-1))
 
 
 def batch_centroids(
@@ -41,9 +43,7 @@ def batch_centroids(
     """
     K = len(group_indices)
     flat_indices = jnp.concatenate(group_indices)
-    segment_ids = jnp.repeat(
-        jnp.arange(K), jnp.array([len(g) for g in group_indices])
-    )
+    segment_ids = jnp.repeat(jnp.arange(K), jnp.array([len(g) for g in group_indices]))
 
     points = coords[flat_indices]
     sums = segment_sum(points, segment_ids, num_segments=K)
@@ -100,8 +100,10 @@ def batch_ring_normals_masked(
     b_hat = b / jnp.clip(jnp.linalg.norm(b, axis=-1, keepdims=True), 1e-8)
     normals = jnp.cross(a_hat, b_hat)
     norms = jnp.linalg.norm(normals, axis=1, keepdims=True)
-    normals = jnp.where(norms > 0, normals / norms, jnp.array([0.0, 0.0, 1.0])[None, :])
-    return normals
+    return cast(
+        jnp.ndarray,
+        jnp.where(norms > 0, normals / norms, jnp.array([0.0, 0.0, 1.0])[None, :]),
+    )
 
 
 def ring_normal(coords: jnp.ndarray, ring_indices: jnp.ndarray) -> jnp.ndarray:
@@ -124,7 +126,10 @@ def ring_normal(coords: jnp.ndarray, ring_indices: jnp.ndarray) -> jnp.ndarray:
     b_hat = b / jnp.clip(jnp.linalg.norm(b), 1e-8)
     normal = jnp.cross(a_hat, b_hat)
     norm = jnp.linalg.norm(normal)
-    return jnp.where(norm > 0, normal / norm, jnp.array([0.0, 0.0, 1.0]))
+    return cast(
+        jnp.ndarray,
+        jnp.where(norm > 0, normal / norm, jnp.array([0.0, 0.0, 1.0])),
+    )
 
 
 def batch_ring_normals(

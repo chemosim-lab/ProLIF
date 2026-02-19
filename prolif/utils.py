@@ -11,7 +11,7 @@ from copy import deepcopy
 from functools import wraps
 from importlib.util import find_spec
 from math import pi
-from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, overload
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast, overload
 
 import numpy as np
 import pandas as pd
@@ -337,7 +337,7 @@ def to_dataframe(
     if drop_empty:
         mask = (df != empty_value).any(axis=0)
         df = df.loc[:, mask]
-    return df
+    return cast(pd.DataFrame, df)
 
 
 def pandas_series_to_bv(s: pd.Series) -> ExplicitBitVect:

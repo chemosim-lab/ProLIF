@@ -142,7 +142,7 @@ class Interaction(ABC):
         """
         return min(
             self(lig_res, prot_res, metadata=True),
-            key=itemgetter("distance"),  # type: ignore[arg-type]
+            key=itemgetter("distance"),
             default=None,
         )
 

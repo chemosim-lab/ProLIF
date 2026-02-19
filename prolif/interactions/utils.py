@@ -32,7 +32,7 @@ def get_mapindex(res: "Residue", index: int) -> int:
     mapindex : int
         The index of the atom in the :class:`~prolif.molecule.Molecule`
     """
-    return res.GetAtomWithIdx(index).GetUnsignedProp("mapindex")
+    return int(res.GetAtomWithIdx(index).GetUnsignedProp("mapindex"))
 
 
 def _distance_3args_l1_p1(

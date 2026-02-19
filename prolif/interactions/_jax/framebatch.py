@@ -17,14 +17,16 @@ from __future__ import annotations
 
 import math
 import subprocess
+from typing import Any
 
 import jax
 import jax.numpy as jnp
+
 import prolif
 from prolif.interactions import (
     Anionic,
-    CationPi,
     Cationic,
+    CationPi,
     EdgeToFace,
     FaceToFace,
     HBAcceptor,
@@ -41,7 +43,7 @@ from prolif.interactions import (
 from .primitives import angle_at_vertex, angle_between_vectors, pairwise_distances
 
 try:
-    import pynvml
+    import pynvml  # type: ignore[import-untyped]
 except ImportError:
     pynvml = None
 
@@ -96,13 +98,13 @@ def hbacceptor_frames(
         acc_idx: (Na,) ligand acceptor indices.
         d_idx: (K,) residue donor indices.
         h_idx: (K,) residue hydrogen indices (paired with donors).
-        distance_cutoff: Max A–D distance.
-        dha_angle_min/max: D–H–A angle limits (deg).
+        distance_cutoff: Max A-D distance.
+        dha_angle_min/max: D-H-A angle limits (deg).
 
     Returns:
         mask: (F, Na, K) boolean
-        distances: (F, Na, K) A–D distances
-        angles: (F, Na, K) D–H–A angles (deg)
+        distances: (F, Na, K) A-D distances
+        angles: (F, Na, K) D-H-A angles (deg)
     """
     acc = lig_coords_f[:, acc_idx, :]
     donors = res_coords_f[:, d_idx, :]
@@ -141,7 +143,7 @@ def hbdonor_frames(
     """Frame-batched hydrogen bond (donor) geometry (inverted).
 
     The distance is measured between donor and acceptor heavy atoms to mirror
-    SingleAngle semantics after role inversion. The angle remains D–H–A in
+    SingleAngle semantics after role inversion. The angle remains D-H-A in
     degrees. Returns (mask, distances, angles) with shapes (F, Nd, Ka).
     """
     donors = lig_coords_f[:, d_idx, :]
@@ -153,7 +155,9 @@ def hbdonor_frames(
     dc = jnp.nextafter(jnp.asarray(distance_cutoff, dists.dtype), jnp.inf)
     dist_ok = dists <= dc
 
-    ang = angle_at_vertex(donors[:, :, None, :], hydrogens[:, :, None, :], acc[:, None, :, :])
+    ang = angle_at_vertex(
+        donors[:, :, None, :], hydrogens[:, :, None, :], acc[:, None, :, :]
+    )
     ang_deg = jnp.degrees(ang)
     min_deg = jnp.nextafter(jnp.asarray(dha_angle_min, ang_deg.dtype), -jnp.inf)
     max_deg = jnp.nextafter(jnp.asarray(dha_angle_max, ang_deg.dtype), jnp.inf)
@@ -178,7 +182,7 @@ def xbacceptor_frames(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Frame-batched halogen bond (acceptor) geometry.
 
-    Returns (mask, distances[A–X], axd_angles, xar_angles) with shapes (F, Na, K).
+    Returns (mask, distances[A-X], axd_angles, xar_angles) with shapes (F, Na, K).
     """
     acc = lig_coords_f[:, a_idx, :]
     neigh = lig_coords_f[:, r_idx, :]
@@ -225,7 +229,7 @@ def xbdonor_frames(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Frame-batched halogen bond (donor) geometry (inverted).
 
-    Returns (mask, distances[X–A], axd_angles, xar_angles) with shapes (F, Nx, Ka).
+    Returns (mask, distances[X-A], axd_angles, xar_angles) with shapes (F, Nx, Ka).
     """
     hal = lig_coords_f[:, x_idx, :]
     don = lig_coords_f[:, d_idx, :]
@@ -285,7 +289,7 @@ def _ring_centroids_normals_frames(
         a_hat = a / jnp.clip(jnp.linalg.norm(a, axis=-1, keepdims=True), 1e-8)
         b_hat = b / jnp.clip(jnp.linalg.norm(b, axis=-1, keepdims=True), 1e-8)
         n = jnp.cross(a_hat, b_hat)
-        n = n / jnp.clip(jnp.linalg.norm(n, axis=-1, keepdims=True), 1e-8)
+        n /= jnp.clip(jnp.linalg.norm(n, axis=-1, keepdims=True), 1e-8)
         centroids_list.append(centroid)
         normals_list.append(n)
     if centroids_list:
@@ -307,19 +311,21 @@ def cationpi_frames(
     angle_min: float = 0.0,
     angle_max: float = 30.0,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Frame-batched Cation–Pi geometry for one orientation (ring vs cation).
+    """Frame-batched Cation-Pi geometry for one orientation (ring vs cation).
 
     Angles are folded into [0, 90] to account for ring-normal sign ambiguity,
     matching ProLIF's ``angle_between_limits(..., ring=True)`` behaviour.
 
     Returns:
         mask: (F, Kr, Kc)
-        distances: (F, Kr, Kc) centroid–cation distances
-        angles: (F, Kr, Kc) folded normal–centroid vector angles (deg)
+        distances: (F, Kr, Kc) centroid-cation distances
+        angles: (F, Kr, Kc) folded normal-centroid vector angles (deg)
     """
     F = int(ring_coords_f.shape[0])
     centroids, normals = _ring_centroids_normals_frames(ring_coords_f, ring_list)
-    cations = cation_coords_f[:, cation_idx, :] if cation_idx.size else jnp.zeros((F, 0, 3))
+    cations = (
+        cation_coords_f[:, cation_idx, :] if cation_idx.size else jnp.zeros((F, 0, 3))
+    )
     if centroids.shape[1] == 0 or cations.shape[1] == 0:
         z = jnp.zeros((F, centroids.shape[1], cations.shape[1]))
         return z.astype(bool), z, z
@@ -406,7 +412,7 @@ def pistacking_frames(
     intersect: bool = False,
     intersect_radius: float = 1.5,
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """Frame-batched Pi-stacking geometry for ring–ring pairs.
+    """Frame-batched Pi-stacking geometry for ring-ring pairs.
 
     When ``intersect=True``, applies ProLIF's EdgeToFace intersection check:
     the line of intersection of the two ring planes must pass within
@@ -414,7 +420,7 @@ def pistacking_frames(
 
     Returns:
         mask: (F, Kl, Kr)
-        distances: (F, Kl, Kr) centroid–centroid distances
+        distances: (F, Kl, Kr) centroid-centroid distances
         plane_angles: (F, Kl, Kr) normals plane angle (deg)
         ncc_angles: (F, Kl, Kr) min of the two normal→centroid angles (deg)
     """
@@ -445,11 +451,14 @@ def pistacking_frames(
 
     mask = dist_ok & pa_ok & ncc_ok
     if intersect:
-        mask = mask & _compute_intersect_check(lc, ln, rc, rn, intersect_radius)
+        mask &= _compute_intersect_check(lc, ln, rc, rn, intersect_radius)
     return mask, dists, pa_deg, ncc_deg
 
 
-def build_actor_masks(lig_mol, residues):
+def build_actor_masks(
+    lig_mol: Any,
+    residues: list[Any],
+) -> tuple[dict[str, jnp.ndarray], dict[str, jnp.ndarray]]:
     """Compute boolean masks for distance-only actor atoms.
 
     Returns ligand and residue masks for Hydrophobic, Cationic, Anionic,
@@ -461,14 +470,14 @@ def build_actor_masks(lig_mol, residues):
     the patterns must be applied to the swapped sides to match ProLIF semantics.
     """
 
-    _INVERTED = frozenset({'Anionic', 'MetalAcceptor'})
+    INVERTED = frozenset({"Anionic", "MetalAcceptor"})
 
     inters = {
-        'Hydrophobic': Hydrophobic(),
-        'Cationic': Cationic(),
-        'Anionic': Anionic(),
-        'MetalDonor': MetalDonor(),
-        'MetalAcceptor': MetalAcceptor(),
+        "Hydrophobic": Hydrophobic(),
+        "Cationic": Cationic(),
+        "Anionic": Anionic(),
+        "MetalDonor": MetalDonor(),
+        "MetalAcceptor": MetalAcceptor(),
     }
 
     N = lig_mol.GetNumAtoms()
@@ -477,7 +486,7 @@ def build_actor_masks(lig_mol, residues):
     lig_masks = {}
     res_masks = {}
     for name, inter in inters.items():
-        inverted = name in _INVERTED
+        inverted = name in INVERTED
         lig_pat = inter.prot_pattern if inverted else inter.lig_pattern
         res_pat = inter.lig_pattern if inverted else inter.prot_pattern
 
@@ -496,14 +505,19 @@ def build_actor_masks(lig_mol, residues):
                 idxs = [mm[0] for mm in pmatches]
                 mm = jnp.zeros((r.GetNumAtoms(),), dtype=bool)
                 mm = mm.at[jnp.array(idxs)].set(True)
-                m = m.at[:r.GetNumAtoms()].set(mm)
+                m = m.at[: r.GetNumAtoms()].set(mm)
             r_rows.append(m)
-        res_masks[name] = jnp.stack(r_rows, axis=0) if r_rows else jnp.zeros((0, 0), dtype=bool)
+        res_masks[name] = (
+            jnp.stack(r_rows, axis=0) if r_rows else jnp.zeros((0, 0), dtype=bool)
+        )
 
     return lig_masks, res_masks
 
 
-def build_angle_indices_rdkit(lig_mol, residues):
+def build_angle_indices_rdkit(
+    lig_mol: Any,
+    residues: list[Any],
+) -> dict[str, dict[str, Any]]:
     """Precompute angle indices using RDKit molecules (internal helper).
 
     This variant derives indices from ProLIF RDKit molecules. It is intended
@@ -521,21 +535,30 @@ def build_angle_indices_rdkit(lig_mol, residues):
     lmatches = lig_mol.GetSubstructMatches(hb_acc.lig_pattern)
     if lmatches:
         hb_acc_idx = [m[0] for m in lmatches]
-    hb_acc_idx = jnp.array(hb_acc_idx, dtype=int) if hb_acc_idx else jnp.zeros((0,), dtype=int)
+    hb_acc_idx = (
+        jnp.array(hb_acc_idx, dtype=int) if hb_acc_idx else jnp.zeros((0,), dtype=int)
+    )
 
     hb_d_rows, hb_h_rows = [], []
     for r in residues:
         pmatches = r.GetSubstructMatches(hb_acc.prot_pattern)
         pairs = []
-        for m in (pmatches or []):
+        for m in pmatches or []:
             if len(m) >= 2:
                 pairs.append((m[0], m[1]))
-        d = jnp.array([p[0] for p in pairs], dtype=int) if pairs else jnp.zeros((0,), dtype=int)
-        h = jnp.array([p[1] for p in pairs], dtype=int) if pairs else jnp.zeros((0,), dtype=int)
+        d = (
+            jnp.array([p[0] for p in pairs], dtype=int)
+            if pairs
+            else jnp.zeros((0,), dtype=int)
+        )
+        h = (
+            jnp.array([p[1] for p in pairs], dtype=int)
+            if pairs
+            else jnp.zeros((0,), dtype=int)
+        )
         hb_d_rows.append(d)
         hb_h_rows.append(h)
 
-    xb_a_rows, xb_r_rows = [], []
     lmatches = lig_mol.GetSubstructMatches(xb_acc.lig_pattern)
     a = [m[0] for m in lmatches] if lmatches else []
     r = [m[1] for m in lmatches] if lmatches else []
@@ -546,71 +569,110 @@ def build_angle_indices_rdkit(lig_mol, residues):
     for res in residues:
         pmatches = res.GetSubstructMatches(xb_acc.prot_pattern)
         pairs = []
-        for m in (pmatches or []):
+        for m in pmatches or []:
             if len(m) >= 2:
                 pairs.append((m[1], m[0]))
-        x = jnp.array([p[0] for p in pairs], dtype=int) if pairs else jnp.zeros((0,), dtype=int)
-        d = jnp.array([p[1] for p in pairs], dtype=int) if pairs else jnp.zeros((0,), dtype=int)
+        x = (
+            jnp.array([p[0] for p in pairs], dtype=int)
+            if pairs
+            else jnp.zeros((0,), dtype=int)
+        )
+        d = (
+            jnp.array([p[1] for p in pairs], dtype=int)
+            if pairs
+            else jnp.zeros((0,), dtype=int)
+        )
         xb_x_rows.append(x)
         xb_d_rows.append(d)
 
     lmatches = lig_mol.GetSubstructMatches(hb_don.prot_pattern)
     hb_lig_pairs = []
-    for m in (lmatches or []):
+    for m in lmatches or []:
         if len(m) >= 2:
             hb_lig_pairs.append((m[0], m[1]))
-    hb_lig_d_idx = jnp.array([p[0] for p in hb_lig_pairs], dtype=int) if hb_lig_pairs else jnp.zeros((0,), dtype=int)
-    hb_lig_h_idx = jnp.array([p[1] for p in hb_lig_pairs], dtype=int) if hb_lig_pairs else jnp.zeros((0,), dtype=int)
+    hb_lig_d_idx = (
+        jnp.array([p[0] for p in hb_lig_pairs], dtype=int)
+        if hb_lig_pairs
+        else jnp.zeros((0,), dtype=int)
+    )
+    hb_lig_h_idx = (
+        jnp.array([p[1] for p in hb_lig_pairs], dtype=int)
+        if hb_lig_pairs
+        else jnp.zeros((0,), dtype=int)
+    )
 
     hb_res_acc_rows = []
     for res in residues:
         pmatches = res.GetSubstructMatches(hb_don.lig_pattern)
-        acc = jnp.array([m[0] for m in (pmatches or [])], dtype=int) if pmatches else jnp.zeros((0,), dtype=int)
+        acc = (
+            jnp.array([m[0] for m in (pmatches or [])], dtype=int)
+            if pmatches
+            else jnp.zeros((0,), dtype=int)
+        )
         hb_res_acc_rows.append(acc)
 
     lmatches = lig_mol.GetSubstructMatches(xb_don.lig_pattern)
     xbdon_pairs = []
-    for m in (lmatches or []):
+    for m in lmatches or []:
         if len(m) >= 2:
             xbdon_pairs.append((m[1], m[0]))
-    xbdon_lig_x_idx = jnp.array([p[0] for p in xbdon_pairs], dtype=int) if xbdon_pairs else jnp.zeros((0,), dtype=int)
-    xbdon_lig_d_idx = jnp.array([p[1] for p in xbdon_pairs], dtype=int) if xbdon_pairs else jnp.zeros((0,), dtype=int)
+    xbdon_lig_x_idx = (
+        jnp.array([p[0] for p in xbdon_pairs], dtype=int)
+        if xbdon_pairs
+        else jnp.zeros((0,), dtype=int)
+    )
+    xbdon_lig_d_idx = (
+        jnp.array([p[1] for p in xbdon_pairs], dtype=int)
+        if xbdon_pairs
+        else jnp.zeros((0,), dtype=int)
+    )
 
     xbdon_res_a_rows, xbdon_res_r_rows = [], []
     for res in residues:
         pmatches = res.GetSubstructMatches(xb_don.lig_pattern)
-        a = jnp.array([m[0] for m in (pmatches or [])], dtype=int) if pmatches else jnp.zeros((0,), dtype=int)
-        r = jnp.array([m[1] for m in (pmatches or [])], dtype=int) if pmatches else jnp.zeros((0,), dtype=int)
-        xbdon_res_a_rows.append(a)
-        xbdon_res_r_rows.append(r)
+        a_idx = (
+            jnp.array([m[0] for m in (pmatches or [])], dtype=int)
+            if pmatches
+            else jnp.zeros((0,), dtype=int)
+        )
+        r_idx = (
+            jnp.array([m[1] for m in (pmatches or [])], dtype=int)
+            if pmatches
+            else jnp.zeros((0,), dtype=int)
+        )
+        xbdon_res_a_rows.append(a_idx)
+        xbdon_res_r_rows.append(r_idx)
 
     return {
-        'hb': {
-            'acc_idx': hb_acc_idx,
-            'res_d_idx': hb_d_rows,
-            'res_h_idx': hb_h_rows,
+        "hb": {
+            "acc_idx": hb_acc_idx,
+            "res_d_idx": hb_d_rows,
+            "res_h_idx": hb_h_rows,
         },
-        'hb_donor': {
-            'lig_d_idx': hb_lig_d_idx,
-            'lig_h_idx': hb_lig_h_idx,
-            'res_a_idx': hb_res_acc_rows,
+        "hb_donor": {
+            "lig_d_idx": hb_lig_d_idx,
+            "lig_h_idx": hb_lig_h_idx,
+            "res_a_idx": hb_res_acc_rows,
         },
-        'xbacc': {
-            'lig_a_idx': xbacc_a_idx,
-            'lig_r_idx': xbacc_r_idx,
-            'res_x_idx': xb_x_rows,
-            'res_d_idx': xb_d_rows,
+        "xbacc": {
+            "lig_a_idx": xbacc_a_idx,
+            "lig_r_idx": xbacc_r_idx,
+            "res_x_idx": xb_x_rows,
+            "res_d_idx": xb_d_rows,
         },
-        'xbdon': {
-            'lig_x_idx': xbdon_lig_x_idx,
-            'lig_d_idx': xbdon_lig_d_idx,
-            'res_a_idx': xbdon_res_a_rows,
-            'res_r_idx': xbdon_res_r_rows,
+        "xbdon": {
+            "lig_x_idx": xbdon_lig_x_idx,
+            "lig_d_idx": xbdon_lig_d_idx,
+            "res_a_idx": xbdon_res_a_rows,
+            "res_r_idx": xbdon_res_r_rows,
         },
     }
 
 
-def build_angle_indices(lig_ag, residue_ags):
+def build_angle_indices(
+    lig_ag: Any,
+    residue_ags: list[Any],
+) -> dict[str, dict[str, Any]]:
     """Build angle indices from AtomGroups for real-frame alignment.
 
     Derives RDKit molecules directly from the provided MDAnalysis AtomGroups
@@ -631,61 +693,83 @@ def build_angle_indices(lig_ag, residue_ags):
     lmatches = lig_mol.GetSubstructMatches(hb_acc.lig_pattern)
     if lmatches:
         hb_acc_idx = [m[0] for m in lmatches]
-    hb_acc_idx = jnp.array(hb_acc_idx, dtype=int) if hb_acc_idx else jnp.zeros((0,), dtype=int)
+    hb_acc_idx = (
+        jnp.array(hb_acc_idx, dtype=int) if hb_acc_idx else jnp.zeros((0,), dtype=int)
+    )
 
     hb_d_rows, hb_h_rows = [], []
     for r in res_mols:
         pmatches = r.GetSubstructMatches(hb_acc.prot_pattern)
         pairs = []
-        for m in (pmatches or []):
+        for m in pmatches or []:
             if len(m) >= 2:
                 pairs.append((m[0], m[1]))
-        d = jnp.array([p[0] for p in pairs], dtype=int) if pairs else jnp.zeros((0,), dtype=int)
-        h = jnp.array([p[1] for p in pairs], dtype=int) if pairs else jnp.zeros((0,), dtype=int)
+        d = (
+            jnp.array([p[0] for p in pairs], dtype=int)
+            if pairs
+            else jnp.zeros((0,), dtype=int)
+        )
+        h = (
+            jnp.array([p[1] for p in pairs], dtype=int)
+            if pairs
+            else jnp.zeros((0,), dtype=int)
+        )
         hb_d_rows.append(d)
         hb_h_rows.append(h)
 
     lmatches = lig_mol.GetSubstructMatches(hb_don.prot_pattern)
     hb_lig_pairs = []
-    for m in (lmatches or []):
+    for m in lmatches or []:
         if len(m) >= 2:
             hb_lig_pairs.append((m[0], m[1]))
-    hb_lig_d_idx = jnp.array([p[0] for p in hb_lig_pairs], dtype=int) if hb_lig_pairs else jnp.zeros((0,), dtype=int)
-    hb_lig_h_idx = jnp.array([p[1] for p in hb_lig_pairs], dtype=int) if hb_lig_pairs else jnp.zeros((0,), dtype=int)
+    hb_lig_d_idx = (
+        jnp.array([p[0] for p in hb_lig_pairs], dtype=int)
+        if hb_lig_pairs
+        else jnp.zeros((0,), dtype=int)
+    )
+    hb_lig_h_idx = (
+        jnp.array([p[1] for p in hb_lig_pairs], dtype=int)
+        if hb_lig_pairs
+        else jnp.zeros((0,), dtype=int)
+    )
 
     hb_res_acc_rows = []
     for r in res_mols:
         pmatches = r.GetSubstructMatches(hb_don.lig_pattern)
-        acc = jnp.array([m[0] for m in (pmatches or [])], dtype=int) if pmatches else jnp.zeros((0,), dtype=int)
+        acc = (
+            jnp.array([m[0] for m in (pmatches or [])], dtype=int)
+            if pmatches
+            else jnp.zeros((0,), dtype=int)
+        )
         hb_res_acc_rows.append(acc)
 
     return {
-        'hb': {
-            'acc_idx': hb_acc_idx,
-            'res_d_idx': hb_d_rows,
-            'res_h_idx': hb_h_rows,
+        "hb": {
+            "acc_idx": hb_acc_idx,
+            "res_d_idx": hb_d_rows,
+            "res_h_idx": hb_h_rows,
         },
-        'hb_donor': {
-            'lig_d_idx': hb_lig_d_idx,
-            'lig_h_idx': hb_lig_h_idx,
-            'res_a_idx': hb_res_acc_rows,
+        "hb_donor": {
+            "lig_d_idx": hb_lig_d_idx,
+            "lig_h_idx": hb_lig_h_idx,
+            "res_a_idx": hb_res_acc_rows,
         },
-        'xbacc': {
-            'lig_a_idx': jnp.zeros((0,), dtype=int),
-            'lig_r_idx': jnp.zeros((0,), dtype=int),
-            'res_x_idx': [jnp.zeros((0,), dtype=int) for _ in res_mols],
-            'res_d_idx': [jnp.zeros((0,), dtype=int) for _ in res_mols],
+        "xbacc": {
+            "lig_a_idx": jnp.zeros((0,), dtype=int),
+            "lig_r_idx": jnp.zeros((0,), dtype=int),
+            "res_x_idx": [jnp.zeros((0,), dtype=int) for _ in res_mols],
+            "res_d_idx": [jnp.zeros((0,), dtype=int) for _ in res_mols],
         },
-        'xbdon': {
-            'lig_x_idx': jnp.zeros((0,), dtype=int),
-            'lig_d_idx': jnp.zeros((0,), dtype=int),
-            'res_a_idx': [jnp.zeros((0,), dtype=int) for _ in res_mols],
-            'res_r_idx': [jnp.zeros((0,), dtype=int) for _ in res_mols],
+        "xbdon": {
+            "lig_x_idx": jnp.zeros((0,), dtype=int),
+            "lig_d_idx": jnp.zeros((0,), dtype=int),
+            "res_a_idx": [jnp.zeros((0,), dtype=int) for _ in res_mols],
+            "res_r_idx": [jnp.zeros((0,), dtype=int) for _ in res_mols],
         },
     }
 
 
-def build_ring_cation_indices(lig_mol, residues):
+def build_ring_cation_indices(lig_mol: Any, residues: list[Any]) -> dict[str, Any]:
     """Precompute ring and cation indices for ring-based interactions.
 
     Uses ProLIF patterns to find aromatic rings and cations on the ligand and
@@ -710,31 +794,39 @@ def build_ring_cation_indices(lig_mol, residues):
 
     cp = CationPi()
     lmatches = lig_mol.GetSubstructMatches(cp.cation)
-    lig_cations = jnp.array([m[0] for m in lmatches], dtype=int) if lmatches else jnp.zeros((0,), dtype=int)
+    lig_cations = (
+        jnp.array([m[0] for m in lmatches], dtype=int)
+        if lmatches
+        else jnp.zeros((0,), dtype=int)
+    )
     res_cations = []
     for r in residues:
         pm = r.GetSubstructMatches(cp.cation)
-        rc = jnp.array([m[0] for m in pm], dtype=int) if pm else jnp.zeros((0,), dtype=int)
+        rc = (
+            jnp.array([m[0] for m in pm], dtype=int)
+            if pm
+            else jnp.zeros((0,), dtype=int)
+        )
         res_cations.append(rc)
 
     return {
-        'lig_rings': lig_rings,
-        'res_rings': res_rings,
-        'lig_cations': lig_cations,
-        'res_cations': res_cations,
-        'pi': pi,
-        'cp': cp,
+        "lig_rings": lig_rings,
+        "res_rings": res_rings,
+        "lig_cations": lig_cations,
+        "res_cations": res_cations,
+        "pi": pi,
+        "cp": cp,
     }
 
 
 def build_vdw_radii(
-    lig_mol,
-    residues,
+    lig_mol: Any,
+    residues: list[Any],
     *,
-    lig_ag=None,
-    residue_ags=None,
+    lig_ag: Any = None,
+    residue_ags: list[Any] | None = None,
     use_real: bool = False,
-):
+) -> tuple[jnp.ndarray, jnp.ndarray, float]:
     """Build per-atom van der Waals radii arrays aligned with coordinate order.
 
     When ``use_real`` is True, radii are derived from MDAnalysis AtomGroups to
@@ -745,7 +837,7 @@ def build_vdw_radii(
     ProLIF's VdW tolerance.
     """
 
-    def _symbol_from_atom(atom):
+    def _symbol_from_atom(atom: Any) -> str:
         try:
             sym = atom.element
         except Exception:
@@ -753,20 +845,24 @@ def build_vdw_radii(
         if not sym:
             if mda_guessers is not None:
                 try:
-                    sym = mda_guessers.guess_atom_element(getattr(atom, 'name', ''))
+                    sym = mda_guessers.guess_atom_element(getattr(atom, "name", ""))
                 except Exception:
-                    sym = 'C'
+                    sym = "C"
             else:
-                sym = 'C'
+                sym = "C"
         return str(sym).capitalize()
 
     vdw = VdWContact()
 
     if use_real:
         if lig_ag is None or residue_ags is None:
-            raise ValueError("lig_ag and residue_ags must be provided when use_real=True")
+            raise ValueError(
+                "lig_ag and residue_ags must be provided when use_real=True"
+            )
         lig_elems = [_symbol_from_atom(a) for a in lig_ag.atoms]
-        lig_radii = jnp.array([vdw.vdwradii.get(e, 1.7) for e in lig_elems], dtype=float)
+        lig_radii = jnp.array(
+            [vdw.vdwradii.get(e, 1.7) for e in lig_elems], dtype=float
+        )
 
         max_m = max((ag.n_atoms for ag in residue_ags), default=0)
         res_rows = []
@@ -777,11 +873,15 @@ def build_vdw_radii(
                 pad = jnp.zeros((max_m - ag.n_atoms,), dtype=float)
                 row = jnp.concatenate([row, pad], axis=0)
             res_rows.append(row)
-        res_radii = jnp.stack(res_rows, axis=0) if res_rows else jnp.zeros((0, 0), dtype=float)
+        res_radii = (
+            jnp.stack(res_rows, axis=0) if res_rows else jnp.zeros((0, 0), dtype=float)
+        )
     else:
         N = lig_mol.GetNumAtoms()
         lig_elems = [lig_mol.GetAtomWithIdx(i).GetSymbol() for i in range(N)]
-        lig_radii = jnp.array([vdw.vdwradii.get(e, 1.7) for e in lig_elems], dtype=float)
+        lig_radii = jnp.array(
+            [vdw.vdwradii.get(e, 1.7) for e in lig_elems], dtype=float
+        )
 
         max_m = max((r.GetNumAtoms() for r in residues), default=0)
         res_rows = []
@@ -793,12 +893,14 @@ def build_vdw_radii(
                 pad = jnp.zeros((max_m - m,), dtype=float)
                 row = jnp.concatenate([row, pad], axis=0)
             res_rows.append(row)
-        res_radii = jnp.stack(res_rows, axis=0) if res_rows else jnp.zeros((0, 0), dtype=float)
+        res_radii = (
+            jnp.stack(res_rows, axis=0) if res_rows else jnp.zeros((0, 0), dtype=float)
+        )
 
     return lig_radii, res_radii, float(vdw.tolerance)
 
 
-def has_interactions_frames(
+def has_interactions_frames(  # noqa: PLR0912
     lig_f: jnp.ndarray,
     res_f: jnp.ndarray,
     res_valid_mask: jnp.ndarray,
@@ -827,48 +929,66 @@ def has_interactions_frames(
 
     d = pairwise_distances_frames(lig_f, res_f)
 
-    m = (d <= 4.5) & lig_masks['Hydrophobic'][None, None, :, None] & (res_actor_masks['Hydrophobic'] & res_valid_mask)[None, :, None, :]
-    results['Hydrophobic'] = jnp.any(m, axis=(2, 3)) if R else jnp.zeros((F, 0), dtype=bool)
+    m = (
+        (d <= 4.5)
+        & lig_masks["Hydrophobic"][None, None, :, None]
+        & (res_actor_masks["Hydrophobic"] & res_valid_mask)[None, :, None, :]
+    )
+    results["Hydrophobic"] = (
+        jnp.any(m, axis=(2, 3)) if R else jnp.zeros((F, 0), dtype=bool)
+    )
 
-    for k in ('Cationic', 'Anionic'):
-        m = (d <= 4.5) & lig_masks[k][None, None, :, None] & (res_actor_masks[k] & res_valid_mask)[None, :, None, :]
+    for k in ("Cationic", "Anionic"):
+        m = (
+            (d <= 4.5)
+            & lig_masks[k][None, None, :, None]
+            & (res_actor_masks[k] & res_valid_mask)[None, :, None, :]
+        )
         results[k] = jnp.any(m, axis=(2, 3)) if R else jnp.zeros((F, 0), dtype=bool)
 
     lig_radii, res_radii, vdw_tol = vdw_radii
     radii_sum = lig_radii[None, None, :, None] + res_radii[None, :, None, :]
     m = (d <= (radii_sum + vdw_tol)) & res_valid_mask[None, :, None, :]
-    results['VdWContact'] = jnp.any(m, axis=(2, 3)) if R else jnp.zeros((F, 0), dtype=bool)
+    results["VdWContact"] = (
+        jnp.any(m, axis=(2, 3)) if R else jnp.zeros((F, 0), dtype=bool)
+    )
 
-    acc_idx = angle_idx['hb']['acc_idx']
+    acc_idx = angle_idx["hb"]["acc_idx"]
     hb_acc_out = []
     for r_i in range(R):
-        d_idx = angle_idx['hb']['res_d_idx'][r_i]
-        h_idx = angle_idx['hb']['res_h_idx'][r_i]
+        d_idx = angle_idx["hb"]["res_d_idx"][r_i]
+        h_idx = angle_idx["hb"]["res_h_idx"][r_i]
         if acc_idx.size and d_idx.size:
-            _m, _, _ = hbacceptor_frames(lig_f, res_f[:, r_i, :, :], acc_idx, d_idx, h_idx)
-            hb_acc_out.append(jnp.any(_m, axis=(1, 2)))
+            m_, _, _ = hbacceptor_frames(
+                lig_f, res_f[:, r_i, :, :], acc_idx, d_idx, h_idx
+            )
+            hb_acc_out.append(jnp.any(m_, axis=(1, 2)))
         else:
             hb_acc_out.append(jnp.zeros((F,), dtype=bool))
-    results['HBAcceptor'] = jnp.stack(hb_acc_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+    results["HBAcceptor"] = (
+        jnp.stack(hb_acc_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+    )
 
     hb_don_out = []
-    lig_d = angle_idx['hb_donor']['lig_d_idx']
-    lig_h = angle_idx['hb_donor']['lig_h_idx']
+    lig_d = angle_idx["hb_donor"]["lig_d_idx"]
+    lig_h = angle_idx["hb_donor"]["lig_h_idx"]
     for r_i in range(R):
-        acc = angle_idx['hb_donor']['res_a_idx'][r_i]
+        acc = angle_idx["hb_donor"]["res_a_idx"][r_i]
         if lig_d.size and acc.size:
-            _m, _, _ = hbdonor_frames(lig_f, res_f[:, r_i, :, :], lig_d, lig_h, acc)
-            hb_don_out.append(jnp.any(_m, axis=(1, 2)))
+            m_, _, _ = hbdonor_frames(lig_f, res_f[:, r_i, :, :], lig_d, lig_h, acc)
+            hb_don_out.append(jnp.any(m_, axis=(1, 2)))
         else:
             hb_don_out.append(jnp.zeros((F,), dtype=bool))
-    results['HBDonor'] = jnp.stack(hb_don_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+    results["HBDonor"] = (
+        jnp.stack(hb_don_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+    )
 
-    lig_rings = ring_idx['lig_rings']
-    res_rings = ring_idx['res_rings']
-    lig_cations = ring_idx['lig_cations']
-    res_cations = ring_idx['res_cations']
-    pi = ring_idx['pi']
-    cp = ring_idx['cp']
+    lig_rings = ring_idx["lig_rings"]
+    res_rings = ring_idx["res_rings"]
+    lig_cations = ring_idx["lig_cations"]
+    res_cations = ring_idx["res_cations"]
+    pi = ring_idx["pi"]
+    cp = ring_idx["cp"]
 
     cationpi_out = []
     picat_out = []
@@ -876,32 +996,45 @@ def has_interactions_frames(
         has_cationpi = jnp.zeros((F,), dtype=bool)
         has_picat = jnp.zeros((F,), dtype=bool)
         if lig_cations.size and len(res_rings[r_i]):
-            _m, _, _ = cationpi_frames(
-                res_f[:, r_i, :, :], res_rings[r_i], lig_f, lig_cations,
+            m_, _, _ = cationpi_frames(
+                res_f[:, r_i, :, :],
+                res_rings[r_i],
+                lig_f,
+                lig_cations,
                 distance_cutoff=float(cp.distance),
                 angle_min=math.degrees(float(cp.angle[0])),
                 angle_max=math.degrees(float(cp.angle[1])),
             )
-            has_cationpi = jnp.any(_m, axis=(1, 2))
+            has_cationpi = jnp.any(m_, axis=(1, 2))
         if len(lig_rings) and res_cations[r_i].size:
-            _m, _, _ = cationpi_frames(
-                lig_f, lig_rings, res_f[:, r_i, :, :], res_cations[r_i],
+            m_, _, _ = cationpi_frames(
+                lig_f,
+                lig_rings,
+                res_f[:, r_i, :, :],
+                res_cations[r_i],
                 distance_cutoff=float(cp.distance),
                 angle_min=math.degrees(float(cp.angle[0])),
                 angle_max=math.degrees(float(cp.angle[1])),
             )
-            has_picat = jnp.any(_m, axis=(1, 2))
+            has_picat = jnp.any(m_, axis=(1, 2))
         cationpi_out.append(has_cationpi)
         picat_out.append(has_picat)
-    results['CationPi'] = jnp.stack(cationpi_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
-    results['PiCation'] = jnp.stack(picat_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+    results["CationPi"] = (
+        jnp.stack(cationpi_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+    )
+    results["PiCation"] = (
+        jnp.stack(picat_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+    )
 
     ps_out = []
     for r_i in range(R):
         if len(lig_rings) and len(res_rings[r_i]):
             ftf = pi.ftf
             mF, _, _, _ = pistacking_frames(
-                lig_f, lig_rings, res_f[:, r_i, :, :], res_rings[r_i],
+                lig_f,
+                lig_rings,
+                res_f[:, r_i, :, :],
+                res_rings[r_i],
                 distance_cutoff=float(ftf.distance),
                 plane_angle_min=math.degrees(float(ftf.plane_angle[0])),
                 plane_angle_max=math.degrees(float(ftf.plane_angle[1])),
@@ -910,7 +1043,10 @@ def has_interactions_frames(
             )
             etf = pi.etf
             mE, _, _, _ = pistacking_frames(
-                lig_f, lig_rings, res_f[:, r_i, :, :], res_rings[r_i],
+                lig_f,
+                lig_rings,
+                res_f[:, r_i, :, :],
+                res_rings[r_i],
                 distance_cutoff=float(etf.distance),
                 plane_angle_min=math.degrees(float(etf.plane_angle[0])),
                 plane_angle_max=math.degrees(float(etf.plane_angle[1])),
@@ -922,7 +1058,9 @@ def has_interactions_frames(
             ps_out.append(jnp.any(mF | mE, axis=(1, 2)))
         else:
             ps_out.append(jnp.zeros((F,), dtype=bool))
-    results['PiStacking'] = jnp.stack(ps_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+    results["PiStacking"] = (
+        jnp.stack(ps_out, axis=1) if R else jnp.zeros((F, 0), dtype=bool)
+    )
 
     if R and vicinity_cutoff is not None:
         masked_d = jnp.where(res_valid_mask[None, :, None, :], d, jnp.inf)
@@ -942,7 +1080,7 @@ def prepare_for_device(
     angle_idx: dict,
     ring_idx: dict,
     vdw_radii: tuple,
-    device: str = 'cpu',
+    device: str = "cpu",
 ) -> tuple:
     """Move frame-batched, small metadata arrays to a target device.
 
@@ -963,51 +1101,90 @@ def prepare_for_device(
         Tuple of all inputs moved to the specified device.
         Returns unchanged inputs if device='cpu' or no GPU available.
     """
-    if device != 'gpu':
-        return lig_f, res_f, res_valid_mask, lig_masks, res_actor_masks, angle_idx, ring_idx, vdw_radii
+    if device != "gpu":
+        return (
+            lig_f,
+            res_f,
+            res_valid_mask,
+            lig_masks,
+            res_actor_masks,
+            angle_idx,
+            ring_idx,
+            vdw_radii,
+        )
 
-    gpus = jax.devices('gpu')
+    gpus = jax.devices("gpu")
     if not gpus:
-        return lig_f, res_f, res_valid_mask, lig_masks, res_actor_masks, angle_idx, ring_idx, vdw_radii
+        return (
+            lig_f,
+            res_f,
+            res_valid_mask,
+            lig_masks,
+            res_actor_masks,
+            angle_idx,
+            ring_idx,
+            vdw_radii,
+        )
 
     dev = gpus[0]
 
     res_valid_mask = jax.device_put(res_valid_mask, device=dev)
-    lig_masks = jax.tree_util.tree_map(lambda x: jax.device_put(x, device=dev), lig_masks)
-    res_actor_masks = jax.tree_util.tree_map(lambda x: jax.device_put(x, device=dev), res_actor_masks)
+    lig_masks = jax.tree_util.tree_map(
+        lambda x: jax.device_put(x, device=dev), lig_masks
+    )
+    res_actor_masks = jax.tree_util.tree_map(
+        lambda x: jax.device_put(x, device=dev), res_actor_masks
+    )
 
     angle_idx = {
-        'hb': {
-            'acc_idx': jax.device_put(angle_idx['hb']['acc_idx'], device=dev),
-            'res_d_idx': [jax.device_put(a, device=dev) for a in angle_idx['hb']['res_d_idx']],
-            'res_h_idx': [jax.device_put(a, device=dev) for a in angle_idx['hb']['res_h_idx']],
+        "hb": {
+            "acc_idx": jax.device_put(angle_idx["hb"]["acc_idx"], device=dev),
+            "res_d_idx": [
+                jax.device_put(a, device=dev) for a in angle_idx["hb"]["res_d_idx"]
+            ],
+            "res_h_idx": [
+                jax.device_put(a, device=dev) for a in angle_idx["hb"]["res_h_idx"]
+            ],
         },
-        'hb_donor': {
-            'lig_d_idx': jax.device_put(angle_idx['hb_donor']['lig_d_idx'], device=dev),
-            'lig_h_idx': jax.device_put(angle_idx['hb_donor']['lig_h_idx'], device=dev),
-            'res_a_idx': [jax.device_put(a, device=dev) for a in angle_idx['hb_donor']['res_a_idx']],
+        "hb_donor": {
+            "lig_d_idx": jax.device_put(angle_idx["hb_donor"]["lig_d_idx"], device=dev),
+            "lig_h_idx": jax.device_put(angle_idx["hb_donor"]["lig_h_idx"], device=dev),
+            "res_a_idx": [
+                jax.device_put(a, device=dev)
+                for a in angle_idx["hb_donor"]["res_a_idx"]
+            ],
         },
-        'xbacc': {
-            'lig_a_idx': jax.device_put(angle_idx['xbacc']['lig_a_idx'], device=dev),
-            'lig_r_idx': jax.device_put(angle_idx['xbacc']['lig_r_idx'], device=dev),
-            'res_x_idx': [jax.device_put(a, device=dev) for a in angle_idx['xbacc']['res_x_idx']],
-            'res_d_idx': [jax.device_put(a, device=dev) for a in angle_idx['xbacc']['res_d_idx']],
+        "xbacc": {
+            "lig_a_idx": jax.device_put(angle_idx["xbacc"]["lig_a_idx"], device=dev),
+            "lig_r_idx": jax.device_put(angle_idx["xbacc"]["lig_r_idx"], device=dev),
+            "res_x_idx": [
+                jax.device_put(a, device=dev) for a in angle_idx["xbacc"]["res_x_idx"]
+            ],
+            "res_d_idx": [
+                jax.device_put(a, device=dev) for a in angle_idx["xbacc"]["res_d_idx"]
+            ],
         },
-        'xbdon': {
-            'lig_x_idx': jax.device_put(angle_idx['xbdon']['lig_x_idx'], device=dev),
-            'lig_d_idx': jax.device_put(angle_idx['xbdon']['lig_d_idx'], device=dev),
-            'res_a_idx': [jax.device_put(a, device=dev) for a in angle_idx['xbdon']['res_a_idx']],
-            'res_r_idx': [jax.device_put(a, device=dev) for a in angle_idx['xbdon']['res_r_idx']],
+        "xbdon": {
+            "lig_x_idx": jax.device_put(angle_idx["xbdon"]["lig_x_idx"], device=dev),
+            "lig_d_idx": jax.device_put(angle_idx["xbdon"]["lig_d_idx"], device=dev),
+            "res_a_idx": [
+                jax.device_put(a, device=dev) for a in angle_idx["xbdon"]["res_a_idx"]
+            ],
+            "res_r_idx": [
+                jax.device_put(a, device=dev) for a in angle_idx["xbdon"]["res_r_idx"]
+            ],
         },
     }
 
     ring_idx = {
-        'lig_rings': [jax.device_put(a, device=dev) for a in ring_idx['lig_rings']],
-        'res_rings': [[jax.device_put(a, device=dev) for a in rr] for rr in ring_idx['res_rings']],
-        'lig_cations': jax.device_put(ring_idx['lig_cations'], device=dev),
-        'res_cations': [jax.device_put(a, device=dev) for a in ring_idx['res_cations']],
-        'pi': ring_idx['pi'],
-        'cp': ring_idx['cp'],
+        "lig_rings": [jax.device_put(a, device=dev) for a in ring_idx["lig_rings"]],
+        "res_rings": [
+            [jax.device_put(a, device=dev) for a in rr] for rr in ring_idx["res_rings"]
+        ],
+        "lig_cations": jax.device_put(ring_idx["lig_cations"], device=dev),
+        "res_cations": [jax.device_put(a, device=dev) for a in ring_idx["res_cations"]],
+        "pi": ring_idx["pi"],
+        "cp": ring_idx["cp"],
     }
 
     lr, rr, vdw_tol = vdw_radii
@@ -1017,16 +1194,25 @@ def prepare_for_device(
         vdw_tol,
     )
 
-    return lig_f, res_f, res_valid_mask, lig_masks, res_actor_masks, angle_idx, ring_idx, vdw_radii
+    return (
+        lig_f,
+        res_f,
+        res_valid_mask,
+        lig_masks,
+        res_actor_masks,
+        angle_idx,
+        ring_idx,
+        vdw_radii,
+    )
 
 
-def get_gpu_device():
+def get_gpu_device() -> Any | None:
     """Return the first GPU device if available, else None.
 
     Safe on CPU-only installs where requesting 'gpu' would raise.
     """
     try:
-        gpus = jax.devices('gpu')
+        gpus = jax.devices("gpu")
     except Exception:
         return None
     return gpus[0] if gpus else None
@@ -1053,13 +1239,17 @@ def get_gpu_memory_info() -> tuple[float, float] | None:
             pass
 
     try:
-        out = subprocess.check_output([
-            'nvidia-smi',
-            '--query-gpu=memory.free,memory.total',
-            '--format=csv,noheader,nounits'
-        ], stderr=subprocess.STDOUT, text=True)
+        out = subprocess.check_output(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.free,memory.total",
+                "--format=csv,noheader,nounits",
+            ],
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
         line = out.strip().splitlines()[0]
-        cols = [c.strip() for c in line.split(',')]
+        cols = [c.strip() for c in line.split(",")]
         free_mb = float(cols[0])
         total_mb = float(cols[1])
         return free_mb, total_mb
@@ -1075,7 +1265,7 @@ def estimate_memory_per_frame(
     """Estimate GPU memory usage per frame in bytes.
 
     This is a rough estimate accounting for:
-        - Distance matrices: R × N × M × 4 bytes
+        - Distance matrices: R x N x M x 4 bytes
         - Intermediate arrays and masks
         - JAX overhead multiplier (~3x for JIT buffers)
 
@@ -1124,7 +1314,7 @@ def calculate_chunk_size(
         mem = get_gpu_memory_info()
         if mem is None:
             return 1000
-        available_memory_mb, total_mb = mem[0], mem[1]
+        available_memory_mb = mem[0]
 
     bytes_per_frame = estimate_memory_per_frame(
         n_ligand_atoms, n_residues, max_residue_atoms
@@ -1133,9 +1323,7 @@ def calculate_chunk_size(
     usable_bytes = available_memory_mb * 1024 * 1024 * memory_fraction
     chunk_size = int(usable_bytes / bytes_per_frame)
 
-    chunk_size = max(1, min(chunk_size, 10000))
-
-    return chunk_size
+    return max(1, min(chunk_size, 10000))
 
 
 def chunked_has_interactions_frames(
@@ -1178,7 +1366,7 @@ def chunked_has_interactions_frames(
 
     dev = get_gpu_device()
 
-    all_results = []
+    all_results: list[dict[str, jnp.ndarray]] = []
     for i in range(0, F, chunk_size):
         j = min(i + chunk_size, F)
 
@@ -1190,18 +1378,24 @@ def chunked_has_interactions_frames(
             chunk_res = res_f[i:j]
 
         chunk_result = has_interactions_frames(
-            chunk_lig, chunk_res, res_valid_mask,
-            lig_masks, res_actor_masks, angle_idx, ring_idx, vdw_radii
+            chunk_lig,
+            chunk_res,
+            res_valid_mask,
+            lig_masks,
+            res_actor_masks,
+            angle_idx,
+            ring_idx,
+            vdw_radii,
         )
 
-        chunk_result = jax.device_get(chunk_result)
-        all_results.append(chunk_result)
+        chunk_result_host = jax.device_get(chunk_result)
+        all_results.append({k: jnp.asarray(v) for k, v in chunk_result_host.items()})
 
     if len(all_results) == 1:
         return all_results[0]
 
     combined = {}
-    for key in all_results[0].keys():
+    for key in all_results[0]:
         combined[key] = jnp.concatenate([r[key] for r in all_results], axis=0)
 
     return combined

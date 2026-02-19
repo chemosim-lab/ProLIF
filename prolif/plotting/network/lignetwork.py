@@ -415,13 +415,14 @@ class LigNetwork:
             ),
         )
         # threshold and keep most occuring ligand atom
-        return (
+        return cast(
+            pd.DataFrame,
             df[df["weight_total"] >= threshold]
             .drop(columns="weight_total")
             .sort_values("weight", ascending=False)
             .groupby(level=["ligand", "protein", "interaction"])
             .head(1)
-            .sort_index()
+            .sort_index(),
         )
 
     @classmethod
@@ -432,8 +433,11 @@ class LigNetwork:
         data = cls._get_records(ifp, all_metadata=display_all)
         df = pd.DataFrame(data)
         df["weight"] = 1
-        return df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
-            columns=["weight", "distance", "components"],
+        return cast(
+            pd.DataFrame,
+            df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
+                columns=["weight", "distance", "components"],
+            ),
         )
 
     def _make_carbon(self) -> dict[str, Any]:
@@ -571,12 +575,21 @@ class LigNetwork:
             resname = ResidueId.from_string(prot_res).name
             restype = self.RESIDUE_TYPES.get(resname)
             restypes[prot_res] = restype
-            color = self.COLORS["residues"].get(restype, self._default_residue_color)
+            color = (
+                self.COLORS["residues"].get(restype, self._default_residue_color)
+                if restype is not None
+                else self._default_residue_color
+            )
+            font_color = (
+                self._FONTCOLORS.get(restype, "black")
+                if restype is not None
+                else "black"
+            )
             node = {
                 "id": prot_res,
                 "label": prot_res,
                 "color": color,
-                "font": {"color": self._FONTCOLORS.get(restype, "black")},
+                "font": {"color": font_color},
                 "shape": "box",
                 "borderWidth": 0,
                 "physics": True,
@@ -595,6 +608,7 @@ class LigNetwork:
             ],
             self.df.iterrows(),
         ):
+            origin: str | int
             if components.startswith("ligand"):
                 if interaction in self._LIG_PI_INTERACTIONS:
                     centroid = self._get_ring_centroid(lig_indices)
@@ -621,7 +635,7 @@ class LigNetwork:
                 "weight": weight,
                 "weight_pct": weight * 100,
             }
-            edge = {
+            edge: dict[str, Any] = {
                 "from": origin,
                 "to": prot_res,
                 "title": self._edge_title_formatter.format_map(int_data),

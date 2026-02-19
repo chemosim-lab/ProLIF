@@ -19,12 +19,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import Any
 
 import jax.numpy as jnp
 import numpy as np
-import prolif
 from MDAnalysis.lib.distances import capped_distance
+
+import prolif
 from prolif import ResidueId
 from prolif.utils import get_residues_near_ligand
 
@@ -39,9 +40,6 @@ from .framebatch import (
     has_interactions_frames,
     prepare_for_device,
 )
-
-if TYPE_CHECKING:
-    import MDAnalysis as mda
 
 
 @dataclass
@@ -63,11 +61,11 @@ class InteractionResult:
     n_residues: int
     interaction_names: list[str] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.interaction_names:
             self.interaction_names = list(self.interactions.keys())
 
-    def to_dataframe(self):
+    def to_dataframe(self) -> Any:
         """Convert results to a pandas DataFrame with MultiIndex columns.
 
         Returns a DataFrame with shape (n_frames, n_residues * n_interactions)
@@ -81,7 +79,9 @@ class InteractionResult:
             names=["residue", "interaction"],
         )
 
-        reshaped = np.zeros((self.n_frames, self.n_residues * len(self.interaction_names)), dtype=bool)
+        reshaped = np.zeros(
+            (self.n_frames, self.n_residues * len(self.interaction_names)), dtype=bool
+        )
         for r_i in range(self.n_residues):
             for i_i, name in enumerate(self.interaction_names):
                 col_idx = r_i * len(self.interaction_names) + i_i
@@ -89,8 +89,11 @@ class InteractionResult:
 
         return pd.DataFrame(reshaped, columns=columns)
 
-    def get_contacts(self, interaction: str | None = None) -> list[tuple[int, "ResidueId", str]]:
-        """Get list of (frame_idx, residue_id, interaction_name) tuples where contacts occur.
+    def get_contacts(
+        self, interaction: str | None = None
+    ) -> list[tuple[int, "ResidueId", str]]:
+        """Get list of (frame_idx, residue_id, interaction_name) tuples
+        where contacts occur.
 
         Args:
             interaction: If specified, filter to only this interaction type.
@@ -114,7 +117,7 @@ class InteractionResult:
         Returns:
             Mapping from residue_id to {interaction_name: count}.
         """
-        result = {}
+        result: dict[ResidueId, dict[str, int]] = {}
         for r_i, rid in enumerate(self.residue_ids):
             result[rid] = {}
             for name in self.interaction_names:
@@ -127,7 +130,7 @@ class InteractionResult:
         Returns:
             Mapping from frame_index to {interaction_name: count}.
         """
-        result = {}
+        result: dict[int, dict[str, int]] = {}
         for f_i in range(self.n_frames):
             result[f_i] = {}
             for name in self.interaction_names:
@@ -135,7 +138,12 @@ class InteractionResult:
         return result
 
 
-def _build_trajectory_frames(u, lig_ag, residue_ags, max_frames: int | None = None):
+def _build_trajectory_frames(
+    u: Any,
+    lig_ag: Any,
+    residue_ags: list[Any],
+    max_frames: int | None = None,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Build per-frame coordinate arrays from MDAnalysis trajectory."""
     F_total = len(u.trajectory)
     F = F_total if not max_frames or max_frames <= 0 else min(F_total, int(max_frames))
@@ -180,18 +188,21 @@ def _build_trajectory_frames(u, lig_ag, residue_ags, max_frames: int | None = No
     return lig_f, res_f, res_valid_mask
 
 
-def _get_residue_ags_from_ids(prot_ag, residue_ids):
+def _get_residue_ags_from_ids(
+    prot_ag: Any,
+    residue_ids: list[ResidueId],
+) -> list[Any]:
     """Map ProLIF ResidueIds to MDAnalysis AtomGroups via direct residue lookup.
 
     Builds a lookup from (resname, resid, segid) to AtomGroup once, then
     matches each ResidueId directly without string-based selection.
     """
     by_key = {(r.resname, r.resid, r.segid): r.atoms for r in prot_ag.residues}
-    by_resname_resid = {}
+    by_resname_resid: dict[tuple[str, int], Any] = {}
     for r in prot_ag.residues:
         by_resname_resid.setdefault((r.resname, r.resid), r.atoms)
 
-    result = []
+    result: list[Any] = []
     for rid in residue_ids:
         key = (rid.name or "", rid.number, rid.chain or "")
         ag = by_key.get(key) or by_resname_resid.get((rid.name or "", rid.number))
@@ -202,9 +213,9 @@ def _get_residue_ags_from_ids(prot_ag, residue_ids):
 
 
 def _scan_residues_all_frames(
-    universe,
-    lig_ag,
-    prot_ag,
+    universe: Any,
+    lig_ag: Any,
+    prot_ag: Any,
     cutoff: float,
     max_frames: int | None = None,
     stride: int = 1,
@@ -232,7 +243,11 @@ def _scan_residues_all_frames(
     residue_set: set[tuple[str, int, str]] = set()
 
     for ts in universe.trajectory[:F:stride]:
-        box = ts.dimensions if ts.dimensions is not None and ts.dimensions[0] > 0 else None
+        box = (
+            ts.dimensions
+            if ts.dimensions is not None and ts.dimensions[0] > 0
+            else None
+        )
 
         pairs = capped_distance(
             lig_ag.positions,
@@ -248,13 +263,17 @@ def _scan_residues_all_frames(
         prot_indices = np.unique(pairs[:, 1])
         nearby_atoms = prot_ag.atoms[prot_indices]
 
-        for res in nearby_atoms.residues:
-            residue_set.add((res.resname, res.resid, res.segid))
+        residue_set.update(
+            (res.resname, res.resid, res.segid) for res in nearby_atoms.residues
+        )
 
     return residue_set
 
 
-def _residue_keys_to_ids(residue_keys: set[tuple[str, int, str]], prot_mol):
+def _residue_keys_to_ids(
+    residue_keys: set[tuple[str, int, str]],
+    prot_mol: Any,
+) -> list[ResidueId]:
     """Convert (resname, resid, segid) tuples to ProLIF ResidueId objects.
 
     Matches residue keys against the protein molecule to retrieve the
@@ -267,9 +286,9 @@ def _residue_keys_to_ids(residue_keys: set[tuple[str, int, str]], prot_mol):
     Returns:
         List of matching ProLIF ResidueId objects.
     """
-    matched_ids = []
+    matched_ids: list[ResidueId] = []
     for resname, resid, segid in sorted(residue_keys):
-        for rid in prot_mol.residues.keys():
+        for rid in prot_mol.residues:
             if rid.name == resname and rid.number == resid:
                 if segid and rid.chain and rid.chain != segid:
                     continue
@@ -282,7 +301,7 @@ def _residue_keys_to_ids(residue_keys: set[tuple[str, int, str]], prot_mol):
 
 
 def analyze_trajectory(
-    universe: "mda.Universe",
+    universe: Any,
     ligand_selection: str = "resname LIG",
     protein_selection: str = "protein",
     *,
@@ -345,7 +364,7 @@ def analyze_trajectory(
     """
     logger = logging.getLogger(__name__)
 
-    if residue_mode not in ("first", "all"):
+    if residue_mode not in {"first", "all"}:
         raise ValueError(f"residue_mode must be 'first' or 'all', got '{residue_mode}'")
 
     lig_ag = universe.select_atoms(ligand_selection)
@@ -367,15 +386,21 @@ def analyze_trajectory(
         first_frame_ids = get_residues_near_ligand(lig_mol, prot_mol, cutoff=cutoff)
 
         residue_keys = _scan_residues_all_frames(
-            universe, lig_ag, prot_ag, cutoff,
-            max_frames=max_frames, stride=scan_stride,
+            universe,
+            lig_ag,
+            prot_ag,
+            cutoff,
+            max_frames=max_frames,
+            stride=scan_stride,
         )
         residue_ids = _residue_keys_to_ids(residue_keys, prot_mol)
 
         logger.info(
             "Residue scan complete: %d residues within %.1f A across trajectory "
             "(first frame: %d residues)",
-            len(residue_ids), cutoff, len(first_frame_ids),
+            len(residue_ids),
+            cutoff,
+            len(first_frame_ids),
         )
 
         universe.trajectory[0]
@@ -388,8 +413,15 @@ def analyze_trajectory(
             interactions={
                 name: np.zeros((0, 0), dtype=bool)
                 for name in [
-                    "Hydrophobic", "Cationic", "Anionic", "VdWContact",
-                    "HBAcceptor", "HBDonor", "PiStacking", "CationPi", "PiCation",
+                    "Hydrophobic",
+                    "Cationic",
+                    "Anionic",
+                    "VdWContact",
+                    "HBAcceptor",
+                    "HBDonor",
+                    "PiStacking",
+                    "CationPi",
+                    "PiCation",
                 ]
             },
             residue_ids=[],
@@ -402,7 +434,7 @@ def analyze_trajectory(
     )
     F = int(lig_f.shape[0])
 
-    lig_res_for_smarts = list(lig_mol.residues.values())[0]
+    lig_res_for_smarts = next(iter(lig_mol.residues.values()))
     lig_masks, res_actor_masks = build_actor_masks(lig_mol, residues)
     angle_idx = build_angle_indices(lig_ag, residue_ags)
     ring_idx = build_ring_cation_indices(lig_res_for_smarts, residues)
@@ -472,11 +504,11 @@ def analyze_trajectory(
 
 
 def analyze_frame(
-    ligand,
-    protein,
+    ligand: Any,
+    protein: Any,
     *,
     cutoff: float = 6.0,
-) -> dict[str, dict]:
+) -> dict[ResidueId, dict[str, bool]]:
     """Compute interactions for a single frame (ProLIF Molecule objects).
 
     This is a convenience function for single-frame analysis that accepts
@@ -521,7 +553,7 @@ def analyze_frame(
     res_valid_mask = jnp.array(np.stack(res_masks, axis=0))
 
     lig_masks, res_actor_masks = build_actor_masks(ligand, residues)
-    angle_idx = _build_angle_indices_rdkit(ligand, residues)
+    angle_idx = build_angle_indices_rdkit(ligand, residues)
     ring_idx = build_ring_cation_indices(ligand, residues)
     vdw_radii = build_vdw_radii(ligand, residues)
 
@@ -537,7 +569,7 @@ def analyze_frame(
         vicinity_cutoff=cutoff,
     )
 
-    output = {}
+    output: dict[ResidueId, dict[str, bool]] = {}
     for r_i, rid in enumerate(residue_ids):
         output[rid] = {}
         for name, arr in results.items():
