@@ -191,21 +191,28 @@ def _build_trajectory_frames(
 def _get_residue_ags_from_ids(
     prot_ag: Any,
     residue_ids: list[ResidueId],
+    use_segid: bool = False,
 ) -> list[Any]:
     """Map ProLIF ResidueIds to MDAnalysis AtomGroups via direct residue lookup.
 
     Builds a lookup from (resname, resid, segid) to AtomGroup once, then
     matches each ResidueId directly without string-based selection.
     """
-    by_key = {(r.resname, r.resid, r.segid): r.atoms for r in prot_ag.residues}
-    by_resname_resid: dict[tuple[str, int], Any] = {}
+    by_key: dict[tuple[str, int, str | None], Any] = {}
     for r in prot_ag.residues:
-        by_resname_resid.setdefault((r.resname, r.resid), r.atoms)
+        if use_segid:
+            chain = str(int(r.segindex))
+        else:
+            try:
+                chain = str(r.atoms[0].chainID).strip() or None
+            except Exception:
+                chain = None
+        by_key[(r.resname, r.resid, chain)] = r.atoms
 
     result: list[Any] = []
     for rid in residue_ids:
-        key = (rid.name or "", rid.number, rid.chain or "")
-        ag = by_key.get(key) or by_resname_resid.get((rid.name or "", rid.number))
+        key = (rid.name or "", rid.number, rid.chain)
+        ag = by_key.get(key)
         if ag is None:
             raise ValueError(f"Could not find residue {rid} in protein AtomGroup")
         result.append(ag)
@@ -219,7 +226,8 @@ def _scan_residues_all_frames(
     cutoff: float,
     max_frames: int | None = None,
     stride: int = 1,
-) -> set[tuple[str, int, str]]:
+    use_segid: bool = False,
+) -> set[tuple[str, int, str | None]]:
     """Scan all trajectory frames to find residues within cutoff of the ligand.
 
     Uses MDAnalysis capped_distance for efficient, PBC-aware neighbor searching.
@@ -240,7 +248,7 @@ def _scan_residues_all_frames(
     F_total = len(universe.trajectory)
     F = F_total if not max_frames or max_frames <= 0 else min(F_total, int(max_frames))
 
-    residue_set: set[tuple[str, int, str]] = set()
+    residue_set: set[tuple[str, int, str | None]] = set()
 
     for ts in universe.trajectory[:F:stride]:
         box = (
@@ -263,15 +271,21 @@ def _scan_residues_all_frames(
         prot_indices = np.unique(pairs[:, 1])
         nearby_atoms = prot_ag.atoms[prot_indices]
 
-        residue_set.update(
-            (res.resname, res.resid, res.segid) for res in nearby_atoms.residues
-        )
+        for res in nearby_atoms.residues:
+            if use_segid:
+                chain = str(int(res.segindex))
+            else:
+                try:
+                    chain = str(res.atoms[0].chainID).strip() or None
+                except Exception:
+                    chain = None
+            residue_set.add((res.resname, res.resid, chain))
 
     return residue_set
 
 
 def _residue_keys_to_ids(
-    residue_keys: set[tuple[str, int, str]],
+    residue_keys: set[tuple[str, int, str | None]],
     prot_mol: Any,
 ) -> list[ResidueId]:
     """Convert (resname, resid, segid) tuples to ProLIF ResidueId objects.
@@ -286,16 +300,15 @@ def _residue_keys_to_ids(
     Returns:
         List of matching ProLIF ResidueId objects.
     """
+    by_key = {(rid.name, rid.number, rid.chain): rid for rid in prot_mol.residues}
     matched_ids: list[ResidueId] = []
-    for resname, resid, segid in sorted(residue_keys):
-        for rid in prot_mol.residues:
-            if rid.name == resname and rid.number == resid:
-                if segid and rid.chain and rid.chain != segid:
-                    continue
-                matched_ids.append(rid)
-                break
-        else:
-            matched_ids.append(ResidueId(resname, resid, segid or None))
+    for key in sorted(
+        residue_keys, key=lambda x: (x[0], x[1], "" if x[2] is None else x[2])
+    ):
+        rid = by_key.get(key)
+        if rid is None:
+            raise KeyError(f"Could not map residue key {key} to a ProLIF ResidueId")
+        matched_ids.append(rid)
 
     return matched_ids
 
@@ -377,13 +390,20 @@ def analyze_trajectory(
 
     universe.trajectory[0]
 
-    lig_mol = prolif.Molecule.from_mda(lig_ag)
-    prot_mol = prolif.Molecule.from_mda(prot_ag)
+    use_segid = prolif.Molecule._use_segid(lig_ag) or prolif.Molecule._use_segid(
+        prot_ag
+    )
+    lig_mol = prolif.Molecule.from_mda(lig_ag, use_segid=use_segid)
+    prot_mol = prolif.Molecule.from_mda(prot_ag, use_segid=use_segid)
 
     if residue_mode == "first":
-        residue_ids = get_residues_near_ligand(lig_mol, prot_mol, cutoff=cutoff)
+        residue_ids = get_residues_near_ligand(
+            lig_mol, prot_mol, cutoff=cutoff, use_segid=use_segid
+        )
     else:
-        first_frame_ids = get_residues_near_ligand(lig_mol, prot_mol, cutoff=cutoff)
+        first_frame_ids = get_residues_near_ligand(
+            lig_mol, prot_mol, cutoff=cutoff, use_segid=use_segid
+        )
 
         residue_keys = _scan_residues_all_frames(
             universe,
@@ -392,6 +412,7 @@ def analyze_trajectory(
             cutoff,
             max_frames=max_frames,
             stride=scan_stride,
+            use_segid=use_segid,
         )
         residue_ids = _residue_keys_to_ids(residue_keys, prot_mol)
 
@@ -406,7 +427,7 @@ def analyze_trajectory(
         universe.trajectory[0]
 
     residues = [prot_mol[rid] for rid in residue_ids]
-    residue_ags = _get_residue_ags_from_ids(prot_ag, residue_ids)
+    residue_ags = _get_residue_ags_from_ids(prot_ag, residue_ids, use_segid=use_segid)
 
     if not residues:
         return InteractionResult(
