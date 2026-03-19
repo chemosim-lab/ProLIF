@@ -1,17 +1,4 @@
-"""
-Frame-batched JAX helpers for MD trajectories.
-
-This module provides minimal, safe utilities to vectorize geometry across
-many frames while keeping indices fixed (SMARTS done once per system).
-
-Design goals:
-- Avoid residue-batched complexity (no per-residue index threading/padding).
-- Keep shapes stable across frames to enable JIT specialization.
-- Only implement clear wins; leave angles to the integration layer for now.
-
-API stability: experimental. Functions here are intentionally small and
-focused to avoid future breakage.
-"""
+"""Frame-batched helpers for JAX interaction calculations."""
 
 from __future__ import annotations
 
@@ -266,10 +253,6 @@ def _ring_centroids_normals_frames(
 ) -> tuple[jnp.ndarray, jnp.ndarray]:
     """Compute ring centroids and normals across frames for a list of rings.
 
-    Normals are computed using the same method as ProLIF's
-    ``get_ring_normal_vector``: cross product of unit vectors from the centroid
-    to the first two ring atoms.
-
     Args:
         coords_f: (F, N, 3) coordinates per frame
         rings: list of index arrays (variable ring sizes allowed)
@@ -313,8 +296,7 @@ def cationpi_frames(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Frame-batched Cation-Pi geometry for one orientation (ring vs cation).
 
-    Angles are folded into [0, 90] to account for ring-normal sign ambiguity,
-    matching ProLIF's ``angle_between_limits(..., ring=True)`` behaviour.
+    Angles are folded into [0, 90] to account for ring-normal sign ambiguity.
 
     Returns:
         mask: (F, Kr, Kc)
@@ -349,11 +331,7 @@ def _compute_intersect_check(
     rn: jnp.ndarray,
     intersect_radius: float,
 ) -> jnp.ndarray:
-    """Check if the ring-plane intersection line passes within radius of a centroid.
-
-    Replicates ProLIF's _get_intersect_point logic: finds the point on the
-    intersection line of the two ring planes closest to the ligand centroid,
-    then checks if that point is within intersect_radius of either centroid.
+    """Check whether ring-plane intersection geometry passes the radius criterion.
 
     Args:
         lc: (F, Kl, 3) ligand ring centroids.
@@ -414,9 +392,8 @@ def pistacking_frames(
 ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     """Frame-batched Pi-stacking geometry for ring-ring pairs.
 
-    When ``intersect=True``, applies ProLIF's EdgeToFace intersection check:
-    the line of intersection of the two ring planes must pass within
-    ``intersect_radius`` of at least one centroid.
+    When ``intersect=True``, the ring-plane intersection distance criterion
+    is applied with ``intersect_radius``.
 
     Returns:
         mask: (F, Kl, Kr)
@@ -462,12 +439,11 @@ def build_actor_masks(
     """Compute boolean masks for distance-only actor atoms.
 
     Returns ligand and residue masks for Hydrophobic, Cationic, Anionic,
-    MetalDonor, and MetalAcceptor SMARTS patterns using ProLIF interactions.
-    Residue masks are padded to a common length across residues.
+    MetalDonor, and MetalAcceptor SMARTS patterns. Residue masks are padded
+    to a common length across residues.
 
-    For interactions created via ``invert_role`` (Anionic, MetalAcceptor), the
-    stored lig_pattern/prot_pattern labels refer to the parent class roles, so
-    the patterns must be applied to the swapped sides to match ProLIF semantics.
+    For inverted interactions (Anionic, MetalAcceptor), ligand and residue
+    patterns are swapped before matching.
     """
 
     INVERTED = frozenset({"Anionic", "MetalAcceptor"})
@@ -518,13 +494,7 @@ def build_angle_indices_rdkit(
     lig_mol: Any,
     residues: list[Any],
 ) -> dict[str, dict[str, Any]]:
-    """Precompute angle indices using RDKit molecules (internal helper).
-
-    This variant derives indices from ProLIF RDKit molecules. It is intended
-    for single-frame RDKit workflows. For real trajectories, prefer
-    ``build_angle_indices`` which derives indices from AtomGroups to align with
-    coordinate order.
-    """
+    """Build angle-index tables from RDKit molecules."""
 
     hb_acc = HBAcceptor()
     hb_don = HBDonor()
@@ -673,15 +643,9 @@ def build_angle_indices(
     lig_ag: Any,
     residue_ags: list[Any],
 ) -> dict[str, dict[str, Any]]:
-    """Build angle indices from AtomGroups for real-frame alignment.
+    """Build angle-index tables from MDAnalysis AtomGroups.
 
-    Derives RDKit molecules directly from the provided MDAnalysis AtomGroups
-    so that returned indices use the same atom ordering as the coordinate
-    arrays built from those groups.
-
-    Returns a dict with the same structure as the RDKit-based variant for the
-    hydrogen-bond orientation pairs. Halogen-bond entries are returned as empty
-    arrays for API completeness.
+    Returns the same key structure as :func:`build_angle_indices_rdkit`.
     """
 
     lig_mol = prolif.Molecule.from_mda(lig_ag)
@@ -770,11 +734,7 @@ def build_angle_indices(
 
 
 def build_ring_cation_indices(lig_mol: Any, residues: list[Any]) -> dict[str, Any]:
-    """Precompute ring and cation indices for ring-based interactions.
-
-    Uses ProLIF patterns to find aromatic rings and cations on the ligand and
-    per residue; returns lists of ring index arrays and arrays of cation indices.
-    """
+    """Build ring and cation index tables for ring-based interactions."""
 
     pi = PiStacking()
     ftf = FaceToFace()
@@ -833,8 +793,8 @@ def build_vdw_radii(
     match the coordinate ordering in real-frame mode. Otherwise, radii are
     derived from RDKit molecules to match duplicate-frame mode.
 
-    Returns ligand radii (N,), residue radii (R, M) padded to max M, and
-    ProLIF's VdW tolerance.
+    Returns ligand radii (N,), residue radii (R, M) padded to max M, and the
+    VdW tolerance used in contact checks.
     """
 
     def _symbol_from_atom(atom: Any) -> str:
@@ -920,8 +880,7 @@ def has_interactions_frames(  # noqa: PLR0912
     Args:
         vicinity_cutoff: Per-frame minimum atom-atom distance cutoff. Any
             (frame, residue) pair where the closest atom-atom distance exceeds
-            this value is masked to False, matching ProLIF's vicinity_cutoff
-            behaviour. Defaults to 6.0 to match ProLIF's default.
+            this value is masked to False. Defaults to 6.0.
     """
     F = int(lig_f.shape[0])
     R = int(res_f.shape[1]) if res_f.ndim == 4 else 0

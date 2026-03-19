@@ -1,26 +1,13 @@
-"""
-High-level API for JAX-accelerated interaction fingerprinting.
-
-This module provides a simple, user-friendly interface that hides the complexity
-of coordinate extraction, SMARTS mask building, device placement, and chunking.
-
-Example usage:
-    >>> from prolif.interactions._jax import analyze_trajectory
-    >>> results = analyze_trajectory(
-    ...     universe,
-    ...     ligand_selection="resname LIG",
-    ...     protein_selection="protein",
-    ...     device="gpu",
-    ... )
-    >>> print(results.interactions["HBDonor"].sum())  # total HB donor interactions
-"""
+"""High-level API for JAX interaction fingerprinting."""
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 from MDAnalysis.lib.distances import capped_distance
@@ -36,10 +23,22 @@ from .framebatch import (
     build_ring_cation_indices,
     build_vdw_radii,
     calculate_chunk_size,
-    chunked_has_interactions_frames,
     has_interactions_frames,
     prepare_for_device,
 )
+
+INTERACTION_NAMES = [
+    "Hydrophobic",
+    "Cationic",
+    "Anionic",
+    "VdWContact",
+    "HBAcceptor",
+    "HBDonor",
+    "PiStacking",
+    "CationPi",
+    "PiCation",
+]
+GPU_AUTO_CHUNK_CAP = 256
 
 
 @dataclass
@@ -188,18 +187,86 @@ def _build_trajectory_frames(
     return lig_f, res_f, res_valid_mask
 
 
+def _resolve_frame_count(trajectory: Any, max_frames: int | None = None) -> int:
+    """Return number of frames to process after applying max_frames."""
+    total = len(trajectory)
+    return total if not max_frames or max_frames <= 0 else min(total, int(max_frames))
+
+
+def _build_residue_valid_mask(residue_ags: list[Any]) -> tuple[jnp.ndarray, int]:
+    """Build (R, M) valid-atom mask and return max atoms per residue."""
+    max_m = max((r.n_atoms for r in residue_ags), default=0)
+    rows = []
+    for r in residue_ags:
+        m = r.n_atoms
+        row = np.zeros((max_m,), dtype=bool)
+        row[:m] = True
+        rows.append(row)
+    mask = jnp.array(np.stack(rows, axis=0) if rows else np.zeros((0, 0), dtype=bool))
+    return mask, max_m
+
+
+def _iter_trajectory_chunks(
+    universe: Any,
+    lig_ag: Any,
+    residue_ags: list[Any],
+    max_m: int,
+    chunk_size: int,
+    max_frames: int | None = None,
+) -> Iterator[tuple[jnp.ndarray, jnp.ndarray, int]]:
+    """Yield streamed coordinate chunks as (lig_chunk, res_chunk, n_frames_chunk)."""
+    if chunk_size <= 0:
+        raise ValueError(f"chunk_size must be > 0, got {chunk_size}")
+
+    F = _resolve_frame_count(universe.trajectory, max_frames=max_frames)
+    N = lig_ag.n_atoms
+
+    lig_frames: list[np.ndarray] = []
+    res_frames: list[np.ndarray] = []
+
+    for _ in universe.trajectory[:F]:
+        lig_frames.append(np.array(lig_ag.positions, dtype=float).reshape(N, 3))
+
+        row_list = []
+        for r in residue_ags:
+            coords = np.array(r.positions, dtype=float)
+            m = coords.shape[0]
+            if m < max_m:
+                pad = np.zeros((max_m - m, 3), dtype=float)
+                coords = np.concatenate([coords, pad], axis=0)
+            row_list.append(coords)
+
+        if row_list:
+            res_frames.append(np.stack(row_list, axis=0))
+        else:
+            res_frames.append(np.zeros((0, max_m, 3), dtype=float))
+
+        if len(lig_frames) == chunk_size:
+            yield (
+                jnp.array(np.stack(lig_frames, axis=0)),
+                jnp.array(np.stack(res_frames, axis=0)),
+                len(lig_frames),
+            )
+            lig_frames.clear()
+            res_frames.clear()
+
+    if lig_frames:
+        yield (
+            jnp.array(np.stack(lig_frames, axis=0)),
+            jnp.array(np.stack(res_frames, axis=0)),
+            len(lig_frames),
+        )
+
+
 def _get_residue_ags_from_ids(
     prot_ag: Any,
     residue_ids: list[ResidueId],
     use_segid: bool = False,
 ) -> list[Any]:
-    """Map ProLIF ResidueIds to MDAnalysis AtomGroups via direct residue lookup.
-
-    Builds a lookup from (resname, resid, segid) to AtomGroup once, then
-    matches each ResidueId directly without string-based selection.
-    """
+    """Return protein AtomGroups matching the provided residue identifiers."""
     by_key: dict[tuple[str, int, str | None], Any] = {}
     for r in prot_ag.residues:
+        chain: str | None
         if use_segid:
             chain = str(int(r.segindex))
         else:
@@ -207,7 +274,7 @@ def _get_residue_ags_from_ids(
                 chain = str(r.atoms[0].chainID).strip() or None
             except Exception:
                 chain = None
-        by_key[(r.resname, r.resid, chain)] = r.atoms
+        by_key[r.resname, r.resid, chain] = r.atoms
 
     result: list[Any] = []
     for rid in residue_ids:
@@ -228,23 +295,7 @@ def _scan_residues_all_frames(
     stride: int = 1,
     use_segid: bool = False,
 ) -> set[tuple[str, int, str | None]]:
-    """Scan all trajectory frames to find residues within cutoff of the ligand.
-
-    Uses MDAnalysis capped_distance for efficient, PBC-aware neighbor searching.
-    Returns a set of (resname, resid, segid) tuples identifying unique residues
-    that come within the cutoff distance of any ligand atom at any frame.
-
-    Args:
-        universe: MDAnalysis Universe with trajectory loaded.
-        lig_ag: Ligand AtomGroup.
-        prot_ag: Protein AtomGroup.
-        cutoff: Distance cutoff in Angstroms.
-        max_frames: Maximum frames to scan. If None, scan all frames.
-        stride: Frame stride for scanning. Default 1 scans every frame.
-
-    Returns:
-        Set of (resname, resid, segid) tuples for residues found within cutoff.
-    """
+    """Return residue keys that contact the ligand within the distance cutoff."""
     F_total = len(universe.trajectory)
     F = F_total if not max_frames or max_frames <= 0 else min(F_total, int(max_frames))
 
@@ -272,6 +323,7 @@ def _scan_residues_all_frames(
         nearby_atoms = prot_ag.atoms[prot_indices]
 
         for res in nearby_atoms.residues:
+            chain: str | None
             if use_segid:
                 chain = str(int(res.segindex))
             else:
@@ -288,18 +340,7 @@ def _residue_keys_to_ids(
     residue_keys: set[tuple[str, int, str | None]],
     prot_mol: Any,
 ) -> list[ResidueId]:
-    """Convert (resname, resid, segid) tuples to ProLIF ResidueId objects.
-
-    Matches residue keys against the protein molecule to retrieve the
-    corresponding ProLIF ResidueId objects, preserving the chain information.
-
-    Args:
-        residue_keys: Set of (resname, resid, segid) tuples.
-        prot_mol: ProLIF Molecule for the protein.
-
-    Returns:
-        List of matching ProLIF ResidueId objects.
-    """
+    """Return residue IDs for the given residue keys."""
     by_key = {(rid.name, rid.number, rid.chain): rid for rid in prot_mol.residues}
     matched_ids: list[ResidueId] = []
     for key in sorted(
@@ -327,10 +368,6 @@ def analyze_trajectory(
 ) -> InteractionResult:
     """Compute interaction fingerprints for all frames in a trajectory.
 
-    This is the main entry point for JAX-accelerated interaction analysis.
-    It handles all the complexity of coordinate extraction, SMARTS matching,
-    device placement, and memory-safe chunking.
-
     Args:
         universe: MDAnalysis Universe with trajectory loaded.
         ligand_selection: MDAnalysis selection string for the ligand.
@@ -338,8 +375,8 @@ def analyze_trajectory(
         cutoff: Distance cutoff (Angstroms) for selecting residues near the ligand.
         max_frames: Maximum number of frames to process. If None, process all.
         device: 'cpu' or 'gpu'. GPU provides significant speedup for large trajectories.
-        chunk_size: Frames per GPU batch. If None, auto-calculated based on
-            available GPU memory. Ignored for CPU.
+        chunk_size: Frames per streamed batch. If None, GPU uses an auto-size
+            capped at 256 frames and CPU uses 256 frames.
         residue_mode: Residue selection strategy. Default is 'all'.
             'all': Pre-scan all frames to find any residue that enters the
                 cutoff at any point. Correct for drifting or unbinding ligands.
@@ -356,24 +393,6 @@ def analyze_trajectory(
         InteractionResult containing boolean arrays for each interaction type:
         Hydrophobic, Cationic, Anionic, VdWContact, HBAcceptor, HBDonor,
         PiStacking, CationPi, PiCation.
-
-    Example:
-        >>> import MDAnalysis as mda
-        >>> from prolif.interactions._jax import analyze_trajectory
-        >>>
-        >>> u = mda.Universe("topology.pdb", "trajectory.xtc")
-        >>> results = analyze_trajectory(
-        ...     u,
-        ...     ligand_selection="resname LIG",
-        ...     protein_selection="protein",
-        ...     device="gpu",
-        ...     residue_mode="all",
-        ... )
-        >>>
-        >>> hb_counts = results.interactions["HBDonor"].sum(axis=0)
-        >>> for rid, count in zip(results.residue_ids, hb_counts):
-        ...     if count > 0:
-        ...         print(f"{rid}: {count} HB donor contacts")
     """
     logger = logging.getLogger(__name__)
 
@@ -432,28 +451,22 @@ def analyze_trajectory(
     if not residues:
         return InteractionResult(
             interactions={
-                name: np.zeros((0, 0), dtype=bool)
-                for name in [
-                    "Hydrophobic",
-                    "Cationic",
-                    "Anionic",
-                    "VdWContact",
-                    "HBAcceptor",
-                    "HBDonor",
-                    "PiStacking",
-                    "CationPi",
-                    "PiCation",
-                ]
+                name: np.zeros((0, 0), dtype=bool) for name in INTERACTION_NAMES
             },
             residue_ids=[],
             n_frames=0,
             n_residues=0,
         )
 
-    lig_f, res_f, res_valid_mask = _build_trajectory_frames(
-        universe, lig_ag, residue_ags, max_frames=max_frames
-    )
-    F = int(lig_f.shape[0])
+    res_valid_mask, max_m = _build_residue_valid_mask(residue_ags)
+    N = lig_ag.n_atoms
+    R = len(residue_ags)
+    if chunk_size is None:
+        if device == "gpu":
+            chunk_size = min(calculate_chunk_size(N, R, max_m), GPU_AUTO_CHUNK_CAP)
+        else:
+            chunk_size = 256
+    chunk_size = int(max(1, chunk_size))
 
     lig_res_for_smarts = next(iter(lig_mol.residues.values()))
     lig_masks, res_actor_masks = build_actor_masks(lig_mol, residues)
@@ -464,8 +477,8 @@ def analyze_trajectory(
     )
 
     (
-        lig_f,
-        res_f,
+        _,
+        _,
         res_valid_mask,
         lig_masks,
         res_actor_masks,
@@ -473,8 +486,8 @@ def analyze_trajectory(
         ring_idx,
         vdw_radii,
     ) = prepare_for_device(
-        lig_f,
-        res_f,
+        jnp.zeros((0, N, 3), dtype=float),
+        jnp.zeros((0, R, max_m, 3), dtype=float),
         res_valid_mask,
         lig_masks,
         res_actor_masks,
@@ -484,42 +497,68 @@ def analyze_trajectory(
         device=device,
     )
 
+    gpu_dev = None
     if device == "gpu":
-        N = int(lig_f.shape[1])
-        R = int(res_f.shape[1])
-        M = int(res_f.shape[2])
-        if chunk_size is None:
-            chunk_size = calculate_chunk_size(N, R, M)
-        results = chunked_has_interactions_frames(
-            lig_f,
-            res_f,
-            res_valid_mask,
-            lig_masks,
-            res_actor_masks,
-            angle_idx,
-            ring_idx,
-            vdw_radii,
-            chunk_size=chunk_size,
-        )
-    else:
-        results = has_interactions_frames(
-            lig_f,
-            res_f,
-            res_valid_mask,
-            lig_masks,
-            res_actor_masks,
-            angle_idx,
-            ring_idx,
-            vdw_radii,
-            vicinity_cutoff=cutoff,
-        )
+        try:
+            gpus = jax.devices("gpu")
+            gpu_dev = gpus[0] if gpus else None
+        except Exception:
+            gpu_dev = None
 
-    np_results = {k: np.asarray(v) for k, v in results.items()}
+    chunk_results: list[dict[str, np.ndarray]] = []
+    total_frames = 0
+
+    for lig_chunk, res_chunk, n_chunk_frames in _iter_trajectory_chunks(
+        universe,
+        lig_ag,
+        residue_ags,
+        max_m=max_m,
+        chunk_size=chunk_size,
+        max_frames=max_frames,
+    ):
+        try:
+            lig_chunk_dev = lig_chunk
+            res_chunk_dev = res_chunk
+            if gpu_dev is not None:
+                lig_chunk_dev = jax.device_put(lig_chunk, device=gpu_dev)
+                res_chunk_dev = jax.device_put(res_chunk, device=gpu_dev)
+
+            chunk_result = has_interactions_frames(
+                lig_chunk_dev,
+                res_chunk_dev,
+                res_valid_mask,
+                lig_masks,
+                res_actor_masks,
+                angle_idx,
+                ring_idx,
+                vdw_radii,
+                vicinity_cutoff=cutoff,
+            )
+        except Exception as exc:
+            if device == "gpu":
+                raise RuntimeError(
+                    f"JAX chunk evaluation failed at chunk_size={chunk_size}. "
+                    "Try a smaller chunk_size (for example: 128, 64, or 32)."
+                ) from exc
+            raise
+        chunk_result = jax.device_get(chunk_result)
+        chunk_results.append({k: np.asarray(v) for k, v in chunk_result.items()})
+        total_frames += n_chunk_frames
+
+    if chunk_results:
+        np_results = {
+            name: np.concatenate([chunk[name] for chunk in chunk_results], axis=0)
+            for name in INTERACTION_NAMES
+        }
+    else:
+        np_results = {
+            name: np.zeros((0, len(residues)), dtype=bool) for name in INTERACTION_NAMES
+        }
 
     return InteractionResult(
         interactions=np_results,
         residue_ids=list(residue_ids),
-        n_frames=F,
+        n_frames=total_frames,
         n_residues=len(residues),
     )
 
@@ -530,10 +569,7 @@ def analyze_frame(
     *,
     cutoff: float = 6.0,
 ) -> dict[ResidueId, dict[str, bool]]:
-    """Compute interactions for a single frame (ProLIF Molecule objects).
-
-    This is a convenience function for single-frame analysis that accepts
-    ProLIF Molecule objects directly, matching the ProLIF API style.
+    """Compute interactions for a single ligand/protein frame.
 
     Args:
         ligand: ProLIF Molecule for the ligand.

@@ -1,13 +1,4 @@
-"""
-JAX-accelerated helpers for ProLIF.
-
-High-level API (recommended):
-- analyze_trajectory: Process full MD trajectories with automatic GPU/chunking
-- analyze_frame: Single-frame analysis matching ProLIF Molecule API
-
-Low-level primitives (for custom pipelines):
-- pairwise_distances, has_interactions_frames, etc.
-"""
+"""Public JAX interaction API exports."""
 
 try:
     import jax

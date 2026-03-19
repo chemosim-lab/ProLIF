@@ -1,11 +1,4 @@
-"""
-JAX-accelerated interaction detection integrated with ProLIF SMARTS matching.
-
-This module provides JAX-accelerated versions of ProLIF interactions that:
-1. Use ProLIF/RDKit for SMARTS pattern matching (chemistry)
-2. Use JAX for batched geometric calculations (distance, angles)
-
-"""
+"""Interaction detection helpers that combine SMARTS matching with JAX geometry."""
 
 from collections.abc import Iterator
 from itertools import product
@@ -39,11 +32,7 @@ def compute_distances_batch(
 
 
 class JAXDistanceMixin:
-    """Mixin to accelerate Distance-based interactions with JAX.
-
-    This mixin overrides the detect method to batch distance calculations
-    while still using ProLIF's SMARTS matching.
-    """
+    """Mixin providing batched distance checks for distance interactions."""
 
     lig_pattern: Any
     prot_pattern: Any
@@ -86,8 +75,6 @@ def detect_distance_batch(
     residues: list[Any],
 ) -> list[list[dict[str, Any]]]:
     """Batch detect Distance interactions across multiple residues.
-
-    This is the main entry point for JAX-accelerated interaction detection.
 
     Args:
         interaction: A Distance-based interaction instance (Hydrophobic, Cationic, etc.)
@@ -217,17 +204,7 @@ def _has_singleangle_interaction(
     residues: list[Any],
     is_inverted: bool,
 ) -> list[bool]:
-    """Check SingleAngle-based interactions (HBAcceptor, HBDonor).
-
-    For SingleAngle:
-    - lig_pattern matches L1 (single atom)
-    - prot_pattern matches P1-P2 (two atoms for angle)
-    - Distance is L1 to P1 or P2
-    - Angle is P1-P2...L1
-
-    For inverted (HBDonor):
-    - Roles are swapped: ligand has P1-P2, protein has L1
-    """
+    """Check single-angle interactions for each residue."""
     results = []
     for res in residues:
         if is_inverted:
@@ -267,15 +244,7 @@ def _has_doubleangle_interaction(
     residues: list[Any],
     is_inverted: bool,
 ) -> list[bool]:
-    """Check DoubleAngle-based interactions (XBAcceptor, XBDonor).
-
-    For DoubleAngle:
-    - lig_pattern matches L1-L2 (two atoms)
-    - prot_pattern matches P1-P2 (two atoms)
-
-    For inverted (XBDonor):
-    - Roles are swapped
-    """
+    """Check double-angle interactions for each residue."""
     results = []
     for res in residues:
         if is_inverted:

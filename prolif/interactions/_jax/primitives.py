@@ -1,10 +1,4 @@
-"""
-JAX-accelerated geometric primitives for molecular interaction calculations.
-
-These functions provide GPU-compatible, vectorized implementations of
-geometric operations used in interaction fingerprinting. All functions
-are designed to work with batched inputs and can be JIT-compiled.
-"""
+"""Geometric primitives used by JAX interaction calculations."""
 
 from typing import cast
 
@@ -31,8 +25,6 @@ def batch_centroids(
     coords: jnp.ndarray, group_indices: list[jnp.ndarray]
 ) -> jnp.ndarray:
     """Compute centroids for multiple groups of atoms.
-
-    Uses segment_sum for efficient computation over variable-size groups.
 
     Args:
         coords: (N, 3) array of all atom coordinates.
@@ -80,9 +72,7 @@ def batch_ring_normals_masked(
     index_padded: jnp.ndarray,
     mask: jnp.ndarray,
 ) -> jnp.ndarray:
-    """Compute unit normals for rings using the same method as ProLIF's
-    ``get_ring_normal_vector``: cross product of unit vectors from the centroid
-    to the first two ring atoms.
+    """Compute unit normal vectors for multiple rings.
 
     Args:
         coords: (N, 3) array of all atom coordinates.
@@ -107,9 +97,7 @@ def batch_ring_normals_masked(
 
 
 def ring_normal(coords: jnp.ndarray, ring_indices: jnp.ndarray) -> jnp.ndarray:
-    """Compute unit normal vector to a ring plane using the same method as
-    ProLIF's ``get_ring_normal_vector``: cross product of unit vectors from the
-    centroid to the first two ring atoms.
+    """Compute the unit normal vector of one ring.
 
     Args:
         coords: (N, 3) array of all atom coordinates.
@@ -135,15 +123,13 @@ def ring_normal(coords: jnp.ndarray, ring_indices: jnp.ndarray) -> jnp.ndarray:
 def batch_ring_normals(
     coords: jnp.ndarray, ring_indices_list: list[jnp.ndarray]
 ) -> jnp.ndarray:
-    """Compute unit normal vectors for multiple rings using Newell's method."""
+    """Compute unit normal vectors for multiple rings."""
     normals = [ring_normal(coords, idxs) for idxs in ring_indices_list]
     return jnp.stack(normals, axis=0)
 
 
 def angle_between_vectors(v1: jnp.ndarray, v2: jnp.ndarray) -> jnp.ndarray:
     """Compute angle between vectors.
-
-    Handles arbitrary batch dimensions via axis=-1 operations.
 
     Args:
         v1: (..., 3) array of vectors.
@@ -164,9 +150,6 @@ def angle_at_vertex(
 ) -> jnp.ndarray:
     """Compute angle formed at a vertex point.
 
-    Calculates the angle p1-vertex-p2, useful for angles like D-H-A
-    in hydrogen bonds.
-
     Args:
         p1: (..., 3) first point.
         vertex: (..., 3) vertex point where angle is measured.
@@ -184,8 +167,6 @@ def point_to_plane_distance(
     points: jnp.ndarray, plane_point: jnp.ndarray, plane_normal: jnp.ndarray
 ) -> jnp.ndarray:
     """Compute signed distances from points to a plane.
-
-    Useful for cation-pi and pi-stacking geometric checks.
 
     Args:
         points: (N, 3) array of points.
