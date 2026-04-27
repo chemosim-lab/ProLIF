@@ -36,7 +36,7 @@ class ProteinHelper:
     """:class:`ProteinHelper` is a class to standardize the residue names and fix the
     bond orders when reading the non-standard residues with RDKit for a molecule.
 
-    .. versionadded:: 2.1.0
+    .. versionadded:: 2.2.0
 
     Parameters
     ----------
