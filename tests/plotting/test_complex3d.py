@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Literal, cast
 
 import MDAnalysis as mda
 import pytest
@@ -84,7 +84,7 @@ class TestComplex3D:
     def test_fp_plot_3d(
         self,
         fp_mols: tuple[plf.Fingerprint, plf.Molecule, plf.Molecule],
-        sanitize: bool | str,
+        sanitize: bool | Literal["protein", "ligand"],
     ) -> None:
         fp, lig_mol, prot_mol = fp_mols
         view = fp.plot_3d(
