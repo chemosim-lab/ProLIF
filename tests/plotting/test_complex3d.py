@@ -80,11 +80,20 @@ class TestComplex3D:
         ):
             Complex3D.from_fingerprint(fp, ligand_mol, protein_mol, frame=0)
 
+    @pytest.mark.parametrize("sanitize", ["protein", "ligand", True, False])
     def test_fp_plot_3d(
-        self, fp_mols: tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]
+        self,
+        fp_mols: tuple[plf.Fingerprint, plf.Molecule, plf.Molecule],
+        sanitize: bool | str,
     ) -> None:
         fp, lig_mol, prot_mol = fp_mols
-        view = fp.plot_3d(lig_mol, prot_mol, frame=0, display_all=fp.count)
+        view = fp.plot_3d(
+            lig_mol,
+            prot_mol,
+            frame=0,
+            display_all=fp.count,
+            sanitize=sanitize,
+        )
         assert view._view
         html = view._view._make_html()
         assert "Hydrophobic" in html
