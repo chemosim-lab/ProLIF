@@ -50,7 +50,7 @@ def cif_parser_lite(cif_string: str) -> dict:
     """
     Parses a CIF string and returns a dictionary of data blocks.
 
-    .. versionadded:: 2.1.0
+    .. versionadded:: 2.2.0
 
     Parameters
     ----------
