@@ -67,7 +67,7 @@ class Complex3D:
         Style object passed to ``3Dmol.js`` for the entire protein.
     PEPTIDE_STYLE : dict[str, dict] = "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"}
         Style object passed to ``3Dmol.js`` for the ligand as a peptide if appropriate.
-    PEPTIDE_THRESHOLD : int = 2
+    PEPTIDE_THRESHOLD : int = 5
         Ligands with this number of residues or more will be displayed using
         ``PEPTIDE_STYLE`` in addition to the ``LIGAND_STYLE``.
     LIGAND_DISPLAYED_ATOM : dict[str, int]

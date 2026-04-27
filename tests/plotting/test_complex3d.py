@@ -32,11 +32,25 @@ class TestComplex3D:
         prot_mol = plf.Molecule.from_mda(prot)
         return fp, lig_mol, prot_mol
 
-    @pytest.fixture(scope="class")
-    def fp_mols(
+    def execute_fp_ppi(
         self, fp: plf.Fingerprint
     ) -> tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]:
-        return self.execute_fp(fp)
+        u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
+        chainA = u.select_atoms("protein and segid A")
+        chainB = u.select_atoms("protein and segid B")
+        fp.run(u.trajectory[0:2], chainA, chainB)
+        chainA_mol = plf.Molecule.from_mda(chainA)
+        chainB_mol = plf.Molecule.from_mda(chainB)
+        return fp, chainA_mol, chainB_mol
+
+    @pytest.fixture(scope="class", params=["execute_fp", "execute_fp_ppi"])
+    def fp_mols(
+        self, fp: plf.Fingerprint, request: pytest.FixtureRequest
+    ) -> tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]:
+        return cast(
+            tuple[plf.Fingerprint, plf.Molecule, plf.Molecule],
+            getattr(self, request.param)(fp),
+        )
 
     @pytest.fixture(scope="class")
     def simple_fp_results(
