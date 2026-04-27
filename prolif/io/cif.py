@@ -117,7 +117,7 @@ def cif_template_reader(cif_filepath: Path | str) -> dict:
     """
     Reads a CIF file and returns a dictionary of data blocks.
 
-    .. versionadded:: 2.1.0
+    .. versionadded:: 2.2.0
 
     Parameters
     ----------
