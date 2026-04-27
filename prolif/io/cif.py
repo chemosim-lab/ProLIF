@@ -18,7 +18,7 @@ def _block_decompose(data_block: list) -> tuple:
     """
     Decomposes a CIF data block into decriptive information and tables.
 
-    .. versionadded:: 2.1.0
+    .. versionadded:: 2.2.0
     """
     descriptions: list[str] = []
     data_tables: list[list] = []
