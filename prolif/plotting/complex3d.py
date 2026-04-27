@@ -208,7 +208,7 @@ class Complex3D:
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
-        santitize_vis_mols: bool | Literal["ligand", "protein"] = "protein",
+        sanitize: bool | Literal["ligand", "protein"] = "protein",
     ) -> Complex3D:
         """Display as a py3Dmol widget view.
 
@@ -226,7 +226,7 @@ class Complex3D:
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
-        santitize_vis_mols: bool | Literal["ligand", "protein"] = "protein"
+        sanitize: bool | Literal["ligand", "protein"] = "protein"
             Whether to sanitize the RDKit molecules used for visualization.
             This is to avoid unkekulization issues that may arise when using the
             coordinates of the molecule.
@@ -237,8 +237,8 @@ class Complex3D:
             Non-polar hydrogen atoms that aren't involved in interactions are now
             hidden. Added support for waters involved in WaterBridge interactions.
 
-        .. versionchanged:: dev
-            Added ``santitize_vis_mols`` parameter to allow sanitization of the RDKit
+        .. versionchanged:: 2.2.0
+            Added ``sanitize`` parameter to allow sanitization of the RDKit
             molecules used for visualization, which can help avoid unkekulization
             issues when using the coordinates of the molecule directly.
         """
@@ -250,7 +250,7 @@ class Complex3D:
             display_all=display_all,
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
-            santitize_vis_mols=santitize_vis_mols,
+            sanitize=sanitize,
         )
         self._view = v
         return self
@@ -359,7 +359,7 @@ class Complex3D:
         colormap: dict[ResidueId, str] | None = None,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
-        santitize_vis_mols: bool | Literal["ligand", "protein"] = "protein",
+        sanitize: bool | Literal["ligand", "protein"] = "protein",
     ) -> None:
         if isinstance(view, Complex3D):
             # backwards compatibility for when display/compare used to return the view
@@ -520,7 +520,7 @@ class Complex3D:
         # show protein
         mol = Chem.RemoveAllHs(
             self.prot_mol,
-            sanitize=(santitize_vis_mols in {"protein", True}),
+            sanitize=(sanitize in {"protein", True}),
         )
         pdb = Chem.MolToPDBBlock(mol, flavor=0x20 | 0x10)
         v.addModel(pdb, "pdb", viewer=position)
@@ -531,7 +531,7 @@ class Complex3D:
         if self.lig_mol.n_residues >= self.PEPTIDE_THRESHOLD:
             mol = Chem.RemoveAllHs(
                 self.lig_mol,
-                sanitize=(santitize_vis_mols in {"ligand", True}),
+                sanitize=(sanitize in {"ligand", True}),
             )
             pdb = Chem.MolToPDBBlock(mol, flavor=0x20 | 0x10)
             v.addModel(pdb, "pdb", viewer=position)
