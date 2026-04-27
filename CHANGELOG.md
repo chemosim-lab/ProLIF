@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unrealised]
+
+### Added
+
+- Support for `ImplicitHBAcceptor` and `ImplicitHBDonor` interactions to calculate  
+  hydrogen bond interactions with merely heavy atoms. This helps users to estimate 
+  the hydrogen bond interactions for structures from PDB database or AI-driven
+  methods (PR #284 with @yuyuan871111, PR #302). 
+- Added a new `protein_helper` function to parse the file and correct the connectivity 
+  of your topology easily with SMILES or CIF templates (PR #275 with @yuyuan871111,
+  PR #302).
+
+### Fixed
+
+### Changed
+
+
 ## [2.1.0] - 2026-01-20
 
 ### Added

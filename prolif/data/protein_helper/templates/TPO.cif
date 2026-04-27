@@ -1,0 +1,155 @@
+data_TPO
+# 
+_chem_comp.id                                    TPO 
+_chem_comp.name                                  PHOSPHOTHREONINE 
+_chem_comp.type                                  "L-PEPTIDE LINKING" 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C4 H10 N O6 P" 
+_chem_comp.mon_nstd_parent_comp_id               THR 
+_chem_comp.pdbx_synonyms                         PHOSPHONOTHREONINE 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2024-09-27 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        199.099 
+_chem_comp.one_letter_code                       T 
+_chem_comp.three_letter_code                     TPO 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        ? 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        1FMO 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  EBI 
+_chem_comp.pdbx_pcm                              Y 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+TPO N    N    N 0 1 N N N Y Y N 21.891 2.133 -14.748 1.153  -1.040 2.377  N    TPO 1  
+TPO CA   CA   C 0 1 N N S Y N N 22.318 2.994 -13.673 0.572  0.199  1.844  CA   TPO 2  
+TPO CB   CB   C 0 1 N N R N N N 21.313 4.075 -13.361 1.111  0.449  0.434  CB   TPO 3  
+TPO CG2  CG2  C 0 1 N N N N N N 21.837 5.045 -12.302 2.634  0.580  0.485  CG2  TPO 4  
+TPO OG1  OG1  O 0 1 N N N N N N 20.898 4.716 -14.523 0.755  -0.645 -0.412 OG1  TPO 5  
+TPO P    P    P 0 1 N N N N N N 19.424 4.424 -14.993 -0.142 -0.039 -1.603 P    TPO 6  
+TPO O1P  O1P  O 0 1 N N N N N N 19.358 5.014 -16.321 0.644  0.968  -2.350 O1P  TPO 7  
+TPO O2P  O2P  O 0 1 N N N N N N 19.243 2.986 -14.834 -0.580 -1.224 -2.601 O2P  TPO 8  
+TPO O3P  O3P  O 0 1 N N N N N N 18.506 5.082 -14.021 -1.456 0.656  -0.985 O3P  TPO 9  
+TPO C    C    C 0 1 N N N Y N Y 22.539 2.278 -12.384 -0.927 0.070  1.794  C    TPO 10 
+TPO O    O    O 0 1 N N N Y N Y 21.778 1.390 -12.005 -1.435 -1.012 1.626  O    TPO 11 
+TPO OXT  OXT  O 0 1 N Y N Y N Y 23.582 2.721 -11.720 -1.700 1.159  1.935  OXT  TPO 12 
+TPO H    H    H 0 1 N N N Y Y N 22.570 1.402 -14.958 2.154  -0.949 2.296  H    TPO 13 
+TPO H2   2HN  H 0 1 N Y N Y Y N 21.663 2.673 -15.582 0.877  -1.782 1.751  H2   TPO 14 
+TPO HA   HA   H 0 1 N N N Y N N 23.275 3.418 -14.056 0.844  1.034  2.490  HA   TPO 15 
+TPO HB   HB   H 0 1 N N N N N N 20.410 3.593 -12.916 0.680  1.369  0.039  HB   TPO 16 
+TPO HG21 1HG2 H 0 0 N N N N N N 21.094 5.844 -12.071 3.065  -0.339 0.881  HG21 TPO 17 
+TPO HG22 2HG2 H 0 0 N N N N N N 22.154 4.506 -11.378 3.018  0.758  -0.518 HG22 TPO 18 
+TPO HG23 3HG2 H 0 0 N N N N N N 22.821 5.477 -12.598 2.906  1.415  1.131  HG23 TPO 19 
+TPO HOP2 2HOP H 0 0 N N N N N N 18.353 2.809 -15.117 -1.114 -0.819 -3.298 HOP2 TPO 20 
+TPO HOP3 3HOP H 0 0 N N N N N N 17.616 4.905 -14.304 -1.938 -0.033 -0.509 HOP3 TPO 21 
+TPO HXT  HXT  H 0 1 N Y N Y N Y 23.722 2.264 -10.898 -2.662 1.076  1.902  HXT  TPO 22 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+TPO N   CA   SING N N 1  
+TPO N   H    SING N N 2  
+TPO N   H2   SING N N 3  
+TPO CA  CB   SING N N 4  
+TPO CA  C    SING N N 5  
+TPO CA  HA   SING N N 6  
+TPO CB  CG2  SING N N 7  
+TPO CB  OG1  SING N N 8  
+TPO CB  HB   SING N N 9  
+TPO CG2 HG21 SING N N 10 
+TPO CG2 HG22 SING N N 11 
+TPO CG2 HG23 SING N N 12 
+TPO OG1 P    SING N N 13 
+TPO P   O1P  DOUB N N 14 
+TPO P   O2P  SING N N 15 
+TPO P   O3P  SING N N 16 
+TPO O2P HOP2 SING N N 17 
+TPO O3P HOP3 SING N N 18 
+TPO C   O    DOUB N N 19 
+TPO C   OXT  SING N N 20 
+TPO OXT HXT  SING N N 21 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+TPO SMILES           ACDLabs              10.04 "O=P(O)(O)OC(C(N)C(=O)O)C"                                                                     
+TPO SMILES_CANONICAL CACTVS               3.341 "C[C@@H](O[P](O)(O)=O)[C@H](N)C(O)=O"                                                          
+TPO SMILES           CACTVS               3.341 "C[CH](O[P](O)(O)=O)[CH](N)C(O)=O"                                                             
+TPO SMILES_CANONICAL "OpenEye OEToolkits" 1.5.0 "C[C@H]([C@@H](C(=O)O)N)OP(=O)(O)O"                                                            
+TPO SMILES           "OpenEye OEToolkits" 1.5.0 "CC(C(C(=O)O)N)OP(=O)(O)O"                                                                     
+TPO InChI            InChI                1.03  "InChI=1S/C4H10NO6P/c1-2(3(5)4(6)7)11-12(8,9)10/h2-3H,5H2,1H3,(H,6,7)(H2,8,9,10)/t2-,3+/m1/s1" 
+TPO InChIKey         InChI                1.03  USRGIUJOYOXOQJ-GBXIJSLDSA-N                                                                    
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+TPO "SYSTEMATIC NAME" ACDLabs              10.04 O-phosphono-L-threonine                        
+TPO "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.5.0 "(2S,3R)-2-amino-3-phosphonooxy-butanoic acid" 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+TPO "Create component"  1999-07-08 EBI  
+TPO "Modify descriptor" 2011-06-04 RCSB 
+TPO "Modify synonyms"   2020-06-05 PDBE 
+TPO "Modify backbone"   2023-11-03 PDBE 
+TPO "Modify PCM"        2024-09-27 PDBE 
+# 
+_pdbx_chem_comp_synonyms.ordinal      1 
+_pdbx_chem_comp_synonyms.comp_id      TPO 
+_pdbx_chem_comp_synonyms.name         PHOSPHONOTHREONINE 
+_pdbx_chem_comp_synonyms.provenance   ? 
+_pdbx_chem_comp_synonyms.type         ? 
+# 
+_pdbx_chem_comp_pcm.pcm_id                             1 
+_pdbx_chem_comp_pcm.comp_id                            TPO 
+_pdbx_chem_comp_pcm.modified_residue_id                THR 
+_pdbx_chem_comp_pcm.type                               Phosphorylation 
+_pdbx_chem_comp_pcm.category                           "Named protein modification" 
+_pdbx_chem_comp_pcm.position                           "Amino-acid side chain" 
+_pdbx_chem_comp_pcm.polypeptide_position               "Any position" 
+_pdbx_chem_comp_pcm.comp_id_linking_atom               ? 
+_pdbx_chem_comp_pcm.modified_residue_id_linking_atom   ? 
+_pdbx_chem_comp_pcm.uniprot_specific_ptm_accession     PTM-0254 
+_pdbx_chem_comp_pcm.uniprot_generic_ptm_accession      ? 
+# 
