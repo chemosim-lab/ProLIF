@@ -568,7 +568,7 @@ class VdWContact(Interaction):
 class ImplicitHBAcceptor(Distance, VdWContact):
     """Implicit Hbond interaction between a ligand (acceptor) and a residue (donor).
 
-    .. versionadded:: 2.1.0
+    .. versionadded:: 2.2.0
 
     Parameters
     ----------
