@@ -1,0 +1,105 @@
+data_NME
+# 
+_chem_comp.id                                    NME 
+_chem_comp.name                                  METHYLAMINE 
+_chem_comp.type                                  NON-POLYMER 
+_chem_comp.pdbx_type                             ATOMP 
+_chem_comp.formula                               "C H5 N" 
+_chem_comp.mon_nstd_parent_comp_id               ? 
+_chem_comp.pdbx_synonyms                         ? 
+_chem_comp.pdbx_formal_charge                    0 
+_chem_comp.pdbx_initial_date                     1999-07-08 
+_chem_comp.pdbx_modified_date                    2024-09-27 
+_chem_comp.pdbx_ambiguous_flag                   N 
+_chem_comp.pdbx_release_status                   REL 
+_chem_comp.pdbx_replaced_by                      ? 
+_chem_comp.pdbx_replaces                         ? 
+_chem_comp.formula_weight                        31.057 
+_chem_comp.one_letter_code                       ? 
+_chem_comp.three_letter_code                     NME 
+_chem_comp.pdbx_model_coordinates_details        ? 
+_chem_comp.pdbx_model_coordinates_missing_flag   N 
+_chem_comp.pdbx_ideal_coordinates_details        Corina 
+_chem_comp.pdbx_ideal_coordinates_missing_flag   N 
+_chem_comp.pdbx_model_coordinates_db_code        1APW 
+_chem_comp.pdbx_subcomponent_list                ? 
+_chem_comp.pdbx_processing_site                  RCSB 
+_chem_comp.pdbx_pcm                              N 
+# 
+loop_
+_chem_comp_atom.comp_id 
+_chem_comp_atom.atom_id 
+_chem_comp_atom.alt_atom_id 
+_chem_comp_atom.type_symbol 
+_chem_comp_atom.charge 
+_chem_comp_atom.pdbx_align 
+_chem_comp_atom.pdbx_aromatic_flag 
+_chem_comp_atom.pdbx_leaving_atom_flag 
+_chem_comp_atom.pdbx_stereo_config 
+_chem_comp_atom.pdbx_backbone_atom_flag 
+_chem_comp_atom.pdbx_n_terminal_atom_flag 
+_chem_comp_atom.pdbx_c_terminal_atom_flag 
+_chem_comp_atom.model_Cartn_x 
+_chem_comp_atom.model_Cartn_y 
+_chem_comp_atom.model_Cartn_z 
+_chem_comp_atom.pdbx_model_Cartn_x_ideal 
+_chem_comp_atom.pdbx_model_Cartn_y_ideal 
+_chem_comp_atom.pdbx_model_Cartn_z_ideal 
+_chem_comp_atom.pdbx_component_atom_id 
+_chem_comp_atom.pdbx_component_comp_id 
+_chem_comp_atom.pdbx_ordinal 
+NME N   N   N 0 1 N N N N N N 25.525 12.865 23.856 0.720  0.000  -0.067 N   NME 1 
+NME C   C   C 0 1 N N N N N N 26.662 12.636 24.801 -0.747 -0.000 0.011  C   NME 2 
+NME HN1 HN1 H 0 1 N Y N N N N 24.669 12.916 24.370 1.105  0.832  0.356  HN1 NME 3 
+NME HN2 HN2 H 0 1 N N N N N N 25.669 13.723 23.363 1.105  -0.831 0.356  HN2 NME 4 
+NME H1  H1  H 0 1 N N N N N N 27.604 12.580 24.236 -1.138 -0.872 -0.513 H1  NME 5 
+NME H2  H2  H 0 1 N N N N N N 26.715 13.468 25.519 -1.055 -0.036 1.056  H2  NME 6 
+NME H3  H3  H 0 1 N N N N N N 26.503 11.692 25.343 -1.135 0.907  -0.452 H3  NME 7 
+# 
+loop_
+_chem_comp_bond.comp_id 
+_chem_comp_bond.atom_id_1 
+_chem_comp_bond.atom_id_2 
+_chem_comp_bond.value_order 
+_chem_comp_bond.pdbx_aromatic_flag 
+_chem_comp_bond.pdbx_stereo_config 
+_chem_comp_bond.pdbx_ordinal 
+NME N C   SING N N 1 
+NME N HN1 SING N N 2 
+NME N HN2 SING N N 3 
+NME C H1  SING N N 4 
+NME C H2  SING N N 5 
+NME C H3  SING N N 6 
+# 
+loop_
+_pdbx_chem_comp_descriptor.comp_id 
+_pdbx_chem_comp_descriptor.type 
+_pdbx_chem_comp_descriptor.program 
+_pdbx_chem_comp_descriptor.program_version 
+_pdbx_chem_comp_descriptor.descriptor 
+NME SMILES           ACDLabs              12.01 NC                          
+NME SMILES_CANONICAL CACTVS               3.370 CN                          
+NME SMILES           CACTVS               3.370 CN                          
+NME SMILES_CANONICAL "OpenEye OEToolkits" 1.7.0 CN                          
+NME SMILES           "OpenEye OEToolkits" 1.7.0 CN                          
+NME InChI            InChI                1.03  InChI=1S/CH5N/c1-2/h2H2,1H3 
+NME InChIKey         InChI                1.03  BAVYZALUXZFZLV-UHFFFAOYSA-N 
+# 
+loop_
+_pdbx_chem_comp_identifier.comp_id 
+_pdbx_chem_comp_identifier.type 
+_pdbx_chem_comp_identifier.program 
+_pdbx_chem_comp_identifier.program_version 
+_pdbx_chem_comp_identifier.identifier 
+NME "SYSTEMATIC NAME" ACDLabs              12.01 methanamine 
+NME "SYSTEMATIC NAME" "OpenEye OEToolkits" 1.7.0 methanamine 
+# 
+loop_
+_pdbx_chem_comp_audit.comp_id 
+_pdbx_chem_comp_audit.action_type 
+_pdbx_chem_comp_audit.date 
+_pdbx_chem_comp_audit.processing_site 
+NME "Create component"  1999-07-08 RCSB 
+NME "Modify descriptor" 2011-06-04 RCSB 
+NME "Modify PCM"        2024-09-27 PDBE 
+# 

@@ -15,6 +15,8 @@ from prolif.interactions.interactions import (
     HBAcceptor,
     HBDonor,
     Hydrophobic,
+    ImplicitHBAcceptor,
+    ImplicitHBDonor,
     MetalAcceptor,
     MetalDonor,
     PiCation,
