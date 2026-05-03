@@ -384,12 +384,14 @@ class Complex3D:
             lres = self.lig_mol[lresid]
             pres = self.prot_mol[presid]
             # set model ids for reusing later
-            for resid, res, style in [
-                (lresid, lres, self.LIGAND_STYLE),
-                (presid, pres, self.RESIDUES_STYLE),
+            for resid, res, style, kekulize in [
+                (lresid, lres, self.LIGAND_STYLE, sanitize in {"ligand", True}),
+                (presid, pres, self.RESIDUES_STYLE, sanitize in {"protein", True}),
             ]:
                 if resid not in self._models:
-                    self._add_residue_to_view(v, position, res, style)
+                    self._add_residue_to_view(
+                        v, position, res, style, kekulize=kekulize
+                    )
             for interaction, metadata_tuple in interactions.items():
                 # whether to display all interactions or only the one with the shortest
                 # distance
@@ -487,7 +489,13 @@ class Complex3D:
             pocket_residues = set(pocket_residues).difference(self._models)
             for resid in pocket_residues:
                 res = self.prot_mol[resid]
-                self._add_residue_to_view(v, position, res, self.RESIDUES_STYLE)
+                self._add_residue_to_view(
+                    v,
+                    position,
+                    res,
+                    self.RESIDUES_STYLE,
+                    kekulize=sanitize in {"protein", True},
+                )
 
         # hide non-polar hydrogens (except if they are involved in an interaction)
         if remove_hydrogens:
@@ -597,11 +605,12 @@ class Complex3D:
         position: tuple[int, int],
         res: Residue,
         style: dict,
+        kekulize: bool = True,
     ) -> None:
         """Add a residue to the view."""
         self._mid += 1
         resid = res.resid
-        v.addModel(Chem.MolToMolBlock(res), "sdf", viewer=position)
+        v.addModel(Chem.MolToMolBlock(res, kekulize=kekulize), "sdf", viewer=position)
         model = v.getModel(viewer=position)
         if resid in self._colormap:
             resid_style = deepcopy(style)
