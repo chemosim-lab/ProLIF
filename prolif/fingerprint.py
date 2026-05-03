@@ -1356,6 +1356,7 @@ class Fingerprint:
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
+        sanitize: bool | Literal["ligand", "protein"] = "protein",
     ) -> "Complex3D":
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
@@ -1383,6 +1384,10 @@ class Fingerprint:
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
+        sanitize: bool | Literal["ligand", "protein"] = "protein"
+            Whether to sanitize the RDKit molecules used for visualization.
+            This is to avoid unkekulization issues that may arise when using the
+            coordinates of the molecule.
 
         See Also
         --------
@@ -1395,6 +1400,10 @@ class Fingerprint:
             Non-polar hydrogen atoms that aren't involved in interactions are now
             hidden. Added support for waters involved in WaterBridge interactions.
 
+        .. versionchanged:: 2.2.0
+            Added ``sanitize`` parameter to allow sanitization of the RDKit
+            molecules used for visualization, which can help avoid unkekulization
+            issues when using the coordinates of the molecule directly.
         """
         from prolif.plotting.complex3d import Complex3D
 
@@ -1410,4 +1419,5 @@ class Fingerprint:
             display_all=display_all,
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
+            sanitize=sanitize,
         )

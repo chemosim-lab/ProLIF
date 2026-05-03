@@ -1,7 +1,10 @@
-from typing import cast
+from contextlib import nullcontext
+from typing import Literal, cast
 
 import MDAnalysis as mda
 import pytest
+from rdkit import Chem
+from rdkit.Chem.rdDistGeom import EmbedMolecule
 
 import prolif as plf
 from prolif.exceptions import RunRequiredError
@@ -32,11 +35,25 @@ class TestComplex3D:
         prot_mol = plf.Molecule.from_mda(prot)
         return fp, lig_mol, prot_mol
 
-    @pytest.fixture(scope="class")
-    def fp_mols(
+    def execute_fp_ppi(
         self, fp: plf.Fingerprint
     ) -> tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]:
-        return self.execute_fp(fp)
+        u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
+        chainA = u.select_atoms("protein and segid A")
+        chainB = u.select_atoms("protein and segid B")
+        fp.run(u.trajectory[0:2], chainA, chainB)
+        chainA_mol = plf.Molecule.from_mda(chainA)
+        chainB_mol = plf.Molecule.from_mda(chainB)
+        return fp, chainA_mol, chainB_mol
+
+    @pytest.fixture(scope="class", params=["execute_fp", "execute_fp_ppi"])
+    def fp_mols(
+        self, fp: plf.Fingerprint, request: pytest.FixtureRequest
+    ) -> tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]:
+        return cast(
+            tuple[plf.Fingerprint, plf.Molecule, plf.Molecule],
+            getattr(self, request.param)(fp),
+        )
 
     @pytest.fixture(scope="class")
     def simple_fp_results(
@@ -88,6 +105,32 @@ class TestComplex3D:
         assert view._view
         html = view._view._make_html()
         assert "Hydrophobic" in html
+
+    @pytest.mark.parametrize(
+        ("sanitize", "can_kekulize"),
+        [("protein", True), ("ligand", False), (True, True), (False, False)],
+    )
+    def test_can_bypass_kekulization_error(
+        self,
+        sanitize: bool | Literal["protein", "ligand"],
+        can_kekulize: bool,
+    ) -> None:
+        """with non-kekulizable protein"""
+        lig = Chem.AddHs(Chem.MolFromSmiles("c1ccccc1"))
+        EmbedMolecule(lig, randomSeed=0xAC1D)
+        prot = Chem.AddHs(Chem.MolFromSequence("F"), addResidueInfo=True)
+        EmbedMolecule(prot, randomSeed=0xAC1D)
+        lmol = plf.Molecule.from_rdkit(lig)
+        pmol = plf.Molecule.from_rdkit(prot)
+        # ensure test pmol is setup correctly
+        mol = Chem.RemoveAllHs(pmol, sanitize=False)
+        with pytest.raises(Chem.KekulizeException):
+            Chem.MolToPDBBlock(mol, flavor=0x20 | 0x10)
+        fp = plf.Fingerprint(["Hydrophobic", "PiStacking"])
+        fp.run_from_iterable([lmol], pmol)
+        ctx = nullcontext() if can_kekulize else pytest.raises(Chem.KekulizeException)
+        with ctx:
+            fp.plot_3d(lmol, pmol, frame=0, only_interacting=False, sanitize=sanitize)
 
     def test_getattr_raises_error_if_not_initialized(
         self, simple_fp_results: tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]

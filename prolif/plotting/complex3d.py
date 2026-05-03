@@ -67,7 +67,7 @@ class Complex3D:
         Style object passed to ``3Dmol.js`` for the entire protein.
     PEPTIDE_STYLE : dict[str, dict] = "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"}
         Style object passed to ``3Dmol.js`` for the ligand as a peptide if appropriate.
-    PEPTIDE_THRESHOLD : int = 2
+    PEPTIDE_THRESHOLD : int = 5
         Ligands with this number of residues or more will be displayed using
         ``PEPTIDE_STYLE`` in addition to the ``LIGAND_STYLE``.
     LIGAND_DISPLAYED_ATOM : dict[str, int]
@@ -208,6 +208,7 @@ class Complex3D:
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
+        sanitize: bool | Literal["ligand", "protein"] = "protein",
     ) -> Complex3D:
         """Display as a py3Dmol widget view.
 
@@ -225,12 +226,21 @@ class Complex3D:
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
+        sanitize: bool | Literal["ligand", "protein"] = "protein"
+            Whether to sanitize the RDKit molecules used for visualization.
+            This is to avoid unkekulization issues that may arise when using the
+            coordinates of the molecule.
+
 
         .. versionchanged:: 2.1.0
             Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
             Non-polar hydrogen atoms that aren't involved in interactions are now
             hidden. Added support for waters involved in WaterBridge interactions.
 
+        .. versionchanged:: 2.2.0
+            Added ``sanitize`` parameter to allow sanitization of the RDKit
+            molecules used for visualization, which can help avoid unkekulization
+            issues when using the coordinates of the molecule directly.
         """
         v = py3Dmol.view(width=size[0], height=size[1], viewergrid=(1, 1), linked=False)
         v.removeAllModels()
@@ -240,6 +250,7 @@ class Complex3D:
             display_all=display_all,
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
+            sanitize=sanitize,
         )
         self._view = v
         return self
@@ -348,6 +359,7 @@ class Complex3D:
         colormap: dict[ResidueId, str] | None = None,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
+        sanitize: bool | Literal["ligand", "protein"] = "protein",
     ) -> None:
         if isinstance(view, Complex3D):
             # backwards compatibility for when display/compare used to return the view
@@ -372,12 +384,14 @@ class Complex3D:
             lres = self.lig_mol[lresid]
             pres = self.prot_mol[presid]
             # set model ids for reusing later
-            for resid, res, style in [
-                (lresid, lres, self.LIGAND_STYLE),
-                (presid, pres, self.RESIDUES_STYLE),
+            for resid, res, style, kekulize in [
+                (lresid, lres, self.LIGAND_STYLE, sanitize in {"ligand", True}),
+                (presid, pres, self.RESIDUES_STYLE, sanitize in {"protein", True}),
             ]:
                 if resid not in self._models:
-                    self._add_residue_to_view(v, position, res, style)
+                    self._add_residue_to_view(
+                        v, position, res, style, kekulize=kekulize
+                    )
             for interaction, metadata_tuple in interactions.items():
                 # whether to display all interactions or only the one with the shortest
                 # distance
@@ -475,7 +489,13 @@ class Complex3D:
             pocket_residues = set(pocket_residues).difference(self._models)
             for resid in pocket_residues:
                 res = self.prot_mol[resid]
-                self._add_residue_to_view(v, position, res, self.RESIDUES_STYLE)
+                self._add_residue_to_view(
+                    v,
+                    position,
+                    res,
+                    self.RESIDUES_STYLE,
+                    kekulize=sanitize in {"protein", True},
+                )
 
         # hide non-polar hydrogens (except if they are involved in an interaction)
         if remove_hydrogens:
@@ -506,7 +526,10 @@ class Complex3D:
                     model.setStyle({"index": hide}, {"stick": {"hidden": True}})
 
         # show protein
-        mol = Chem.RemoveAllHs(self.prot_mol, sanitize=False)
+        mol = Chem.RemoveAllHs(
+            self.prot_mol,
+            sanitize=(sanitize in {"protein", True}),
+        )
         pdb = Chem.MolToPDBBlock(mol, flavor=0x20 | 0x10)
         v.addModel(pdb, "pdb", viewer=position)
         model = v.getModel(viewer=position)
@@ -514,7 +537,10 @@ class Complex3D:
 
         # do the same for ligand if multiple residues
         if self.lig_mol.n_residues >= self.PEPTIDE_THRESHOLD:
-            mol = Chem.RemoveAllHs(self.lig_mol, sanitize=False)
+            mol = Chem.RemoveAllHs(
+                self.lig_mol,
+                sanitize=(sanitize in {"ligand", True}),
+            )
             pdb = Chem.MolToPDBBlock(mol, flavor=0x20 | 0x10)
             v.addModel(pdb, "pdb", viewer=position)
             model = v.getModel(viewer=position)
@@ -579,11 +605,12 @@ class Complex3D:
         position: tuple[int, int],
         res: Residue,
         style: dict,
+        kekulize: bool = True,
     ) -> None:
         """Add a residue to the view."""
         self._mid += 1
         resid = res.resid
-        v.addModel(Chem.MolToMolBlock(res), "sdf", viewer=position)
+        v.addModel(Chem.MolToMolBlock(res, kekulize=kekulize), "sdf", viewer=position)
         model = v.getModel(viewer=position)
         if resid in self._colormap:
             resid_style = deepcopy(style)

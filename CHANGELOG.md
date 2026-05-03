@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Added a parameter `sanitize` for `Fingerprint.plot_3d` and `Complex3D.display`
+  to sanitize the hydrogen-removed structures before visualization in 3D plot
+  (Issue #304, PR #345 by @yuyuan871111).
+
 ### Changed
 
 
