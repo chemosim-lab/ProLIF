@@ -73,20 +73,20 @@ class Hydrophobic(Distance):
         Properly excluded all carbon linked to nitrogen/oxygen/fluoride from being
         hydrophobic, previous versions were allowing such carbons if they were aromatic.
         Fixed patterns taken from RDKit that were not made for mols with explicit H.
+
+    .. versionchanged:: 2.2.0
+        Simplified SMARTS for readability, without changing the meaning.
     """
 
     def __init__(
         self,
         hydrophobic: str = (
+            # RDKit's LumpedHydrophobe
             "[c,s,Br,I,S&H0&v2"
-            # equivalent to RDKit's ChainTwoWayAttach with explicit H support
-            ",$([C&R0;$([CH0](=*)=*),$([CH1](=*)-[!#1]),$([CH2](-[!#1])-[!#1])])"
-            # equivalent to RDKit's ThreeWayAttach
-            ",$([C;$([CH0](=*)(-[!#1])-[!#1]),$([CH1](-[!#1])(-[!#1])-[!#1])])"
-            # tButyl
-            ",$([C&D4!R](-[CH3])(-[CH3])-[CH3])"
-            # not carbon connected to N/O/F and not charged
-            ";!$([#6]~[#7,#8,#9]);+0]"
+            # equivalent to RDKit's ChainTwoWayAttach and ThreeWayAttach Hydrophobe
+            ",$([C;X2H0R0,X3H1R0,X4H2R0,X3H0,X4H1,X4H0])"
+            # not charged, and not carbon attached to N, O, F
+            ";+0;!$([#6]~[#7,#8,#9])]"
         ),
         distance: float = 4.5,
     ) -> None:
