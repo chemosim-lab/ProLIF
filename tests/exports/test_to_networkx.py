@@ -9,7 +9,7 @@ from rdkit.Chem.rdDistGeom import EmbedMolecule
 from prolif.exports.to_networkx import build_graph, to_networkx
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def ligand_mol() -> Chem.Mol:
     """Create a simple ligand molecule (benzene) for testing"""
     mol = Chem.MolFromSmiles("c1ccccc1")
@@ -18,7 +18,7 @@ def ligand_mol() -> Chem.Mol:
     return mol
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def fp_mock() -> MagicMock:
     """Create a mock Fingerprint object with interaction data"""
     fp = MagicMock()
@@ -53,7 +53,7 @@ def graph(fp_mock: MagicMock, ligand_mol: Chem.Mol) -> "nx.MultiGraph[int | str]
 
 @pytest.fixture
 def complex_fp_mock() -> MagicMock:
-    """Create a mock Fingerprint object with more complex interactions for overlap testing"""
+    """Create a mock Fingerprint object for overlap testing"""
     fp = MagicMock()
     ifp_data = {
         ("LIG1", "PRO100.A"): {
@@ -207,24 +207,26 @@ def test_no_overlaps_in_to_networkx_coordinates(
             ligand_nodes[node_id] = np.array([data.get("x", 0), data.get("y", 0)])
 
     # Define minimum acceptable distance
-    # mol_scale * distance between opposite carbons of benzene ring
-    min_distance = mol_scale * 2.8
+    min_distance = 2.9 * mol_scale
 
     # Test 1: Check for residue-residue overlaps
     for res1_id, res1_pos in protein_nodes.items():
         for res2_id, res2_pos in protein_nodes.items():
             if res1_id != res2_id:
                 distance = float(np.linalg.norm(res1_pos - res2_pos))
-                assert distance >= min_distance, (
+                assert distance > min_distance, (
                     f"Residue-residue overlap detected between {res1_id} and "
-                    f"{res2_id}: distance={distance}"
+                    f"{res2_id}: {distance=:.1f}"
                 )
 
     # Test 2: Check for residue-ligand atom overlaps
+    # mol_scale * distance between carbon and centroid of benzene ring * tolerance
+    min_distance = mol_scale * 2.6
+
     for res_id, res_pos in protein_nodes.items():
         for atom_id, atom_pos in ligand_nodes.items():
             distance = float(np.linalg.norm(res_pos - atom_pos))
-            assert distance >= min_distance, (
+            assert distance > min_distance, (
                 f"Residue-ligand overlap detected between {res_id} and atom "
-                f"{atom_id}: distance={distance}"
+                f"{atom_id}: {distance:.1f}"
             )

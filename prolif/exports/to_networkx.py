@@ -611,8 +611,7 @@ def calculate_coordinates(
 
     center = np.mean(ligand_coords, axis=0)
     ligand_bounds = np.max(ligand_coords, axis=0) - np.min(ligand_coords, axis=0)
-    width = ligand_bounds[0]
-    height = ligand_bounds[1]
+    width, height = ligand_bounds
 
     # Calculate initial positions for water and protein nodes
     pos = _calculate_initial_positions(
@@ -633,9 +632,7 @@ def calculate_coordinates(
             )
 
     # Resolve overlaps
-    pos = _resolve_overlaps(
-        pos, water_nodes, protein_nodes, ligand_coords, max(width, height)
-    )
+    pos = _resolve_overlaps(pos, water_nodes, protein_nodes, ligand_coords, mol_scale)
 
     # Update node positions in graph
     for n, (x, y) in pos.items():
@@ -773,7 +770,7 @@ def _resolve_overlaps(
     water_nodes: list[str],
     protein_nodes: list[str],
     ligand_coords: np.ndarray,
-    size: float,
+    mol_scale: int,
 ) -> dict[int | str, np.ndarray]:
     """
     Resolve overlaps between nodes.
@@ -782,10 +779,11 @@ def _resolve_overlaps(
     1. Non-ligand nodes with each other
     2. Non-ligand nodes with ligand atoms
     """
-    min_distance_1 = min(100, size * 0.3)
-    min_distance_2 = min(100, size * 0.2)
+    min_distance_lig = 2.6 * mol_scale
+    min_distance_non_lig = 2.9 * mol_scale
     max_iterations = 100
 
+    halfway_iteration = max_iterations // 2
     non_ligand_nodes = water_nodes + protein_nodes
 
     for iteration in range(max_iterations):
@@ -809,11 +807,11 @@ def _resolve_overlaps(
 
                 dist = np.linalg.norm(delta)
 
-                if 0 < dist < min_distance_1:
+                if 0 < dist < min_distance_non_lig:
                     overlap_found = True
-                    force = (min_distance_1 - dist) * 0.5
-                    if iteration >= 50:
-                        force *= 1.6
+                    force = (min_distance_non_lig - dist) * 0.5
+                    if iteration >= halfway_iteration:
+                        force *= 1.5
                     direction = delta / dist
 
                     adjustments[node1] -= direction * force
@@ -835,14 +833,16 @@ def _resolve_overlaps(
                 delta = pos[node] - ligand_coord
                 dist = np.linalg.norm(delta)
 
-                if 0 < dist < min_distance_2:
+                if 0 < dist < min_distance_lig:
                     overlap_found = True
-                    force = (min_distance_2 - dist) * 1.5
-                    if iteration >= 50:
+                    force = (min_distance_lig - dist) * 1.2
+                    if iteration >= halfway_iteration:
                         force *= 4 / 3
                     direction = delta / dist
-
                     ligand_adjustments[node] += direction * force
+                    # only apply one adjustment per node to avoid averaging forces when
+                    # the node is initially placed in the center of a ring
+                    break
 
         # Apply ligand overlap adjustments
         for node, adjustment in ligand_adjustments.items():
