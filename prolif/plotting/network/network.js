@@ -24,11 +24,6 @@ function drawGraph(_id, nodes, edges, options) {
     // instantiate the network
     var network = new vis.Network(container, data, options);
 
-    // once the graph has stabilized, disable physics to lock layout
-    network.on("stabilizationIterationsDone", function () {
-        network.setOptions({ physics: false });
-    });
-
     return network;
 }
 
