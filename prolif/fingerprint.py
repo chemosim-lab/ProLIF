@@ -244,7 +244,8 @@ class Fingerprint:
         ``use_segid`` parameter and attribute.
 
     .. versionchanged:: 2.2.0
-        Added ``implicit_hydrogens`` parameter and attribute.
+        Added ``implicit_hydrogens`` for easily switching to implicit-hydrogen
+        interactions.
     """
 
     def __init__(
@@ -258,6 +259,8 @@ class Fingerprint:
     ) -> None:
         if interactions is None:
             interactions = DEFAULT_INTERACTIONS
+        elif interactions == "all":
+            interactions = self.list_available()
         if implicit_hydrogens:
             temp_interactions = []
             misconfigured: list[tuple[str, str, dict]] = []
@@ -292,13 +295,11 @@ class Fingerprint:
 
     def _set_interactions(
         self,
-        interactions: Literal["all"] | Sequence[str],
+        interactions: Sequence[str],
         parameters: dict[str, dict[str, Any]] | None,
     ) -> None:
         # read interactions to compute
         parameters = parameters or {}
-        if interactions == "all":
-            interactions = self.list_available()
 
         # sanity check
         self._check_valid_interactions(interactions, "interactions")
