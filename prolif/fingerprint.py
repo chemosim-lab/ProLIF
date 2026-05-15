@@ -128,6 +128,10 @@ class Fingerprint:
         This parameter is ignored if the ``residues`` parameter of the ``run`` methods
         is set to anything other than ``None``.
 
+    implicit_hydrogens : bool
+        Whether to use interactions compatible with implicit hydrogens instead of the
+        default explicit hydrogen-based ones.
+
     Attributes
     ----------
     interactions : dict
@@ -238,6 +242,9 @@ class Fingerprint:
     .. versionchanged:: 2.1.0
         Added support for bridged interactions (e.g. ``WaterBridge``). Added
         ``use_segid`` parameter and attribute.
+
+    .. versionchanged:: 2.2.0
+        Added ``implicit_hydrogens`` parameter and attribute.
     """
 
     def __init__(
@@ -247,9 +254,36 @@ class Fingerprint:
         count: bool = False,
         vicinity_cutoff: float = 6.0,
         use_segid: bool | None = None,
+        implicit_hydrogens: bool = False,
     ) -> None:
         if interactions is None:
             interactions = DEFAULT_INTERACTIONS
+        if implicit_hydrogens:
+            temp_interactions = []
+            misconfigured: list[tuple[str, str, dict]] = []
+            for explicit in interactions:
+                implicit = f"Implicit{explicit}"
+                if implicit in _INTERACTIONS:
+                    temp_interactions.append(implicit)
+                    if parameters and explicit in parameters:
+                        misconfigured.append((implicit, explicit, parameters[explicit]))
+                else:
+                    temp_interactions.append(explicit)
+            if misconfigured:
+                raise ValueError(
+                    "The following interactions were requested in their "
+                    "implicit-hydrogen form but parametrized for the explicit-hydrogen "
+                    f"form: {misconfigured}\n"
+                    "Please either parametrize them in the implicit form or remove the"
+                    f" `{implicit_hydrogens=}` parameter."
+                )
+
+            interactions = [
+                implicit
+                if (implicit := f"Implicit{explicit}") in _INTERACTIONS
+                else explicit
+                for explicit in interactions
+            ]
         self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
