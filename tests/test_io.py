@@ -84,7 +84,6 @@ class TestMoleculeStandardizer:
         return input_mol
 
     @pytest.fixture(scope="class")
-    @pytest.mark.parametrize("input_rdmol", [True, False], indirect=True)
     def input_molecule(self, input_rdmol: Chem.Mol) -> Molecule:
         """Return the Molecule object for the input file."""
         return Molecule.from_rdkit(input_rdmol)
