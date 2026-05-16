@@ -260,9 +260,12 @@ class Fingerprint:
         if interactions is None:
             interactions = DEFAULT_INTERACTIONS
         elif interactions == "all":
-            interactions = self.list_available()
+            interactions = [
+                i for i in self.list_available() if not i.startswith("Implicit")
+            ]
+
         if implicit_hydrogens:
-            temp_interactions = []
+            temp_interactions: list[str] = []
             misconfigured: list[tuple[str, str, dict]] = []
             for explicit in interactions:
                 implicit = f"Implicit{explicit}"
@@ -280,13 +283,8 @@ class Fingerprint:
                     "Please either parametrize them in the implicit form or remove the"
                     f" `{implicit_hydrogens=}` parameter."
                 )
+            interactions = temp_interactions
 
-            interactions = [
-                implicit
-                if (implicit := f"Implicit{explicit}") in _INTERACTIONS
-                else explicit
-                for explicit in interactions
-            ]
         self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff

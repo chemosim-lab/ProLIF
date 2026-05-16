@@ -579,7 +579,7 @@ def split_molecule(
     .. versionchanged:: 2.2.0
         The underlying residues of the input molecule are copied instead of being
         recalculated from each new child molecule, allowing to keep information from the
-        :class:`~prolif.io.protein_helper.ProteinHelper` class.
+        :class:`~prolif.io.molecule_standardizer.MoleculeStandardizer` class.
 
     """
     lhs_residues: list[Residue] = []
