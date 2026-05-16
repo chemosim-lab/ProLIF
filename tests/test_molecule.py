@@ -207,3 +207,4 @@ def test_split_molecule(water_u: "Universe") -> None:
     assert (pmol.residues.number == [range(20, 31)]).all()
     assert len(Chem.GetMolFrags(pmol)) == 1
     assert len(Chem.GetMolFrags(wmol)) == 11
+    assert combined["TIP310.5"] is wmol["TIP310.5"]

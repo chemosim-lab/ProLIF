@@ -1,4 +1,4 @@
-import pandas as pd
+import gemmi
 
 from prolif.io.constants import (
     AMBER_POOL,
@@ -19,9 +19,17 @@ from prolif.io.constants import (
 def test_standard_aa() -> None:
     """Test that STANDARD_AA contains the expected amino acids."""
 
+    assert isinstance(STANDARD_AA, gemmi.cif.Document)
     assert len(STANDARD_AA) == 26
-    assert len(STANDARD_AA["ALA"]) == 4
-    assert isinstance(STANDARD_AA["ALA"]["_chem_comp_atom"], pd.DataFrame)
+    ala_block = STANDARD_AA.find_block("ALA")
+    assert ala_block is not None
+    assert ala_block.name == "ALA"
+    # verify we can access bond data from the block
+    bond_table = ala_block.find(
+        "_chem_comp_bond.",
+        ["atom_id_1", "atom_id_2", "value_order"],
+    )
+    assert len(bond_table) > 0
 
 
 def test_resname_aliases() -> None:

@@ -39,6 +39,7 @@ dependencies = [
     "multiprocess",
     "dill",
     "psutil",
+    "gemmi>=0.7.5",
 ]
 
 [project.optional-dependencies]
@@ -99,8 +100,8 @@ include = ["prolif*"]
 "prolif" = ["py.typed"]
 "prolif.data" = ["*"]
 "prolif.data.vina" = ["*"]
-"prolif.data.protein_helper" = ["*"]
-"prolif.data.protein_helper.templates" = ["*"]
+"prolif.data.molecule_standardizer" = ["*"]
+"prolif.data.molecule_standardizer.templates" = ["*"]
 "prolif.data.implicitHbond" = ["*"]
 "prolif.plotting.network" = ["*"]
 
