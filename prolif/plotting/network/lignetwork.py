@@ -415,14 +415,13 @@ class LigNetwork:
             ),
         )
         # threshold and keep most occuring ligand atom
-        return cast(
-            pd.DataFrame,
+        return (
             df[df["weight_total"] >= threshold]
             .drop(columns="weight_total")
             .sort_values("weight", ascending=False)
             .groupby(level=["ligand", "protein", "interaction"])
             .head(1)
-            .sort_index(),
+            .sort_index()
         )
 
     @classmethod
@@ -433,11 +432,8 @@ class LigNetwork:
         data = cls._get_records(ifp, all_metadata=display_all)
         df = pd.DataFrame(data)
         df["weight"] = 1
-        return cast(
-            pd.DataFrame,
-            df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
-                columns=["weight", "distance", "components"],
-            ),
+        return df.set_index(["ligand", "protein", "interaction", "atoms"]).reindex(
+            columns=["weight", "distance", "components"],
         )
 
     def _make_carbon(self) -> dict[str, Any]:
