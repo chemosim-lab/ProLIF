@@ -21,6 +21,7 @@ from prolif.io.constants import (
     MAX_AMIDE_LENGTH,
     RESNAME_ALIASES,
 )
+from prolif.molecule import pdbqt_supplier
 from prolif.residue import Residue
 
 logger = logging.getLogger(__name__)
@@ -127,7 +128,6 @@ def assign_bond_orders_from_template(
         Renamed from ``assign_bond_orders_from_smiles`` and now takes an RDKit
         ``Mol`` object instead of a SMILES string.
     """
-    from prolif.molecule import pdbqt_supplier
 
     for atm in mol.GetAtoms():
         # Set the necessary property for _adjust_hydrogens function

@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+from unittest.mock import Mock
 
 import gemmi
 import pytest
@@ -129,6 +130,12 @@ class TestMoleculeStandardizer:
         return [*mol_templates, *cif_templates]
 
     @pytest.fixture(scope="class")
+    def any_templates(
+        self, request: pytest.FixtureRequest
+    ) -> list[gemmi.cif.Document] | list[tuple[str, Chem.Mol]]:
+        return request.getfixturevalue(request.param)  # type: ignore[no-any-return]
+
+    @pytest.fixture(scope="class")
     def hsd_residue(self) -> Residue:
         """Return a HID residue for testing."""
         protein_path = datapath / "implicitHbond/receptor_hsd.pdb"
@@ -229,6 +236,27 @@ class TestMoleculeStandardizer:
         # RDKit Mol engine
         mol_engine = RDKitMolTemplateEngine("XYZ", Chem.MolFromSmiles("C1=CC=CC=C1"))
         assert mol_engine.n_heavy_atoms() == 6
+
+    @pytest.mark.parametrize(
+        "any_templates", ["mol_templates", "cif_templates"], indirect=True
+    )
+    def test_engine_exc_shows_residue_id(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        any_templates: list[gemmi.cif.Document] | list[tuple[str, Chem.Mol]],
+    ) -> None:
+        mock = Mock(side_effect=SystemError("test"))
+        monkeypatch.setattr("prolif.io.template_engine.CIFTemplateEngine.apply", mock)
+        monkeypatch.setattr(
+            "prolif.io.template_engine.RDKitMolTemplateEngine.apply", mock
+        )
+        standardizer = MoleculeStandardizer(templates=any_templates)
+
+        with pytest.raises(
+            ValueError,
+            match="Could not apply template for residue ALA1.A: test",
+        ):
+            standardizer(Chem.MolFromSequence("AA"))
 
     def test_fix_molecule_bond_orders_cif(
         self,

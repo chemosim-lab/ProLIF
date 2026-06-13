@@ -221,7 +221,13 @@ class MoleculeStandardizer:
                 )
 
             # fix the bond orders via the engine
-            new_residues.append(engine.apply(residue))
+            try:
+                fixed = engine.apply(residue)
+            except Exception as e:
+                raise ValueError(
+                    f"Could not apply template for residue {residue.resid}: {e}"
+                ) from e
+            new_residues.append(fixed)
 
         # update the protein molecule with the new residues
         protein_mol.residues = ResidueGroup(new_residues)
