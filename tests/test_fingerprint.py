@@ -82,7 +82,31 @@ class TestFingerprint:
 
     def test_init_all(self) -> None:
         fp = Fingerprint("all")
-        assert set(fp.interactions) == set(_INTERACTIONS)
+        assert set(fp.interactions) == set(_INTERACTIONS) - {
+            "ImplicitHBDonor",
+            "ImplicitHBAcceptor",
+        }
+
+    def test_init_implicit(self) -> None:
+        fp = Fingerprint(implicit_hydrogens=True)
+        assert "ImplicitHBDonor" in fp.interactions
+        assert "ImplicitHBDonor" in fp.interactions
+
+    def test_init_implicit_all(self) -> None:
+        fp = Fingerprint("all", implicit_hydrogens=True)
+        assert set(fp.interactions) == set(_INTERACTIONS) - {"HBDonor", "HBAcceptor"}
+
+    def test_init_implicit_with_explicit_params(self) -> None:
+        with pytest.raises(
+            ValueError,
+            match=(
+                "The following interactions were requested in their implicit-hydrogen "
+                "form but parametrized for the explicit-hydrogen form"
+            ),
+        ):
+            Fingerprint(
+                implicit_hydrogens=True, parameters={"HBDonor": {"distance": 4.2}}
+            )
 
     def test_n_interactions(self, fp: Fingerprint) -> None:
         assert fp.n_interactions == len(fp.interactions)

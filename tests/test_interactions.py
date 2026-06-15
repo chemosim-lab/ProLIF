@@ -83,7 +83,7 @@ def ihb_ignore_geometry_checks(request: pytest.FixtureRequest):  # type: ignore
 class TestInteractions:
     @pytest.fixture(scope="class")
     def fingerprint(self) -> Fingerprint:
-        return Fingerprint("all")
+        return Fingerprint(Fingerprint.list_available())
 
     @pytest.mark.parametrize(
         ("func_name", "any_mol", "any_other_mol", "expected"),

@@ -128,6 +128,10 @@ class Fingerprint:
         This parameter is ignored if the ``residues`` parameter of the ``run`` methods
         is set to anything other than ``None``.
 
+    implicit_hydrogens : bool
+        Whether to use interactions compatible with implicit hydrogens instead of the
+        default explicit hydrogen-based ones.
+
     Attributes
     ----------
     interactions : dict
@@ -238,6 +242,10 @@ class Fingerprint:
     .. versionchanged:: 2.1.0
         Added support for bridged interactions (e.g. ``WaterBridge``). Added
         ``use_segid`` parameter and attribute.
+
+    .. versionchanged:: 2.2.0
+        Added ``implicit_hydrogens`` for easily switching to implicit-hydrogen
+        interactions.
     """
 
     def __init__(
@@ -247,9 +255,36 @@ class Fingerprint:
         count: bool = False,
         vicinity_cutoff: float = 6.0,
         use_segid: bool | None = None,
+        implicit_hydrogens: bool = False,
     ) -> None:
         if interactions is None:
             interactions = DEFAULT_INTERACTIONS
+        elif interactions == "all":
+            interactions = [
+                i for i in self.list_available() if not i.startswith("Implicit")
+            ]
+
+        if implicit_hydrogens:
+            temp_interactions: list[str] = []
+            misconfigured: list[tuple[str, str, dict]] = []
+            for explicit in interactions:
+                implicit = f"Implicit{explicit}"
+                if implicit in _INTERACTIONS:
+                    temp_interactions.append(implicit)
+                    if parameters and explicit in parameters:
+                        misconfigured.append((implicit, explicit, parameters[explicit]))
+                else:
+                    temp_interactions.append(explicit)
+            if misconfigured:
+                raise ValueError(
+                    "The following interactions were requested in their "
+                    "implicit-hydrogen form but parametrized for the explicit-hydrogen "
+                    f"form: {misconfigured}\n"
+                    "Please either parametrize them in the implicit form or remove the"
+                    f" `{implicit_hydrogens=}` parameter."
+                )
+            interactions = temp_interactions
+
         self.count = count
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
@@ -258,13 +293,11 @@ class Fingerprint:
 
     def _set_interactions(
         self,
-        interactions: Literal["all"] | Sequence[str],
+        interactions: Sequence[str],
         parameters: dict[str, dict[str, Any]] | None,
     ) -> None:
         # read interactions to compute
         parameters = parameters or {}
-        if interactions == "all":
-            interactions = self.list_available()
 
         # sanity check
         self._check_valid_interactions(interactions, "interactions")
