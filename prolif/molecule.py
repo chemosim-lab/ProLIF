@@ -146,6 +146,15 @@ class Molecule(BaseRDKitMol):
             mol = prolif.Molecule.from_mda(protein)
             mol
 
+        Since MDAnalysis v2.10.0, it is possible to directly control how bond orders and
+        charges are inferred from the topology using the ``inferrer`` parameter::
+
+            >>> from MDAnalysis.converters.RDKitInferring import TemplateInferrer
+            >>> from rdkit import Chem
+            >>> ligand_template = Chem.MolFromSmiles("NC(c2nc(=Cc1ccc([O-])cc1)c(=O)n2CC=O)C(C)O")
+            >>> ligand_inferrer = TemplateInferrer(ligand_template)
+            >>> mol = prolif.Molecule.from_mda(u, "resname LIG", inferrer=ligand_inferrer)
+
         .. versionchanged:: 2.1.0
             Added `use_segid`.
         """

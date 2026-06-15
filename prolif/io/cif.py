@@ -4,8 +4,7 @@ I/O-related helper functions --- :mod:`prolif.io.cif`
 This module provides a wrapper around `gemmi` for reading
 Crystallographic Information File (CIF) format.
 
-.. versionchanged:: 2.2.0
-    Replaced the custom CIF parser with a thin wrapper around ``gemmi``.
+.. versionadded:: 2.2.0
 """
 
 from pathlib import Path

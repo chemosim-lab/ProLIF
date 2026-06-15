@@ -1,7 +1,7 @@
 Installation
 ------------
 
-The recommanded way to install ProLIF is to use `conda`_.
+The recommended way to install ProLIF is to use `conda`_.
 
 These first steps are optional and will create a separate environment for ProLIF::
 
