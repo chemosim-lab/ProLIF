@@ -26,9 +26,17 @@ Calculate a Protein-Ligand Interaction Fingerprint --- :mod:`prolif.fingerprint`
 """
 
 import warnings
-from collections.abc import Iterable, Sequence, Sized
+from collections.abc import Callable, Iterable, Sequence, Sized
 from inspect import signature
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    Optional,
+    Union,
+    cast,
+    overload,
+)
 
 import dill
 import numpy as np
@@ -53,6 +61,7 @@ from prolif.parallel import (
     get_n_jobs,
 )
 from prolif.plotting.utils import IS_NOTEBOOK
+from prolif.residue import Residue, ignore_self_interactions
 from prolif.utils import (
     get_residues_near_ligand,
     to_bitvectors,
@@ -68,7 +77,7 @@ if TYPE_CHECKING:
 
     from prolif.plotting.complex3d import Complex3D
     from prolif.plotting.network import LigNetwork
-    from prolif.residue import Residue, ResidueId
+    from prolif.residue import ResidueId
     from prolif.typeshed import (
         IFPData,
         IFPResults,
@@ -462,6 +471,7 @@ class Fingerprint:
         prot: Molecule,
         residues: "ResidueSelection" = None,
         metadata: Literal[False] = False,
+        ignore: Callable[[Residue, Residue], bool] = ignore_self_interactions,
     ) -> dict[tuple["ResidueId", "ResidueId"], "NDArray"]: ...
     @overload
     def generate(
@@ -470,6 +480,7 @@ class Fingerprint:
         prot: Molecule,
         residues: "ResidueSelection" = None,
         metadata: Literal[True] = True,
+        ignore: Callable[[Residue, Residue], bool] = ignore_self_interactions,
     ) -> IFP: ...
     def generate(
         self,
@@ -477,6 +488,7 @@ class Fingerprint:
         prot: Molecule,
         residues: "ResidueSelection" = None,
         metadata: bool = False,
+        ignore: Callable[[Residue, Residue], bool] = ignore_self_interactions,
     ) -> IFP | dict[tuple["ResidueId", "ResidueId"], "NDArray"]:
         """Generates the interaction fingerprint between 2 molecules
 
@@ -497,6 +509,13 @@ class Fingerprint:
         metadata : bool
             For each residue pair and interaction, return an interaction metadata
             dictionary instead of bits.
+        ignore : Callable[[Residue, Residue], bool]
+            Predicate function that returns ``True`` if the two residues should be
+            skipped when calculating interactions. Default is to ignore interactions
+            between the same residue (see
+            :func:`~prolif.residue.ignore_self_interactions`). Can be used to exclude
+            residue pairs based on :class:`~prolif.residue.ResidueId` attributes, but
+            also by geometric criteria (e.g. residues where any atom clashes).
 
         Returns
         -------
@@ -525,6 +544,9 @@ class Fingerprint:
             dictionary of metadata tuples indexed by interaction name instead of a
             tuple of arrays.
 
+        .. versionchanged:: 2.2.0
+            Added ``ignore`` parameter.
+
         """
         ifp: IFP | dict[tuple["ResidueId", "ResidueId"], "NDArray"] = (
             IFP() if metadata else {}
@@ -541,6 +563,8 @@ class Fingerprint:
                 )
             for prot_key in prot_residues:  # type:ignore[union-attr]
                 pres = prot[prot_key]
+                if ignore(lres, pres):
+                    continue
                 key = (lresid, pres.resid)
                 interactions = get_interactions(lres, pres)
                 if any(interactions):
@@ -558,6 +582,7 @@ class Fingerprint:
         progress: bool = True,
         n_jobs: int | None = None,
         parallel_strategy: Literal["chunk", "queue"] | None = None,
+        ignore: Callable[[Residue, Residue], bool] = ignore_self_interactions,
     ) -> "Fingerprint":
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
@@ -600,6 +625,13 @@ class Fingerprint:
               atoms.
             - ``None``: See :func:`~prolif.parallel.get_mda_parallel_strategy` for
               the default behavior.
+        ignore : Callable[[Residue, Residue], bool]
+            Predicate function that returns ``True`` if the two residues should be
+            skipped when calculating interactions. Default is to ignore interactions
+            between the same residue (see
+            :func:`~prolif.residue.ignore_self_interactions`). Can be used to exclude
+            residue pairs based on :class:`~prolif.residue.ResidueId` attributes, but
+            also by geometric criteria (e.g. residues where any atom clashes).
 
         Raises
         ------
@@ -647,6 +679,9 @@ class Fingerprint:
             Added ``use_segid``, ``parallel_strategy`` parameter and changed the
             default behavior of ``n_jobs=None``.
 
+        .. versionchanged:: 2.2.0
+            Added ``ignore`` parameter.
+
         """  # noqa: E501
         if converter_kwargs is not None and len(converter_kwargs) != 2:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
@@ -679,6 +714,7 @@ class Fingerprint:
                     residues=residues,
                     converter_kwargs=converter_kwargs,
                     progress=progress,
+                    ignore=ignore,
                 )
             else:
                 ifp = self._run_parallel(
@@ -690,6 +726,7 @@ class Fingerprint:
                     progress=progress,
                     n_jobs=n_jobs,
                     parallel_strategy=parallel_strategy,
+                    ignore=ignore,
                 )
             self.ifp = ifp
 
@@ -704,6 +741,7 @@ class Fingerprint:
                 use_segid=self.use_segid,
                 n_jobs=n_jobs,
                 parallel_strategy=parallel_strategy,
+                ignore=ignore,
             )
         return self
 
@@ -725,6 +763,7 @@ class Fingerprint:
         residues: "ResidueSelection",
         converter_kwargs: tuple[dict, dict],
         progress: bool,
+        ignore: Callable[[Residue, Residue], bool],
         **kwargs: Any,
     ) -> "IFPResults":
         """Serial implementation for trajectories."""
@@ -741,7 +780,7 @@ class Fingerprint:
                 prot, use_segid=self.use_segid, **converter_kwargs[1]
             )
             ifp[int(ts.frame)] = self.generate(
-                lig_mol, prot_mol, residues=residues, metadata=True
+                lig_mol, prot_mol, residues=residues, metadata=True, ignore=ignore
             )
         return ifp
 
@@ -755,6 +794,7 @@ class Fingerprint:
         progress: bool,
         n_jobs: int | None,
         parallel_strategy: Literal["chunk", "queue"],
+        ignore: Callable[[Residue, Residue], bool],
         **kwargs: Any,
     ) -> "IFPResults":
         """Parallel implementation of :meth:`~Fingerprint.run`"""
@@ -785,6 +825,7 @@ class Fingerprint:
                     residues=residues,
                     converter_kwargs=converter_kwargs,
                     progress=progress,
+                    ignore=ignore,
                 )
             else:
                 frames = []
@@ -802,6 +843,7 @@ class Fingerprint:
                 tqdm_kwargs=tqdm_kwargs,
                 rdkitconverter_kwargs=converter_kwargs,
                 use_segid=self.use_segid or False,
+                ignore=ignore,
             ) as pool:
                 return pool.process(traj, lig, prot)
 
@@ -818,6 +860,7 @@ class Fingerprint:
             tqdm_kwargs=tqdm_kwargs,
             rdkitconverter_kwargs=converter_kwargs,
             use_segid=self.use_segid or False,
+            ignore=ignore,
         ) as pool:
             for ifp_data_chunk in pool.process(args_iterable):
                 ifp.update(ifp_data_chunk)
@@ -832,6 +875,7 @@ class Fingerprint:
         residues: "ResidueSelection" = None,
         progress: bool = True,
         n_jobs: int | None = None,
+        ignore: Callable[[Residue, Residue], bool] = ignore_self_interactions,
     ) -> "Fingerprint":
         """Generates the fingerprint between a list of ligands and a protein
 
@@ -856,6 +900,13 @@ class Fingerprint:
             Number of processes to run in parallel. If ``n_jobs=1``, the
             calculation will run in serial. If ``n_jobs=None``, see
             :func:`~prolif.parallel.get_n_jobs` for the default behavior.
+        ignore : Callable[[Residue, Residue], bool]
+            Predicate function that returns ``True`` if the two residues should be
+            skipped when calculating interactions. Default is to ignore interactions
+            between the same residue (see
+            :func:`~prolif.residue.ignore_self_interactions`). Can be used to exclude
+            residue pairs based on :class:`~prolif.residue.ResidueId` attributes, but
+            also by geometric criteria (e.g. residues where any atom clashes).
 
         Raises
         ------
@@ -897,6 +948,9 @@ class Fingerprint:
         .. versionchanged:: 2.1.0
             Changed the default behavior of ``n_jobs=None``.
 
+        .. versionchanged:: 2.2.0
+            Added ``ignore`` parameter.
+
         """
         if residues == "all":
             residues = list(prot_mol.residues)
@@ -909,6 +963,7 @@ class Fingerprint:
                     prot_mol=prot_mol,
                     residues=residues,
                     progress=progress,
+                    ignore=ignore,
                 )
             else:
                 ifp = self._run_iter_parallel(
@@ -917,6 +972,7 @@ class Fingerprint:
                     residues=residues,
                     progress=progress,
                     n_jobs=n_jobs,
+                    ignore=ignore,
                 )
             self.ifp = ifp
 
@@ -927,6 +983,7 @@ class Fingerprint:
                 residues=residues,
                 progress=progress,
                 n_jobs=n_jobs,
+                ignore=ignore,
             )
 
         return self
@@ -937,12 +994,15 @@ class Fingerprint:
         prot_mol: Molecule,
         residues: "ResidueSelection" = None,
         progress: bool = True,
+        ignore: Callable[[Residue, Residue], bool] = ignore_self_interactions,
         **kwargs: Any,
     ) -> "IFPResults":
         iterator = tqdm(lig_iterable, **kwargs) if progress else lig_iterable
         ifp: "IFPResults" = {}
         for i, lig_mol in enumerate(iterator):
-            ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
+            ifp[i] = self.generate(
+                lig_mol, prot_mol, residues=residues, metadata=True, ignore=ignore
+            )
         return ifp
 
     def _run_iter_parallel(
@@ -952,6 +1012,7 @@ class Fingerprint:
         residues: "ResidueSelection" = None,
         progress: bool = True,
         n_jobs: int | None = None,
+        ignore: Callable[[Residue, Residue], bool] = ignore_self_interactions,
         **kwargs: Any,
     ) -> "IFPResults":
         """Parallel implementation of :meth:`~Fingerprint.run_from_iterable`"""
@@ -967,6 +1028,7 @@ class Fingerprint:
             fingerprint=self,
             prot_mol=prot_mol,
             residues=residues,
+            ignore=ignore,
             tqdm_kwargs={"total": total, "disable": not progress, **kwargs},
         ) as pool:
             for i, ifp_data in enumerate(pool.process(lig_iterable)):

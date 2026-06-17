@@ -193,6 +193,14 @@ class TestFingerprint:
         int_data = ifp[key]
         assert "Hydrophobic" in int_data
 
+    def test_generate_ignore(
+        self, fp_simple: Fingerprint, ligand_mol: "Molecule", protein_mol: "Molecule"
+    ) -> None:
+        ifp = fp_simple.generate(
+            ligand_mol, protein_mol, ignore=lambda _res1, _res2: True, metadata=True
+        )
+        assert not ifp
+
     @pytest.mark.parametrize(
         "trajectory_slice",
         [
@@ -248,6 +256,42 @@ class TestFingerprint:
         lig_suppl = list(sdf_supplier(path))
         fp_simple.run_from_iterable(lig_suppl[:2], protein_mol, progress=False)
         assert len(fp_simple.ifp) == 2
+
+    @pytest.mark.parametrize("n_jobs", [None, 1])
+    def test_run_ignore(
+        self,
+        fp_simple: Fingerprint,
+        u: mda.Universe,
+        ligand_ag: "AtomGroup",
+        protein_ag: "AtomGroup",
+        n_jobs: int | None,
+    ) -> None:
+        fp_simple.run(
+            u.trajectory[0],
+            ligand_ag,
+            protein_ag,
+            ignore=lambda _res1, _res2: True,
+            progress=False,
+            n_jobs=n_jobs,
+        )
+        assert fp_simple.ifp == {0: {}}
+
+    @pytest.mark.parametrize("n_jobs", [None, 1])
+    def test_run_from_iterable_ignore(
+        self,
+        fp_simple: Fingerprint,
+        ligand_mol: "Molecule",
+        protein_mol: "Molecule",
+        n_jobs: int | None,
+    ) -> None:
+        fp_simple.run_from_iterable(
+            [ligand_mol],
+            protein_mol,
+            ignore=lambda _res1, _res2: True,
+            progress=False,
+            n_jobs=n_jobs,
+        )
+        assert fp_simple.ifp == {0: {}}
 
     def test_to_df(
         self,
