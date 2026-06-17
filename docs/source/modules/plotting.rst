@@ -7,4 +7,4 @@ Plotting
 
 .. automodule:: prolif.plotting.complex3d
 
-.. automodule:: prolif.plotting.network
+.. automodule:: prolif.plotting.network.lignetwork
