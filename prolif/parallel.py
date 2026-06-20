@@ -50,7 +50,7 @@ parameter or the ``PROLIF_N_JOBS`` env variable.
 """
 
 import os
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from ctypes import c_uint32
 from threading import Event, Thread
 from time import sleep
@@ -64,7 +64,6 @@ from tqdm.auto import tqdm
 
 from prolif.molecule import Molecule
 from prolif.pickling import PICKLE_HANDLER
-from prolif.residue import Residue
 
 if TYPE_CHECKING:
     from multiprocessing.pool import Pool as BuiltinPool
@@ -199,9 +198,6 @@ class TrajectoryPool:
         from MDAnalysis: the first for the ligand, and the second for the protein
     use_segid: bool
         Use the segment number rather than the chain identifier as a chain.
-    ignore: Callable[[Residue, Residue], bool]
-        Function that returns True if the interaction should be ignored.
-        By default, self-interactions are ignored.
 
     Attributes
     ----------
@@ -215,8 +211,6 @@ class TrajectoryPool:
     .. versionchanged:: 2.1.0
         Added `use_segid`.
 
-    .. versionchanged:: 2.2.0
-        Added `ignore`.
     """
 
     tracker: ClassVar["Synchronized"] = cast("Synchronized", Value(c_uint32, lock=True))
@@ -224,7 +218,6 @@ class TrajectoryPool:
     residues: ClassVar["ResidueSelection"]
     converter_kwargs: ClassVar[tuple[dict, dict]]
     use_segid: ClassVar[bool]
-    ignore: ClassVar[Callable[[Residue, Residue], bool]]
 
     def __init__(
         self,
@@ -234,7 +227,6 @@ class TrajectoryPool:
         tqdm_kwargs: dict,
         rdkitconverter_kwargs: tuple[dict, dict],
         use_segid: bool,
-        ignore: Callable[[Residue, Residue], bool],
     ) -> None:
         self.tqdm_kwargs = tqdm_kwargs
         self.pool = cast(
@@ -248,7 +240,6 @@ class TrajectoryPool:
                     residues,
                     rdkitconverter_kwargs,
                     use_segid,
-                    ignore,
                 ),
             ),
         )
@@ -261,7 +252,6 @@ class TrajectoryPool:
         residues: "ResidueSelection",
         rdkitconverter_kwargs: tuple[dict, dict],
         use_segid: bool,
-        ignore: Callable[[Residue, Residue], bool],
     ) -> None:
         """Initializer classmethod passed to the pool so that each child process can
         access these objects without copying them."""
@@ -270,7 +260,6 @@ class TrajectoryPool:
         cls.residues = residues
         cls.converter_kwargs = rdkitconverter_kwargs
         cls.use_segid = use_segid
-        cls.ignore = ignore
 
     @classmethod
     def executor(
@@ -297,7 +286,6 @@ class TrajectoryPool:
                 prot_mol,
                 residues=cls.residues,
                 metadata=True,
-                ignore=cls.ignore,
             )
             ifp[int(ts.frame)] = data
             with cls.tracker.get_lock():
@@ -358,9 +346,6 @@ class MolIterablePool:
         List of protein residues considered for the IFP
     tqdm_kwargs : dict
         Parameters for the :class:`~tqdm.std.tqdm` progress bar
-    ignore: Callable[[Residue, Residue], bool]
-        Function that returns True if the interaction should be ignored.
-        By default, self-interactions are ignored.
 
     Attributes
     ----------
@@ -368,14 +353,11 @@ class MolIterablePool:
         The underlying pool instance.
 
 
-    .. versionchanged:: 2.2.0
-        Added `ignore`.
     """
 
     fp: ClassVar["Fingerprint"]
     pmol: ClassVar[Molecule]
     residues: ClassVar["ResidueSelection"]
-    ignore: ClassVar[Callable[[Residue, Residue], bool]]
 
     def __init__(
         self,
@@ -383,7 +365,6 @@ class MolIterablePool:
         fingerprint: "Fingerprint",
         prot_mol: Molecule,
         residues: "ResidueSelection",
-        ignore: Callable[[Residue, Residue], bool],
         tqdm_kwargs: dict,
     ) -> None:
         self.tqdm_kwargs = tqdm_kwargs
@@ -392,7 +373,7 @@ class MolIterablePool:
             Pool(
                 n_processes,
                 initializer=self.initializer,
-                initargs=(fingerprint, prot_mol, residues, ignore),
+                initargs=(fingerprint, prot_mol, residues),
             ),
         )
 
@@ -402,14 +383,12 @@ class MolIterablePool:
         fingerprint: "Fingerprint",
         prot_mol: Molecule,
         residues: "ResidueSelection",
-        ignore: Callable[[Residue, Residue], bool],
     ) -> None:
         """Initializer classmethod passed to the pool so that each child process can
         access these objects without copying them."""
         cls.fp = fingerprint
         cls.pmol = prot_mol
         cls.residues = residues
-        cls.ignore = ignore
 
     @classmethod
     def executor(cls, mol: Molecule) -> "IFP":
@@ -422,9 +401,7 @@ class MolIterablePool:
             A dictionary indexed by ``(ligand, protein)`` residue pairs, and each value
             is a sparse dictionary of metadata indexed by interaction name.
         """
-        return cls.fp.generate(
-            mol, cls.pmol, residues=cls.residues, metadata=True, ignore=cls.ignore
-        )
+        return cls.fp.generate(mol, cls.pmol, residues=cls.residues, metadata=True)
 
     def process(self, args_iterable: Iterable[Molecule]) -> Iterable["IFP"]:
         """Maps the input iterable of molecules to the executor function.
@@ -477,20 +454,16 @@ class TrajectoryPoolQueue:
         from MDAnalysis: the first for the ligand, and the second for the protein
     use_segid: bool
         Use the segment number rather than the chain identifier as a chain.
-    ignore: Callable[[Residue, Residue], bool]
-        Function that returns True if the interaction should be ignored.
-        By default, self-interactions are ignored.
 
 
     .. versionadded:: 2.1.0
 
     .. versionchanged:: 2.2.0
-        Added `ignore`.
+        Added ``ignore`` parameter to :class:`~prolif.fingerprint.Fingerprint` constructor.
     """
 
     fp: ClassVar["Fingerprint"]
     residues: ClassVar["ResidueSelection"]
-    ignore: ClassVar[Callable[[Residue, Residue], bool]]
 
     def __init__(
         self,
@@ -500,7 +473,6 @@ class TrajectoryPoolQueue:
         tqdm_kwargs: dict,
         rdkitconverter_kwargs: tuple[dict, dict],
         use_segid: bool,
-        ignore: Callable[[Residue, Residue], bool],
     ) -> None:
         self.n_processes = n_processes
         self.tqdm_kwargs = tqdm_kwargs
@@ -511,7 +483,7 @@ class TrajectoryPoolQueue:
             Pool(
                 n_processes,
                 initializer=self.initializer,
-                initargs=(fingerprint, residues, ignore),
+                initargs=(fingerprint, residues),
             ),
         )
 
@@ -520,13 +492,11 @@ class TrajectoryPoolQueue:
         cls,
         fingerprint: "Fingerprint",
         residues: "ResidueSelection",
-        ignore: Callable[[Residue, Residue], bool],
     ) -> None:
         """Initializer classmethod passed to the pool so that each child process can
         access these objects without copying them."""
         cls.fp = fingerprint
         cls.residues = residues
-        cls.ignore = ignore
 
     @classmethod
     def executor(cls, args: tuple[int, Molecule, Molecule]) -> tuple[int, "IFP"]:
@@ -548,7 +518,6 @@ class TrajectoryPoolQueue:
             prot_mol,
             residues=cls.residues,
             metadata=True,
-            ignore=cls.ignore,
         )
         return frame, data
 

@@ -308,7 +308,8 @@ def ignore_self_interactions(
     Returns
     -------
     bool
-        ``True`` if the residues are the same, ``False`` otherwise.
+        ``True`` if the residues are the same and should be skipped, ``False``
+        otherwise.
 
 
     .. versionadded:: 2.2.0
