@@ -458,8 +458,6 @@ class TrajectoryPoolQueue:
 
     .. versionadded:: 2.1.0
 
-    .. versionchanged:: 2.2.0
-        Added ``ignore`` parameter to :class:`~prolif.fingerprint.Fingerprint` constructor.
     """
 
     fp: ClassVar["Fingerprint"]

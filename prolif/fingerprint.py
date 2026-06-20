@@ -578,91 +578,91 @@ class Fingerprint:
     ) -> "Fingerprint":
         """Generates the fingerprint on a trajectory for a ligand and a protein
 
-        Parameters
-        ----------
-        traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced or MDAnalysis.coordinates.base.FrameIteratorIndices or MDAnalysis.coordinates.timestep.Timestep
-            Iterate over this Universe trajectory or sliced trajectory object
-            to extract the frames used for the fingerprint extraction
-        lig : MDAnalysis.core.groups.AtomGroup
-            An MDAnalysis AtomGroup for the ligand
-        prot : MDAnalysis.core.groups.AtomGroup
-            An MDAnalysis AtomGroup for the protein (with multiple residues)
-        residues : list or "all" or None
-            A list of protein residues (:class:`str`, :class:`int` or
-            :class:`~prolif.residue.ResidueId`) to take into account for
-            the fingerprint extraction. If ``"all"``, all residues will be
-            used. If ``None``, at each frame the
-            :func:`~prolif.utils.get_residues_near_ligand` function is used to
-            automatically use protein residues that are distant of 6.0 Å or
-            less from each ligand residue.
-        converter_kwargs : tuple[dict, dict], optional
-            Tuple of kwargs passed to the underlying
-            :class:`~MDAnalysis.converters.RDKit.RDKitConverter` from MDAnalysis: the
-            first for the ligand, and the second for the protein
-        progress : bool
-            Display a :class:`~tqdm.std.tqdm` progressbar while running the calculation
-        n_jobs : int or None
-            Number of processes to run in parallel. If ``n_jobs=1``, the analysis
-            will run in serial. If ``n_jobs=None``, see
-            :func:`~prolif.parallel.get_n_jobs` for the default behavior.
-        parallel_strategy : {"chunk", "queue"}, optional
-            Strategy for parallel execution:
+                Parameters
+                ----------
+                traj : MDAnalysis.coordinates.base.ProtoReader or MDAnalysis.coordinates.base.FrameIteratorSliced or MDAnalysis.coordinates.base.FrameIteratorIndices or MDAnalysis.coordinates.timestep.Timestep
+                    Iterate over this Universe trajectory or sliced trajectory object
+                    to extract the frames used for the fingerprint extraction
+                lig : MDAnalysis.core.groups.AtomGroup
+                    An MDAnalysis AtomGroup for the ligand
+                prot : MDAnalysis.core.groups.AtomGroup
+                    An MDAnalysis AtomGroup for the protein (with multiple residues)
+                residues : list or "all" or None
+                    A list of protein residues (:class:`str`, :class:`int` or
+                    :class:`~prolif.residue.ResidueId`) to take into account for
+                    the fingerprint extraction. If ``"all"``, all residues will be
+                    used. If ``None``, at each frame the
+                    :func:`~prolif.utils.get_residues_near_ligand` function is used to
+                    automatically use protein residues that are distant of 6.0 Å or
+                    less from each ligand residue.
+                converter_kwargs : tuple[dict, dict], optional
+                    Tuple of kwargs passed to the underlying
+                    :class:`~MDAnalysis.converters.RDKit.RDKitConverter` from MDAnalysis: the
+                    first for the ligand, and the second for the protein
+                progress : bool
+                    Display a :class:`~tqdm.std.tqdm` progressbar while running the calculation
+                n_jobs : int or None
+                    Number of processes to run in parallel. If ``n_jobs=1``, the analysis
+                    will run in serial. If ``n_jobs=None``, see
+                    :func:`~prolif.parallel.get_n_jobs` for the default behavior.
+                parallel_strategy : {"chunk", "queue"}, optional
+                    Strategy for parallel execution:
 
-            - ``"chunk"``: Split trajectory into chunks and distribute to workers.
-              Each worker pickles the full MDAnalysis objects once per chunk.
-              Scales better for small trajectories.
-            - ``"queue"``: Main thread converts frames to Molecules and enqueues
-              them for workers. Avoids repeated MDAnalysis pickling overhead.
-              Better when pickling is expensive, e.g. large trajectories with many
-              atoms.
-            - ``None``: See :func:`~prolif.parallel.get_mda_parallel_strategy` for
-              the default behavior.
+                    - ``"chunk"``: Split trajectory into chunks and distribute to workers.
+                      Each worker pickles the full MDAnalysis objects once per chunk.
+                      Scales better for small trajectories.
+                    - ``"queue"``: Main thread converts frames to Molecules and enqueues
+                      them for workers. Avoids repeated MDAnalysis pickling overhead.
+                      Better when pickling is expensive, e.g. large trajectories with many
+                      atoms.
+                    - ``None``: See :func:`~prolif.parallel.get_mda_parallel_strategy` for
+                      the default behavior.
 
-        Raises
-------
-        ValueError
-            If ``n_jobs <= 0``
+                Raises
+        ------
+                ValueError
+                    If ``n_jobs <= 0``
 
-        Returns
-        -------
-        prolif.fingerprint.Fingerprint
-            The Fingerprint instance that generated the fingerprint
+                Returns
+                -------
+                prolif.fingerprint.Fingerprint
+                    The Fingerprint instance that generated the fingerprint
 
-        Example
-        -------
-        ::
+                Example
+                -------
+                ::
 
-            >>> u = mda.Universe("top.pdb", "traj.nc")
-            >>> lig = u.select_atoms("resname LIG")
-            >>> prot = u.select_atoms("protein")
-            >>> fp = prolif.Fingerprint().run(u.trajectory[:10], lig, prot)
+                    >>> u = mda.Universe("top.pdb", "traj.nc")
+                    >>> lig = u.select_atoms("resname LIG")
+                    >>> prot = u.select_atoms("protein")
+                    >>> fp = prolif.Fingerprint().run(u.trajectory[:10], lig, prot)
 
-        .. seealso::
+                .. seealso::
 
-            - :meth:`Fingerprint.generate` to generate the fingerprint between
-              two single structures.
-            - :meth:`Fingerprint.run_from_iterable` to generate the fingerprint
-              between a protein and a collection of ligands.
+                    - :meth:`Fingerprint.generate` to generate the fingerprint between
+                      two single structures.
+                    - :meth:`Fingerprint.run_from_iterable` to generate the fingerprint
+                      between a protein and a collection of ligands.
 
-        .. versionchanged:: 0.3.2
-            Moved the ``return_atoms`` parameter from the ``run`` method to the
-            dataframe conversion code
+                .. versionchanged:: 0.3.2
+                    Moved the ``return_atoms`` parameter from the ``run`` method to the
+                    dataframe conversion code
 
-        .. versionchanged:: 1.0.0
-            Added support for multiprocessing
+                .. versionchanged:: 1.0.0
+                    Added support for multiprocessing
 
-        .. versionchanged:: 1.1.0
-            Added support for passing kwargs to the RDKitConverter through
-            the ``converter_kwargs`` parameter
+                .. versionchanged:: 1.1.0
+                    Added support for passing kwargs to the RDKitConverter through
+                    the ``converter_kwargs`` parameter
 
-        .. versionchanged:: 2.0.0
-            Changed the format of the :attr:`~Fingerprint.ifp` attribute to be a
-            dictionary containing more complete interaction metadata instead of just
-            atom indices.
+                .. versionchanged:: 2.0.0
+                    Changed the format of the :attr:`~Fingerprint.ifp` attribute to be a
+                    dictionary containing more complete interaction metadata instead of just
+                    atom indices.
 
-        .. versionchanged:: 2.1.0
-            Added ``use_segid``, ``parallel_strategy`` parameter and changed the
-            default behavior of ``n_jobs=None``.
+                .. versionchanged:: 2.1.0
+                    Added ``use_segid``, ``parallel_strategy`` parameter and changed the
+                    default behavior of ``n_jobs=None``.
 
         """  # noqa: E501
         if converter_kwargs is not None and len(converter_kwargs) != 2:
@@ -959,9 +959,7 @@ class Fingerprint:
         iterator = tqdm(lig_iterable, **kwargs) if progress else lig_iterable
         ifp: "IFPResults" = {}
         for i, lig_mol in enumerate(iterator):
-            ifp[i] = self.generate(
-                lig_mol, prot_mol, residues=residues, metadata=True
-            )
+            ifp[i] = self.generate(lig_mol, prot_mol, residues=residues, metadata=True)
         return ifp
 
     def _run_iter_parallel(
