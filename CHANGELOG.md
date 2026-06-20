@@ -8,13 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+## [2.2.0] - 2026-06-20
+
+### Added
+
 - Added `ignore` parameter in `Fingerprint` to ignore specific pairs of residues.
   Defaults to ignoring interactions of a residue with itself.
 - Support for `ImplicitHBAcceptor` and `ImplicitHBDonor` interactions to calculate  
   hydrogen bond interactions with merely heavy atoms. This helps users to estimate 
   the hydrogen bond interactions for structures from PDB database or AI-driven
   methods (PR #284 with @yuyuan871111, PR #302). 
-- Added a new `protein_helper` function to parse the file and correct the connectivity 
+- Added a new `MoleculeStandardizer` to parse and correct the connectivity 
   of your topology easily with SMILES or CIF templates (PR #275 with @yuyuan871111,
   PR #302).
 
