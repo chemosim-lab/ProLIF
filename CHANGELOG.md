@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `ignore` parameter in `Fingerprint` to ignore specific pairs of residues.
+  Defaults to ignoring interactions of a residue with itself.
 - Support for `ImplicitHBAcceptor` and `ImplicitHBDonor` interactions to calculate  
   hydrogen bond interactions with merely heavy atoms. This helps users to estimate 
   the hydrogen bond interactions for structures from PDB database or AI-driven

@@ -9,7 +9,11 @@ Residues
     .. autoclass:: ResidueId
         :members:
 
-    
+    Utilities
+    ---------
+
+    .. autofunction:: ignore_self_interactions
+
     ResidueGroup
     ------------
 

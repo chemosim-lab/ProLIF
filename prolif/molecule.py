@@ -157,7 +157,7 @@ class Molecule(BaseRDKitMol):
 
         .. versionchanged:: 2.1.0
             Added `use_segid`.
-        """
+        """  # noqa: E501
         ag = obj.select_atoms(selection) if selection else obj.atoms
         if ag.n_atoms == 0:
             raise mda.SelectionError("AtomGroup is empty, please check your selection")

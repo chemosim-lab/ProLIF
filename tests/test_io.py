@@ -254,7 +254,7 @@ class TestMoleculeStandardizer:
 
         with pytest.raises(
             ValueError,
-            match="Could not apply template for residue ALA1.A: test",
+            match=r"Could not apply template for residue ALA1.A: test",
         ):
             standardizer(Chem.MolFromSequence("AA"))
 

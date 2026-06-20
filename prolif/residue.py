@@ -289,3 +289,29 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
     @property
     def n_residues(self) -> int:
         return len(self)
+
+
+def ignore_self_interactions(
+    res1: Residue,
+    res2: Residue,
+) -> bool:
+    """
+    Ignore interactions between the same residue
+
+    Parameters
+    ----------
+    res1 : Residue
+        The first residue
+    res2 : Residue
+        The second residue
+
+    Returns
+    -------
+    bool
+        ``True`` if the residues are the same and should be skipped, ``False``
+        otherwise.
+
+
+    .. versionadded:: 2.2.0
+    """
+    return res1.resid == res2.resid

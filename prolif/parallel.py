@@ -207,15 +207,17 @@ class TrajectoryPool:
     pool : multiprocess.pool.Pool
         The underlying pool instance.
 
+
     .. versionchanged:: 2.1.0
         Added `use_segid`.
+
     """
 
     tracker: ClassVar["Synchronized"] = cast("Synchronized", Value(c_uint32, lock=True))
     fp: ClassVar["Fingerprint"]
     residues: ClassVar["ResidueSelection"]
     converter_kwargs: ClassVar[tuple[dict, dict]]
-    use_segid: bool
+    use_segid: ClassVar[bool]
 
     def __init__(
         self,
@@ -349,6 +351,8 @@ class MolIterablePool:
     ----------
     pool : multiprocess.pool.Pool
         The underlying pool instance.
+
+
     """
 
     fp: ClassVar["Fingerprint"]
@@ -451,7 +455,9 @@ class TrajectoryPoolQueue:
     use_segid: bool
         Use the segment number rather than the chain identifier as a chain.
 
+
     .. versionadded:: 2.1.0
+
     """
 
     fp: ClassVar["Fingerprint"]
