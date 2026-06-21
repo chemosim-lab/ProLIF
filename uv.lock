@@ -2100,6 +2100,7 @@ tests = [
     { name = "prolif", extra = ["plots"] },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "rdkit" },
 ]
 type-check = [
     { name = "mypy" },
@@ -2128,7 +2129,7 @@ requires-dist = [
     { name = "psutil" },
     { name = "py3dmol", marker = "extra == 'plots'" },
     { name = "pyvis", marker = "extra == 'tutorials'" },
-    { name = "rdkit", marker = "extra == 'tutorials'" },
+    { name = "rdkit", marker = "extra == 'tutorials'", specifier = ">=2022.9.1" },
     { name = "scipy", specifier = ">=1.3.0" },
     { name = "seaborn", marker = "extra == 'tutorials'", specifier = "<1.0" },
     { name = "tqdm" },
@@ -2148,6 +2149,7 @@ dev = [
     { name = "prolif", extras = ["tutorials"] },
     { name = "pytest", specifier = ">=6.1.2" },
     { name = "pytest-cov" },
+    { name = "rdkit", specifier = ">=2022.9.1" },
     { name = "rdkit", specifier = ">=2024.3.2" },
     { name = "recommonmark" },
     { name = "ruff", specifier = "==0.11.2" },
@@ -2174,6 +2176,7 @@ tests = [
     { name = "prolif", extras = ["plots"] },
     { name = "pytest", specifier = ">=6.1.2" },
     { name = "pytest-cov" },
+    { name = "rdkit", specifier = ">=2022.9.1" },
 ]
 type-check = [
     { name = "mypy", specifier = ">=1.0.0" },

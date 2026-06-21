@@ -45,7 +45,7 @@ dependencies = [
 [project.optional-dependencies]
 plots = ["py3Dmol", "matplotlib>=3.5"]
 tutorials = [
-    "rdkit",
+    "rdkit>=2022.09.1",
     "matplotlib>=3.7",
     "seaborn<1.0",
     "pyvis",
@@ -53,7 +53,13 @@ tutorials = [
 ]
 
 [dependency-groups]
-tests = ["pytest>=6.1.2", "pytest-cov", "ipython", "rdkit", "prolif[plots]"]
+tests = [
+    "pytest>=6.1.2",
+    "pytest-cov",
+    "ipython",
+    "rdkit>=2022.09.1",
+    "prolif[plots]",
+]
 docs = [
     "sphinx==5.3.0",
     "sphinx-copybutton",
