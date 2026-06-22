@@ -10,7 +10,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from itertools import product
 from math import degrees, radians
-from operator import itemgetter
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, overload
 
 import numpy as np
@@ -142,7 +141,9 @@ class Interaction(ABC):
         """
         return min(
             self(lig_res, prot_res, metadata=True),
-            key=itemgetter("distance"),  # type: ignore[arg-type]
+            key=lambda metadata: (
+                metadata["distance"] if metadata is not None else float("inf")
+            ),
             default=None,
         )
 
