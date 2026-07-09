@@ -7,7 +7,7 @@ Welcome to ProLIF's documentation!
    :width: 240px
 
 .. include:: ../README.rst
-   :start-line: 5
+   :start-line: 10
 
 .. toctree::
    :caption: Information

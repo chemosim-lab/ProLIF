@@ -2,6 +2,12 @@
 ProLIF
 =======
 
+.. image:: docs/logo.svg
+   :alt: ProLIF logo
+   :align: center
+   :width: 240px
+
+
 .. list-table::
     :widths: 12 35
 
