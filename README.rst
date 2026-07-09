@@ -2,10 +2,11 @@
 ProLIF
 =======
 
-.. image:: docs/logo.svg
-   :alt: ProLIF logo
-   :align: center
-   :width: 240px
+.. raw:: html
+
+   <p align="center">
+     <img src="docs/logo.svg" alt="ProLIF logo" width="240">
+   </p>
 
 
 .. list-table::

@@ -6,8 +6,10 @@ Welcome to ProLIF's documentation!
    :align: center
    :width: 240px
 
+|
+
 .. include:: ../README.rst
-   :start-line: 10
+   :start-line: 11
 
 .. toctree::
    :caption: Information
