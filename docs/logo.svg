@@ -16,7 +16,9 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:cc="http://creativecommons.org/ns#"><sodipodi:namedview
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/"><title
+   id="title4">ProLIF logo</title><sodipodi:namedview
    id="namedview1"
    pagecolor="#ffffff"
    bordercolor="#000000"
@@ -26,7 +28,7 @@
    inkscape:pagecheckerboard="0"
    inkscape:deskcolor="#d1d1d1"
    inkscape:zoom="0.2800824"
-   inkscape:cx="680.15698"
+   inkscape:cx="394.52675"
    inkscape:cy="840.82399"
    inkscape:window-width="1920"
    inkscape:window-height="940"
@@ -240,7 +242,7 @@
 <metadata
    id="metadata4"><rdf:RDF><cc:Work
        rdf:about=""><cc:license
-         rdf:resource="http://creativecommons.org/licenses/by/4.0/" /></cc:Work><cc:License
+         rdf:resource="http://creativecommons.org/licenses/by/4.0/" /><dc:title>ProLIF logo</dc:title><dc:date>09.07.2025</dc:date><dc:creator><cc:Agent><dc:title>Anton Siomchen</dc:title></cc:Agent></dc:creator></cc:Work><cc:License
        rdf:about="http://creativecommons.org/licenses/by/4.0/"><cc:permits
          rdf:resource="http://creativecommons.org/ns#Reproduction" /><cc:permits
          rdf:resource="http://creativecommons.org/ns#Distribution" /><cc:requires

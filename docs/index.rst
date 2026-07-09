@@ -9,7 +9,7 @@ Welcome to ProLIF's documentation!
 |
 
 .. include:: ../README.rst
-   :start-line: 11
+   :start-line: 8
 
 .. toctree::
    :caption: Information

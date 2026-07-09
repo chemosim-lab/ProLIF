@@ -1,7 +1,4 @@
 
-ProLIF
-=======
-
 .. raw:: html
 
    <p align="center">
