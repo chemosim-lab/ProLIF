@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed the HBond acceptor SMARTS pattern to exclude backbone nitrogens from being
+  considered as acceptors (Issue #358). While the previous pattern already excluded
+  this case, it didn't take into account the fragmentation of the protein in residues
+  performed by ProLIF internally, which modifies the environment of atoms involved in
+  peptide bonds, thus leading to the nitrogen not matching the exclusion rule and
+  passing as an acceptor.
+
 ### Changed
 
 ### Deprecated

@@ -5,12 +5,13 @@ from typing import TYPE_CHECKING, Literal, cast
 import MDAnalysis as mda
 import numpy as np
 import pytest
+from MDAnalysis.topology.guessers import guess_types
 from MDAnalysis.transformations import rotateby, translate
 from rdkit import Chem, RDLogger
 
 import prolif
 from prolif.fingerprint import Fingerprint
-from prolif.interactions import ImplicitHBAcceptor, VdWContact
+from prolif.interactions import HBAcceptor, ImplicitHBAcceptor, VdWContact
 from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.interactions.constants import IDEAL_ATOM_ANGLES, VDW_PRESETS
 from prolif.interactions.utils import get_mapindex
@@ -34,7 +35,7 @@ if TYPE_CHECKING:
 @pytest.fixture(scope="module")
 def benzene_universe() -> "Universe":
     benzene = mda.Universe(prolif.datafiles.datapath / "benzene.mol2")
-    elements = mda.topology.guessers.guess_types(benzene.atoms.names)
+    elements = guess_types(benzene.atoms.names)
     benzene.add_TopologyAttr("elements", elements)
     benzene.segments.segids = np.array(["U1"], dtype=object)
     benzene.transfer_to_memory()
@@ -392,6 +393,31 @@ class TestInteractions:
                 f"Found {n_matches} matches for mol {name} hydrogens, "
                 f"expected {expected}"
             )
+
+    @pytest.mark.parametrize("sequence", ["ALG", "LLA", "ALL"])
+    @pytest.mark.parametrize("implicit_h", [True, False])
+    def test_backbone_nitrogen_matched_as_acceptor(
+        self, sequence: str, implicit_h: bool
+    ) -> None:
+        """
+        Test for temporary fix of issue #358.
+
+        Once substructure matching is done on the entire molecule instead of residues,
+        the HBond Acceptor pattern should remove the
+        `&!$([ND2v3^2+0](-[H])-[CD4v4H1^3]-[CD2^2+0]=O)` part (same in the
+        ImplicitHBAcceptor class), and remove this test.
+        """
+        mol = Chem.MolFromSequence(sequence)
+        if not implicit_h:
+            mol = Chem.AddHs(mol, addResidueInfo=True)
+        mol = prolif.Molecule.from_rdkit(mol)
+        acceptor_qmol = (
+            ImplicitHBAcceptor() if implicit_h else HBAcceptor()
+        ).lig_pattern
+        res = mol[1]  # ignore first and last residues
+        nitrogens = [a.GetIdx() for a in res.GetAtoms() if a.GetAtomicNum() == 7]
+        acceptors = set().union(*res.GetSubstructMatches(acceptor_qmol))
+        assert not set(nitrogens).intersection(acceptors)
 
     @pytest.mark.parametrize(
         ("interaction_qmol", "smiles", "expected"),
