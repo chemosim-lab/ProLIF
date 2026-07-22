@@ -612,6 +612,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         for cases where the geometry is not relevant or when the user wants to skip the
         geometry checks for performance reasons. Defaults to False.
 
+
     .. versionadded:: 2.2.0
 
     .. versionchanged:: 2.2.1
