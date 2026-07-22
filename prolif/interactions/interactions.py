@@ -122,12 +122,17 @@ class HBAcceptor(SingleAngle):
         Removed charged aromatic nitrogen, triazolium, and guanidine/anidine-like from
         acceptors. Added charged nitrogen from histidine as donor.
 
+    .. versionchanged:: 2.2.1
+        Fixed to explicitly exclude backbone nitrogens from being considered as
+        acceptors.
+
     """
 
     def __init__(
         self,
         acceptor: str = (
-            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
+            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([ND2v3^2+0](-[H])-[CD4v4H1^3]-[CD2^2+0]=O)"
+            "&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
             ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
             ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
             ",$([o+0])"
@@ -576,8 +581,6 @@ class VdWContact(Interaction):
 class ImplicitHBAcceptor(Distance, VdWContact):
     """Implicit Hbond interaction between a ligand (acceptor) and a residue (donor).
 
-    .. versionadded:: 2.2.0
-
     Parameters
     ----------
     acceptor : str
@@ -609,12 +612,21 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         for cases where the geometry is not relevant or when the user wants to skip the
         geometry checks for performance reasons. Defaults to False.
 
+
+    .. versionadded:: 2.2.0
+
+    .. versionchanged:: 2.2.1
+        Fixed to explicitly exclude backbone nitrogens from being considered as
+        acceptors.
+
     """
 
     def __init__(
         self,
         acceptor: str = (
-            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
+            "[$([N&!$([NX3]-*=[O,N,P,S])"
+            "&!$([Nv3^2+0;D2&H1,D1h1,D1h2]-[Cv4^3;D4H1,D3&h1]-[CD2^2+0]=O)"
+            "&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
             ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
             ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
             ",$([o+0])"
