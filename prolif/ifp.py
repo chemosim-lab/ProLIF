@@ -5,7 +5,7 @@ Storing interactions --- :mod:`prolif.ifp`
 
 from collections import UserDict
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, NamedTuple, Union, overload
+from typing import TYPE_CHECKING, Any, NamedTuple, Union, overload
 
 from prolif.residue import ResidueId
 
@@ -92,6 +92,13 @@ class IFP(UserDict[tuple[ResidueId, ResidueId], "IFPData"]):
             "either ResidueId or residue string. If you need to filter the IFP, a "
             "single ResidueId or residue string can also be used.",
         )
+
+    def __contains__(self, key: Any) -> bool:
+        try:
+            self[key]
+            return True
+        except KeyError:
+            return False
 
     def interactions(self) -> Iterator[InteractionData]:
         """Yields all interactions data as an :class:`InteractionData` namedtuple.

@@ -48,3 +48,18 @@ def test_interaction_data_iteration(ifp: IFP) -> None:
     assert "distance" in data.metadata
     for data in ifp.interactions():
         assert isinstance(data, InteractionData)
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        ("LIG1.G", "VAL201.A"),
+        (ResidueId.from_string("LIG1.G"), ResidueId.from_string("VAL201.A")),
+        "VAL201.A",
+        ResidueId.from_string("VAL201.A"),
+    ],
+)
+def test_contains(
+    ifp: IFP, key: tuple[ResidueId, ResidueId] | tuple[str, str] | ResidueId | str
+) -> None:
+    assert key in ifp
