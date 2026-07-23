@@ -1,5 +1,10 @@
-ProLIF
-======
+
+.. raw:: html
+
+   <p align="center">
+     <img src="docs/logo.svg" alt="ProLIF logo" width="240">
+   </p>
+
 
 .. list-table::
     :widths: 12 35
