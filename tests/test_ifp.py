@@ -51,18 +51,17 @@ def test_interaction_data_iteration(ifp: IFP) -> None:
 
 
 @pytest.mark.parametrize(
-    "key",
+    ("key", "expected"),
     [
-        ("LIG1.G", "VAL201.A"),
-        (ResidueId.from_string("LIG1.G"), ResidueId.from_string("VAL201.A")),
-        "VAL201.A",
-        ResidueId.from_string("VAL201.A"),
+        (("LIG1.G", "VAL201.A"), True),
+        ((ResidueId.from_string("LIG1.G"), ResidueId.from_string("VAL201.A")), True),
+        ("VAL201.A", True),
+        (ResidueId.from_string("VAL201.A"), True),
+        (0, False),
     ],
 )
-def test_contains(
-    ifp: IFP, key: tuple[ResidueId, ResidueId] | tuple[str, str] | ResidueId | str
-) -> None:
-    assert key in ifp
+def test_contains(ifp: IFP, key: Any, expected: bool) -> None:
+    assert (key in ifp) is expected
 
 
 @pytest.mark.parametrize(
