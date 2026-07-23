@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -63,3 +63,17 @@ def test_contains(
     ifp: IFP, key: tuple[ResidueId, ResidueId] | tuple[str, str] | ResidueId | str
 ) -> None:
     assert key in ifp
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        ("LIG1.G", "VAL201.A"),
+        (ResidueId.from_string("LIG1.G"), ResidueId.from_string("VAL201.A")),
+        "VAL201.A",
+        ResidueId.from_string("VAL201.A"),
+    ],
+)
+def test_get(ifp: IFP, key: Any) -> None:
+    sentinel = object()
+    assert ifp.get(key, sentinel) is not sentinel
