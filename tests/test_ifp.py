@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -48,3 +48,31 @@ def test_interaction_data_iteration(ifp: IFP) -> None:
     assert "distance" in data.metadata
     for data in ifp.interactions():
         assert isinstance(data, InteractionData)
+
+
+@pytest.mark.parametrize(
+    ("key", "expected"),
+    [
+        (("LIG1.G", "VAL201.A"), True),
+        ((ResidueId.from_string("LIG1.G"), ResidueId.from_string("VAL201.A")), True),
+        ("VAL201.A", True),
+        (ResidueId.from_string("VAL201.A"), True),
+        (0, False),
+    ],
+)
+def test_contains(ifp: IFP, key: Any, expected: bool) -> None:
+    assert (key in ifp) is expected
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        ("LIG1.G", "VAL201.A"),
+        (ResidueId.from_string("LIG1.G"), ResidueId.from_string("VAL201.A")),
+        "VAL201.A",
+        ResidueId.from_string("VAL201.A"),
+    ],
+)
+def test_get(ifp: IFP, key: Any) -> None:
+    sentinel = object()
+    assert ifp.get(key, sentinel) is not sentinel
