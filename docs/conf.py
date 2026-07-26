@@ -85,6 +85,7 @@ source_suffix = {
 # a list of builtin themes.
 #
 html_theme = "sphinx_book_theme"
+html_favicon = "favicon.ico"
 pygments_style = "sphinx"
 html_theme_options = {
     "repository_url": "https://github.com/chemosim-lab/ProLIF",

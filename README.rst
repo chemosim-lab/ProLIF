@@ -79,6 +79,14 @@ distributed under the Apache License, Version 2.0 ::
     See the License for the specific language governing permissions and
     limitations under the License.
 
+Logo
+----
+
+The ProLIF logo was created by `Anton Siomchen <https://github.com/asiomchen>`_
+and is licensed under the
+`Creative Commons Attribution 4.0 International License
+<https://creativecommons.org/licenses/by/4.0/>`_.
+
 
 .. |pypi-version| image:: https://img.shields.io/pypi/v/prolif.svg
    :target: https://pypi.python.org/pypi/prolif
