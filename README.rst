@@ -2,7 +2,7 @@
 .. raw:: html
 
    <p align="center">
-     <img src="docs/logo.svg" alt="ProLIF logo" width="240">
+     <img src="docs/assets/logo.svg" alt="ProLIF logo" width="240">
    </p>
 
 

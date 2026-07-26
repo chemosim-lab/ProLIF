@@ -1,7 +1,7 @@
 Welcome to ProLIF's documentation!
 ==================================
 
-.. image:: logo.svg
+.. image:: assets/logo.svg
    :alt: ProLIF logo
    :align: center
    :width: 240px
