@@ -1,10 +1,10 @@
 
-.. raw:: html
+.. image:: docs/assets/logo.svg
+   :alt: ProLIF logo
+   :width: 240
+   :align: center
 
-   <p align="center">
-     <img src="docs/assets/logo.svg" alt="ProLIF logo" width="240">
-   </p>
-
+..
 
 .. list-table::
     :widths: 12 35
