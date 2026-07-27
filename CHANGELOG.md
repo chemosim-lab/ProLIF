@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+## [2.2.1] - 2026-07-27
+
+### Added
+
+- Logo (PR #359 by Anton Siomchen).
 - Support for richer `in` checks on `IFP` object.
 
 ### Fixed
@@ -18,12 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   performed by ProLIF internally, which modifies the environment of atoms involved in
   peptide bonds, thus leading to the nitrogen not matching the exclusion rule and
   passing as an acceptor.
-
-### Changed
-
-### Deprecated
-
-### Removed
 
 ## [2.2.0] - 2026-06-20
 
