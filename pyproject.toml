@@ -68,6 +68,7 @@ docs = [
     "recommonmark",
     "sphinx-book-theme",
     "prolif[tutorials]",
+    "sphinx-autobuild>=2024.10.3",
 ]
 type-check = [
     "mypy>=1.0.0",
@@ -155,6 +156,10 @@ cmd = "pytest"
 [tool.poe.tasks.docs]
 help = "Builds the documentation"
 cmd = "sphinx-build -M html docs/ docs/_build/"
+
+[tool.poe.tasks.live-docs]
+help = "Builds and serves the documentation with live reload"
+cmd = "sphinx-autobuild --watch . docs docs/_build/html"
 
 [tool.poe.tasks.check]
 help = "Runs all of the checks"
