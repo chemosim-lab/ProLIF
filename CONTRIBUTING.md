@@ -120,6 +120,12 @@ uv run poe docs
 You can then open the `docs/_build/html/index.html` file with your browser to navigate the docs and
 see any changes that you've made.
 
+For a local preview that automatically rebuilds and reloads as you edit the documentation, run:
+```
+uv run poe live-docs
+```
+The documentation is served at <http://127.0.0.1:8000>. Press `Ctrl+C` to stop the server.
+
 If you're adding a new module, you will need to update some `.rst` files in the `docs/source/`
 folder and/or the `modules` subfolder. For example, if you're adding a new functionality to plot
 the IFP analysis results, you can make the relevant changes in the

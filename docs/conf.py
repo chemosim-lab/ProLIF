@@ -85,6 +85,8 @@ source_suffix = {
 # a list of builtin themes.
 #
 html_theme = "sphinx_book_theme"
+html_favicon = "assets/favicon.ico"
+html_logo = "assets/logo.svg"
 pygments_style = "sphinx"
 html_theme_options = {
     "repository_url": "https://github.com/chemosim-lab/ProLIF",
@@ -99,6 +101,18 @@ html_theme_options = {
             "name": "GitHub",
             "url": "https://github.com/chemosim-lab/ProLIF",
             "icon": "fa-brands fa-square-github",
+            "type": "fontawesome",
+        },
+        {
+            "name": "Zenodo",
+            "url": "https://zenodo.org/deposit/10802629",
+            "icon": "https://zenodo.org/static/favicon.ico",
+            "type": "url",
+        },
+        {
+            "name": "Paper",
+            "url": "https://doi.org/10.1186/s13321-021-00548-6",
+            "icon": "fa-solid fa-scroll",
             "type": "fontawesome",
         },
     ],

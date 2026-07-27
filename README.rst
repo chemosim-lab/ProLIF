@@ -1,5 +1,10 @@
-ProLIF
-======
+
+.. raw:: html
+
+   <p align="center">
+     <img src="docs/assets/logo.svg" alt="ProLIF logo" width="240">
+   </p>
+
 
 .. list-table::
     :widths: 12 35
@@ -73,6 +78,14 @@ distributed under the Apache License, Version 2.0 ::
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
+
+Logo
+----
+
+The ProLIF logo was created by `Anton Siomchen <https://github.com/asiomchen>`_
+and is licensed under the
+`Creative Commons Attribution 4.0 International License
+<https://creativecommons.org/licenses/by/4.0/>`_.
 
 
 .. |pypi-version| image:: https://img.shields.io/pypi/v/prolif.svg

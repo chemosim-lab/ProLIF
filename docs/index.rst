@@ -1,7 +1,15 @@
 Welcome to ProLIF's documentation!
 ==================================
 
+.. image:: assets/logo.svg
+   :alt: ProLIF logo
+   :align: center
+   :width: 240px
+
+|
+
 .. include:: ../README.rst
+   :start-line: 8
 
 .. toctree::
    :caption: Information
