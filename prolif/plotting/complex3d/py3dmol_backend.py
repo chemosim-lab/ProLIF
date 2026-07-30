@@ -60,7 +60,7 @@ class Py3DMolSettings(Settings[dict[str, dict]]):
                 {position: atom, backgroundColor: 'mintcream', fontColor:'black'}
             );
         }
-    }"""
+    }"""  # noqa: E501
     interaction_hover_callback: str = """
     function(shape,viewer) {
         if(!shape.label) {
@@ -113,7 +113,11 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         return getattr(model, cmd)(*args, **kwargs)
 
     def load_molecule(
-        self, mol: "Molecule", component: str, style: dict[str, dict], kekulize: bool=False
+        self,
+        mol: "Molecule",
+        component: str,
+        style: dict[str, dict],
+        kekulize: bool = False,
     ) -> None:
         if kekulize:
             mol = Chem.Mol(mol)
@@ -180,8 +184,8 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         interaction: str,
         distance: float,
         points: tuple["Point3D", "Point3D"],
-        residues: tuple["ResidueId", "ResidueId"],
-        atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
+        residues: tuple["ResidueId", "ResidueId"],  # noqa: ARG002
+        atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],  # noqa: ARG002
     ) -> None:
         p1, p2 = points
         interaction_label = f"{interaction}: {distance:.2f}Å"

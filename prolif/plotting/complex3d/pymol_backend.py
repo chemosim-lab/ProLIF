@@ -96,7 +96,11 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         self.cmd("view rdinterface, recall")
 
     def load_molecule(
-        self, mol: "Molecule", component: str, style: dict[str, list[str]], kekulize: bool=False
+        self,
+        mol: "Molecule",
+        component: str,
+        style: dict[str, list[str]],
+        kekulize: bool = False,
     ) -> None:
         if kekulize:
             mol = Chem.Mol(mol)
@@ -139,8 +143,8 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
     def add_interaction(
         self,
         interaction: str,
-        distance: float,
-        points: tuple["Point3D", "Point3D"],
+        distance: float,  # noqa: ARG002
+        points: tuple["Point3D", "Point3D"],  # noqa: ARG002
         residues: tuple["ResidueId", "ResidueId"],
         atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
     ) -> None:

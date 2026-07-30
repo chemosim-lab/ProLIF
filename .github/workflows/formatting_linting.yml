@@ -2,9 +2,9 @@ name: "Ruff/Black"
 
 on:
   push:
-    branches: [ "*" ]
+    branches: ["*"]
   pull_request:
-    branches: [ "*" ]
+    branches: ["*"]
 
 concurrency:
   group: "${{ github.ref }}-${{ github.head_ref }}"
@@ -22,7 +22,7 @@ jobs:
       - name: Code formatting
         uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
         with:
-          version: 0.11.2
+          version: 0.12.0
           args: "format --diff"
 
       - name: Notebook formatting
@@ -34,5 +34,5 @@ jobs:
       - name: Code linting
         uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
         with:
-          version: 0.11.2
+          version: 0.12.0
           args: "check --preview --diff"
