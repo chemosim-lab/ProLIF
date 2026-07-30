@@ -351,7 +351,7 @@ class Complex3D:
         self._view = v
         return self
 
-    def _populate_view(  # type: ignore[no-any-unimported]  # noqa: PLR0912
+    def _populate_view(  # type: ignore[no-any-unimported]
         self,
         view: py3Dmol.view | Complex3D,
         position: tuple[int, int] = (0, 0),
