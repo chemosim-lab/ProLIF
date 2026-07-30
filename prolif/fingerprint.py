@@ -1467,7 +1467,8 @@ class Fingerprint:
             Added ``sanitize`` parameter to allow sanitization of the RDKit
             molecules used for visualization, which can help avoid unkekulization
             issues when using the coordinates of the molecule directly.
-        """
+
+        """  # noqa: E501
         from prolif.plotting.complex3d import Complex3D
 
         plot3d = Complex3D.from_fingerprint(

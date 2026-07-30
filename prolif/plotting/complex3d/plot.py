@@ -60,7 +60,7 @@ class Complex3D:
         vicinity of the ligand, or only the ones participating in an interaction. Moved
         most options to the `backend_settings` object (accessible through
         :attr:`backend`'s :attr:`settings`).
-    """
+    """  # noqa: E501
 
     def __init__(
         self,
@@ -118,7 +118,7 @@ class Complex3D:
             provided, this will be used instead.
         backend_kwargs: Any
             Additional parameters passed to the backend's setup.
-        """
+        """  # noqa: E501
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
                 "Please run the fingerprint analysis before attempting to display"
@@ -399,7 +399,12 @@ class Complex3D:
             else settings.ligand_style,
             kekulize=sanitize in {"ligand", True},
         )
-        backend.load_molecule(self.prot_mol, "protein", settings.protein_style,kekulize=sanitize in {"protein", True},)
+        backend.load_molecule(
+            self.prot_mol,
+            "protein",
+            settings.protein_style,
+            kekulize=sanitize in {"protein", True},
+        )
         if self.water_mol:
             backend.load_molecule(self.water_mol, "water", settings.residues_style)
 
@@ -503,7 +508,9 @@ class Complex3D:
 
         # show "protein" residues that are close to the "ligand"
         if not only_interacting:
-            self._show_unpaired_residues(self.prot_mol, "protein", kekulize=sanitize in {"protein", True})
+            self._show_unpaired_residues(
+                self.prot_mol, "protein", kekulize=sanitize in {"protein", True}
+            )
             if self.water_mol:
                 self._show_unpaired_residues(self.water_mol, "water")
 
@@ -513,7 +520,7 @@ class Complex3D:
 
         backend.finalize()
 
-    def _show_unpaired_residues(self, mol: Molecule, component: str, kekulize: bool=False) -> None:
+    def _show_unpaired_residues(self, mol: Molecule, component: str) -> None:
         pocket_residues = get_residues_near_ligand(self.lig_mol, mol)
         unpaired_residues = set(pocket_residues).difference(self.backend.residues)
         for resid in unpaired_residues:
@@ -585,7 +592,7 @@ class Complex3D:
             super().__setattr__(name, value)
 
     def _repr_html_(self) -> str | None:
-        if self.interface:
+        if self.interface and hasattr(self.interface, "_repr_html_"):
             return self.interface._repr_html_()  # type: ignore[no-any-return]
         return None
 

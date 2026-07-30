@@ -81,7 +81,7 @@ type-check = [
     "types-psutil",
 ]
 dev = [
-    "ruff==0.11.2",                   # keep synced with formatting_linting.yml
+    "ruff==0.12.0",
     "black[jupyter]",
     "poethepoet>=0.33.0",
     { include-group = "tests" },
@@ -268,6 +268,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["ARG001"]
+
+[tool.ruff.lint.pylint]
+allow-dunder-method-names = ["_repr_html", "_repr_png_"]
 
 [tool.isort]
 profile = "black"
