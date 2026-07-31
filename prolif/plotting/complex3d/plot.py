@@ -57,8 +57,11 @@ class Complex3D:
         to the ``display`` and ``compare`` methods to remove non-polar hydrogens that
         aren't involved in an interaction. Added ``only_interacting`` parameter to the
         ``display`` and ``compare`` methods to show all protein residues in the
-        vicinity of the ligand, or only the ones participating in an interaction. Moved
-        most options to the `backend_settings` object (accessible through
+        vicinity of the ligand, or only the ones participating in an interaction.
+
+    .. versionchanged:: X.Y.Z
+        Added support for multiple backends (``py3Dmol`` and ``pymol``) and moved
+        most options to the ``backend_settings`` object (accessible through
         :attr:`backend`'s :attr:`settings`).
     """  # noqa: E501
 
@@ -146,7 +149,6 @@ class Complex3D:
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
-        sanitize: bool | Literal["ligand", "protein"] = "protein",
     ) -> Complex3D:
         """Display the complex in 3D.
 
@@ -164,10 +166,6 @@ class Complex3D:
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
-        sanitize: bool | Literal["ligand", "protein"] = "protein"
-            Whether to sanitize the RDKit molecules used for visualization.
-            This is to avoid unkekulization issues that may arise when using the
-            coordinates of the molecule.
 
         .. versionchanged:: 2.1.0
             Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
@@ -180,10 +178,13 @@ class Complex3D:
             molecules used for visualization, which can help avoid unkekulization
             issues when using the coordinates of the molecule directly.
 
+        .. versionchanged:: X.Y.Z
+            Removed ``sanitize`` parameter as unrequired following the backend changes.
+
         """
         # setup view parameters
         if isinstance(self.backend, Py3DmolBackend):
-            kwargs = {"viewergrid": (1, 1), "width": size[0], "height": size[1]}
+            kwargs: dict = {"viewergrid": (1, 1), "width": size[0], "height": size[1]}
         elif isinstance(self.backend, PyMOLBackend):
             kwargs = {"width": size[0], "height": size[1]}
         else:
@@ -196,7 +197,6 @@ class Complex3D:
             display_all=display_all,
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
-            sanitize=sanitize,
         )
         self.interface = self.backend.interface
         return self
@@ -266,7 +266,7 @@ class Complex3D:
 
         # configure view parameters
         if isinstance(self.backend, Py3DmolBackend):
-            kwargs = {
+            kwargs: dict = {
                 "viewergrid": (1, 2),
                 "width": size[0],
                 "height": size[1],
@@ -380,12 +380,11 @@ class Complex3D:
         other.backend = get_3d_plot_backend(other_settings)
         return self
 
-    def _populate_view(  # noqa: PLR0912
+    def _populate_view(
         self,
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
-        sanitize: bool | Literal["ligand", "protein"] = "protein",
     ) -> None:
         backend = self.backend
         settings = cast("Settings", backend.settings)
@@ -397,14 +396,8 @@ class Complex3D:
             settings.peptide_style
             if self.lig_mol.n_residues >= settings.peptide_threshold
             else settings.ligand_style,
-            kekulize=sanitize in {"ligand", True},
         )
-        backend.load_molecule(
-            self.prot_mol,
-            "protein",
-            settings.protein_style,
-            kekulize=sanitize in {"protein", True},
-        )
+        backend.load_molecule(self.prot_mol, "protein", settings.protein_style)
         if self.water_mol:
             backend.load_molecule(self.water_mol, "water", settings.residues_style)
 
@@ -453,9 +446,12 @@ class Complex3D:
                                 ]
                                 p1 = self.lig_mol.GetConformer().GetAtomPosition(atoms1)
                             else:
-                                atoms1 = metadata["parent_indices"][src][0]
-                                p1 = self.water_mol.GetConformer().GetAtomPosition(
-                                    atoms1
+                                # water-water or water-protein
+                                atoms1 = metadata["indices"][src][0]
+                                p1 = (
+                                    self.water_mol[src]
+                                    .GetConformer()
+                                    .GetAtomPosition(atoms1)
                                 )
                             if dest == "protein":
                                 atoms2 = metadata["parent_indices"]["protein"][
@@ -465,9 +461,11 @@ class Complex3D:
                                     atoms2
                                 )
                             else:
-                                atoms2 = metadata["parent_indices"][dest][0]
-                                p2 = self.water_mol.GetConformer().GetAtomPosition(
-                                    atoms2
+                                atoms2 = metadata["indices"][dest][0]
+                                p2 = (
+                                    self.water_mol[dest]
+                                    .GetConformer()
+                                    .GetAtomPosition(atoms2)
                                 )
 
                             backend.add_interaction(
@@ -508,9 +506,7 @@ class Complex3D:
 
         # show "protein" residues that are close to the "ligand"
         if not only_interacting:
-            self._show_unpaired_residues(
-                self.prot_mol, "protein", kekulize=sanitize in {"protein", True}
-            )
+            self._show_unpaired_residues(self.prot_mol, "protein")
             if self.water_mol:
                 self._show_unpaired_residues(self.water_mol, "water")
 
