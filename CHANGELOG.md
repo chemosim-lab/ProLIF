@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Using `split_molecule` could lead to indexing errors down the line (Issue #365).
+  It now properly forwards the indices of the new parent molecules to the underlying
+  residues, instead of reusing the indices inherited from the input molecule.
+
 ### Changed
 
 ### Deprecated

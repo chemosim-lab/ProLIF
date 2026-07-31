@@ -590,17 +590,33 @@ def split_molecule(
         recalculated from each new child molecule, allowing to keep information from the
         :class:`~prolif.io.molecule_standardizer.MoleculeStandardizer` class.
 
+    .. versionchanged:: 2.2.2
+        Fixed the issue where the underlying residues were using parent atom indices
+        of the input molecule instead of the new ones, often leading to indexing errors.
+
     """
-    lhs_residues: list[Residue] = []
-    rhs_residues: list[Residue] = []
+    residues: tuple[list[Residue], list[Residue]] = [], []
+    indices: dict[bool, int] = {True: 0, False: 0}
+    parent_to_new: tuple[defaultdict[int, int], defaultdict[int, int]] = (
+        defaultdict(int),
+        defaultdict(int),
+    )
     with Chem.RWMol(mol) as lhs, Chem.RWMol(mol) as rhs:
         for residue in mol:
-            first = predicate(residue.resid)
-            del_target = rhs if first else lhs
+            is_lhs = predicate(residue.resid)
+            del_target = rhs if is_lhs else lhs
             for atom in residue.GetAtoms():
-                del_target.RemoveAtom(atom.GetUnsignedProp("mapindex"))
-            res_target = lhs_residues if first else rhs_residues
-            res_target.append(residue)
-    return Molecule(lhs.GetMol(), residues=lhs_residues), Molecule(
-        rhs.GetMol(), residues=rhs_residues
+                parent_idx = atom.GetUnsignedProp("mapindex")
+                del_target.RemoveAtom(parent_idx)
+                parent_to_new[is_lhs][parent_idx] = indices[is_lhs]
+                indices[is_lhs] += 1
+            residues[is_lhs].append(residue)
+    for mapping, reslist in zip(parent_to_new, residues, strict=True):
+        for residue in reslist:
+            for atom in residue.GetAtoms():
+                parent_idx = atom.GetUnsignedProp("mapindex")
+                new_idx = mapping[parent_idx]
+                atom.SetUnsignedProp("mapindex", new_idx)
+    return Molecule(lhs.GetMol(), residues=residues[1]), Molecule(
+        rhs.GetMol(), residues=residues[0]
     )
