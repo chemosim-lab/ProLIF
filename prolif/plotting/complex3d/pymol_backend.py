@@ -96,15 +96,8 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         self.cmd("view rdinterface, recall")
 
     def load_molecule(
-        self,
-        mol: "Molecule",
-        component: str,
-        style: dict[str, list[str]],
-        kekulize: bool = False,
+        self, mol: "Molecule", component: str, style: dict[str, list[str]]
     ) -> None:
-        if kekulize:
-            mol = Chem.Mol(mol)
-            Chem.Kekulize(mol)
         pdb_dump = Chem.MolToPDBBlock(mol, flavor=16 | 32)
         model_id = f"{self.group_id}.{component}"
         with self.ignore_autozoom():
