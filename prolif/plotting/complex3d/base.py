@@ -126,9 +126,7 @@ class Backend(Protocol, Generic[SettingsT, ComponentT, ModelT]):
     def finalize(self) -> None:
         """Finalize the plot."""
 
-    def load_molecule(
-        self, mol: "Molecule", component: ComponentT, style: Any, kekulize: bool = False
-    ) -> None:
+    def load_molecule(self, mol: "Molecule", component: ComponentT, style: Any) -> None:
         """Load a molecule into the view with the given style."""
 
     def show_residue(

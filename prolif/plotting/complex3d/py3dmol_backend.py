@@ -113,15 +113,8 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         return getattr(model, cmd)(*args, **kwargs)
 
     def load_molecule(
-        self,
-        mol: "Molecule",
-        component: str,
-        style: dict[str, dict],
-        kekulize: bool = False,
+        self, mol: "Molecule", component: str, style: dict[str, dict]
     ) -> None:
-        if kekulize:
-            mol = Chem.Mol(mol)
-            Chem.Kekulize(mol)
         pdb_dump = Chem.MolToPDBBlock(mol, flavor=16 | 32)
         needs_dummy = "cartoon" in style
         if needs_dummy:

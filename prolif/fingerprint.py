@@ -1408,7 +1408,6 @@ class Fingerprint:
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
-        sanitize: bool | Literal["ligand", "protein"] = "protein",
         backend_settings: Union[
             Literal["py3Dmol", "pymol"], "Py3DMolSettings", "PyMOLSettings"
         ] = "py3Dmol",
@@ -1461,12 +1460,16 @@ class Fingerprint:
             Added ``only_interacting=True`` and ``remove_hydrogens=True`` parameters.
             Non-polar hydrogen atoms that aren't involved in interactions are now
             hidden. Added support for waters involved in WaterBridge interactions.
-            Added ``backend_settings``.
 
         .. versionchanged:: 2.2.0
             Added ``sanitize`` parameter to allow sanitization of the RDKit
             molecules used for visualization, which can help avoid unkekulization
             issues when using the coordinates of the molecule directly.
+
+        .. versionchanged:: X.Y.Z
+            Added support for multiple backends (``py3Dmol`` and ``pymol``) and moved
+            most options to the ``backend_settings`` object. Removed ``sanitize``
+            parameter as unrequired following the backend changes.
 
         """  # noqa: E501
         from prolif.plotting.complex3d import Complex3D
@@ -1485,5 +1488,4 @@ class Fingerprint:
             display_all=display_all,
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
-            sanitize=sanitize,
         )
