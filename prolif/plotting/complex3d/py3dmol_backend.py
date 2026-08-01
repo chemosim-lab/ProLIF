@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from prolif.molecule import Molecule
     from prolif.residue import Residue, ResidueId
+    from prolif.typeshed import Component
 
 
 @dataclass
@@ -77,7 +78,7 @@ class Py3DMolSettings(Settings[dict[str, dict]]):
     }"""
 
 
-class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
+class Py3DmolBackend(Backend[Py3DMolSettings, int]):
     def setup(
         self,
         viewergrid: tuple[int, int],
@@ -113,7 +114,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         return getattr(model, cmd)(*args, **kwargs)
 
     def load_molecule(
-        self, mol: "Molecule", component: str, style: dict[str, dict]
+        self, mol: "Molecule", component: "Component", style: dict[str, dict]
     ) -> None:
         pdb_dump = Chem.MolToPDBBlock(mol, flavor=16 | 32)
         needs_dummy = "cartoon" in style
@@ -154,7 +155,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         self._model_count += 1
 
     def show_residue(
-        self, residue: "Residue", component: str, style: dict[str, dict]
+        self, residue: "Residue", component: "Component", style: dict[str, dict]
     ) -> None:
         super().show_residue(residue, component, style)
         model_id = self.models[component]
@@ -176,6 +177,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
         self,
         interaction: str,
         distance: float,
+        components: tuple["Component", "Component"],  # noqa: ARG002
         points: tuple["Point3D", "Point3D"],
         residues: tuple["ResidueId", "ResidueId"],  # noqa: ARG002
         atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],  # noqa: ARG002
@@ -197,7 +199,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, str, int]):
             viewer=self.position,
         )
 
-    def hide_hydrogens(self, component: str, keep_indices: list[int]) -> None:
+    def hide_hydrogens(self, component: "Component", keep_indices: list[int]) -> None:
         self.modelcmd(
             "setStyle",
             {"and": [{"elem": "H"}, {"not": {"index": keep_indices}}]},

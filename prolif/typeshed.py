@@ -31,6 +31,7 @@ IFPResults: TypeAlias = dict[int, "IFP"]
 
 InteractionMetadata: TypeAlias = dict[str, Any]
 IFPData: TypeAlias = dict[str, Sequence[InteractionMetadata]]
+Component: TypeAlias = Literal["ligand", "protein", "water"]
 
 # MDAnalysis
 Trajectory: TypeAlias = Union[  # type: ignore[no-any-unimported]

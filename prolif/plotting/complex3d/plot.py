@@ -21,6 +21,7 @@ from prolif.exceptions import RunRequiredError
 from prolif.plotting.complex3d.py3dmol_backend import Py3DmolBackend, Py3DMolSettings
 from prolif.plotting.complex3d.pymol_backend import PyMOLBackend, PyMOLSettings
 from prolif.plotting.utils import metadata_iterator
+from prolif.residue import ResidueId
 from prolif.utils import get_residues_near_ligand
 
 if TYPE_CHECKING:
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
     from prolif.ifp import IFP
     from prolif.molecule import Molecule
     from prolif.plotting.complex3d.base import Backend, Settings
+    from prolif.typeshed import Component
 
 
 class Complex3D:
@@ -148,7 +150,7 @@ class Complex3D:
         size: tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
+        remove_hydrogens: "bool | Component" = True,
     ) -> Complex3D:
         """Display the complex in 3D.
 
@@ -210,7 +212,7 @@ class Complex3D:
         linked: bool = True,
         color_unique: str | None = "magentaCarbon",
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
+        remove_hydrogens: "bool | Component" = True,
     ) -> Complex3D:
         """Displays the initial complex side-by-side with a second one for easier
         comparison.
@@ -327,7 +329,7 @@ class Complex3D:
         *,
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
+        remove_hydrogens: "bool | Component" = True,
     ) -> Complex3D:
         """Add another ``Complex3D`` object to the current plot.
 
@@ -384,7 +386,7 @@ class Complex3D:
         self,
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
+        remove_hydrogens: "bool | Component" = True,
     ) -> None:
         backend = self.backend
         settings = cast("Settings", backend.settings)
@@ -401,7 +403,7 @@ class Complex3D:
         if self.water_mol:
             backend.load_molecule(self.water_mol, "water", settings.residues_style)
 
-        self._interacting_atoms: defaultdict[str, set[int]] = defaultdict(set)
+        self._interacting_atoms: defaultdict["Component", set[int]] = defaultdict(set)
         # show all interacting residues
         for (lresid, presid), interactions in self.ifp.items():
             lres = self.lig_mol[lresid]
@@ -445,14 +447,16 @@ class Complex3D:
                                     settings.ligand_displayed_atoms.get(interaction, 0)
                                 ]
                                 p1 = self.lig_mol.GetConformer().GetAtomPosition(atoms1)
+                                res1 = lresid
                             else:
                                 # water-water or water-protein
-                                atoms1 = metadata["indices"][src][0]
-                                p1 = (
-                                    self.water_mol[src]
-                                    .GetConformer()
-                                    .GetAtomPosition(atoms1)
+                                atoms1 = metadata["parent_indices"][
+                                    settings.bridged_interactions[interaction]
+                                ][settings.protein_displayed_atoms.get(interaction, 0)]
+                                p1 = self.water_mol.GetConformer().GetAtomPosition(
+                                    atoms1
                                 )
+                                res1 = ResidueId.from_string(src)
                             if dest == "protein":
                                 atoms2 = metadata["parent_indices"]["protein"][
                                     settings.protein_displayed_atoms.get(interaction, 0)
@@ -460,19 +464,25 @@ class Complex3D:
                                 p2 = self.prot_mol.GetConformer().GetAtomPosition(
                                     atoms2
                                 )
+                                res2 = presid
                             else:
-                                atoms2 = metadata["indices"][dest][0]
-                                p2 = (
-                                    self.water_mol[dest]
-                                    .GetConformer()
-                                    .GetAtomPosition(atoms2)
+                                atoms2 = metadata["parent_indices"][
+                                    settings.bridged_interactions[interaction]
+                                ][settings.protein_displayed_atoms.get(interaction, 0)]
+                                p2 = self.water_mol.GetConformer().GetAtomPosition(
+                                    atoms2
                                 )
+                                res2 = ResidueId.from_string(dest)
 
                             backend.add_interaction(
                                 interaction,
                                 distance=metadata[distlabel],
+                                components=(
+                                    "water" if src != "ligand" else "ligand",
+                                    "water" if dest != "protein" else "protein",
+                                ),
                                 points=(p1, p2),
-                                residues=(lresid, presid),
+                                residues=(res1, res2),
                                 atoms=(atoms1, atoms2),
                             )
 
@@ -499,6 +509,7 @@ class Complex3D:
                         backend.add_interaction(
                             interaction,
                             distance=dist,
+                            components=("ligand", "protein"),
                             points=(p1, p2),
                             residues=(lresid, presid),
                             atoms=(atoms1, atoms2),
@@ -516,7 +527,7 @@ class Complex3D:
 
         backend.finalize()
 
-    def _show_unpaired_residues(self, mol: Molecule, component: str) -> None:
+    def _show_unpaired_residues(self, mol: Molecule, component: "Component") -> None:
         pocket_residues = get_residues_near_ligand(self.lig_mol, mol)
         unpaired_residues = set(pocket_residues).difference(self.backend.residues)
         for resid in unpaired_residues:
@@ -528,7 +539,7 @@ class Complex3D:
     def _hide_hydrogens(
         self, remove_hydrogens: bool | Literal["ligand", "protein", "water"]
     ) -> None:
-        to_hide: list[tuple[str, Molecule]] = []
+        to_hide: list[tuple["Component", Molecule]] = []
         if remove_hydrogens in {"ligand", True}:
             to_hide.append(("ligand", self.lig_mol))
         if remove_hydrogens in {"protein", True}:
