@@ -52,12 +52,17 @@ class PyMOLSettings(Settings):
 
 
 @cache
-def get_rpc_server() -> PyMOLRPCServer:
+def get_rpc_server(port: int = 9123) -> PyMOLRPCServer:
     """Get proxy to the PyMOL RPC server."""
     host = os.environ.get("PYMOL_RPCHOST", "localhost")
-    port = 9123
     proxy = cast(PyMOLRPCServer, ServerProxy(f"http://{host}:{port}/RPC2"))
-    proxy.ping()
+    try:
+        proxy.ping()
+    except ConnectionRefusedError:
+        raise RuntimeError(
+            "Could not connect to PyMOL RPC server. "
+            "Make sure you run PyMOL with the `-R` flag."
+        ) from None
     atexit.register(proxy.__close)
     return proxy
 
