@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from prolif.molecule import Molecule
     from prolif.residue import Residue, ResidueId
+    from prolif.typeshed import Component
 
 
 @dataclass
@@ -67,7 +68,14 @@ def get_rpc_server(port: int = 9123) -> PyMOLRPCServer:
     return proxy
 
 
-class PyMOLBackend(Backend[PyMOLSettings, str, str]):
+_forbidden_table = str.maketrans({".": None, ":": None})
+
+
+def _strip_forbidden_chars(s: str) -> str:
+    return s.translate(_forbidden_table)
+
+
+class PyMOLBackend(Backend[PyMOLSettings, str]):
     def setup(
         self,
         handler: Callable[[str], None] | None = None,
@@ -101,7 +109,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
         self.cmd("view rdinterface, recall")
 
     def load_molecule(
-        self, mol: "Molecule", component: str, style: dict[str, list[str]]
+        self, mol: "Molecule", component: "Component", style: dict[str, list[str]]
     ) -> None:
         pdb_dump = Chem.MolToPDBBlock(mol, flavor=16 | 32)
         model_id = f"{self.group_id}.{component}"
@@ -114,7 +122,7 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
     def show_residue(
         self,
         residue: "Residue",
-        component: str,
+        component: "Component",
         style: dict[str, list[str]],
     ) -> None:
         super().show_residue(residue, component, style)
@@ -133,26 +141,29 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
                 for extra in extras:
                     self.cmd(extra.format(selection))
 
-    def hide_hydrogens(self, component: str, keep_indices: list[int]) -> None:
+    def hide_hydrogens(self, component: "Component", keep_indices: list[int]) -> None:
         model_id = self.models[component]
-        selection = " or ".join([f"rank {i}" for i in keep_indices])
-        self.cmd(f"hide %{model_id} and elem H and not ({selection})")
+        subset = " or ".join([f"rank {i}" for i in keep_indices])
+        selection = f"%{model_id} and elem H"
+        if subset:
+            selection += f" and not ({subset})"
+        self.cmd(f"hide ({selection})")
 
     def add_interaction(
         self,
         interaction: str,
         distance: float,  # noqa: ARG002
+        components: tuple["Component", "Component"],
         points: tuple["Point3D", "Point3D"],  # noqa: ARG002
         residues: tuple["ResidueId", "ResidueId"],
         atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
     ) -> None:
         lresid, presid = residues
-        latoms, patoms = atoms
         colour = (
             self.settings.colors.get(interaction, "#dedede").upper().replace("#", "0x")
         )
         selections = []
-        for component, indices in [("ligand", latoms), ("protein", patoms)]:
+        for component, indices in zip(components, atoms, strict=True):
             if isinstance(indices, int):
                 sel = f"%{self.group_id}.{component} and (rank {indices})"
             else:
@@ -160,12 +171,9 @@ class PyMOLBackend(Backend[PyMOLSettings, str, str]):
                 sel = f"%{self.group_id}.{component} and (rank {ring_indices})"
             selections.append(sel)
 
-        resids = f"{lresid}_{presid}".replace(".", "")
+        resids = _strip_forbidden_chars(f"{lresid}_{presid}")
         atom_ids = "_".join(
-            [
-                "".join(map(str, (atoms,) if isinstance(atoms, int) else atoms))
-                for atoms in (latoms, patoms)
-            ]
+            ["".join(map(str, (a,) if isinstance(a, int) else a)) for a in atoms]
         )
         name = f"{self.group_id}.interactions.{interaction}.{resids}.{atom_ids}"
         self.cmd(f"distance {name}, {', '.join(selections)}, mode=4")

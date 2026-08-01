@@ -4,7 +4,7 @@
 # show interaction
 # hide nonpolar hydrogens
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, TypeAlias, TypeVar
 
 from prolif.plotting.utils import separated_interaction_colors
 
@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
     from prolif.molecule import Molecule
     from prolif.residue import Residue, ResidueId
+
+Component: TypeAlias = Literal["ligand", "protein", "water"]
 
 _RING_SYSTEMS = ("PiStacking", "EdgeToFace", "FaceToFace")
 
@@ -87,19 +89,18 @@ class Settings(Generic[StyleT]):
 
 
 SettingsT = TypeVar("SettingsT", bound=Settings)
-ComponentT = TypeVar("ComponentT")
 ModelT = TypeVar("ModelT")
 
 
-class Backend(Protocol, Generic[SettingsT, ComponentT, ModelT]):
+class Backend(Protocol, Generic[SettingsT, ModelT]):
     """
     Protocol for a 3D visualization backend.
     """
 
     settings: SettingsT
     interface: Any = None
-    models: dict[ComponentT, ModelT]
-    residues: dict["ResidueId", ComponentT]
+    models: dict[Component, ModelT]
+    residues: dict["ResidueId", Component]
     _model_count: int
 
     def __init__(self, settings: SettingsT) -> None:
@@ -126,25 +127,26 @@ class Backend(Protocol, Generic[SettingsT, ComponentT, ModelT]):
     def finalize(self) -> None:
         """Finalize the plot."""
 
-    def load_molecule(self, mol: "Molecule", component: ComponentT, style: Any) -> None:
+    def load_molecule(self, mol: "Molecule", component: Component, style: Any) -> None:
         """Load a molecule into the view with the given style."""
 
     def show_residue(
         self,
         residue: "Residue",
-        component: ComponentT,
+        component: Component,
         style: Any,  # noqa: ARG002
     ) -> None:
         """Show a residue on the plot."""
         self.residues[residue.resid] = component
 
-    def hide_hydrogens(self, component: ComponentT, keep_indices: list[int]) -> None:
+    def hide_hydrogens(self, component: Component, keep_indices: list[int]) -> None:
         """Hide non-polar hydrogens in the view."""
 
     def add_interaction(
         self,
         interaction: str,
         distance: float,
+        components: tuple[Component, Component],
         points: tuple["Point3D", "Point3D"],
         residues: tuple["ResidueId", "ResidueId"],
         atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
