@@ -13,3 +13,5 @@ Helper functions
 .. automodule:: prolif.io.cif
     :members: cif_template_reader
 
+.. automodule:: prolif.exceptions
+    :members: error_handler

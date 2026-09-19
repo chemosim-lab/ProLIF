@@ -4,13 +4,14 @@ Residue-related classes --- :mod:`prolif.residue`
 """
 
 import re
-from collections import UserDict
+from collections import Counter, UserDict
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from rdkit.Chem.rdmolops import FastFindRings
 
+from prolif.exceptions import error_handler
 from prolif.rdkitmol import BaseRDKitMol
 
 if TYPE_CHECKING:
@@ -222,6 +223,26 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
             self.number = np.asarray(number, dtype=np.uint32)
             self.chain = np.asarray(chain, dtype=object)
         super().__init__([(r.resid, r) for r in self._residues])
+        if self.n_residues != len(self._residues):
+            by_resid = Counter([r.resid for r in self._residues])
+            fragmented = ", ".join(
+                map(str, [resid for resid, count in by_resid.items() if count >= 2])
+            )
+            error_handler.fragmented_residue.trigger(
+                "The following residues are fragmented and ProLIF only allows "
+                f"one fragment per residue identifier: {fragmented}. This is typically "
+                "caused by two atoms from the same residue being too far apart "
+                "and not being detected as properly bonded by MDAnalysis/RDKit. "
+                "If you're using MDAnalysis, try "
+                "passing a custom van der Waals radius for the responsible atoms: "
+                "`<selection>.guess_bonds(vdwradii={'<element>': <radius>})`. "
+                "If you're using RDKit, try calling rdkit's "
+                ":func:`~rdkit.Chem.rdDetermineBonds.DetermineConnectivity` function "
+                "with different options. "
+                "Alternatively, add explicit bonds to your input files. Although not "
+                "recommended, you can also ignore this error by setting "
+                "`prolif.error_handler.fragmented_residue.on_error = 'warn'."
+            )
 
     def __getitem__(self, key: "ResidueKey") -> Residue:
         # bool is a subclass of int but shouldn't be used here
