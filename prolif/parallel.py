@@ -497,7 +497,7 @@ class TrajectoryPoolQueue:
         cls.residues = residues
 
     @classmethod
-    def executor(cls, args: tuple[int, Molecule, Molecule]) -> tuple[int, "IFP"]:
+    def executor(cls, args: tuple[int, Molecule, Molecule] | Exception) -> tuple[int, "IFP"]:
         """Classmethod executed by each child process on a single frame.
 
         Parameters
@@ -510,6 +510,8 @@ class TrajectoryPoolQueue:
         result : tuple[int, prolif.ifp.IFP]
             Tuple of (frame_number, IFP data)
         """
+        if isinstance(args, Exception):
+            raise args
         frame, lig_mol, prot_mol = args
         data = cls.fp.generate(
             lig_mol,
@@ -542,16 +544,19 @@ class TrajectoryPoolQueue:
             A dictionary of :class:`~prolif.ifp.IFP` indexed by frame number
         """
 
-        def frame_generator() -> Iterable[tuple[int, Molecule, Molecule]]:
+        def frame_generator() -> Iterable[tuple[int, Molecule, Molecule] | Exception]:
             """Generator that yields (frame, lig_mol, prot_mol) tuples."""
-            for ts in traj:
-                lig_mol = Molecule.from_mda(
-                    lig, use_segid=self.use_segid, **self.converter_kwargs[0]
-                )
-                prot_mol = Molecule.from_mda(
-                    prot, use_segid=self.use_segid, **self.converter_kwargs[1]
-                )
-                yield int(ts.frame), lig_mol, prot_mol
+            try:
+                for ts in traj:
+                    lig_mol = Molecule.from_mda(
+                        lig, use_segid=self.use_segid, **self.converter_kwargs[0]
+                    )
+                    prot_mol = Molecule.from_mda(
+                        prot, use_segid=self.use_segid, **self.converter_kwargs[1]
+                    )
+                    yield int(ts.frame), lig_mol, prot_mol
+            except Exception as e:
+                yield e
 
         ifp: "IFPResults" = {}
         # Use imap to stream results as they complete
