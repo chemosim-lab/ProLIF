@@ -1,6 +1,7 @@
+import pickle
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import pytest
 from MDAnalysis import SelectionError
@@ -83,6 +84,12 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
         assert water_mol["TIP34.3"]
         # would have overwritten TIP34.3 if using chain as there's only chain X
         assert water_mol["TIP34.4"]
+
+    @pytest.mark.parametrize("pk", [pickle, pytest.importorskip("dill")])
+    def test_pickle(self, mol: Molecule, pk: Any) -> None:
+        unpickled = pk.loads(pk.dumps(mol))
+        assert hasattr(unpickled, "residues")
+        assert list(unpickled.residues) == list(mol.residues)
 
 
 class SupplierBase:

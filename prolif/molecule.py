@@ -89,12 +89,14 @@ class Molecule(BaseRDKitMol):
 
     def __init__(
         self,
-        mol: Chem.Mol,
+        mol: Chem.Mol | str | bytes,
         *,
         use_segid: bool = False,
         residues: list[Residue] | None = None,
     ) -> None:
         super().__init__(mol)
+        if isinstance(mol, (str, bytes)):
+            return
         # set mapping of atoms
         for atom in self.GetAtoms():
             atom.SetUnsignedProp("mapindex", atom.GetIdx())
