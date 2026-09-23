@@ -1,4 +1,3 @@
-# ruff: noqa: F401
 from prolif.interactions.base import (
     BasePiStacking,
     Distance,
