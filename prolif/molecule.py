@@ -94,7 +94,7 @@ class Molecule(BaseRDKitMol):
         use_segid: bool = False,
         residues: list[Residue] | None = None,
     ) -> None:
-        super().__init__(mol)
+        super().__init__(mol)  # type: ignore[arg-type]
         if isinstance(mol, (str, bytes)):
             return
         # set mapping of atoms

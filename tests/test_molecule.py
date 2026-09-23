@@ -1,4 +1,5 @@
 import pickle
+import warnings
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -7,9 +8,10 @@ import pytest
 from MDAnalysis import SelectionError
 from numpy.testing import assert_array_equal
 from rdkit import Chem
+from rdkit.Chem.rdDistGeom import EmbedMolecule
 
 from prolif.datafiles import datapath
-from prolif.exceptions import FragmentedResidueError, error_handler
+from prolif.exceptions import FragmentedResidueError
 from prolif.molecule import (
     Molecule,
     mol2_supplier,
@@ -86,10 +88,20 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
         assert water_mol["TIP34.4"]
 
     @pytest.mark.parametrize("pk", [pickle, pytest.importorskip("dill")])
-    def test_pickle(self, mol: Molecule, pk: Any) -> None:
-        unpickled = pk.loads(pk.dumps(mol))
+    def test_pickle(self, pk: Any) -> None:
+        mol = Chem.MolFromSequence("AA")
+        mol = Chem.AddHs(mol, addResidueInfo=True)
+        EmbedMolecule(mol, randomSeed=42)
+        # make both residues only differ by SegmentID
+        for atom in mol.GetAtoms():
+            mi: Chem.AtomPDBResidueInfo = atom.GetPDBResidueInfo()
+            mi.SetSegmentNumber(mi.GetResidueNumber())
+            mi.SetResidueNumber(1)
+        pmol = Molecule.from_rdkit(mol, use_segid=True)
+        assert pmol.n_residues == 2
+        unpickled = pk.loads(pk.dumps(pmol))
         assert hasattr(unpickled, "residues")
-        assert list(unpickled.residues) == list(mol.residues)
+        assert list(unpickled.residues) == list(pmol.residues)
 
 
 class SupplierBase:

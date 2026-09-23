@@ -497,7 +497,9 @@ class TrajectoryPoolQueue:
         cls.residues = residues
 
     @classmethod
-    def executor(cls, args: tuple[int, Molecule, Molecule] | Exception) -> tuple[int, "IFP"]:
+    def executor(
+        cls, args: tuple[int, Molecule, Molecule] | Exception
+    ) -> tuple[int, "IFP"]:
         """Classmethod executed by each child process on a single frame.
 
         Parameters
