@@ -14,4 +14,4 @@ Helper functions
     :members: cif_template_reader
 
 .. automodule:: prolif.exceptions
-    :members: error_handler
+    :members: OptionalException, FragmentedResidueError, trigger

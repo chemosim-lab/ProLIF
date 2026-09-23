@@ -266,7 +266,11 @@ def test_successive_split_molecule_calls(water_u: "Universe") -> None:
                 UserWarning, match=r"The following residues are fragmented.+: ALA1.A."
             ),
         ),
-        (lambda _: None, nullcontext()),
+        ("skip", nullcontext()),
+        (
+            lambda _: warnings.warn("foobar", stacklevel=2),
+            pytest.warns(UserWarning, match="foobar"),
+        ),
     ],
 )
 def test_disconnected_residue_handling(
@@ -283,6 +287,6 @@ ATOM      3  N   GLY A   2      20.000  20.000  20.000  1.00  0.00           N
 END
 """
     rdmol = Chem.MolFromPDBBlock(pdb, removeHs=False, sanitize=False)
-    monkeypatch.setattr(error_handler.fragmented_residue, "on_error", on_error)
+    monkeypatch.setattr(FragmentedResidueError, "on_error", on_error)
     with context:
         Molecule(rdmol)

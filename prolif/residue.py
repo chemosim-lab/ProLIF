@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 from rdkit.Chem.rdmolops import FastFindRings
 
-from prolif.exceptions import error_handler
+from prolif.exceptions import FragmentedResidueError, trigger
 from prolif.rdkitmol import BaseRDKitMol
 
 if TYPE_CHECKING:
@@ -228,7 +228,8 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
             fragmented = ", ".join(
                 map(str, [resid for resid, count in by_resid.items() if count >= 2])
             )
-            error_handler.fragmented_residue.trigger(
+            trigger(
+                FragmentedResidueError,
                 "The following residues are fragmented and ProLIF only allows "
                 f"one fragment per residue identifier: {fragmented}. This is typically "
                 "caused by two atoms from the same residue being too far apart "
@@ -239,9 +240,7 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
                 "If you're using RDKit, try calling rdkit's "
                 ":func:`~rdkit.Chem.rdDetermineBonds.DetermineConnectivity` function "
                 "with different options. "
-                "Alternatively, add explicit bonds to your input files. Although not "
-                "recommended, you can also ignore this error by setting "
-                "`prolif.error_handler.fragmented_residue.on_error = 'warn'."
+                "Alternatively, add explicit bonds to your input files.",
             )
 
     def __getitem__(self, key: "ResidueKey") -> Residue:

@@ -1,6 +1,5 @@
 from prolif import datafiles
 from prolif._version import __version__
-from prolif.exceptions import error_handler
 from prolif.fingerprint import Fingerprint
 from prolif.molecule import (
     Molecule,

@@ -5,8 +5,7 @@ Custom exceptions and error handling --- :mod:`prolif.exceptions`
 
 import warnings
 from collections.abc import Callable
-from dataclasses import dataclass, field
-from typing import Literal, TypeAlias
+from typing import ClassVar, Literal, TypeAlias
 
 
 class RunRequiredError(RuntimeError):
@@ -14,31 +13,21 @@ class RunRequiredError(RuntimeError):
     to have been called prior to execution."""
 
 
-ErrorBehavior: TypeAlias = Callable[[str], None] | Literal["warn", "raise"]
+ErrorBehavior: TypeAlias = Callable[[str], None] | Literal["warn", "raise", "skip"]
 
 
 class OptionalException(RuntimeError):
     """Used for runtime exceptions that can be converted to a warning or directly
     handled by the user"""
 
-    on_error: ErrorBehavior = "raise"
-
-    def trigger(self, msg: str) -> None:
-        if self.on_error == "raise":
-            raise type(self)(msg)
-        if self.on_error == "warn":
-            warnings.warn(msg, stacklevel=2)
-        else:
-            self.on_error(msg)
+    on_error: ClassVar[ErrorBehavior] = "raise"
 
 
 class FragmentedResidueError(OptionalException):
     """When a ResidueId maps to multiple Residue objects"""
 
 
-@(lambda cls: cls())
-@dataclass(frozen=True)
-class error_handler:
+def trigger(exc: type[OptionalException], msg: str) -> None:
     """Handles the runtime behavior when specific skippable exceptions happen.
 
     Examples
@@ -47,21 +36,29 @@ class error_handler:
     If you believe the reasons for the error don't apply to your specific case, you can
     convert it to a warning message instead::
 
-        >>> error_handler.fragmented_residue.on_error = "warn"
+        >>> FragmentedResidueError.on_error = "warn"
 
-    You can also completely bypass the errors::    
+    You can also completely bypass the exception::
 
-        >>> error_handler.fragmented_residue.on_error = lambda msg: None
+        >>> FragmentedResidueError.on_error = "skip"
 
     Or redirect them elsewhere::
 
-        >>> error_handler.fragmented_residue.on_error = lambda msg: logger.debug(msg)
+        >>> FragmentedResidueError.on_error = lambda msg: logger.error(msg)
 
 
-    ..versionadded: 2.2.2
+    .. versionadded:: 2.2.2
 
     """
-
-    fragmented_residue: FragmentedResidueError = field(
-        default_factory=FragmentedResidueError
-    )
+    match on_error := exc.on_error:
+        case "raise":
+            raise exc(
+                f"{msg}\nAlthough not recommended, you can also ignore this error by "
+                f"setting `prolif.exceptions.{exc.__name__}.on_error = 'warn'."
+            )
+        case "warn":
+            warnings.warn(msg, stacklevel=2)
+        case on_error if callable(on_error):
+            on_error(msg)
+        case _:
+            pass
