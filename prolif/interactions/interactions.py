@@ -131,7 +131,7 @@ class HBAcceptor(SingleAngle):
     def __init__(
         self,
         acceptor: str = (
-            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([ND2v3^2+0](-[H])-[CD4v4H1^3]-[CD2^2+0]=O)"
+            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([ND2v3^2+0;H1,r5]-[CD4v4H1^3]-[CD2^2+0]=O)"
             "&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
             ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
             ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
@@ -625,7 +625,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         self,
         acceptor: str = (
             "[$([N&!$([NX3]-*=[O,N,P,S])"
-            "&!$([Nv3^2+0;D2&H1,D1h1,D1h2]-[Cv4^3;D4H1,D3&h1]-[CD2^2+0]=O)"
+            "&!$([NX2^2+0;H1,r5]-[CX4v4H1^3]-[CD2^2+0]=O)"
             "&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
             ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
             ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
