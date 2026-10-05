@@ -169,13 +169,16 @@ def get_residues_near_ligand(
     return list(set(resids))
 
 
-def split_mol_by_residues(mol: Chem.Mol) -> list[Chem.Mol]:
+def split_mol_by_residues(mol: Chem.Mol, use_segid: bool = False) -> list[Chem.Mol]:
     """Splits a molecule in multiple fragments based on residues
 
     Parameters
     ----------
     mol : rdkit.Chem.rdchem.Mol
         The molecule to fragment
+    use_segid : bool
+        Whether to use the segid column from the PDB file to identify residues.
+        Default is ``False``.
 
     Returns
     -------
@@ -191,7 +194,8 @@ def split_mol_by_residues(mol: Chem.Mol) -> list[Chem.Mol]:
         for frag in GetMolFrags(res, asMols=True, sanitizeFrags=False):
             # count number of unique residues in the fragment
             resids: dict[int, ResidueId] = {
-                a.GetIdx(): ResidueId.from_atom(a) for a in frag.GetAtoms()
+                a.GetIdx(): ResidueId.from_atom(a, use_segid=use_segid)
+                for a in frag.GetAtoms()
             }
             if len(set(resids.values())) > 1:
                 # split on peptide bonds

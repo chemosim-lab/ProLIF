@@ -70,7 +70,7 @@ class RDKitMolTemplateEngine:
 
     def apply(self, residue: Residue) -> Residue:
         new_res = assign_bond_orders_from_template(template_mol=self._mol, mol=residue)
-        return Residue(new_res)
+        return Residue(new_res, use_segid=residue._use_segid)
 
 
 class CIFTemplateEngine:
@@ -104,7 +104,7 @@ class CIFTemplateEngine:
     def apply(self, residue: Residue) -> Residue:
         new_res = strip_bonds(residue)
         new_res = assign_intra_props(new_res, self._name, self._block)
-        return Residue(new_res)
+        return Residue(new_res, use_segid=residue._use_segid)
 
 
 def assign_bond_orders_from_template(

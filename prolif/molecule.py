@@ -100,7 +100,7 @@ class Molecule(BaseRDKitMol):
             atom.SetUnsignedProp("mapindex", atom.GetIdx())
         if residues is None:
             # split in residues
-            residues = split_mol_by_residues(self)
+            residues = split_mol_by_residues(self, use_segid=use_segid)
             residues = [Residue(mol, use_segid=use_segid) for mol in residues]
             residues.sort(key=attrgetter("resid"))
         self.residues = ResidueGroup(residues)
@@ -610,13 +610,17 @@ def split_molecule(
                 del_target.RemoveAtom(parent_idx)
                 parent_to_new[is_lhs][parent_idx] = indices[is_lhs]
                 indices[is_lhs] += 1
-            residues[is_lhs].append(residue)
+            residues[is_lhs].append(Residue(residue, use_segid=residue._use_segid))
     for mapping, reslist in zip(parent_to_new, residues, strict=True):
         for residue in reslist:
             for atom in residue.GetAtoms():
                 parent_idx = atom.GetUnsignedProp("mapindex")
                 new_idx = mapping[parent_idx]
                 atom.SetUnsignedProp("mapindex", new_idx)
-    return Molecule(lhs.GetMol(), residues=residues[1]), Molecule(
-        rhs.GetMol(), residues=residues[0]
+    lhsmol = lhs.GetMol()
+    rhsmol = rhs.GetMol()
+    Chem.FastFindRings(lhsmol)
+    Chem.FastFindRings(rhsmol)
+    return Molecule(lhsmol, residues=residues[1]), Molecule(
+        rhsmol, residues=residues[0]
     )
