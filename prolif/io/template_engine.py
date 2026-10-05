@@ -7,17 +7,21 @@ implementations for fixing bond orders on residues.
 .. versionadded:: 2.2.0
 """
 
-from __future__ import annotations
-
+import bisect
 import logging
+from collections.abc import Sequence
+from itertools import combinations
 from typing import Protocol, runtime_checkable
 
 import gemmi
 from rdkit import Chem
+from rdkit.Chem.rdMolTransforms import GetAngleDeg
 
 from prolif.io.constants import (
     ATOMNAME_ALIASES,
     FORMAL_CHARGE_ALIASES,
+    HYBRIDIZATION_ANGLES,
+    HYBRIDIZATION_MAP,
     MAX_AMIDE_LENGTH,
     RESNAME_ALIASES,
 )
@@ -345,3 +349,42 @@ def _assign_intra_props_lone_H(em: Chem.RWMol) -> Chem.RWMol:
             em.AddBond(i, j, order=Chem.BondType.SINGLE)
 
     return em
+
+
+def get_atom_hybridization(
+    atom: Chem.Atom, conf: Chem.Conformer
+) -> Chem.HybridizationType:
+    """Get the hybridization of a single atom based on its bond angles."""
+    if atom.GetDegree() == 1:
+        if atom.GetAtomicNum() == 1:
+            return Chem.HybridizationType.S
+        # diatomic system would lead to infinite recursion
+        if conf.GetNumAtoms() == 2:
+            return Chem.HybridizationType.UNSPECIFIED
+        return get_atom_hybridization(atom.GetNeighbors()[0], conf)
+    bond_angles = [
+        GetAngleDeg(conf, n1.GetIdx(), atom.GetIdx(), n2.GetIdx())
+        for n1, n2 in combinations(atom.GetNeighbors(), 2)
+    ]
+    if not bond_angles:
+        return Chem.HybridizationType.UNSPECIFIED
+    return _map_angles_to_hybridization(bond_angles)
+
+
+def _map_angles_to_hybridization(angles: Sequence[float]) -> Chem.HybridizationType:
+    """Maps a list of bond angles around a central atom to its hybridization."""
+    angles_key = frozenset([_quantize_angle(a) for a in angles])
+    # exact mapping
+    if (hyb := HYBRIDIZATION_MAP.get(angles_key)) is not None:
+        return hyb
+    # geometry might be odd, fallback to average angle
+    avg_angle = sum(angles) / len(angles)
+    angles_key = frozenset([_quantize_angle(avg_angle)])
+    return HYBRIDIZATION_MAP.get(angles_key, Chem.HybridizationType.UNSPECIFIED)
+
+
+def _quantize_angle(angle: float) -> float:
+    """Bin a bond angle to its nearest ideal reference angle."""
+    # Midpoints between archetypes
+    idx = bisect.bisect_right([99.75, 114.75, 150.0], angle)
+    return HYBRIDIZATION_ANGLES[idx]

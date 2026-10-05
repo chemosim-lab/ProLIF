@@ -789,7 +789,13 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         # Check acceptor (ligand-centered)
         if on in {"both", "ligand"}:
             # Check acceptor atom's angle
-            ideal_acceptor_atom_angle = IDEAL_ATOM_ANGLES[lig_atom.GetHybridization()]
+            ideal_acceptor_atom_angle = IDEAL_ATOM_ANGLES.get(
+                lig_atom.GetHybridization()
+            )
+            if ideal_acceptor_atom_angle is None:
+                # hybridization other than SP, SP2, SP3 not supported
+                return False
+
             acceptor_atom_angles = self._get_atom_angles(
                 res=lig_res,
                 res_atom_idx=lig_atom_idx,
@@ -826,7 +832,11 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         # Check donor atom (protein-centered)
         if on in {"both", "protein"}:
             # Check donor atom's angle
-            ideal_donor_atom_angle = IDEAL_ATOM_ANGLES[prot_atom.GetHybridization()]
+            ideal_donor_atom_angle = IDEAL_ATOM_ANGLES.get(prot_atom.GetHybridization())
+            if ideal_donor_atom_angle is None:
+                # hybridization other than SP, SP2, SP3 not supported
+                return False
+
             donor_atom_angles = self._get_atom_angles(
                 res=prot_res,
                 res_atom_idx=prot_atom_idx,

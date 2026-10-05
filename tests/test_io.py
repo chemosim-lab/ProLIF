@@ -1,3 +1,4 @@
+from collections.abc import Collection
 from contextlib import nullcontext
 from unittest.mock import Mock
 
@@ -15,6 +16,7 @@ from prolif.io.template_engine import (
     CIFTemplateEngine,
     RDKitMolTemplateEngine,
     _assign_intra_props_lone_H,
+    _map_angles_to_hybridization,
     strip_bonds,
 )
 from prolif.io.xml import parse_altnames
@@ -466,3 +468,20 @@ class TestMoleculeStandardizer:
 
         for bond1, bond2 in zip(mol.GetBonds(), em_fixed.GetBonds(), strict=True):
             assert bond1.GetBondType() == bond2.GetBondType()
+
+
+@pytest.mark.parametrize(
+    ("angles", "expected"),
+    [
+        ([109.4, 109.5, 109.47, 109.47], Chem.HybridizationType.SP3),
+        ([104.5, 104.3, 104.4], Chem.HybridizationType.SP3),
+        ([120.0, 119.0, 121.0], Chem.HybridizationType.SP2),
+        ([181.0, 179.0], Chem.HybridizationType.SP),
+        ([90, 120, 180], Chem.HybridizationType.SP3D),
+        ([90, 90, 90, 180, 180], Chem.HybridizationType.SP3D2),
+    ],
+)
+def test_hybridization_mapping(
+    angles: Collection[float], expected: Chem.HybridizationType
+) -> None:
+    assert _map_angles_to_hybridization(angles) is expected
