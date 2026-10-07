@@ -1,7 +1,8 @@
 import pickle
 import warnings
-from collections.abc import Callable
+from collections import defaultdict
 from contextlib import AbstractContextManager, nullcontext
+from functools import reduce
 from typing import TYPE_CHECKING, Any, ClassVar
 
 import pytest
@@ -11,7 +12,7 @@ from rdkit import Chem
 from rdkit.Chem.rdDistGeom import EmbedMolecule
 
 from prolif.datafiles import datapath
-from prolif.exceptions import FragmentedResidueError
+from prolif.exceptions import ErrorBehavior, FragmentedResidueError
 from prolif.molecule import (
     Molecule,
     mol2_supplier,
@@ -262,6 +263,17 @@ def test_successive_split_molecule_calls(water_u: "Universe") -> None:
             assert atom.GetUnsignedProp("mapindex") == atom.GetIdx()
 
 
+@pytest.fixture
+def fragmented_rdmol() -> Chem.Mol:
+    pdb = """\
+ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N
+ATOM      2  CA  ALA A   1      10.000  10.000  10.000  1.00  0.00           C
+ATOM      3  N   GLY A   2      20.000  20.000  20.000  1.00  0.00           N
+END
+"""
+    return Chem.MolFromPDBBlock(pdb, removeHs=False, sanitize=False)
+
+
 @pytest.mark.parametrize(
     ("on_error", "context"),
     [
@@ -280,25 +292,42 @@ def test_successive_split_molecule_calls(water_u: "Universe") -> None:
         ),
         ("skip", nullcontext()),
         (
-            lambda _: warnings.warn("foobar", stacklevel=2),
+            lambda *_: warnings.warn("foobar", stacklevel=2),
             pytest.warns(UserWarning, match="foobar"),
         ),
     ],
 )
 def test_disconnected_residue_handling(
-    on_error: Callable[[str], None] | str,
+    on_error: ErrorBehavior,
     context: AbstractContextManager,
+    fragmented_rdmol: Chem.Mol,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A residue that is fragmented due to invalid bond inferring should raise an
     error rather than silently drop all but the last fragment"""
-    pdb = """\
-ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00  0.00           N
-ATOM      2  CA  ALA A   1      10.000  10.000  10.000  1.00  0.00           C
-ATOM      3  N   GLY A   2      20.000  20.000  20.000  1.00  0.00           N
-END
-"""
-    rdmol = Chem.MolFromPDBBlock(pdb, removeHs=False, sanitize=False)
+
     monkeypatch.setattr(FragmentedResidueError, "on_error", on_error)
     with context:
-        Molecule(rdmol)
+        Molecule(fragmented_rdmol)
+
+
+def test_disconnected_residue_custom_callback(
+    monkeypatch: pytest.MonkeyPatch, fragmented_rdmol: Chem.Mol
+) -> None:
+    def combine_mols(msg: str, *args: Any) -> None:
+        """A simple callback that combines fragmented residues in the same mol object"""
+        residue_group = args[0]
+        grouped = defaultdict(list)
+        for r in residue_group._residues:
+            grouped[r.resid].append(r)
+        combined = [
+            Residue(reduce(Chem.CombineMols, group, Chem.Mol()))
+            for group in grouped.values()
+        ]
+        residue_group.__init__(combined)
+
+    monkeypatch.setattr(FragmentedResidueError, "on_error", combine_mols)
+    mol = Molecule(fragmented_rdmol)
+    assert mol.n_residues == 2
+    assert len(mol.residues._residues) == 2
+    assert mol["ALA1.A"].GetNumAtoms() == 2

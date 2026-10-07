@@ -50,7 +50,7 @@ class ResidueId:
         name: str | None = "UNK",
         number: int | None = 0,
         chain: str | None = None,
-    ):
+    ) -> None:
         self.name = "UNK" if not name else name.strip()
         self.number = number or 0
         self.chain = None if not chain else chain.strip()
@@ -172,7 +172,7 @@ class Residue(BaseRDKitMol):
         Added `use_segid`.
     """
 
-    def __init__(self, mol: "Chem.Mol", *, use_segid: bool = False):
+    def __init__(self, mol: "Chem.Mol", *, use_segid: bool = False) -> None:
         super().__init__(mol)
         FastFindRings(self)
         self._use_segid = use_segid
@@ -207,7 +207,7 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
     access a subset of a ResidueGroup.
     """
 
-    def __init__(self, residues: Iterable[Residue]):
+    def __init__(self, residues: Iterable[Residue]) -> None:
         self._residues = cast(Sequence[Residue], np.asarray(residues, dtype=object))
         resinfo = [
             (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
@@ -241,6 +241,7 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
                 ":func:`~rdkit.Chem.rdDetermineBonds.DetermineConnectivity` function "
                 "with different options. "
                 "Alternatively, add explicit bonds to your input files.",
+                self,
             )
 
     def __getitem__(self, key: "ResidueKey") -> Residue:

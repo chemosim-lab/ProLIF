@@ -4,8 +4,7 @@ Custom exceptions and error handling --- :mod:`prolif.exceptions`
 """
 
 import warnings
-from collections.abc import Callable
-from typing import ClassVar, Literal, TypeAlias
+from typing import Any, ClassVar, Literal, Protocol, TypeAlias
 
 
 class RunRequiredError(RuntimeError):
@@ -13,7 +12,11 @@ class RunRequiredError(RuntimeError):
     to have been called prior to execution."""
 
 
-ErrorBehavior: TypeAlias = Callable[[str], None] | Literal["warn", "raise", "skip"]
+class OptionalExceptionCallback(Protocol):
+    def __call__(self, msg: str, *args: Any) -> None: ...
+
+
+ErrorBehavior: TypeAlias = OptionalExceptionCallback | Literal["warn", "raise", "skip"]
 
 
 class OptionalException(RuntimeError):
@@ -27,7 +30,7 @@ class FragmentedResidueError(OptionalException):
     """When a ResidueId maps to multiple Residue objects"""
 
 
-def trigger(exc: type[OptionalException], msg: str) -> None:
+def trigger(exc: type[OptionalException], msg: str, *args: Any) -> None:
     """Handles the runtime behavior when specific skippable exceptions happen.
 
     Examples
@@ -42,9 +45,9 @@ def trigger(exc: type[OptionalException], msg: str) -> None:
 
         >>> FragmentedResidueError.on_error = "skip"
 
-    Or redirect them elsewhere::
+    Or do something else::
 
-        >>> FragmentedResidueError.on_error = lambda msg: logger.error(msg)
+        >>> FragmentedResidueError.on_error = lambda msg, *_: logger.error(msg)
 
 
     .. versionadded:: 2.2.2
@@ -59,6 +62,6 @@ def trigger(exc: type[OptionalException], msg: str) -> None:
         case "warn":
             warnings.warn(msg, stacklevel=2)
         case on_error if callable(on_error):
-            on_error(msg)
+            on_error(msg, *args)
         case _:
             pass
