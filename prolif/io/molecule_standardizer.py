@@ -251,7 +251,8 @@ class MoleculeStandardizer:
                 parent_atom = protein_mol.GetAtomWithIdx(parent_idx)
                 atom.SetHybridization(get_atom_hybridization(parent_atom, parent_conf))
                 # Assign explicitHs with radical on cut peptide bonds.
-                # Valence will be different from how non-implicit systems are handled,
+                # Valence will be different from how explicit systems are handled
+                # because of the required property cache update,
                 # so we avoid using valence in interaction SMARTS for the peptide bond
                 # nitrogen exclusion in ImplicitHBondAcceptor.
                 if parent_idx in terminal_atoms and (nh := atom.GetTotalNumHs()) > 0:

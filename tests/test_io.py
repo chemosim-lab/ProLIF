@@ -1,4 +1,3 @@
-from collections.abc import Collection
 from contextlib import nullcontext
 from unittest.mock import Mock
 
@@ -10,6 +9,7 @@ from rdkit.Chem import AllChem
 from rdkit.Chem.rdDetermineBonds import DetermineConnectivity
 
 from prolif.datafiles import datapath
+from prolif.interactions import ImplicitHBAcceptor
 from prolif.io.cif import cif_template_reader
 from prolif.io.molecule_standardizer import MoleculeStandardizer
 from prolif.io.template_engine import (
@@ -246,6 +246,7 @@ class TestMoleculeStandardizer:
         self,
         monkeypatch: pytest.MonkeyPatch,
         any_templates: list[gemmi.cif.Document] | list[tuple[str, Chem.Mol]],
+        protein_mol: Molecule,
     ) -> None:
         mock = Mock(side_effect=SystemError("test"))
         monkeypatch.setattr("prolif.io.template_engine.CIFTemplateEngine.apply", mock)
@@ -256,9 +257,9 @@ class TestMoleculeStandardizer:
 
         with pytest.raises(
             ValueError,
-            match=r"Could not apply template for residue ALA1.A: test",
+            match=r"Could not apply template for residue [A-Z]{3}\d+(\.A)?: test",
         ):
-            standardizer(Chem.MolFromSequence("AA"))
+            standardizer(protein_mol)
 
     def test_fix_molecule_bond_orders_cif(
         self,
@@ -469,6 +470,25 @@ class TestMoleculeStandardizer:
         for bond1, bond2 in zip(mol.GetBonds(), em_fixed.GetBonds(), strict=True):
             assert bond1.GetBondType() == bond2.GetBondType()
 
+    def test_peptide_nitrogen_not_acceptor(
+        self, ihb_protein: Molecule, standardizer_default: MoleculeStandardizer
+    ) -> None:
+        """
+        Test that the peptide nitrogen is not considered an acceptor after being
+        standardized.
+        """
+        stdmol = standardizer_default(ihb_protein)
+        res = stdmol[4]
+        nitrogens = [
+            atom.GetIdx() for atom in res.GetAtoms() if atom.GetAtomicNum() == 7
+        ]
+        assert len(nitrogens) == 1, (
+            f"{len(nitrogens)} nitrogens found for residue {res.resid}"
+        )
+        acceptor_qmol = ImplicitHBAcceptor().lig_pattern
+        acceptors = set().union(*res.GetSubstructMatches(acceptor_qmol))
+        assert nitrogens[0] not in acceptors
+
 
 @pytest.mark.parametrize(
     ("angles", "expected"),
@@ -482,6 +502,6 @@ class TestMoleculeStandardizer:
     ],
 )
 def test_hybridization_mapping(
-    angles: Collection[float], expected: Chem.HybridizationType
+    angles: list[float], expected: Chem.HybridizationType
 ) -> None:
     assert _map_angles_to_hybridization(angles) is expected

@@ -18,7 +18,7 @@ import pandas as pd
 from MDAnalysis import AtomGroup, Universe
 from MDAnalysis.coordinates.timestep import Timestep
 from rdkit import Chem, rdBase
-from rdkit.Chem import FragmentOnBonds, GetMolFrags, SplitMolByPDBResidues
+from rdkit.Chem import GetMolFrags, SplitMolByPDBResidues
 from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 from rdkit.Geometry import Point3D
 from scipy.spatial import cKDTree
@@ -198,13 +198,18 @@ def split_mol_by_residues(mol: Chem.Mol, use_segid: bool = False) -> list[Chem.M
                 for a in frag.GetAtoms()
             }
             if len(set(resids.values())) > 1:
-                # split on peptide bonds
-                bonds = [
-                    b.GetIdx() for b in frag.GetBonds() if is_peptide_bond(b, resids)
-                ]
-                mols = FragmentOnBonds(frag, bonds, addDummies=False)
-                mols = GetMolFrags(mols, asMols=True, sanitizeFrags=False)
-                residues.extend(mols)
+                # FragmentOnBonds cannot be used here as it fills the lost bond
+                # with an extra implicit H, unlike SplitMolByPDBResidues
+                with Chem.RWMol(frag) as rwmol:
+                    for bond in frag.GetBonds():
+                        if is_peptide_bond(bond, resids):
+                            rwmol.RemoveBond(
+                                bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                            )
+                res_frags = GetMolFrags(
+                    rwmol.GetMol(), asMols=True, sanitizeFrags=False
+                )
+                residues.extend(res_frags)
             else:
                 residues.append(frag)
     return residues

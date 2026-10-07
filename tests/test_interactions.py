@@ -394,7 +394,7 @@ class TestInteractions:
                 f"expected {expected}"
             )
 
-    @pytest.mark.parametrize("sequence", ["ALG", "LLA", "ALL"])
+    @pytest.mark.parametrize("sequence", ["ALG", "LLA", "ALL", "APA"])
     @pytest.mark.parametrize("implicit_h", [True, False])
     def test_backbone_nitrogen_matched_as_acceptor(
         self, sequence: str, implicit_h: bool
