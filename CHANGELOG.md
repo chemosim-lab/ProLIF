@@ -10,7 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `MoleculeStandardizer` now properly assigns each atom's hybridization.
+- The HBond acceptor SMARTS patterns now exclude proline backbone nitrogens, and
+  the implicit and explicit patterns are harmonized: the peptide nitrogen
+  exclusion prefers degree over valence.
+- Implicit HBond interactions no longer raise a `KeyError` for atoms with a
+  hybridization other than SP, SP2 or SP3, and instead treats the interaction
+  as invalid.
+- Using `split_molecule` could swap atoms between the two output molecules if the
+  components residues were ordered differently from the original molecule, typically
+  when water molecules in multiple chains are present.
+- The residue fragmentation that occurs when creating a `Molecule` no longer assigns a
+  wrong hydrogen count to atoms at the cut peptide bonds when both residues are the same
+  e.g. when splitting a di-Alanine.
+
 ### Changed
+
+- The `use_segid` option is now propagated through `Residue`,
+  `split_mol_by_residues`, the template engines and `split_molecule`, so
+  residues created from these code paths keep the correct chain identifier.
 
 ### Deprecated
 
