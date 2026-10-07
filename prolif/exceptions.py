@@ -21,13 +21,19 @@ ErrorBehavior: TypeAlias = OptionalExceptionCallback | Literal["warn", "raise", 
 
 class OptionalException(RuntimeError):
     """Used for runtime exceptions that can be converted to a warning or directly
-    handled by the user"""
+    handled by the user
+    
+    .. versionadded:: 2.2.3
+    """
 
     on_error: ClassVar[ErrorBehavior] = "raise"
 
 
 class FragmentedResidueError(OptionalException):
-    """When a ResidueId maps to multiple Residue objects"""
+    """When a ResidueId maps to multiple Residue objects
+    
+    .. versionadded:: 2.2.3
+    """
 
 
 def trigger(exc: type[OptionalException], msg: str, *args: Any) -> None:
@@ -50,7 +56,7 @@ def trigger(exc: type[OptionalException], msg: str, *args: Any) -> None:
         >>> FragmentedResidueError.on_error = lambda msg, *_: logger.error(msg)
 
 
-    .. versionadded:: 2.2.2
+    .. versionadded:: 2.2.3
 
     """
     match on_error := exc.on_error:
