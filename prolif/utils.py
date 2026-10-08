@@ -176,9 +176,8 @@ def split_mol_by_residues(mol: Chem.Mol, use_segid: bool = False) -> list[Chem.M
     ----------
     mol : rdkit.Chem.rdchem.Mol
         The molecule to fragment
-    use_segid : bool
-        Whether to use the segid column from the PDB file to identify residues.
-        Default is ``False``.
+    use_segid: bool, default = False
+        Use the segment number rather than the chain identifier as a chain
 
     Returns
     -------

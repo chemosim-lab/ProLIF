@@ -4,13 +4,14 @@ Residue-related classes --- :mod:`prolif.residue`
 """
 
 import re
-from collections import UserDict
+from collections import Counter, UserDict
 from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from rdkit.Chem.rdmolops import FastFindRings
 
+from prolif.exceptions import FragmentedResidueError, trigger
 from prolif.rdkitmol import BaseRDKitMol
 
 if TYPE_CHECKING:
@@ -49,7 +50,7 @@ class ResidueId:
         name: str | None = "UNK",
         number: int | None = 0,
         chain: str | None = None,
-    ):
+    ) -> None:
         self.name = "UNK" if not name else name.strip()
         self.number = number or 0
         self.chain = None if not chain else chain.strip()
@@ -171,7 +172,7 @@ class Residue(BaseRDKitMol):
         Added `use_segid`.
     """
 
-    def __init__(self, mol: "Chem.Mol", *, use_segid: bool = False):
+    def __init__(self, mol: "Chem.Mol", *, use_segid: bool = False) -> None:
         super().__init__(mol)
         FastFindRings(self)
         self._use_segid = use_segid
@@ -206,7 +207,7 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
     access a subset of a ResidueGroup.
     """
 
-    def __init__(self, residues: Iterable[Residue]):
+    def __init__(self, residues: Iterable[Residue]) -> None:
         self._residues = cast(Sequence[Residue], np.asarray(residues, dtype=object))
         resinfo = [
             (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
@@ -222,6 +223,26 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
             self.number = np.asarray(number, dtype=np.uint32)
             self.chain = np.asarray(chain, dtype=object)
         super().__init__([(r.resid, r) for r in self._residues])
+        if self.n_residues != len(self._residues):
+            by_resid = Counter([r.resid for r in self._residues])
+            fragmented = ", ".join(
+                map(str, [resid for resid, count in by_resid.items() if count >= 2])
+            )
+            trigger(
+                FragmentedResidueError,
+                "The following residues are fragmented and ProLIF only allows "
+                f"one fragment per residue identifier: {fragmented}. This is typically "
+                "caused by two atoms from the same residue being too far apart "
+                "and not being detected as properly bonded by MDAnalysis/RDKit. "
+                "If you're using MDAnalysis, try "
+                "passing a custom van der Waals radius for the responsible atoms: "
+                "`<selection>.guess_bonds(vdwradii={'<element>': <radius>})`. "
+                "If you're using RDKit, try calling rdkit's "
+                ":func:`~rdkit.Chem.rdDetermineBonds.DetermineConnectivity` function "
+                "with different options. "
+                "Alternatively, add explicit bonds to your input files.",
+                self,
+            )
 
     def __getitem__(self, key: "ResidueKey") -> Residue:
         # bool is a subclass of int but shouldn't be used here

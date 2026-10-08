@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `FragmentedResidueError` for when multiple residues share the
+  same `ResidueId`.
+- Added `OptionalException` base class to define the behaviour on specific runtime
+  errors that may be ignored or handled by the user.
+
 ### Fixed
 
 - `MoleculeStandardizer` now properly assigns each atom's hybridization.
@@ -23,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The residue fragmentation that occurs when creating a `Molecule` no longer assigns a
   wrong hydrogen count to atoms at the cut peptide bonds when both residues are the same
   e.g. when splitting a di-Alanine.
+- Fixed a bug in the `"queue"` parallel strategy where the pickling/unpickling of the
+  RDKit molecules would silently redo the residue splitting without preserving the
+  original `use_segid` flag.
+- Fixed an issue in the `"queue"` parallel strategy where exceptions raised during
+  trajectory iteration would silently crash the background task and hang the process
+  indefinitely.
 
 ### Changed
 
