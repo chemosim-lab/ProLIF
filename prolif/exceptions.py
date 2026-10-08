@@ -22,7 +22,7 @@ ErrorBehavior: TypeAlias = OptionalExceptionCallback | Literal["warn", "raise", 
 class OptionalException(RuntimeError):
     """Used for runtime exceptions that can be converted to a warning or directly
     handled by the user
-    
+
     .. versionadded:: 2.2.3
     """
 
@@ -31,7 +31,7 @@ class OptionalException(RuntimeError):
 
 class FragmentedResidueError(OptionalException):
     """When a ResidueId maps to multiple Residue objects
-    
+
     .. versionadded:: 2.2.3
     """
 
