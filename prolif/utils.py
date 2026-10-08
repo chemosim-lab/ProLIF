@@ -18,7 +18,7 @@ import pandas as pd
 from MDAnalysis import AtomGroup, Universe
 from MDAnalysis.coordinates.timestep import Timestep
 from rdkit import Chem, rdBase
-from rdkit.Chem import FragmentOnBonds, GetMolFrags, SplitMolByPDBResidues
+from rdkit.Chem import GetMolFrags, SplitMolByPDBResidues
 from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 from rdkit.Geometry import Point3D
 from scipy.spatial import cKDTree
@@ -169,13 +169,16 @@ def get_residues_near_ligand(
     return list(set(resids))
 
 
-def split_mol_by_residues(mol: Chem.Mol) -> list[Chem.Mol]:
+def split_mol_by_residues(mol: Chem.Mol, use_segid: bool = False) -> list[Chem.Mol]:
     """Splits a molecule in multiple fragments based on residues
 
     Parameters
     ----------
     mol : rdkit.Chem.rdchem.Mol
         The molecule to fragment
+    use_segid : bool
+        Whether to use the segid column from the PDB file to identify residues.
+        Default is ``False``.
 
     Returns
     -------
@@ -191,16 +194,22 @@ def split_mol_by_residues(mol: Chem.Mol) -> list[Chem.Mol]:
         for frag in GetMolFrags(res, asMols=True, sanitizeFrags=False):
             # count number of unique residues in the fragment
             resids: dict[int, ResidueId] = {
-                a.GetIdx(): ResidueId.from_atom(a) for a in frag.GetAtoms()
+                a.GetIdx(): ResidueId.from_atom(a, use_segid=use_segid)
+                for a in frag.GetAtoms()
             }
             if len(set(resids.values())) > 1:
-                # split on peptide bonds
-                bonds = [
-                    b.GetIdx() for b in frag.GetBonds() if is_peptide_bond(b, resids)
-                ]
-                mols = FragmentOnBonds(frag, bonds, addDummies=False)
-                mols = GetMolFrags(mols, asMols=True, sanitizeFrags=False)
-                residues.extend(mols)
+                # FragmentOnBonds cannot be used here as it fills the lost bond
+                # with an extra implicit H, unlike SplitMolByPDBResidues
+                with Chem.RWMol(frag) as rwmol:
+                    for bond in frag.GetBonds():
+                        if is_peptide_bond(bond, resids):
+                            rwmol.RemoveBond(
+                                bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                            )
+                res_frags = GetMolFrags(
+                    rwmol.GetMol(), asMols=True, sanitizeFrags=False
+                )
+                residues.extend(res_frags)
             else:
                 residues.append(frag)
     return residues

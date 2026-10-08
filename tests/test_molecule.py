@@ -207,7 +207,8 @@ def test_split_molecule(water_u: "Universe") -> None:
     assert (pmol.residues.number == [range(20, 31)]).all()
     assert len(Chem.GetMolFrags(pmol)) == 1
     assert len(Chem.GetMolFrags(wmol)) == 11
-    assert combined["TIP310.5"] is wmol["TIP310.5"]
+    assert combined["TIP310.5"].resid == wmol["TIP310.5"].resid
+    assert combined["TIP310.5"].GetNumAtoms() == wmol["TIP310.5"].GetNumAtoms()
 
 
 def test_split_molecule_reassigns_mapindex(u: "Universe") -> None:
@@ -221,3 +222,20 @@ def test_split_molecule_reassigns_mapindex(u: "Universe") -> None:
     assert lhs.n_residues == 1
     # if not reset, this would be 148
     assert lhs[0].GetAtomWithIdx(0).GetUnsignedProp("mapindex") == 0
+
+
+def test_successive_split_molecule_calls(water_u: "Universe") -> None:
+    prot = water_u.select_atoms("protein and resid 20-30")
+    water = water_u.select_atoms("resname TIP3 and segindex 5 and resid 10-20")
+    lig = water_u.select_atoms("resname QNB")
+    combined = Molecule.from_mda(prot + water + lig)
+
+    lmol, others = split_molecule(combined, lambda x: x.name == "QNB")
+    _, pmol = split_molecule(others, lambda x: x.name == "TIP3")
+
+    for entity in (lmol, pmol):
+        residue_level = {r.resid for r in entity}
+        atom_level = {ResidueId.from_atom(a, use_segid=True) for a in entity.GetAtoms()}
+        assert residue_level == atom_level
+        for atom in entity.GetAtoms():
+            assert atom.GetUnsignedProp("mapindex") == atom.GetIdx()

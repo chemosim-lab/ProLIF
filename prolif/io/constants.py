@@ -7,6 +7,8 @@ Other constants are organized by Yu-Yuan (Stuart) Yang, 2025
 
 from pathlib import Path
 
+from rdkit import Chem
+
 from prolif.datafiles import datapath
 from prolif.io.cif import cif_template_reader
 from prolif.io.xml import parse_altnames
@@ -292,3 +294,13 @@ TERMINAL_OXYGEN_NAMES = {
     key for key, value in ATOMNAME_ALIASES["Protein"].items() if value.strip() == "OXT"
 }
 TERMINAL_OXYGEN_NAMES.add("OXT")
+
+HYBRIDIZATION_ANGLES = (90.0, 109.5, 120.0, 180.0)
+
+HYBRIDIZATION_MAP = {
+    frozenset([180.0]): Chem.HybridizationType.SP,
+    frozenset([120.0]): Chem.HybridizationType.SP2,
+    frozenset([109.5]): Chem.HybridizationType.SP3,
+    frozenset([90.0, 120.0, 180.0]): Chem.HybridizationType.SP3D,
+    frozenset([90.0, 180.0]): Chem.HybridizationType.SP3D2,
+}

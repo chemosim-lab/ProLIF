@@ -131,7 +131,7 @@ class HBAcceptor(SingleAngle):
     def __init__(
         self,
         acceptor: str = (
-            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([ND2v3^2+0](-[H])-[CD4v4H1^3]-[CD2^2+0]=O)"
+            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([ND2v3^2+0;H1,r5]-[CD4v4H1^3]-[CD2^2+0]=O)"
             "&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
             ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
             ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
@@ -625,7 +625,7 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         self,
         acceptor: str = (
             "[$([N&!$([NX3]-*=[O,N,P,S])"
-            "&!$([Nv3^2+0;D2&H1,D1h1,D1h2]-[Cv4^3;D4H1,D3&h1]-[CD2^2+0]=O)"
+            "&!$([NX2^2+0;H1,r5]-[CX4v4H1^3]-[CD2^2+0]=O)"
             "&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
             ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
             ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
@@ -789,7 +789,13 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         # Check acceptor (ligand-centered)
         if on in {"both", "ligand"}:
             # Check acceptor atom's angle
-            ideal_acceptor_atom_angle = IDEAL_ATOM_ANGLES[lig_atom.GetHybridization()]
+            ideal_acceptor_atom_angle = IDEAL_ATOM_ANGLES.get(
+                lig_atom.GetHybridization()
+            )
+            if ideal_acceptor_atom_angle is None:
+                # hybridization other than SP, SP2, SP3 not supported
+                return False
+
             acceptor_atom_angles = self._get_atom_angles(
                 res=lig_res,
                 res_atom_idx=lig_atom_idx,
@@ -826,7 +832,11 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         # Check donor atom (protein-centered)
         if on in {"both", "protein"}:
             # Check donor atom's angle
-            ideal_donor_atom_angle = IDEAL_ATOM_ANGLES[prot_atom.GetHybridization()]
+            ideal_donor_atom_angle = IDEAL_ATOM_ANGLES.get(prot_atom.GetHybridization())
+            if ideal_donor_atom_angle is None:
+                # hybridization other than SP, SP2, SP3 not supported
+                return False
+
             donor_atom_angles = self._get_atom_angles(
                 res=prot_res,
                 res_atom_idx=prot_atom_idx,

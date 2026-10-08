@@ -174,6 +174,7 @@ class Residue(BaseRDKitMol):
     def __init__(self, mol: "Chem.Mol", *, use_segid: bool = False):
         super().__init__(mol)
         FastFindRings(self)
+        self._use_segid = use_segid
         self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0), use_segid=use_segid)
 
     def __repr__(self) -> str:  # pragma: no cover
