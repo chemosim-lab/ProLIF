@@ -26,7 +26,12 @@ from prolif.interactions.base import (
     Interaction,
     SingleAngle,
 )
-from prolif.interactions.constants import IDEAL_ATOM_ANGLES, VDW_PRESETS
+from prolif.interactions.constants import (
+    IDEAL_ATOM_ANGLES,
+    VDW_PRESETS,
+    PiR5,
+    PiR6,
+)
 from prolif.io.constants import RESNAME_ALIASES
 from prolif.utils import angle_between_limits, get_centroid, get_ring_normal_vector
 
@@ -270,15 +275,15 @@ class CationPi(Interaction):
         Removed charged atom from being considered for ionic interaction if it
         is bonded to an atom with opposite charge.
 
+    .. versionchanged:: 2.2.3
+        5 and 6-membered rings fused to a smaller ring are no longer excluded.
+
     """
 
     def __init__(
         self,
         cation: str = "[+{1-}!$(*~[*-{1-}]),$([NX3&!$([NX3]-O)]-[C]=[NX3+])]",
-        pi_ring: tuple[str, ...] = (
-            "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
-            "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
-        ),
+        pi_ring: tuple[str, ...] = (PiR6, PiR5),
         distance: float = 4.5,
         angle: "Angles" = (0, 30),
     ) -> None:
@@ -348,6 +353,9 @@ class FaceToFace(BasePiStacking):
     .. versionchanged:: 2.0.0
         Renamed ``centroid_distance`` to distance.
 
+    .. versionchanged:: 2.2.3
+        5 and 6-membered rings fused to a smaller ring are no longer excluded.
+
     """
 
     def __init__(
@@ -355,10 +363,7 @@ class FaceToFace(BasePiStacking):
         distance: float = 5.5,
         plane_angle: "Angles" = (0, 35),
         normal_to_centroid_angle: "Angles" = (0, 33),
-        pi_ring: tuple[str, ...] = (
-            "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
-            "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
-        ),
+        pi_ring: tuple[str, ...] = (PiR6, PiR5),
     ) -> None:
         super().__init__(
             distance=distance,
@@ -395,6 +400,9 @@ class EdgeToFace(BasePiStacking):
     .. versionchanged:: 2.0.0
         Renamed ``centroid_distance`` to distance, added ``intersect_radius`` parameter.
 
+    .. versionchanged:: 2.2.3
+        5 and 6-membered rings fused to a smaller ring are no longer excluded.
+
     """
 
     def __init__(
@@ -402,10 +410,7 @@ class EdgeToFace(BasePiStacking):
         distance: float = 6.5,
         plane_angle: "Angles" = (50, 90),
         normal_to_centroid_angle: "Angles" = (0, 30),
-        pi_ring: tuple[str, ...] = (
-            "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
-            "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
-        ),
+        pi_ring: tuple[str, ...] = (PiR6, PiR5),
         intersect_radius: float = 1.5,
     ) -> None:
         super().__init__(

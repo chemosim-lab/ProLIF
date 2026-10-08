@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed an issue in the `"queue"` parallel strategy where exceptions raised during
   trajectory iteration would silently crash the background task and hang the process
   indefinitely.
+- 5 and 6-membered rings fused to a smaller ring are no longer excluded.
 
 ### Changed
 
