@@ -261,9 +261,6 @@ class MoleculeStandardizer:
                     atom.SetNoImplicit(True)
                     atom.UpdatePropertyCache()
 
-            # allow querying for rings in SMARTS
-            Chem.FastFindRings(fixed)
-
             new_residues.append(fixed)
 
         # update the protein molecule with the new residues

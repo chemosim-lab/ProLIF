@@ -620,8 +620,6 @@ def split_molecule(
                 atom.SetUnsignedProp("mapindex", new_idx)
     lhsmol = lhs.GetMol()
     rhsmol = rhs.GetMol()
-    Chem.FastFindRings(lhsmol)
-    Chem.FastFindRings(rhsmol)
     return Molecule(lhsmol, residues=residues[1]), Molecule(
         rhsmol, residues=residues[0]
     )

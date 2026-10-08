@@ -9,7 +9,7 @@ from collections.abc import Iterable, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-from rdkit.Chem.rdmolops import FastFindRings
+from rdkit.Chem.rdmolops import GetSSSR
 
 from prolif.exceptions import FragmentedResidueError, trigger
 from prolif.rdkitmol import BaseRDKitMol
@@ -174,7 +174,7 @@ class Residue(BaseRDKitMol):
 
     def __init__(self, mol: "Chem.Mol", *, use_segid: bool = False) -> None:
         super().__init__(mol)
-        FastFindRings(self)
+        GetSSSR(self)
         self._use_segid = use_segid
         self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0), use_segid=use_segid)
 
