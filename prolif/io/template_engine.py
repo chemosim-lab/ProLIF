@@ -11,7 +11,7 @@ import bisect
 import logging
 from collections.abc import Sequence
 from itertools import combinations
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import gemmi
 from rdkit import Chem
@@ -48,6 +48,9 @@ class TemplateEngine(Protocol):
         """Fix the bond orders of the residue using this template."""
         ...
 
+    def set_runtime_context(self, **kwargs: Any) -> None:
+        """Set any runtime context for the template engine."""
+
 
 class RDKitMolTemplateEngine:
     """Template engine using an RDKit Mol object.
@@ -75,6 +78,9 @@ class RDKitMolTemplateEngine:
     def apply(self, residue: Residue) -> Residue:
         new_res = assign_bond_orders_from_template(template_mol=self._mol, mol=residue)
         return Residue(new_res, use_segid=residue._use_segid)
+
+    def set_runtime_context(self, **kwargs: Any) -> None:
+        pass
 
 
 class CIFTemplateEngine:
@@ -108,7 +114,17 @@ class CIFTemplateEngine:
     def apply(self, residue: Residue) -> Residue:
         new_res = strip_bonds(residue)
         new_res = assign_intra_props(new_res, self._name, self._block)
+        # copy hybridization from parent atom based on geometry
+        parent_mol = self.parent_mol
+        parent_conf = parent_mol.GetConformer()
+        for atom in new_res.GetAtoms():
+            parent_idx = atom.GetUnsignedProp("mapindex")
+            parent_atom = parent_mol.GetAtomWithIdx(parent_idx)
+            atom.SetHybridization(get_atom_hybridization(parent_atom, parent_conf))
         return Residue(new_res, use_segid=residue._use_segid)
+
+    def set_runtime_context(self, **kwargs: Any) -> None:
+        self.parent_mol = kwargs["parent_mol"]
 
 
 def assign_bond_orders_from_template(
