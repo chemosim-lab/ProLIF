@@ -17,6 +17,7 @@ import numpy as np
 from rdkit.Chem import MolFromSmarts
 from rdkit.Geometry import Point3D
 
+from prolif.interactions.constants import PiR5, PiR6
 from prolif.interactions.utils import (
     DISTANCE_FUNCTIONS_3ARGS,
     DISTANCE_FUNCTIONS_4ARGS,
@@ -483,6 +484,9 @@ class BasePiStacking(Interaction, is_abstract=True):
         Renamed ``centroid_distance`` to distance. Added ``intersect`` and
         ``ring_radius`` parameters.
 
+    .. versionchanged:: 2.2.3
+        5 and 6-membered rings fused to a smaller ring are no longer excluded.
+
     """
 
     def __init__(
@@ -490,10 +494,7 @@ class BasePiStacking(Interaction, is_abstract=True):
         distance: float,
         plane_angle: "Angles",
         normal_to_centroid_angle: "Angles",
-        pi_ring: Iterable[str] = (
-            "[a;r6]1:[a;r6]:[a;r6]:[a;r6]:[a;r6]:[a;r6]:1",
-            "[a;r5]1:[a;r5]:[a;r5]:[a;r5]:[a;r5]:1",
-        ),
+        pi_ring: Iterable[str] = (PiR6, PiR5),
         intersect: bool = False,
         intersect_radius: float = 1.5,
     ) -> None:
