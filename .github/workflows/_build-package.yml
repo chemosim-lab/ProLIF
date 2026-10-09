@@ -30,10 +30,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Setup UV
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v10
 
     - name: Adjust version based on tag
       run: |
@@ -70,7 +70,7 @@ jobs:
 
     - name: Cache package
       if: inputs.cache-package
-      uses: actions/cache/save@v3
+      uses: actions/cache/save@v6
       with:
         path: |
           dist/prolif-*.whl
@@ -79,7 +79,7 @@ jobs:
 
     - name: Expose package as artifact
       if: inputs.upload-package
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: prolif-package
         path: |
@@ -96,10 +96,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
 
     - name: Install python with pip
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v7
       with:
         python-version: "3.10"
         cache: "pip"
@@ -109,7 +109,7 @@ jobs:
         pip install rdkit
 
     - name: Retrieve cached package
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v6
       id: cache-prolif
       with:
         path: |

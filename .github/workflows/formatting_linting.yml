@@ -13,22 +13,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Code formatting
-        uses: astral-sh/ruff-action@v2
+        uses: astral-sh/ruff-action@v4
         with:
           version: 0.11.2
           args: "format --diff"
 
       - name: Notebook formatting
-        uses: psf/black@stable
+        uses: psf/black@26
         with:
           src: "docs/notebooks/"
           jupyter: true
 
       - name: Code linting
-        uses: astral-sh/ruff-action@v2
+        uses: astral-sh/ruff-action@v4
         with:
           version: 0.11.2
           args: "check --preview --diff"

@@ -11,14 +11,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.11"
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
       - name: Install project and dependencies
         run: |
@@ -79,7 +78,7 @@ jobs:
           } >> tmp_data/comment.md
 
       - name: Find Comment
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@v4
         id: fc-typecheck
         with:
           issue-number: ${{ github.event.pull_request.number }}
@@ -87,7 +86,7 @@ jobs:
           body-includes: "### Type-checking report"
 
       - name: Create or update comment
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@v5
         with:
           comment-id: ${{ steps.fc-typecheck.outputs.comment-id }}
           issue-number: ${{ github.event.pull_request.number }}

@@ -30,7 +30,7 @@ jobs:
       id-token: write
     steps:
       - name: Retrieve cached package
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v6
         id: cache-prolif
         with:
           path: |
