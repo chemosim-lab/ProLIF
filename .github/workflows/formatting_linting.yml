@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ "*" ]
 
+concurrency:
+  group: "${{ github.ref }}-${{ github.head_ref }}"
+  cancel-in-progress: false
+
 jobs:
   formatting:
     name: Code formatting
@@ -13,22 +17,22 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Code formatting
-        uses: astral-sh/ruff-action@v2
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
         with:
           version: 0.11.2
           args: "format --diff"
 
       - name: Notebook formatting
-        uses: psf/black@stable
+        uses: psf/black@87928e6d6761a4a6d22250e1fee5601b3998086e
         with:
           src: "docs/notebooks/"
           jupyter: true
 
       - name: Code linting
-        uses: astral-sh/ruff-action@v2
+        uses: astral-sh/ruff-action@278981a28ce3188b1e39527901f38254bf3aac89
         with:
           version: 0.11.2
           args: "check --preview --diff"
