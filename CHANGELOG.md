@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+### Changed
+
+### Deprecated
+
+### Removed
+
+## [2.2.3] - 2026-10-09
+
+### Added
+
 - Added `FragmentedResidueError` for when multiple residues share the
   same `ResidueId`.
 - Added `OptionalException` base class to define the behaviour on specific runtime
@@ -42,10 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `use_segid` option is now propagated through `Residue`,
   `split_mol_by_residues`, the template engines and `split_molecule`, so
   residues created from these code paths keep the correct chain identifier.
-
-### Deprecated
-
-### Removed
 
 ## [2.2.2] - 2026-09-19
 
