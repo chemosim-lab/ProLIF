@@ -123,3 +123,9 @@ IDEAL_ATOM_ANGLES = {
     HybridizationType.SP2: 120.0,
     HybridizationType.SP: 180.0,
 }
+
+# aromatic ring patterns
+AromR5 = "[a;r5,!R1&r4,!R1&r3]"
+AromR6 = "[a;r6,!R1&r5,!R1&r4,!R1&r3]"
+PiR5 = f"{AromR5}1:{AromR5}:{AromR5}:{AromR5}:{AromR5}:1"
+PiR6 = f"{AromR6}1:{AromR6}:{AromR6}:{AromR6}:{AromR6}:{AromR6}:1"

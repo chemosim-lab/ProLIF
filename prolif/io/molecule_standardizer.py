@@ -28,7 +28,6 @@ from prolif.io.template_engine import (
     CIFTemplateEngine,
     RDKitMolTemplateEngine,
     TemplateEngine,
-    get_atom_hybridization,
 )
 from prolif.molecule import Molecule
 from prolif.residue import Residue, ResidueGroup, ResidueId
@@ -189,7 +188,6 @@ class MoleculeStandardizer:
         forcefield_name = self.forcefield_guesser(conv_resnames)
 
         # standardize the protein molecule
-        parent_conf = protein_mol.GetConformer()
         resids: dict[int, ResidueId] = {
             a.GetIdx(): ResidueId.from_atom(a, use_segid=protein_mol[0]._use_segid)
             for a in protein_mol.GetAtoms()
@@ -238,6 +236,7 @@ class MoleculeStandardizer:
                 )
 
             # fix the bond orders via the engine
+            engine.set_runtime_context(parent_mol=protein_mol)
             try:
                 fixed = engine.apply(residue)
             except Exception as e:
@@ -245,24 +244,20 @@ class MoleculeStandardizer:
                     f"Could not apply template for residue {residue.resid}: {e}"
                 ) from e
 
-            # copy hybridization from parent atom based on geometry
             for atom in fixed.GetAtoms():
-                parent_idx = atom.GetUnsignedProp("mapindex")
-                parent_atom = protein_mol.GetAtomWithIdx(parent_idx)
-                atom.SetHybridization(get_atom_hybridization(parent_atom, parent_conf))
                 # Assign explicitHs with radical on cut peptide bonds.
                 # Valence will be different from how explicit systems are handled
                 # because of the required property cache update,
                 # so we avoid using valence in interaction SMARTS for the peptide bond
                 # nitrogen exclusion in ImplicitHBondAcceptor.
-                if parent_idx in terminal_atoms and (nh := atom.GetTotalNumHs()) > 0:
+                if (
+                    atom.GetUnsignedProp("mapindex") in terminal_atoms
+                    and (nh := atom.GetTotalNumHs()) > 0
+                ):
                     atom.SetNumExplicitHs(nh - 1)
                     atom.SetNumRadicalElectrons(atom.GetNumRadicalElectrons() + 1)
                     atom.SetNoImplicit(True)
                     atom.UpdatePropertyCache()
-
-            # allow querying for rings in SMARTS
-            Chem.FastFindRings(fixed)
 
             new_residues.append(fixed)
 

@@ -270,6 +270,7 @@ class TestMoleculeStandardizer:
 
         standardizer = MoleculeStandardizer(templates=cif_templates)
         engine = standardizer.engines["TPO"]
+        engine.set_runtime_context(parent_mol=input_molecule)
         fixed_mol = engine.apply(input_molecule.residues[1])
         assert isinstance(fixed_mol, Residue)
 
@@ -294,6 +295,7 @@ class TestMoleculeStandardizer:
         # CIF engine
         cif_standardizer = MoleculeStandardizer(templates=cif_templates)
         cif_engine = cif_standardizer.engines["TPO"]
+        cif_engine.set_runtime_context(parent_mol=input_molecule)
         fixed_cif = cif_engine.apply(input_molecule.residues[1])
 
         # RDKit engine
