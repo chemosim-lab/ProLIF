@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ "*" ]
 
+concurrency:
+  group: "${{ github.ref }}-${{ github.head_ref }}"
+  cancel-in-progress: false
+
 jobs:
   formatting:
     name: Code formatting
