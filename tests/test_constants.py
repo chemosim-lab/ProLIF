@@ -14,7 +14,22 @@ from prolif.io.constants import (
     STANDARD_RESNAME_MAP,
     TERMINAL_OXYGEN_NAMES,
 )
+from prolif.interactions.constants import VDWRADII
 
+def test_vdw_radii() -> None:
+    """Test that the van der Waals radii are imported correctly from MDAnalysis"""
+
+    assert isinstance(VDWRADII, dict)
+    assert len(VDWRADII) > 0
+    assert VDWRADII["H"] == 1.1
+    assert VDWRADII["C"] == 1.7
+    assert VDWRADII["N"] == 1.55
+    assert VDWRADII["O"] == 1.52
+    assert VDWRADII["S"] == 1.8
+    for symbol, radius in VDWRADII.items():
+        assert isinstance(symbol, str)
+        assert isinstance(radius, float)
+        assert radius > 0.0
 
 def test_standard_aa() -> None:
     """Test that STANDARD_AA contains the expected amino acids."""
