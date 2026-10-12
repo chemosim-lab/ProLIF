@@ -2,7 +2,7 @@
 Constants used by the package for interactions.
 """
 
-from MDAnalysis.topology.tables import vdwradii
+from MDAnalysis.guesser.tables import vdwradii
 from rdkit.Chem import GetPeriodicTable
 from rdkit.Chem.rdchem import HybridizationType
 
