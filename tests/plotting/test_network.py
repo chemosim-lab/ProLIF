@@ -57,15 +57,17 @@ class TestLigNetwork:
         view = net.display()
         assert view._iframe
         html = view._iframe
-        assert escape('"from": 5, "to": "PHE331.B", "title": "Hydrophobic') in html
+        assert escape('"from": 5, "to": "PHE331:1.B", "title": "Hydrophobic') in html
         if fp.count:
-            assert escape('"from": 14, "to": "PHE331.B", "title": "Hydrophobic') in html
+            assert (
+                escape('"from": 14, "to": "PHE331:1.B", "title": "Hydrophobic') in html
+            )
 
     def test_integration_agg(self, get_ligplot: partial[LigNetwork]) -> None:
         net = get_ligplot(kind="aggregate", threshold=0)
         view = net.display()
         assert view._iframe
-        assert "PHE331.B" in view._iframe
+        assert "PHE331:1.B" in view._iframe
 
     def test_kwargs(self, get_ligplot: partial[LigNetwork]) -> None:
         with patch(
@@ -95,7 +97,7 @@ class TestLigNetwork:
         )
         view = net.display()
         assert view._iframe
-        assert "PHE331.B" in view._iframe
+        assert "PHE331:1.B" in view._iframe
 
     def test_save_file(
         self, get_ligplot: partial[LigNetwork], tmp_path: "Path"
@@ -103,7 +105,7 @@ class TestLigNetwork:
         net = get_ligplot()
         output = tmp_path / "lignetwork.html"
         net.save(output)
-        assert "PHE331.B" in output.read_text()
+        assert "PHE331:1.B" in output.read_text()
 
     def test_from_fingerprint_raises_kind(
         self, get_ligplot: partial[LigNetwork]
@@ -148,4 +150,4 @@ class TestLigNetwork:
         fp.run_from_iterable([ligand], protein)
         view = fp.plot_lignetwork(ligand, kind="frame", frame=0)
         assert view._iframe
-        assert "TIP383.X" in view._iframe
+        assert "TIP383:3.X" in view._iframe

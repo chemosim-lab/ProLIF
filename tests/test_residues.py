@@ -13,53 +13,73 @@ if TYPE_CHECKING:
 
 class TestResidueId:
     @pytest.mark.parametrize(
-        ("name", "number", "chain"),
+        ("name", "number", "segment", "chain"),
         [
-            ("ALA", None, None),
-            ("ALA", 1, None),
-            ("ALA", 0, None),
-            ("ALA", None, "B"),
-            ("ALA", 1, "B"),
-            (None, 1, "B"),
-            (None, None, "B"),
-            (None, 1, None),
-            (None, None, None),
-            ("", None, None),
-            (None, None, ""),
-            ("", None, ""),
+            ("ALA", None, None, None),
+            ("ALA", 1, None, None),
+            ("ALA", 0, None, None),
+            ("ALA", None, None, "B"),
+            ("ALA", 1, None, "B"),
+            (None, 1, None, "B"),
+            (None, None, None, "B"),
+            (None, 1, None, None),
+            (None, None, None, None),
+            ("ALA", 1, 2, "B"),
+            (None, 1, 2, "B"),
+            (None, None, 2, "B"),
+            (None, 1, 2, None),
+            (None, None, 2, None),
+            ("", None, None, None),
+            (None, None, None, ""),
+            ("", None, None, ""),
         ],
     )
     def test_init(
-        self, name: str | None, number: int | None, chain: str | None
+        self,
+        name: str | None,
+        number: int | None,
+        segment: int | None,
+        chain: str | None,
     ) -> None:
-        resid = ResidueId(name, number, chain)
-        name = name or "UNK"
+        resid = ResidueId(name, number, segment, chain)
+        name = name or ""
         number = number or 0
-        chain = chain or None
+        segment = segment or 0
+        chain = chain or ""
         assert resid.name == name
         assert resid.number == number
+        assert resid.segment == segment
         assert resid.chain == chain
 
     @pytest.mark.parametrize(
-        ("name", "number", "chain"),
+        ("name", "number", "segment", "chain"),
         [
-            ("ALA", None, None),
-            ("ALA", 1, None),
-            ("ALA", 0, None),
-            ("ALA", None, "B"),
-            ("ALA", 1, "B"),
-            ("DA", 1, None),
-            (None, 1, "B"),
-            (None, None, "B"),
-            (None, 1, None),
-            (None, None, None),
-            ("", None, None),
-            (None, None, ""),
-            ("", None, ""),
+            ("ALA", None, None, None),
+            ("ALA", 1, None, None),
+            ("ALA", 0, None, None),
+            ("ALA", None, None, "B"),
+            ("ALA", 1, None, "B"),
+            ("DA", 1, None, None),
+            (None, 1, None, "B"),
+            (None, None, None, "B"),
+            (None, 1, None, None),
+            (None, None, None, None),
+            ("ALA", 1, 2, "B"),
+            (None, 1, 2, "B"),
+            (None, None, 2, "B"),
+            (None, 1, 2, None),
+            (None, None, 2, None),
+            ("", None, None, None),
+            (None, None, None, ""),
+            ("", None, None, ""),
         ],
     )
     def test_from_atom(
-        self, name: str | None, number: int | None, chain: str | None
+        self,
+        name: str | None,
+        number: int | None,
+        segment: int | None,
+        chain: str | None,
     ) -> None:
         atom = Chem.Atom(1)
         mi = Chem.AtomPDBResidueInfo()
@@ -67,15 +87,19 @@ class TestResidueId:
             mi.SetResidueName(name)
         if number is not None:
             mi.SetResidueNumber(number)
+        if segment is not None:
+            mi.SetSegmentNumber(segment)
         if chain is not None:
             mi.SetChainId(chain)
         atom.SetMonomerInfo(mi)
         resid = ResidueId.from_atom(atom)
-        name = name or "UNK"
+        name = name or ""
         number = number or 0
-        chain = chain or None
+        segment = segment or 0
+        chain = chain or ""
         assert resid.name == name
         assert resid.number == number
+        assert resid.segment == segment
         assert resid.chain == chain
 
     @pytest.mark.parametrize(
@@ -98,55 +122,54 @@ class TestResidueId:
     def test_from_atom_no_mi(self) -> None:
         atom = Chem.Atom(1)
         resid = ResidueId.from_atom(atom)
-        assert resid.name == "UNK"
+        assert resid.name == ""
         assert resid.number == 0
-        assert resid.chain is None
+        assert resid.segment == 0
+        assert resid.chain == ""
 
     @pytest.mark.parametrize(
         ("resid_str", "expected"),
         [
-            ("ALA", ("ALA", 0, None)),
-            ("ALA1", ("ALA", 1, None)),
-            ("ALA.B", ("ALA", 0, "B")),
-            ("ALA1.B", ("ALA", 1, "B")),
-            ("1.B", ("UNK", 1, "B")),
-            (".B", ("UNK", 0, "B")),
-            (".0", ("UNK", 0, "0")),
-            ("1", ("UNK", 1, None)),
-            ("", ("UNK", 0, None)),
-            ("DA2.A", ("DA", 2, "A")),
-            ("DA2", ("DA", 2, None)),
-            ("DA", ("DA", 0, None)),
-            ("8NU", ("8NU", 0, None)),
-            ("8NU1", ("8NU", 1, None)),
-            ("8NU1.A", ("8NU", 1, "A")),
-            ("8NU.A", ("8NU", 0, "A")),
-            ("TIP3", ("TIP3", 0, None)),
-            ("TIP3.A", ("TIP3", 0, "A")),
-            ("TIP31", ("TIP3", 1, None)),
-            ("TIP31.A", ("TIP3", 1, "A")),
-            ("TIP31.1", ("TIP3", 1, "1")),
-            ("T3P1", ("T3P", 1, None)),
-            ("HISE1", ("HISE", 1, None)),
-            ("H2O1", ("H2O", 1, None)),
-            ("K123.A", ("K", 123, "A")),
-            ("K  123.A", ("K", 123, "A")),
-            ("MN123.A", ("MN", 123, "A")),
-            ("MN 123.A", ("MN", 123, "A")),
+            ("ALA", ("ALA",)),
+            ("ALA1", ("ALA", 1)),
+            ("ALA.B", ("ALA", 0, 0, "B")),
+            ("ALA1.B", ("ALA", 1, 0, "B")),
+            ("1.B", ("", 1, 0, "B")),
+            (".B", ("", 0, 0, "B")),
+            (".0", ("", 0, 0, "0")),
+            ("1", ("", 1, 0, None)),
+            ("", ("", 0, 0, None)),
+            ("DA2.A", ("DA", 2, 0, "A")),
+            ("DA2", ("DA", 2)),
+            ("DA", ("DA",)),
+            ("8NU", ("8NU",)),
+            ("8NU1", ("8NU", 1)),
+            ("8NU1.A", ("8NU", 1, 0, "A")),
+            ("8NU.A", ("8NU", 0, 0, "A")),
+            ("TIP3", ("TIP3",)),
+            ("TIP3.A", ("TIP3", 0, 0, "A")),
+            ("TIP31", ("TIP3", 1)),
+            ("TIP31.A", ("TIP3", 1, 0, "A")),
+            ("TIP31.1", ("TIP3", 1, 0, "1")),
+            ("T3P1", ("T3P", 1)),
+            ("HISE1", ("HISE", 1)),
+            ("H2O1", ("H2O", 1)),
+            ("K123.A", ("K", 123, 0, "A")),
+            ("K  123.A", ("K", 123, 0, "A")),
+            ("MN123.A", ("MN", 123, 0, "A")),
+            ("MN 123.A", ("MN", 123, 0, "A")),
         ],
     )
-    def test_from_string(
-        self, resid_str: str, expected: tuple[str, int, str | None]
-    ) -> None:
+    def test_from_string(self, resid_str: str, expected: tuple) -> None:
         resid = ResidueId.from_string(resid_str)
         assert resid == ResidueId(*expected)
 
     def test_eq(self) -> None:
         name, number, chain = "ALA", 1, "A"
-        res1 = ResidueId(name, number, chain)
-        res2 = ResidueId(name, number, chain)
+        res1 = ResidueId(name, number, chain=chain)
+        res2 = ResidueId(name, number, chain=chain)
         assert res1 == res2
-        assert res1.__eq__(42) is NotImplemented
+        assert res1 != 42
 
     @pytest.mark.parametrize(
         ("res1", "res2"),
@@ -163,12 +186,55 @@ class TestResidueId:
         resid2 = ResidueId.from_string(res2)
         assert resid1 < resid2
 
-    @pytest.mark.parametrize("resid_str", ["ALA1.A", "DA2.B", "HIS3", "UNK0"])
-    def test_repr(self, resid_str: str) -> None:
+    @pytest.mark.parametrize(
+        ("resid_str", "expected"),
+        [
+            ("ALA1.A", "ResidueId('ALA', 1, 0, 'A')"),
+            ("DA2.B", "ResidueId('DA', 2, 0, 'B')"),
+            ("HIS3", "ResidueId('HIS', 3, 0)"),
+            ("ALA", "ResidueId('ALA', 0, 0)"),
+            ("ALA.B", "ResidueId('ALA', 0, 0, 'B')"),
+            ("1.B", "ResidueId('', 1, 0, 'B')"),
+            ("1", "ResidueId('', 1, 0)"),
+            (".B", "ResidueId('', 0, 0, 'B')"),
+            ("", "ResidueId('', 0, 0)"),
+            ("ALA1:2.A", "ResidueId('ALA', 1, 2, 'A')"),
+            ("ALA1:2", "ResidueId('ALA', 1, 2)"),
+            ("ALA:2", "ResidueId('ALA', 0, 2)"),
+            ("1:2.A", "ResidueId('', 1, 2, 'A')"),
+            ("1:2", "ResidueId('', 1, 2)"),
+            (":2.A", "ResidueId('', 0, 2, 'A')"),
+            (":2", "ResidueId('', 0, 2)"),
+        ],
+    )
+    def test_repr(self, resid_str: str, expected: str) -> None:
         resid = ResidueId.from_string(resid_str)
-        expected = f"ResidueId({resid.name}, {resid.number}, {resid.chain})"
         assert repr(resid) == expected
-        assert str(resid) == resid_str
+
+    @pytest.mark.parametrize(
+        ("resid_str", "expected"),
+        [
+            ("ALA1.A", "ALA1:0.A"),
+            ("DA2.B", "DA2:0.B"),
+            ("HIS3", "HIS3:0"),
+            ("ALA", "ALA0:0"),
+            ("ALA.B", "ALA0:0.B"),
+            ("1.B", "1:0.B"),
+            ("1", "1:0"),
+            (".B", "0:0.B"),
+            ("", "0:0"),
+            ("ALA1:2.A", "ALA1:2.A"),
+            ("ALA1:2", "ALA1:2"),
+            ("ALA:2", "ALA0:2"),
+            ("1:2.A", "1:2.A"),
+            ("1:2", "1:2"),
+            (":2.A", "0:2.A"),
+            (":2", "0:2"),
+        ],
+    )
+    def test_str(self, resid_str: str, expected: str) -> None:
+        resid = ResidueId.from_string(resid_str)
+        assert str(resid) == expected
 
 
 class TestResidue(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
@@ -184,7 +250,7 @@ class TestResidue(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
         assert mol.resid == resid
 
     def test_str(self, mol: Residue) -> None:
-        assert str(mol) == "ALA1.A"
+        assert str(mol) == "ALA1:0.A"
 
 
 class TestResidueGroup:
@@ -223,19 +289,19 @@ class TestResidueGroup:
     @pytest.mark.parametrize(
         ("ix", "resid", "resid_str"),
         [
-            (0, ("ALA", 1, "A"), "ALA1.A"),
-            (4, ("CYS", 5, "A"), "CYS5.A"),
-            (6, ("GLU", 7, "A"), "GLU7.A"),
-            (9, ("ILE", 10, "A"), "ILE10.A"),
-            (19, ("VAL", 20, "A"), "VAL20.A"),
-            (-1, ("VAL", 20, "A"), "VAL20.A"),
+            (0, ("ALA", 1, 0, "A"), "ALA1:0.A"),
+            (4, ("CYS", 5, 0, "A"), "CYS5:0.A"),
+            (6, ("GLU", 7, 0, "A"), "GLU7:0.A"),
+            (9, ("ILE", 10, 0, "A"), "ILE10:0.A"),
+            (19, ("VAL", 20, 0, "A"), "VAL20:0.A"),
+            (-1, ("VAL", 20, 0, "A"), "VAL20:0.A"),
         ],
     )
     def test_getitem(
         self,
         residues: list[Residue],
         ix: int,
-        resid: tuple[str, int, str | None],
+        resid: tuple,
         resid_str: str,
     ) -> None:
         rg = ResidueGroup(residues)

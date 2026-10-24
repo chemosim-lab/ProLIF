@@ -62,10 +62,12 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
 
     def test_from_rdkit_resid_args(self) -> None:
         mol = Chem.MolFromSmiles("CCO")
-        newmol = Molecule.from_rdkit(mol, "FOO", 42, "A")
-        assert newmol[0].resid == ResidueId("FOO", 42, "A")
+        newmol = Molecule.from_rdkit(mol, "FOO", 42, 1, "A")
+        assert newmol[0].resid == ResidueId("FOO", 42, 1, "A")
 
-    @pytest.mark.parametrize("key", [0, 42, -1, "LYS49.A", ResidueId("LYS", 49, "A")])
+    @pytest.mark.parametrize(
+        "key", [0, 42, -1, "LYS49.A", ResidueId("LYS", 49, 0, "A")]
+    )
     def test_getitem(self, mol: Molecule, key: int | str | ResidueId) -> None:
         assert mol[key].resid is mol.residues[key].resid
 
@@ -84,9 +86,9 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
         """
         water = water_u.select_atoms("resname TIP3 and byres around 6 protein")
         water_mol = Molecule.from_mda(water, NoImplicit=False)
-        assert water_mol["TIP34.3"]
+        assert water_mol["TIP34:3.X"]
         # would have overwritten TIP34.3 if using chain as there's only chain X
-        assert water_mol["TIP34.4"]
+        assert water_mol["TIP34:4.X"]
 
     @pytest.mark.parametrize("pk", [pickle, pytest.importorskip("dill")])
     def test_pickle(self, pk: Any) -> None:
@@ -106,7 +108,7 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
 
 
 class SupplierBase:
-    resid = ResidueId("UNL", 1, "")
+    resid = ResidueId("UNL", 1)
     slice_behavior: ClassVar[AbstractContextManager] = nullcontext()
 
     def test_len(self, suppl: "Sequence[Molecule]") -> None:
@@ -138,7 +140,7 @@ class SupplierBase:
 
 
 class TestPDBQTSupplier(SupplierBase):
-    resid = ResidueId("LIG", 1, "G")
+    resid = ResidueId("LIG", 1, 0, "G")
 
     @pytest.fixture()
     def suppl(self) -> "Sequence[Molecule]":
@@ -229,8 +231,8 @@ def test_split_molecule(water_u: "Universe") -> None:
     assert (pmol.residues.number == [range(20, 31)]).all()
     assert len(Chem.GetMolFrags(pmol)) == 1
     assert len(Chem.GetMolFrags(wmol)) == 11
-    assert combined["TIP310.5"].resid == wmol["TIP310.5"].resid
-    assert combined["TIP310.5"].GetNumAtoms() == wmol["TIP310.5"].GetNumAtoms()
+    assert combined["TIP310:5.X"].resid == wmol["TIP310:5.X"].resid
+    assert combined["TIP310:5.X"].GetNumAtoms() == wmol["TIP310:5.X"].GetNumAtoms()
 
 
 def test_split_molecule_reassigns_mapindex(u: "Universe") -> None:
@@ -281,13 +283,13 @@ END
             "raise",
             pytest.raises(
                 FragmentedResidueError,
-                match=r"The following residues are fragmented.+: ALA1.A.",
+                match=r"The following residues are fragmented.+: ALA1:0.A.",
             ),
         ),
         (
             "warn",
             pytest.warns(
-                UserWarning, match=r"The following residues are fragmented.+: ALA1.A."
+                UserWarning, match=r"The following residues are fragmented.+: ALA1:0.A."
             ),
         ),
         ("skip", nullcontext()),
@@ -330,4 +332,4 @@ def test_disconnected_residue_custom_callback(
     mol = Molecule(fragmented_rdmol)
     assert mol.n_residues == 2
     assert len(mol.residues._residues) == 2
-    assert mol["ALA1.A"].GetNumAtoms() == 2
+    assert mol["ALA1:0.A"].GetNumAtoms() == 2

@@ -188,6 +188,7 @@ class Molecule(BaseRDKitMol):
         mol: Chem.Mol,
         resname: str = "UNL",
         resnumber: int = 1,
+        segment: int = 0,
         chain: str = "",
         use_segid: bool = False,
     ) -> "Molecule":
@@ -205,6 +206,8 @@ class Molecule(BaseRDKitMol):
             The default residue name that is used if none was found
         resnumber : int
             The default residue number that is used if none was found
+        segment : int
+            The default segment number that is used if none was found
         chain : str
             The default chain Id that is used if none was found
         use_segid: bool, default = False
@@ -214,10 +217,13 @@ class Molecule(BaseRDKitMol):
         -----
         This method only checks for an existing AtomPDBResidueInfo in the first
         atom. If none was found, it will patch all atoms with the one created
-        from the method's arguments (resname, resnumber, chain).
+        from the method's arguments.
 
         .. versionchanged:: 2.1.0
             Added `use_segid`.
+
+        .. versionchanged:: 3.0.0
+            Added `segment`.
         """
         if mol.GetAtomWithIdx(0).GetMonomerInfo():
             return cls(mol, use_segid=use_segid)
@@ -227,6 +233,7 @@ class Molecule(BaseRDKitMol):
                 f" {atom.GetSymbol():<3.3}",
                 residueName=resname,
                 residueNumber=resnumber,
+                segmentNumber=segment,
                 chainId=chain,
             )
             atom.SetMonomerInfo(mi)

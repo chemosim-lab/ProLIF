@@ -19,14 +19,14 @@ def ifp(u: "Universe", ligand_ag: "AtomGroup", protein_ag: "AtomGroup") -> IFP:
 
 
 def test_ifp_indexing(ifp: IFP) -> None:
-    lig_id, prot_id = "LIG1.G", "VAL201.A"
+    lig_id, prot_id = "LIG1:2.G", "VAL201:0.A"
     metadata1 = ifp[ResidueId.from_string(lig_id), ResidueId.from_string(prot_id)]
     metadata2 = ifp[lig_id, prot_id]
     assert metadata1 is metadata2
 
 
 def test_ifp_filtering(ifp: IFP) -> None:
-    lig_id, prot_id = "LIG1.G", "VAL201.A"
+    lig_id, prot_id = "LIG1:2.G", "VAL201:0.A"
     assert ifp[lig_id] == ifp
     assert (
         next(iter(ifp[prot_id].values()))
@@ -42,7 +42,7 @@ def test_wrong_key(ifp: IFP) -> None:
 def test_interaction_data_iteration(ifp: IFP) -> None:
     data = next(ifp.interactions())
     assert isinstance(data, InteractionData)
-    assert data.ligand == ResidueId("LIG", 1, "G")
+    assert data.ligand == ResidueId("LIG", 1, 2, "G")
     assert data.protein.chain in {"A", "B"}
     assert data.interaction in {"Hydrophobic", "VdWContact"}
     assert "distance" in data.metadata
@@ -53,10 +53,13 @@ def test_interaction_data_iteration(ifp: IFP) -> None:
 @pytest.mark.parametrize(
     ("key", "expected"),
     [
-        (("LIG1.G", "VAL201.A"), True),
-        ((ResidueId.from_string("LIG1.G"), ResidueId.from_string("VAL201.A")), True),
-        ("VAL201.A", True),
-        (ResidueId.from_string("VAL201.A"), True),
+        (("LIG1:2.G", "VAL201:0.A"), True),
+        (
+            (ResidueId.from_string("LIG1:2.G"), ResidueId.from_string("VAL201:0.A")),
+            True,
+        ),
+        ("VAL201:0.A", True),
+        (ResidueId.from_string("VAL201:0.A"), True),
         (0, False),
     ],
 )
@@ -67,10 +70,10 @@ def test_contains(ifp: IFP, key: Any, expected: bool) -> None:
 @pytest.mark.parametrize(
     "key",
     [
-        ("LIG1.G", "VAL201.A"),
-        (ResidueId.from_string("LIG1.G"), ResidueId.from_string("VAL201.A")),
-        "VAL201.A",
-        ResidueId.from_string("VAL201.A"),
+        ("LIG1:2.G", "VAL201:0.A"),
+        (ResidueId.from_string("LIG1:2.G"), ResidueId.from_string("VAL201:0.A")),
+        "VAL201:0.A",
+        ResidueId.from_string("VAL201:0.A"),
     ],
 )
 def test_get(ifp: IFP, key: Any) -> None:
