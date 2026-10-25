@@ -77,7 +77,7 @@ class RDKitMolTemplateEngine:
 
     def apply(self, residue: Residue) -> Residue:
         new_res = assign_bond_orders_from_template(template_mol=self._mol, mol=residue)
-        return Residue(new_res, use_segid=residue._use_segid)
+        return Residue(new_res)
 
     def set_runtime_context(self, **kwargs: Any) -> None:
         pass
@@ -121,7 +121,7 @@ class CIFTemplateEngine:
             parent_idx = atom.GetUnsignedProp("mapindex")
             parent_atom = parent_mol.GetAtomWithIdx(parent_idx)
             atom.SetHybridization(get_atom_hybridization(parent_atom, parent_conf))
-        return Residue(new_res, use_segid=residue._use_segid)
+        return Residue(new_res)
 
     def set_runtime_context(self, **kwargs: Any) -> None:
         self.parent_mol = kwargs["parent_mol"]

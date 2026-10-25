@@ -160,4 +160,4 @@ class TestComplex3D:
         fp.run_from_iterable([ligand], protein)
         view = fp.plot_3d(ligand, protein, water, frame=0)
         html = view._make_html()
-        assert "TIP383.X" in html
+        assert "TIP383:3.X" in html

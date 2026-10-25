@@ -515,7 +515,7 @@ class TestInteractions:
     def test_edgetoface_phe331(
         self, ligand_mol: "Molecule", protein_mol: "Molecule", fingerprint: Fingerprint
     ) -> None:
-        lig, phe331 = ligand_mol[0], protein_mol["PHE331.B"]
+        lig, phe331 = ligand_mol[0], protein_mol["PHE331:1.B"]
         assert fingerprint.edgetoface.any(lig, phe331)  # type: ignore[attr-defined]
         assert not fingerprint.facetoface.any(lig, phe331)  # type: ignore[attr-defined]
         assert fingerprint.pistacking.any(lig, phe331)  # type: ignore[attr-defined]
@@ -659,7 +659,7 @@ class TestInteractions:
         with pytest.raises(
             ValueError,
             match=(
-                r"No nearby heavy atoms found in residue HOH1._ "
+                r"No nearby heavy atoms found in residue HOH1:0._ "
                 r"for atom 'O' at index 0."
             ),
         ):
@@ -751,7 +751,7 @@ class TestBridgedInteractions:
         int_data = next(fp.ifp[0].interactions())
 
         assert int_data.interaction == "WaterBridge"
-        assert str(int_data.protein) == "TRP400.X"
+        assert str(int_data.protein) == "TRP400:1.X"
 
     @pytest.mark.parametrize(
         ("kwargs", "num_expected"),
@@ -777,7 +777,7 @@ class TestBridgedInteractions:
 
         assert len(all_int_data) == num_expected
         int_data = all_int_data[-1]
-        assert "distance_TIP383.X_TIP317.X" in int_data.metadata
+        assert "distance_TIP383:3.X_TIP317:3.X" in int_data.metadata
 
     def test_water_bridge_with_updating_atomgroup(
         self,
@@ -800,7 +800,7 @@ class TestBridgedInteractions:
 
         assert len(all_int_data) == 3
         int_data = all_int_data[-1]
-        assert "distance_TIP383.X_TIP317.X" in int_data.metadata
+        assert "distance_TIP383:3.X_TIP317:3.X" in int_data.metadata
 
     def test_run_iter_water_bridge(
         self, water_mols: tuple["Molecule", "Molecule", "Molecule"]
@@ -812,7 +812,7 @@ class TestBridgedInteractions:
         int_data = next(fp.ifp[1].interactions())
 
         assert int_data.interaction == "WaterBridge"
-        assert str(int_data.protein) == "TRP400.X"
+        assert str(int_data.protein) == "TRP400:1.X"
 
     def test_higher_order_run_iter_water_bridge(
         self, water_mols: tuple["Molecule", "Molecule", "Molecule"]
@@ -827,4 +827,4 @@ class TestBridgedInteractions:
 
         assert len(all_int_data) == 3
         int_data = all_int_data[-1]
-        assert "distance_TIP383.X_TIP317.X" in int_data.metadata
+        assert "distance_TIP383:3.X_TIP317:3.X" in int_data.metadata

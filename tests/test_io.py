@@ -257,7 +257,7 @@ class TestMoleculeStandardizer:
 
         with pytest.raises(
             ValueError,
-            match=r"Could not apply template for residue [A-Z]{3}\d+(\.A)?: test",
+            match=r"Could not apply template for residue [A-Z]{3}\d+(:\d)?(\.A)?: test",
         ):
             standardizer(protein_mol)
 
@@ -368,7 +368,7 @@ class TestMoleculeStandardizer:
         # Test standardizing a molecule with missing heavy atoms
         with pytest.warns(
             UserWarning,
-            match=r"Residue MET1\.A has a different number of heavy atoms "
+            match=r"Residue MET1:0\.A has a different number of heavy atoms "
             r"than the standard residue\. This may affect H-bond detection\.",
         ):
             protein_mol = standardizer_default(mol_missing_atom)
@@ -414,7 +414,7 @@ class TestMoleculeStandardizer:
         # Test with a residue
         residue_mol = standardizer(Molecule(hsd_residue))
         assert len(residue_mol.residues) == 1
-        assert str(residue_mol.residues[0].resid) == "HID109.A"
+        assert str(residue_mol.residues[0].resid) == "HID109:0.A"
 
         # Test with a BENZAMIDINE residue (from path)
         ben_mol = standardizer(ben_path)

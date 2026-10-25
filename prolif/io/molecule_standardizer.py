@@ -189,8 +189,7 @@ class MoleculeStandardizer:
 
         # standardize the protein molecule
         resids: dict[int, ResidueId] = {
-            a.GetIdx(): ResidueId.from_atom(a, use_segid=protein_mol[0]._use_segid)
-            for a in protein_mol.GetAtoms()
+            a.GetIdx(): ResidueId.from_atom(a) for a in protein_mol.GetAtoms()
         }
         terminal_atoms: set[int] = set(
             chain(

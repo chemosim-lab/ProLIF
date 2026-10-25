@@ -138,58 +138,58 @@ def test_angle_limits(
 def test_pocket_residues(ligand_mol: "Chem.Mol", protein_mol: "Chem.Mol") -> None:
     resids = get_residues_near_ligand(ligand_mol, protein_mol)
     residues = [
-        "TYR38.A",
-        "TYR40.A",
-        "GLN41.A",
-        "VAL102.A",
-        "SER106.A",
-        "TYR109.A",
-        "THR110.A",
-        "TRP115.A",
-        "TRP125.A",
-        "LEU126.A",
-        "ASP129.A",
-        "ILE130.A",
-        "THR131.A",
-        "CYS133.A",
-        "THR134.A",
-        "ILE137.A",
-        "ILE180.A",
-        "GLU198.A",
-        "CYS199.A",
-        "VAL200.A",
-        "VAL201.A",
-        "ASN202.A",
-        "THR203.A",
-        "TYR208.A",
-        "THR209.A",
-        "VAL210.A",
-        "TYR211.A",
-        "SER212.A",
-        "THR213.A",
-        "VAL214.A",
-        "GLY215.A",
-        "ALA216.A",
-        "PHE217.A",
-        "TRP327.B",
-        "PHE330.B",
-        "PHE331.B",
-        "ILE333.B",
-        "SER334.B",
-        "LEU335.B",
-        "MET337.B",
-        "PRO338.B",
-        "LEU348.B",
-        "ALA349.B",
-        "ILE350.B",
-        "PHE351.B",
-        "ASP352.B",
-        "PHE353.B",
-        "PHE354.B",
-        "THR355.B",
-        "TRP356.B",
-        "GLY358.B",
-        "TYR359.B",
+        "TYR38:0.A",
+        "TYR40:0.A",
+        "GLN41:0.A",
+        "VAL102:0.A",
+        "SER106:0.A",
+        "TYR109:0.A",
+        "THR110:0.A",
+        "TRP115:0.A",
+        "TRP125:0.A",
+        "LEU126:0.A",
+        "ASP129:0.A",
+        "ILE130:0.A",
+        "THR131:0.A",
+        "CYS133:0.A",
+        "THR134:0.A",
+        "ILE137:0.A",
+        "ILE180:0.A",
+        "GLU198:0.A",
+        "CYS199:0.A",
+        "VAL200:0.A",
+        "VAL201:0.A",
+        "ASN202:0.A",
+        "THR203:0.A",
+        "TYR208:0.A",
+        "THR209:0.A",
+        "VAL210:0.A",
+        "TYR211:0.A",
+        "SER212:0.A",
+        "THR213:0.A",
+        "VAL214:0.A",
+        "GLY215:0.A",
+        "ALA216:0.A",
+        "PHE217:0.A",
+        "TRP327:1.B",
+        "PHE330:1.B",
+        "PHE331:1.B",
+        "ILE333:1.B",
+        "SER334:1.B",
+        "LEU335:1.B",
+        "MET337:1.B",
+        "PRO338:1.B",
+        "LEU348:1.B",
+        "ALA349:1.B",
+        "ILE350:1.B",
+        "PHE351:1.B",
+        "ASP352:1.B",
+        "PHE353:1.B",
+        "PHE354:1.B",
+        "THR355:1.B",
+        "TRP356:1.B",
+        "GLY358:1.B",
+        "TYR359:1.B",
     ]
     for res in residues:
         r = ResidueId.from_string(res)
@@ -237,14 +237,14 @@ def test_to_df(ifp: "IFPResults") -> None:
     assert df.shape == (2, 4)
     assert df.dtypes.iloc[0].type is np.bool_
     assert df.index.name == "Frame"
-    assert ("LIG1", "ALA1", "A") in df.columns
-    assert df["LIG1", "ALA1", "A"][0] is np.bool_(True)
-    assert ("LIG1", "ALA1", "B") in df.columns
-    assert df["LIG1", "ALA1", "B"][0] is np.bool_(False)
-    assert ("LIG1", "ALA1", "C") not in df.columns
-    assert ("LIG1", "GLU2", "A") not in df.columns
-    assert ("LIG1", "ASP3", "B") in df.columns
-    assert df["LIG1", "ASP3", "B"][0] is np.bool_(False)
+    assert ("LIG1:0", "ALA1:0", "A") in df.columns
+    assert df["LIG1:0", "ALA1:0", "A"][0] is np.bool_(True)
+    assert ("LIG1:0", "ALA1:0", "B") in df.columns
+    assert df["LIG1:0", "ALA1:0", "B"][0] is np.bool_(False)
+    assert ("LIG1:0", "ALA1:0", "C") not in df.columns
+    assert ("LIG1:0", "GLU2:0", "A") not in df.columns
+    assert ("LIG1:0", "ASP3:0", "B") in df.columns
+    assert df["LIG1:0", "ASP3:0", "B"][0] is np.bool_(False)
 
 
 @pytest.mark.parametrize(
@@ -258,9 +258,9 @@ def test_to_df(ifp: "IFPResults") -> None:
 def test_to_df_dtype(dtype: type, ifp: "IFPResults") -> None:
     df = to_dataframe(ifp, ["A", "B", "C"], dtype=dtype)
     assert df.dtypes.iloc[0].type is dtype
-    assert df["LIG1", "ALA1", "A"][0] == dtype(True)
-    assert df["LIG1", "ALA1", "B"][0] == dtype(False)
-    assert df["LIG1", "ASP3", "B"][0] == dtype(False)
+    assert df["LIG1:0", "ALA1:0", "A"][0] == dtype(True)
+    assert df["LIG1:0", "ALA1:0", "B"][0] == dtype(False)
+    assert df["LIG1:0", "ASP3:0", "B"][0] == dtype(False)
 
 
 def test_to_df_drop_empty(ifp: "IFPResults") -> None:
@@ -279,7 +279,7 @@ def test_to_df_no_interaction_in_first_frame(
 def test_to_df_count(ifp_count: "IFPResults") -> None:
     df = to_dataframe(ifp_count, ["A", "B", "C"], count=True)
     assert df[df > 1].any().any()
-    value = df["LIG1", "ALA1", "A"][0]
+    value = df["LIG1:0", "ALA1:0", "A"][0]
     assert value.dtype == np.uint8
     assert value == 2
 

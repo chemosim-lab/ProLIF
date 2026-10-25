@@ -6,7 +6,7 @@ Residue-related classes --- :mod:`prolif.residue`
 import re
 from collections import Counter, UserDict
 from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 from rdkit.Chem.rdmolops import GetSSSR
@@ -19,8 +19,16 @@ if TYPE_CHECKING:
 
     from prolif.typeshed import ResidueKey
 
+T = TypeVar("T")
+
 _RE_RESID = re.compile(
-    r"(TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?(\d*)\.?([A-Z\d]{1,2})?"
+    r"""
+    (?P<name>TIP[234]|T[234]P|H2O|[0-9][A-Z]{2}|[A-Z ]+)?
+    (?P<number>\d+)?
+    (?P<segment>:\d)?
+    (?P<chain>\.[A-Z\d]+)?
+    """,
+    re.VERBOSE,
 )
 
 
@@ -29,12 +37,14 @@ class ResidueId:
 
     Parameters
     ----------
-    name : str or None, default = "UNK"
+    name : str or None, default = None
         Residue name
-    number : int or None, default = 0
+    number : int or None, default = None
         Residue number
+    segment : int or None, default = None
+        Segment index
     chain : str or None, default = None
-        Protein chain or segment index
+        Residue chain
 
     Notes
     -----
@@ -43,62 +53,77 @@ class ResidueId:
     .. versionchanged:: 2.1.0
         Whitespaces are now stripped from the name and chain. Better support for water
         and monatomic ion residue names. Ability to use the segment index as chain.
+
+    .. versionchanged:: 3.0.0
+        The ``segment`` is now a separate attribute from the chain.
     """
 
     def __init__(
         self,
-        name: str | None = "UNK",
-        number: int | None = 0,
+        name: str | None = None,
+        number: int | None = None,
+        segment: int | None = None,
         chain: str | None = None,
     ) -> None:
-        self.name = "UNK" if not name else name.strip()
+        # same defaults as RDKit
+        self.name = _name if (_name := (name or "").strip()) else ""
         self.number = number or 0
-        self.chain = None if not chain else chain.strip()
+        self.segment = segment or 0
+        self.chain = _chain if (_chain := (chain or "").strip()) else ""
 
     def __repr__(self) -> str:
-        return f"ResidueId({self.name}, {self.number}, {self.chain})"
+        parts = f"{self.name!r}, {self.number}, {self.segment}"
+        if self.chain:
+            return f"ResidueId({parts}, {self.chain!r})"
+        return f"ResidueId({parts})"
 
     def __str__(self) -> str:
-        resid = f"{self.name}{self.number}"
+        parts = f"{self.name}{self.number}:{self.segment}"
         if self.chain:
-            return f"{resid}.{self.chain}"
-        return resid
+            return f"{parts}.{self.chain}"
+        return parts
 
     def __hash__(self) -> int:
-        return hash((self.name, self.number, self.chain))
+        return hash((self.name, self.number, self.segment, self.chain))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ResidueId):
             return NotImplemented
-        return (self.name, self.number, self.chain) == (
+        return (self.name, self.number, self.segment, self.chain) == (
             other.name,
             other.number,
+            other.segment,
             other.chain,
         )
 
     def __lt__(self, other: "ResidueId") -> bool:
-        return (_chain_key(self.chain), self.number) < (
-            _chain_key(other.chain),
+        return (self.chain, self.segment, self.number) < (
+            other.chain,
+            other.segment,
             other.number,
         )
 
     @classmethod
-    def from_atom(cls, atom: "Chem.Atom", use_segid: bool = False) -> "ResidueId":
+    def from_atom(cls, atom: "Chem.Atom") -> "ResidueId":
         """Creates a ResidueId from an RDKit atom
 
         Parameters
         ----------
         atom : rdkit.Chem.rdchem.Atom
             An atom that contains an RDKit :class:`~rdkit.Chem.rdchem.AtomMonomerInfo`
-        use_segid: bool, default = False
-            Use the segment number rather than the chain identifier as a chain
+
+
+        .. versionchanged:: 3.0.0
+            Removed the ``use_segid`` parameter. Both the chain and the segment are now
+            always extracted from the atom's PDB residue info.
         """
-        mi = atom.GetMonomerInfo()
-        if mi:
-            name = mi.GetResidueName()
-            number = mi.GetResidueNumber()
-            chain = str(mi.GetSegmentNumber()) if use_segid else mi.GetChainId()
-            return cls(name, number, chain)
+        if mi := atom.GetPDBResidueInfo():
+            return cls(
+                name=mi.GetResidueName(),
+                number=mi.GetResidueNumber(),
+                segment=mi.GetSegmentNumber(),
+                chain=mi.GetChainId(),
+            )
         return cls()
 
     @classmethod
@@ -108,44 +133,57 @@ class ResidueId:
         Parameters
         ----------
         resid_str : str
-            A string in the format ``<3-letter code><residue number>.<chain>``
+            A string in the format ``<resname><resnumber>:<segment>.<chain>``
             All arguments are optionnal, and the dot should be present only if
-            the chain identifier is also present
+            the chain identifier is also present, same for the colon and segment number.
 
         Examples
         --------
 
-        +-----------+----------------------------------+
-        | string    | Corresponding ResidueId          |
-        +===========+==================================+
-        | "ALA10.A" | ``ResidueId("ALA", 10, "A")``    |
-        +-----------+----------------------------------+
-        | "GLU33"   | ``ResidueId("GLU", 33, None)``   |
-        +-----------+----------------------------------+
-        | "LYS.B"   | ``ResidueId("LYS", 0, "B")``     |
-        +-----------+----------------------------------+
-        | "ARG"     | ``ResidueId("ARG", 0, None)``    |
-        +-----------+----------------------------------+
-        | "5.C"     | ``ResidueId("UNK", 5, "C")``     |
-        +-----------+----------------------------------+
-        | "42"      | ``ResidueId("UNK", 42, None)``   |
-        +-----------+----------------------------------+
-        | ".D"      | ``ResidueId("UNK", 0, "D")``     |
-        +-----------+----------------------------------+
-        | ""        | ``ResidueId("UNK", 0, None)``    |
-        +-----------+----------------------------------+
+        +------------+----------------------------------+
+        | string     | Corresponding ResidueId          |
+        +============+==================================+
+        | "ALA10.A"  | ``ResidueId('ALA', 10, 0, 'A')`` |
+        +------------+----------------------------------+
+        | "GLU33"    | ``ResidueId('GLU', 33, 0)``      |
+        +------------+----------------------------------+
+        | "LYS.B"    | ``ResidueId('LYS', 0, 0, 'B')``  |
+        +------------+----------------------------------+
+        | "WAT3:2.B" | ``ResidueId('WAT', 3, 2, 'B')``  |
+        +------------+----------------------------------+
+        | "WAT3:2"   | ``ResidueId('WAT', 3, 2)``       |
+        +------------+----------------------------------+
+        | "ARG"      | ``ResidueId('ARG', 0, 0)``       |
+        +------------+----------------------------------+
+        | "5.C"      | ``ResidueId('', 5, 0, 'C')``     |
+        +------------+----------------------------------+
+        | "42"       | ``ResidueId('', 42, 0)``         |
+        +------------+----------------------------------+
+        | ".D"       | ``ResidueId('', 0, 0, 'D')``     |
+        +------------+----------------------------------+
+        | ":2"       | ``ResidueId('', 0, 2)``          |
+        +------------+----------------------------------+
+        | ""         | ``ResidueId('', 0, 0)``          |
+        +------------+----------------------------------+
 
         """
-        matches = cast(re.Match, _RE_RESID.search(resid_str))
-        name, number, chain = matches.groups()
-        number = int(number) if number else 0
-        return cls(name, number, chain)
+        if not (matches := _RE_RESID.search(resid_str)):
+            return cls()
+        g = matches.groupdict()
+        return cls(
+            name=g["name"],
+            number=int(number) if (number := g["number"]) is not None else None,
+            segment=int(segment)
+            if (segment := cls._strip_prefix(g["segment"])) is not None
+            else None,
+            chain=cls._strip_prefix(g["chain"]),
+        )
 
-
-def _chain_key(chain: str | None) -> tuple[bool, str | None]:
-    """Handles the case where the two chains are of different types"""
-    # e.g., None from WAT123, and str from ALA42.A
-    return (chain is not None, chain)
+    @classmethod
+    def _strip_prefix(cls, x: str | None) -> str | None:
+        if x is None:
+            return None
+        return x[1:]
 
 
 class Residue(BaseRDKitMol):
@@ -155,8 +193,6 @@ class Residue(BaseRDKitMol):
     ----------
     mol : rdkit.Chem.rdchem.Mol
         The residue as an RDKit molecule
-    use_segid: bool, default = False
-        Use the segment number rather than the chain identifier as a chain
 
     Attributes
     ----------
@@ -169,14 +205,17 @@ class Residue(BaseRDKitMol):
     ``str(Residue)``
 
     .. versionchanged:: 2.1.0
-        Added `use_segid`.
+        Added ``use_segid``.
+
+    .. versionchanged:: 3.0.0
+        Removed the ``use_segid`` parameter. The segment is now a separate attribute
+        of :class:`~prolif.residue.ResidueId` and is always extracted.
     """
 
-    def __init__(self, mol: "Chem.Mol", *, use_segid: bool = False) -> None:
+    def __init__(self, mol: "Chem.Mol") -> None:
         super().__init__(mol)
         GetSSSR(self)
-        self._use_segid = use_segid
-        self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0), use_segid=use_segid)
+        self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0))
 
     def __repr__(self) -> str:  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])
@@ -210,17 +249,20 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
     def __init__(self, residues: Iterable[Residue]) -> None:
         self._residues = cast(Sequence[Residue], np.asarray(residues, dtype=object))
         resinfo = [
-            (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
+            (r.resid.name, r.resid.number, r.resid.segment, r.resid.chain)
+            for r in self._residues
         ]
         try:
-            name, number, chain = zip(*resinfo, strict=True)
+            name, number, segment, chain = zip(*resinfo, strict=True)
         except ValueError:
             self.name = np.array([], dtype=object)
             self.number = np.array([], dtype=np.uint8)
+            self.segment = np.array([], dtype=np.uint8)
             self.chain = np.array([], dtype=object)
         else:
             self.name = np.asarray(name, dtype=object)
             self.number = np.asarray(number, dtype=np.uint32)
+            self.segment = np.asarray(segment, dtype=np.uint32)
             self.chain = np.asarray(chain, dtype=object)
         super().__init__([(r.resid, r) for r in self._residues])
         if self.n_residues != len(self._residues):
@@ -270,8 +312,8 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
         mask : numpy.ndarray
             A 1D array of ``dtype=bool`` with the same length as the number of
             residues in the ResidueGroup. The mask should be constructed by
-            using conditions on the "name", "number", and "chain" residue
-            attributes as defined in the :class:`~prolif.residue.ResidueId`
+            using conditions on the "name", "number", "segment", and "chain"
+            residue attributes as defined in the :class:`~prolif.residue.ResidueId`
             class
 
         Returns
