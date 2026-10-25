@@ -248,17 +248,20 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
     def __init__(self, residues: Iterable[Residue]) -> None:
         self._residues = cast(Sequence[Residue], np.asarray(residues, dtype=object))
         resinfo = [
-            (r.resid.name, r.resid.number, r.resid.chain) for r in self._residues
+            (r.resid.name, r.resid.number, r.resid.segment, r.resid.chain)
+            for r in self._residues
         ]
         try:
-            name, number, chain = zip(*resinfo, strict=True)
+            name, number, segment, chain = zip(*resinfo, strict=True)
         except ValueError:
             self.name = np.array([], dtype=object)
             self.number = np.array([], dtype=np.uint8)
+            self.segment = np.array([], dtype=np.uint8)
             self.chain = np.array([], dtype=object)
         else:
             self.name = np.asarray(name, dtype=object)
             self.number = np.asarray(number, dtype=np.uint32)
+            self.segment = np.asarray(segment, dtype=np.uint32)
             self.chain = np.asarray(chain, dtype=object)
         super().__init__([(r.resid, r) for r in self._residues])
         if self.n_residues != len(self._residues):
@@ -308,8 +311,8 @@ class ResidueGroup(UserDict[ResidueId, Residue]):
         mask : numpy.ndarray
             A 1D array of ``dtype=bool`` with the same length as the number of
             residues in the ResidueGroup. The mask should be constructed by
-            using conditions on the "name", "number", and "chain" residue
-            attributes as defined in the :class:`~prolif.residue.ResidueId`
+            using conditions on the "name", "number", "segment", and "chain"
+            residue attributes as defined in the :class:`~prolif.residue.ResidueId`
             class
 
         Returns

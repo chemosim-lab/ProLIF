@@ -250,16 +250,21 @@ class TestResidueGroup:
         for (resid, rg_res), res in zip(rg.items(), residues, strict=True):
             assert rg_res is res
             assert resid is rg_res.resid
-        resinfo = [(r.resid.name, r.resid.number, r.resid.chain) for r in residues]
-        name, number, chain = zip(*resinfo, strict=True)
+        resinfo = [
+            (r.resid.name, r.resid.number, r.resid.segment, r.resid.chain)
+            for r in residues
+        ]
+        name, number, segment, chain = zip(*resinfo, strict=True)
         assert_equal(rg.name, name)
         assert_equal(rg.number, number)
+        assert_equal(rg.segment, segment)
         assert_equal(rg.chain, chain)
 
     def test_init_empty(self) -> None:
         rg = ResidueGroup([])
         assert_equal(rg.name, [])
         assert_equal(rg.number, [])
+        assert_equal(rg.segment, [])
         assert_equal(rg.chain, [])
         assert_equal(rg._residues, [])
         assert rg.data == {}
