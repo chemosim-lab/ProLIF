@@ -76,8 +76,6 @@ class LigNetwork:
     carbon : float
         Size of the carbon atom dots on the depiction. Use `0` to hide the
         carbon dots
-    use_segid : bool
-        If ``True``, uses the segment ID as the chain identifier of residues.
 
     Attributes
     ----------
@@ -110,6 +108,9 @@ class LigNetwork:
     .. versionchanged:: 2.1.0
         Added the ``show_interaction_data`` argument and exposed the ``fontsize`` in
         ``display``.
+
+    .. versionchanged:: 3.0.0
+        Removed the ``use_segid`` parameter.
     """
 
     COLORS: ClassVar = {
@@ -212,11 +213,9 @@ class LigNetwork:
         molsize: int = 35,
         rotation: float = 0,
         carbon: float = 0.16,
-        use_segid: bool = False,
     ) -> None:
         self._ligand_resids = {
-            str(ResidueId.from_atom(atom, use_segid=use_segid))
-            for atom in lig_mol.GetAtoms()
+            str(ResidueId.from_atom(atom)) for atom in lig_mol.GetAtoms()
         }
         self._interacting_atoms: set[int] = {
             cast(int, u if isinstance(u, int) else v)
@@ -341,15 +340,16 @@ class LigNetwork:
 
         .. versionchanged:: 2.0.0
             Added the ``display_all`` parameter.
+
+        .. versionchanged:: 3.0.0
+            Removed the ``use_segid`` parameter.
         """
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
                 "Please run the fingerprint analysis before attempting to display"
                 " results.",
             )
-        kwargs.setdefault("use_segid", fp.use_segid or False)
         molsize = kwargs.get("molsize", 35)
-        use_segid = kwargs.get("use_segid", False)
         graph = build_graph(
             fp,
             ligand_mol,
@@ -358,7 +358,6 @@ class LigNetwork:
             display_all=display_all,
             threshold=threshold,
             mol_scale=molsize,
-            use_segid=use_segid,
         )
         return cls(graph, ligand_mol, **kwargs)
 

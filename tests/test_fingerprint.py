@@ -143,13 +143,13 @@ class TestFingerprint:
             u.trajectory[0:1],
             ligand_ag,
             protein_ag,
-            residues=["VAL201.A"],
+            residues=["VAL201:0.A"],
             progress=False,
         )
-        lig_id = ResidueId.from_string("LIG1.G")
+        lig_id = ResidueId.from_string("LIG1:2.G")
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
-        res = ResidueId.from_string("VAL201.A")
+        res = ResidueId.from_string("VAL201:0.A")
         assert (lig_id, res) in fp_simple.ifp[0]
         fp_simple.run(
             u.trajectory[1:2],
@@ -160,7 +160,7 @@ class TestFingerprint:
         )
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 1
-        res = ResidueId.from_string("MET337.B")
+        res = ResidueId.from_string("MET337:1.B")
         assert (lig_id, res) in fp_simple.ifp[1]
         fp_simple.run(
             u.trajectory[:3],
@@ -172,7 +172,7 @@ class TestFingerprint:
         assert hasattr(fp_simple, "ifp")
         assert len(fp_simple.ifp) == 3
         assert len(fp_simple.ifp[0]) > 1
-        res = ResidueId.from_string("PHE351.B")
+        res = ResidueId.from_string("PHE351:1.B")
         assert (lig_id, res) in fp_simple.ifp[0]
         u.trajectory[0]
 
@@ -180,7 +180,7 @@ class TestFingerprint:
         self, fp_simple: Fingerprint, ligand_mol: "Molecule", protein_mol: "Molecule"
     ) -> None:
         ifp = fp_simple.generate(ligand_mol, protein_mol)
-        key = (ResidueId("LIG", 1, "G"), ResidueId("VAL", 201, "A"))
+        key = (ResidueId("LIG", 1, 2, "G"), ResidueId("VAL", 201, 0, "A"))
         bv = ifp[key]
         assert isinstance(bv, np.ndarray)
         assert bv[0] is np.True_
@@ -189,7 +189,7 @@ class TestFingerprint:
         self, fp_simple: Fingerprint, ligand_mol: "Molecule", protein_mol: "Molecule"
     ) -> None:
         ifp = fp_simple.generate(ligand_mol, protein_mol, metadata=True)
-        key = (ResidueId("LIG", 1, "G"), ResidueId("VAL", 201, "A"))
+        key = (ResidueId("LIG", 1, 2, "G"), ResidueId("VAL", 201, 0, "A"))
         int_data = ifp[key]
         assert "Hydrophobic" in int_data
 
@@ -573,8 +573,8 @@ class TestFingerprint:
         )
         fp.run(water_u.trajectory[:1], ligand, protein, n_jobs=1)
 
-        assert "WaterBridge" in fp.ifp[0]["QNB1.X", "TRP400.X"]
-        assert "HBDonor" in fp.ifp[0]["QNB1.X", "ASN404.X"]
+        assert "WaterBridge" in fp.ifp[0]["QNB1:2.X", "TRP400:1.X"]
+        assert "HBDonor" in fp.ifp[0]["QNB1:2.X", "ASN404:1.X"]
 
     def test_water_bridge_run_iter(
         self, water_mols: tuple["Molecule", "Molecule", "Molecule"]
@@ -585,8 +585,8 @@ class TestFingerprint:
         )
         fp.run_from_iterable([ligand], protein)
 
-        assert "WaterBridge" in fp.ifp[0]["QNB1.X", "TRP400.X"]
-        assert "HBDonor" in fp.ifp[0]["QNB1.X", "ASN404.X"]
+        assert "WaterBridge" in fp.ifp[0]["QNB1:2.X", "TRP400:1.X"]
+        assert "HBDonor" in fp.ifp[0]["QNB1:2.X", "ASN404:1.X"]
 
     def test_water_bridge_updates_cache_size(
         self,
@@ -605,31 +605,3 @@ class TestFingerprint:
         fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
         fp.run(water_u.trajectory[:1], ligand, protein)
         mocked.assert_called_once_with(3)
-
-    def test_run_can_switch_to_segid_over_chains(
-        self,
-        water_u: "mda.Universe",
-        water_atomgroups: tuple["AtomGroup", "AtomGroup", "AtomGroup"],
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """
-        If more segids than chains are present, Molecule should switch to segindex.
-        """
-        lig, prot, water = water_atomgroups
-        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
-        assert fp._use_segid(lig, prot) is False
-        water = water_u.select_atoms("resname TIP3 and byres around 6 protein")
-        fp = Fingerprint(["WaterBridge"], parameters={"WaterBridge": {"water": water}})
-        assert fp._use_segid(lig, prot) is True
-
-        def patch_run_serial(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-            return {0: {}}
-
-        monkeypatch.setattr(fp, "_run_serial", patch_run_serial)
-        fp.run(
-            water_u.trajectory[:1],
-            lig,
-            prot,
-            n_jobs=1,
-        )
-        assert fp.use_segid is True

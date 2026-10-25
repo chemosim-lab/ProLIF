@@ -109,7 +109,6 @@ class WaterBridge(BridgedInteraction):
         super().setup(ifp_store=ifp_store, **kwargs)
         self.residues = self.kwargs.pop("residues", None)
         self.converter_kwargs = self.kwargs.pop("converter_kwargs", ({}, {}))
-        self.water_fp.use_segid = self.kwargs.pop("use_segid", False)
         self.water_fp.ignore = self.kwargs.pop("ignore", self.water_fp.ignore)
 
     def run(
