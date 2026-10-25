@@ -195,17 +195,17 @@ class Fingerprint:
     .. ipython:: python
 
         # any HBDonor between ligand and ASP129
-        fp.hbdonor.any(lig, prot["ASP129.A"])
+        fp.hbdonor.any(lig, prot["ASP129:0.A"])
         # all HBAcceptor between ASP129 and CYS133
-        fp.hbacceptor.all(prot["ASP129.A"], prot["CYS133.A"])
+        fp.hbacceptor.all(prot["ASP129:0.A"], prot["CYS133:0.A"])
 
     You can also obtain the indices of atoms responsible for the interaction:
 
     .. ipython:: python
 
-        fp.metadata(lig, prot["ASP129.A"])
-        fp.hbdonor.any(lig, prot["ASP129.A"], metadata=True)
-        fp.hbdonor.best(lig, prot["ASP129.A"])
+        fp.metadata(lig, prot["ASP129:0.A"])
+        fp.hbdonor.any(lig, prot["ASP129:0.A"], metadata=True)
+        fp.hbdonor.best(lig, prot["ASP129:0.A"])
 
     Since version ``2.1.0``, you can also use bridged interactions such as
     ``WaterBridge``:

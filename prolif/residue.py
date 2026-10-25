@@ -204,7 +204,7 @@ class Residue(BaseRDKitMol):
     ``str(Residue)``
 
     .. versionchanged:: 2.1.0
-        Added `use_segid`.
+        Added ``use_segid``.
 
     .. versionchanged:: 3.0.0
         Removed the ``use_segid`` parameter. The segment is now a separate attribute

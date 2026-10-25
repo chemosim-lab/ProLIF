@@ -72,17 +72,17 @@ class Molecule(BaseRDKitMol):
 
     .. ipython:: python
 
-        mol["TYR38.A"] # by resid string (residue name + number + chain)
+        mol["TYR38:0.A"] # by resid string (residue name + number + segment + chain)
         mol[42] # by index (from 0 to n_residues-1)
-        mol[prolif.ResidueId("TYR", 38, "A")] # by ResidueId
+        mol[prolif.ResidueId("TYR", 38, 0, "A")] # by ResidueId
 
     See :mod:`prolif.residue` for more information on residues
 
     .. versionchanged:: 2.1.0
-        Added `use_segid`.
+        Added ``use_segid``.
 
     .. versionchanged:: 2.2.0
-        Added `residues` to bypass :func:`~prolif.utils.split_mol_by_residues`.
+        Added ``residues`` to bypass :func:`~prolif.utils.split_mol_by_residues`.
 
     .. versionchanged:: 3.0.0
         Removed the ``use_segid`` parameter. The segment is now a separate attribute
@@ -155,7 +155,7 @@ class Molecule(BaseRDKitMol):
             >>> mol = prolif.Molecule.from_mda(u, "resname LIG", inferrer=ligand_inferrer)
 
         .. versionchanged:: 2.1.0
-            Added `use_segid`.
+            Added ``use_segid``.
 
         .. versionchanged:: 3.0.0
             Removed the ``use_segid`` parameter. The segment is now a separate attribute
@@ -202,10 +202,10 @@ class Molecule(BaseRDKitMol):
         from the method's arguments.
 
         .. versionchanged:: 2.1.0
-            Added `use_segid`.
+            Added ``use_segid``.
 
         .. versionchanged:: 3.0.0
-            Added `segment`. Removed the ``use_segid`` parameter.
+            Added ``segment``. Removed the ``use_segid`` parameter.
         """
         if mol.GetAtomWithIdx(0).GetMonomerInfo():
             return cls(mol)
