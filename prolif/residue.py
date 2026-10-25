@@ -112,6 +112,7 @@ class ResidueId:
         atom : rdkit.Chem.rdchem.Atom
             An atom that contains an RDKit :class:`~rdkit.Chem.rdchem.AtomMonomerInfo`
 
+
         .. versionchanged:: 3.0.0
             Removed the ``use_segid`` parameter. Both the chain and the segment are now
             always extracted from the atom's PDB residue info.
@@ -132,7 +133,7 @@ class ResidueId:
         Parameters
         ----------
         resid_str : str
-            A string in the format ``<3-letter code><residue number>.<chain>:<segment>``
+            A string in the format ``<resname><resnumber>:<segment>.<chain>``
             All arguments are optionnal, and the dot should be present only if
             the chain identifier is also present, same for the colon and segment number.
 
