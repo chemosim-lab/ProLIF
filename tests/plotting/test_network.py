@@ -87,7 +87,6 @@ class TestLigNetwork:
             assert kwargs["flatten_coordinates"] is False
             assert kwargs["rotation"] == 42
             assert kwargs["carbon"] == 0
-            assert kwargs["use_segid"] is False
         net = get_ligplot(
             kekulize=True,
             use_coordinates=True,

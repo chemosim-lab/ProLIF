@@ -40,7 +40,6 @@ from typing import (
 
 import dill
 import numpy as np
-from MDAnalysis import AtomGroup
 from MDAnalysis.converters.RDKit import atomgroup_to_mol, set_converter_cache_size
 from MDAnalysis.coordinates.timestep import Timestep
 from rdkit import Chem
@@ -160,12 +159,6 @@ class Fingerprint:
         Dict of interaction fingerprints in a sparse format for the given trajectory or
         docking poses: ``{<frame number>: <IFP>}``. See the :class:`~prolif.ifp.IFP`
         class for more information.
-    use_segid : bool
-        Whether to use the segment index or the chain identifier as a chain in
-        :class:`~profif.residue.ResidueId` objects.
-        This is automatically set to ``True`` for MD simulations if any of the
-        inputs passed to :meth:`~prolif.molecule.Molecule.from_mda` have more segments
-        than chains.
 
     Raises
     ------
@@ -259,6 +252,9 @@ class Fingerprint:
     .. versionchanged:: 2.2.0
         Added ``implicit_hydrogens`` for easily switching to implicit-hydrogen
         interactions. Added ``ignore`` parameter.
+
+    .. versionchanged:: 3.0.0
+        Removed the ``use_segid`` parameter and attribute.
     """
 
     def __init__(
@@ -267,7 +263,6 @@ class Fingerprint:
         parameters: dict[str, dict[str, Any]] | None = None,
         count: bool = False,
         vicinity_cutoff: float = 6.0,
-        use_segid: bool | None = None,
         implicit_hydrogens: bool = False,
         ignore: Callable[[Residue, Residue], bool] = ignore_self_interactions,
     ) -> None:
@@ -304,7 +299,6 @@ class Fingerprint:
         self._set_interactions(interactions, parameters)
         self.vicinity_cutoff = vicinity_cutoff
         self.parameters = parameters
-        self.use_segid: bool | None = use_segid
 
     def _set_interactions(
         self,
@@ -552,7 +546,6 @@ class Fingerprint:
                     lres,
                     prot,
                     self.vicinity_cutoff,
-                    use_segid=self.use_segid or False,
                 )
             for prot_key in prot_residues:  # type:ignore[union-attr]
                 pres = prot[prot_key]
@@ -664,6 +657,9 @@ class Fingerprint:
                     Added ``use_segid``, ``parallel_strategy`` parameter and changed the
                     default behavior of ``n_jobs=None``.
 
+                .. versionchanged:: 3.0.0
+                    Removed the ``use_segid`` parameter.
+
         """  # noqa: E501
         if converter_kwargs is not None and len(converter_kwargs) != 2:
             raise ValueError("converter_kwargs must be a list of 2 dicts")
@@ -678,14 +674,8 @@ class Fingerprint:
             and maxsize <= 2
         ):
             set_converter_cache_size(2 + len(self.bridged_interactions))
-        if self.use_segid is None:
-            self.use_segid = self._use_segid(lig, prot)
         if residues == "all":
-            residues = list(
-                Molecule.from_mda(
-                    prot, use_segid=self.use_segid, **converter_kwargs[1]
-                ).residues
-            )
+            residues = list(Molecule.from_mda(prot, **converter_kwargs[1]).residues)
 
         if self.interactions:
             if n_jobs == 1:
@@ -718,20 +708,10 @@ class Fingerprint:
                 residues=residues,
                 converter_kwargs=converter_kwargs,
                 progress=progress,
-                use_segid=self.use_segid,
                 n_jobs=n_jobs,
                 parallel_strategy=parallel_strategy,
             )
         return self
-
-    def _use_segid(self, lig: "MDAObject", prot: "MDAObject") -> bool:
-        """Whether to use the segment index or the chainID as a chain."""
-        use_segid = Molecule._use_segid(lig) or Molecule._use_segid(prot)
-        for interaction in self.bridged_interactions.values() or []:
-            for obj in vars(interaction).values():
-                if isinstance(obj, AtomGroup):
-                    use_segid |= Molecule._use_segid(obj)
-        return use_segid
 
     def _run_serial(
         self,
@@ -751,12 +731,8 @@ class Fingerprint:
         iterator = tqdm(traj, **kwargs) if progress else traj
         ifp: "IFPResults" = {}
         for ts in iterator:
-            lig_mol = Molecule.from_mda(
-                lig, use_segid=self.use_segid, **converter_kwargs[0]
-            )
-            prot_mol = Molecule.from_mda(
-                prot, use_segid=self.use_segid, **converter_kwargs[1]
-            )
+            lig_mol = Molecule.from_mda(lig, **converter_kwargs[0])
+            prot_mol = Molecule.from_mda(prot, **converter_kwargs[1])
             ifp[int(ts.frame)] = self.generate(
                 lig_mol, prot_mol, residues=residues, metadata=True
             )
@@ -818,7 +794,6 @@ class Fingerprint:
                 residues=residues,
                 tqdm_kwargs=tqdm_kwargs,
                 rdkitconverter_kwargs=converter_kwargs,
-                use_segid=self.use_segid or False,
             ) as pool:
                 return pool.process(traj, lig, prot)
 
@@ -834,7 +809,6 @@ class Fingerprint:
             residues=residues,
             tqdm_kwargs=tqdm_kwargs,
             rdkitconverter_kwargs=converter_kwargs,
-            use_segid=self.use_segid or False,
         ) as pool:
             for ifp_data_chunk in pool.process(args_iterable):
                 ifp.update(ifp_data_chunk)

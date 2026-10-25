@@ -196,8 +196,6 @@ class TrajectoryPool:
     rdkitconverter_kwargs : tuple[dict, dict]
         Parameters for the :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
         from MDAnalysis: the first for the ligand, and the second for the protein
-    use_segid: bool
-        Use the segment number rather than the chain identifier as a chain.
 
     Attributes
     ----------
@@ -211,13 +209,14 @@ class TrajectoryPool:
     .. versionchanged:: 2.1.0
         Added `use_segid`.
 
+    .. versionchanged:: 3.0.0
+        Removed the ``use_segid`` parameter.
     """
 
     tracker: ClassVar["Synchronized"] = cast("Synchronized", Value(c_uint32, lock=True))
     fp: ClassVar["Fingerprint"]
     residues: ClassVar["ResidueSelection"]
     converter_kwargs: ClassVar[tuple[dict, dict]]
-    use_segid: ClassVar[bool]
 
     def __init__(
         self,
@@ -226,7 +225,6 @@ class TrajectoryPool:
         residues: "ResidueSelection",
         tqdm_kwargs: dict,
         rdkitconverter_kwargs: tuple[dict, dict],
-        use_segid: bool,
     ) -> None:
         self.tqdm_kwargs = tqdm_kwargs
         self.pool = cast(
@@ -239,7 +237,6 @@ class TrajectoryPool:
                     fingerprint,
                     residues,
                     rdkitconverter_kwargs,
-                    use_segid,
                 ),
             ),
         )
@@ -251,7 +248,6 @@ class TrajectoryPool:
         fingerprint: "Fingerprint",
         residues: "ResidueSelection",
         rdkitconverter_kwargs: tuple[dict, dict],
-        use_segid: bool,
     ) -> None:
         """Initializer classmethod passed to the pool so that each child process can
         access these objects without copying them."""
@@ -259,7 +255,6 @@ class TrajectoryPool:
         cls.fp = fingerprint
         cls.residues = residues
         cls.converter_kwargs = rdkitconverter_kwargs
-        cls.use_segid = use_segid
 
     @classmethod
     def executor(
@@ -275,12 +270,8 @@ class TrajectoryPool:
         traj, lig, prot, chunk = args
         ifp: "IFPResults" = {}
         for ts in traj[chunk]:
-            lig_mol = Molecule.from_mda(
-                lig, use_segid=cls.use_segid, **cls.converter_kwargs[0]
-            )
-            prot_mol = Molecule.from_mda(
-                prot, use_segid=cls.use_segid, **cls.converter_kwargs[1]
-            )
+            lig_mol = Molecule.from_mda(lig, **cls.converter_kwargs[0])
+            prot_mol = Molecule.from_mda(prot, **cls.converter_kwargs[1])
             data = cls.fp.generate(
                 lig_mol,
                 prot_mol,
@@ -452,11 +443,12 @@ class TrajectoryPoolQueue:
     rdkitconverter_kwargs : tuple[dict, dict]
         Parameters for the :class:`~MDAnalysis.converters.RDKit.RDKitConverter`
         from MDAnalysis: the first for the ligand, and the second for the protein
-    use_segid: bool
-        Use the segment number rather than the chain identifier as a chain.
 
 
     .. versionadded:: 2.1.0
+
+    .. versionchanged:: 3.0.0
+        Removed the ``use_segid`` parameter.
 
     """
 
@@ -470,12 +462,10 @@ class TrajectoryPoolQueue:
         residues: "ResidueSelection",
         tqdm_kwargs: dict,
         rdkitconverter_kwargs: tuple[dict, dict],
-        use_segid: bool,
     ) -> None:
         self.n_processes = n_processes
         self.tqdm_kwargs = tqdm_kwargs
         self.converter_kwargs = rdkitconverter_kwargs
-        self.use_segid = use_segid
         self.pool = cast(
             "BuiltinPool",
             Pool(
@@ -550,12 +540,8 @@ class TrajectoryPoolQueue:
             """Generator that yields (frame, lig_mol, prot_mol) tuples."""
             try:
                 for ts in traj:
-                    lig_mol = Molecule.from_mda(
-                        lig, use_segid=self.use_segid, **self.converter_kwargs[0]
-                    )
-                    prot_mol = Molecule.from_mda(
-                        prot, use_segid=self.use_segid, **self.converter_kwargs[1]
-                    )
+                    lig_mol = Molecule.from_mda(lig, **self.converter_kwargs[0])
+                    prot_mol = Molecule.from_mda(prot, **self.converter_kwargs[1])
                     yield int(ts.frame), lig_mol, prot_mol
             except Exception as e:
                 yield e

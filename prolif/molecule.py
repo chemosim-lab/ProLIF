@@ -34,8 +34,6 @@ class Molecule(BaseRDKitMol):
     ----------
     mol : rdkit.Chem.rdchem.Mol
         A ligand or protein with a single conformer
-    use_segid: bool, default = False
-        Use the segment number rather than the chain identifier as a chain.
 
     Attributes
     ----------
@@ -85,13 +83,16 @@ class Molecule(BaseRDKitMol):
 
     .. versionchanged:: 2.2.0
         Added `residues` to bypass :func:`~prolif.utils.split_mol_by_residues`.
+
+    .. versionchanged:: 3.0.0
+        Removed the ``use_segid`` parameter. The segment is now a separate attribute
+        of :class:`~prolif.residue.ResidueId` and is always extracted.
     """
 
     def __init__(
         self,
         mol: Chem.Mol | str | bytes,
         *,
-        use_segid: bool = False,
         residues: list[Residue] | None = None,
     ) -> None:
         super().__init__(mol)  # type: ignore[arg-type]
@@ -102,8 +103,8 @@ class Molecule(BaseRDKitMol):
             atom.SetUnsignedProp("mapindex", atom.GetIdx())
         if residues is None:
             # split in residues
-            residues = split_mol_by_residues(self, use_segid=use_segid)
-            residues = [Residue(mol, use_segid=use_segid) for mol in residues]
+            residues = split_mol_by_residues(self)
+            residues = [Residue(mol) for mol in residues]
             residues.sort(key=attrgetter("resid"))
         self.residues = ResidueGroup(residues)
 
@@ -112,8 +113,6 @@ class Molecule(BaseRDKitMol):
         cls,
         obj: "MDAObject",
         selection: str | None = None,
-        *,
-        use_segid: bool | None = None,
         **kwargs: Any,
     ) -> "Molecule":
         """Creates a Molecule from an MDAnalysis object
@@ -125,8 +124,6 @@ class Molecule(BaseRDKitMol):
         selection : None or str
             Apply a selection to `obj` to create an AtomGroup. Uses all atoms
             in `obj` if ``selection=None``
-        use_segid: bool | None, default = None
-            Use the segment number rather than the chain identifier as a chain.
         **kwargs : object
             Other arguments passed to the
             :class:`~MDAnalysis.converters.RDKit.RDKitConverter` of MDAnalysis
@@ -159,28 +156,16 @@ class Molecule(BaseRDKitMol):
 
         .. versionchanged:: 2.1.0
             Added `use_segid`.
+
+        .. versionchanged:: 3.0.0
+            Removed the ``use_segid`` parameter. The segment is now a separate attribute
+            of :class:`~prolif.residue.ResidueId` and is always extracted.
         """  # noqa: E501
         ag = obj.select_atoms(selection) if selection else obj.atoms
         if ag.n_atoms == 0:
             raise mda.SelectionError("AtomGroup is empty, please check your selection")
         mol = ag.convert_to.rdkit(**kwargs)
-        use_segid = cls._use_segid(ag, use_segid)
-        return cls(mol, use_segid=use_segid)
-
-    @classmethod
-    def _use_segid(cls, obj: "MDAObject", use_segid: bool | None = None) -> bool:
-        """Whether to use the segment index or the chainID as a chain."""
-        if use_segid is not None:
-            return use_segid
-        ag = obj.atoms
-        try:
-            # chainID not always defined
-            n_chains = len(set(ag.chainIDs))
-        except Exception:
-            return True
-        # segindices is always defined
-        n_segids = len(set(ag.residues.segindices))
-        return n_segids > n_chains
+        return cls(mol)
 
     @classmethod
     def from_rdkit(
@@ -190,7 +175,6 @@ class Molecule(BaseRDKitMol):
         resnumber: int = 1,
         segment: int = 0,
         chain: str = "",
-        use_segid: bool = False,
     ) -> "Molecule":
         """Creates a Molecule from an RDKit molecule
 
@@ -210,8 +194,6 @@ class Molecule(BaseRDKitMol):
             The default segment number that is used if none was found
         chain : str
             The default chain Id that is used if none was found
-        use_segid: bool, default = False
-            Use the segment number rather than the chain identifier as a chain
 
         Notes
         -----
@@ -223,10 +205,10 @@ class Molecule(BaseRDKitMol):
             Added `use_segid`.
 
         .. versionchanged:: 3.0.0
-            Added `segment`.
+            Added `segment`. Removed the ``use_segid`` parameter.
         """
         if mol.GetAtomWithIdx(0).GetMonomerInfo():
-            return cls(mol, use_segid=use_segid)
+            return cls(mol)
         mol = copy.deepcopy(mol)
         for atom in mol.GetAtoms():
             mi = Chem.AtomPDBResidueInfo(
@@ -614,7 +596,7 @@ def split_molecule(
                 parent_idx = atom.GetUnsignedProp("mapindex")
                 del_target.RemoveAtom(parent_idx)
                 parent_indices[is_lhs].append(parent_idx)
-            residues[is_lhs].append(Residue(residue, use_segid=residue._use_segid))
+            residues[is_lhs].append(Residue(residue))
     parent_to_new = [
         {parent_idx: new_idx for new_idx, parent_idx in enumerate(sorted(indices))}
         for indices in parent_indices

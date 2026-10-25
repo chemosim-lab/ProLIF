@@ -78,18 +78,6 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
     def test_n_residues(self, mol: Molecule) -> None:
         assert mol.n_residues == mol.residues.n_residues
 
-    def test_large_selection_automatically_uses_segid(
-        self, water_u: "Universe"
-    ) -> None:
-        """
-        If more segids than chains are present, Molecule should switch to segindex.
-        """
-        water = water_u.select_atoms("resname TIP3 and byres around 6 protein")
-        water_mol = Molecule.from_mda(water, NoImplicit=False)
-        assert water_mol["TIP34:3.X"]
-        # would have overwritten TIP34.3 if using chain as there's only chain X
-        assert water_mol["TIP34:4.X"]
-
     @pytest.mark.parametrize("pk", [pickle, pytest.importorskip("dill")])
     def test_pickle(self, pk: Any) -> None:
         mol = Chem.MolFromSequence("AA")
@@ -100,7 +88,7 @@ class TestMolecule(pytest.BaseTestMixinRDKitMol):  # type: ignore[name-defined]
             mi: Chem.AtomPDBResidueInfo = atom.GetPDBResidueInfo()
             mi.SetSegmentNumber(mi.GetResidueNumber())
             mi.SetResidueNumber(1)
-        pmol = Molecule.from_rdkit(mol, use_segid=True)
+        pmol = Molecule.from_rdkit(mol)
         assert pmol.n_residues == 2
         unpickled = pk.loads(pk.dumps(pmol))
         assert hasattr(unpickled, "residues")
@@ -259,7 +247,7 @@ def test_successive_split_molecule_calls(water_u: "Universe") -> None:
 
     for entity in (lmol, pmol):
         residue_level = {r.resid for r in entity}
-        atom_level = {ResidueId.from_atom(a, use_segid=True) for a in entity.GetAtoms()}
+        atom_level = {ResidueId.from_atom(a) for a in entity.GetAtoms()}
         assert residue_level == atom_level
         for atom in entity.GetAtoms():
             assert atom.GetUnsignedProp("mapindex") == atom.GetIdx()

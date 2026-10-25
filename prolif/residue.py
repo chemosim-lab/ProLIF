@@ -104,15 +104,17 @@ class ResidueId:
         )
 
     @classmethod
-    def from_atom(cls, atom: "Chem.Atom", use_segid: bool = False) -> "ResidueId":
+    def from_atom(cls, atom: "Chem.Atom") -> "ResidueId":
         """Creates a ResidueId from an RDKit atom
 
         Parameters
         ----------
         atom : rdkit.Chem.rdchem.Atom
             An atom that contains an RDKit :class:`~rdkit.Chem.rdchem.AtomMonomerInfo`
-        use_segid: bool, default = False
-            Use the segment number rather than the chain identifier as a chain
+
+        .. versionchanged:: 3.0.0
+            Removed the ``use_segid`` parameter. Both the chain and the segment are now
+            always extracted from the atom's PDB residue info.
         """
         if mi := atom.GetPDBResidueInfo():
             return cls(
@@ -190,8 +192,6 @@ class Residue(BaseRDKitMol):
     ----------
     mol : rdkit.Chem.rdchem.Mol
         The residue as an RDKit molecule
-    use_segid: bool, default = False
-        Use the segment number rather than the chain identifier as a chain
 
     Attributes
     ----------
@@ -205,13 +205,16 @@ class Residue(BaseRDKitMol):
 
     .. versionchanged:: 2.1.0
         Added `use_segid`.
+
+    .. versionchanged:: 3.0.0
+        Removed the ``use_segid`` parameter. The segment is now a separate attribute
+        of :class:`~prolif.residue.ResidueId` and is always extracted.
     """
 
-    def __init__(self, mol: "Chem.Mol", *, use_segid: bool = False) -> None:
+    def __init__(self, mol: "Chem.Mol") -> None:
         super().__init__(mol)
         GetSSSR(self)
-        self._use_segid = use_segid
-        self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0), use_segid=use_segid)
+        self.resid = ResidueId.from_atom(self.GetAtomWithIdx(0))
 
     def __repr__(self) -> str:  # pragma: no cover
         name = ".".join([self.__class__.__module__, self.__class__.__name__])

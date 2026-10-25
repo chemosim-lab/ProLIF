@@ -38,7 +38,6 @@ def build_graph(
     frame: int = 0,
     display_all: bool = False,
     threshold: float = 0.3,
-    use_segid: bool = False,
 ) -> "nx.MultiGraph[int | str]":
     """Build the interaction graph (nodes + edges only, no layout coordinates).
 
@@ -52,13 +51,9 @@ def build_graph(
             "Please run the fingerprint analysis before attempting to display results."
         )
     if kind == "frame":
-        return _make_frame_graph_from_fp(
-            fp, ligand_mol, mol_scale, frame, display_all, use_segid=use_segid
-        )
+        return _make_frame_graph_from_fp(fp, ligand_mol, mol_scale, frame, display_all)
     if kind == "aggregate":
-        return _make_agg_graph_from_fp(
-            fp, ligand_mol, mol_scale, threshold, use_segid=use_segid
-        )
+        return _make_agg_graph_from_fp(fp, ligand_mol, mol_scale, threshold)
     raise ValueError(f'{kind!r} must be "aggregate" or "frame"')
 
 
@@ -70,7 +65,6 @@ def to_networkx(
     display_all: bool = False,
     threshold: float = 0.3,
     mol_scale: int = 1,
-    use_segid: bool = False,
 ) -> "nx.MultiGraph[int | str]":
     """Convert a ProLIF fingerprint to a NetworkX graph with layout coordinates.
 
@@ -90,17 +84,16 @@ def to_networkx(
         Show all atom-level occurrences; only used when ``kind="frame"``.
     threshold : float
         Minimum frequency (0-1) for aggregate graphs.
-    use_segid : bool
-        Use segment ID instead of chain ID when building residue identifiers.
 
     Returns
     -------
     nx.MultiGraph
         Graph with ``x``/``y`` coordinates on every node.
+
+    .. versionchanged:: 3.0.0
+        Removed the ``use_segid`` parameter.
     """
-    graph = build_graph(
-        fp, ligand_mol, mol_scale, kind, frame, display_all, threshold, use_segid
-    )
+    graph = build_graph(fp, ligand_mol, mol_scale, kind, frame, display_all, threshold)
     return calculate_coordinates(graph, ligand_mol, mol_scale)
 
 
@@ -218,7 +211,6 @@ def _make_frame_graph_from_fp(
     mol_scale: int = 1,
     frame: int = 0,
     display_all: bool = False,
-    use_segid: bool = False,
 ) -> "nx.MultiGraph[int | str]":
     """Build an interaction graph for a single trajectory frame."""
     if frame not in fp.ifp:
@@ -227,9 +219,7 @@ def _make_frame_graph_from_fp(
     records, max_order = _get_records(fp.ifp[frame], all_metadata=display_all)
     if not records:
         return graph
-    _add_ligand_nodes_and_bonds(
-        graph, ligand_mol, mol_scale=mol_scale, use_segid=use_segid
-    )
+    _add_ligand_nodes_and_bonds(graph, ligand_mol, mol_scale=mol_scale)
     _add_records_to_graph(graph, records)
     graph.graph["max_bridge_order"] = max_order
     return graph
@@ -239,7 +229,6 @@ def _add_ligand_nodes_and_bonds(
     graph: "nx.MultiGraph[int | str]",
     ligand_mol: Chem.Mol,
     mol_scale: int = 1,
-    use_segid: bool = False,
 ) -> None:
     """Add ligand atom nodes (with 3-D coordinates) and bond edges to *graph*."""
     conformer = ligand_mol.GetConformer()
@@ -254,7 +243,7 @@ def _add_ligand_nodes_and_bonds(
             x=float(pos.x),
             y=float(pos.y),
             z=float(pos.z),
-            ligand=str(ResidueId.from_atom(atom, use_segid=use_segid)),
+            ligand=str(ResidueId.from_atom(atom)),
         )
     for bond in ligand_mol.GetBonds():
         graph.add_edge(
@@ -361,7 +350,6 @@ def _make_agg_graph_from_fp(
     ligand_mol: Chem.Mol,
     mol_scale: int = 1,
     threshold: float = 0.3,
-    use_segid: bool = False,
 ) -> "nx.MultiGraph[int | str]":
     """Build an interaction graph aggregated over all frames."""
     graph: "nx.MultiGraph[int | str]" = nx.MultiGraph()
@@ -374,9 +362,7 @@ def _make_agg_graph_from_fp(
         max_order = max(max_order, frame_max_order)
     if not all_records:
         return graph
-    _add_ligand_nodes_and_bonds(
-        graph, ligand_mol, mol_scale=mol_scale, use_segid=use_segid
-    )
+    _add_ligand_nodes_and_bonds(graph, ligand_mol, mol_scale=mol_scale)
     grouped = _aggregate_interaction_data(all_records, n_frames)
     filtered = _filter_by_threshold(grouped, threshold)
     _add_records_to_graph(graph, _filtered_data_to_records(filtered))
