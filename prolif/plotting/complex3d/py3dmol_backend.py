@@ -9,12 +9,11 @@ from typing import TYPE_CHECKING, Any, cast
 import py3Dmol
 from IPython.display import display_javascript
 from rdkit import Chem
+from rdkit.Geometry import Point3D
 
 from prolif.plotting.complex3d.base import Backend, Settings
 
 if TYPE_CHECKING:
-    from rdkit.Geometry import Point3D
-
     from prolif.molecule import Molecule
     from prolif.residue import Residue, ResidueId
     from prolif.typeshed import Component
@@ -57,7 +56,7 @@ class Py3DMolSettings(Settings[dict[str, dict]]):
     function(atom,viewer) {
         if(!atom.label) {
             atom.label = viewer.addLabel(
-                atom.resn+atom.resi+'.'+atom.chain+':'+(atom.atom ? atom.atom : atom.serial),
+                atom.resn+atom.resi+'.'+atom.chain+' '+(atom.atom ? atom.atom : atom.serial),
                 {position: atom, backgroundColor: 'mintcream', fontColor:'black'}
             );
         }
@@ -95,6 +94,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, int]):
         super().prepare()
         self.position = position
         self.colormap = {} if colormap is None else colormap
+        self.mols: dict[Component, Molecule] = {}
 
     def clear(self) -> None:
         self.cmd("removeAllModels")
@@ -153,6 +153,7 @@ class Py3DmolBackend(Backend[Py3DMolSettings, int]):
         )
         self.models[component] = self._model_count
         self._model_count += 1
+        self.mols[component] = mol
 
     def show_residue(
         self, residue: "Residue", component: "Component", style: dict[str, dict]
@@ -177,18 +178,24 @@ class Py3DmolBackend(Backend[Py3DMolSettings, int]):
         self,
         interaction: str,
         distance: float,
-        components: tuple["Component", "Component"],  # noqa: ARG002
-        points: tuple["Point3D", "Point3D"],
+        components: tuple["Component", "Component"],
         residues: tuple["ResidueId", "ResidueId"],  # noqa: ARG002
-        atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],  # noqa: ARG002
+        atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
     ) -> None:
-        p1, p2 = points
+        points: list[Point3D] = []
+        for component, indices in zip(components, atoms, strict=True):
+            p = (
+                self.get_ring_centroid(component, indices)
+                if isinstance(indices, tuple)
+                else self.mols[component].GetConformer().GetAtomPosition(indices)
+            )
+            points.append(p)
         interaction_label = f"{interaction}: {distance:.2f}Å"
         self.cmd(
             "addCylinder",
             {
-                "start": {"x": p1.x, "y": p1.y, "z": p1.z},
-                "end": {"x": p2.x, "y": p2.y, "z": p2.z},
+                "start": {"x": points[0].x, "y": points[0].y, "z": points[0].z},
+                "end": {"x": points[1].x, "y": points[1].y, "z": points[1].z},
                 "color": self.settings.colors.get(interaction, "grey"),
                 **self.settings.interaction_style,
                 "hoverable": True,
@@ -220,3 +227,10 @@ class Py3DmolBackend(Backend[Py3DMolSettings, int]):
             """,
             raw=True,
         )
+
+    def get_ring_centroid(
+        self, component: "Component", indices: tuple[int, ...]
+    ) -> Point3D:
+        """Get the centroid of a ring system."""
+        centroid = self.mols[component].xyz[list(indices)].mean(axis=0)
+        return Point3D(*centroid)

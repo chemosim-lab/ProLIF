@@ -15,8 +15,6 @@ import warnings
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
-from rdkit.Geometry import Point3D
-
 from prolif.exceptions import RunRequiredError
 from prolif.plotting.complex3d.py3dmol_backend import Py3DmolBackend, Py3DMolSettings
 from prolif.plotting.complex3d.pymol_backend import PyMOLBackend, PyMOLSettings
@@ -138,12 +136,6 @@ class Complex3D:
             backend_settings=backend_settings,
             **backend_kwargs,
         )
-
-    @staticmethod
-    def get_ring_centroid(mol: Molecule, indices: tuple[int, ...]) -> Point3D:
-        """Get the centroid of a ring system."""
-        centroid = mol.xyz[list(indices)].mean(axis=0)
-        return Point3D(*centroid)
 
     def display(
         self,
@@ -446,32 +438,22 @@ class Complex3D:
                                 atoms1 = metadata["parent_indices"]["ligand"][
                                     settings.ligand_displayed_atoms.get(interaction, 0)
                                 ]
-                                p1 = self.lig_mol.GetConformer().GetAtomPosition(atoms1)
                                 res1 = lresid
                             else:
                                 # water-water or water-protein
                                 atoms1 = metadata["parent_indices"][
                                     settings.bridged_interactions[interaction]
                                 ][settings.protein_displayed_atoms.get(interaction, 0)]
-                                p1 = self.water_mol.GetConformer().GetAtomPosition(
-                                    atoms1
-                                )
                                 res1 = ResidueId.from_string(src)
                             if dest == "protein":
                                 atoms2 = metadata["parent_indices"]["protein"][
                                     settings.protein_displayed_atoms.get(interaction, 0)
                                 ]
-                                p2 = self.prot_mol.GetConformer().GetAtomPosition(
-                                    atoms2
-                                )
                                 res2 = presid
                             else:
                                 atoms2 = metadata["parent_indices"][
                                     settings.bridged_interactions[interaction]
                                 ][settings.protein_displayed_atoms.get(interaction, 0)]
-                                p2 = self.water_mol.GetConformer().GetAtomPosition(
-                                    atoms2
-                                )
                                 res2 = ResidueId.from_string(dest)
 
                             backend.add_interaction(
@@ -481,36 +463,32 @@ class Complex3D:
                                     "water" if src != "ligand" else "ligand",
                                     "water" if dest != "protein" else "protein",
                                 ),
-                                points=(p1, p2),
                                 residues=(res1, res2),
                                 atoms=(atoms1, atoms2),
                             )
 
                     else:
                         # get coordinates for both points of the interaction
-                        if interaction in settings.ligand_ring_interactions:
-                            atoms1 = metadata["parent_indices"]["ligand"]
-                            p1 = self.get_ring_centroid(self.lig_mol, atoms1)
-                        else:
-                            atoms1 = metadata["parent_indices"]["ligand"][
+                        atoms1 = (
+                            metadata["parent_indices"]["ligand"]
+                            if interaction in settings.ligand_ring_interactions
+                            else metadata["parent_indices"]["ligand"][
                                 settings.ligand_displayed_atoms.get(interaction, 0)
                             ]
-                            p1 = self.lig_mol.GetConformer().GetAtomPosition(atoms1)
-                        if interaction in settings.protein_ring_interactions:
-                            atoms2 = metadata["parent_indices"]["protein"]
-                            p2 = self.get_ring_centroid(self.prot_mol, atoms2)
-                        else:
-                            atoms2 = metadata["parent_indices"]["protein"][
+                        )
+                        atoms2 = (
+                            metadata["parent_indices"]["protein"]
+                            if interaction in settings.protein_ring_interactions
+                            else metadata["parent_indices"]["protein"][
                                 settings.protein_displayed_atoms.get(interaction, 0)
                             ]
-                            p2 = self.prot_mol.GetConformer().GetAtomPosition(atoms2)
+                        )
                         # add interaction line
                         dist = metadata.get("distance", float("nan"))
                         backend.add_interaction(
                             interaction,
                             distance=dist,
                             components=("ligand", "protein"),
-                            points=(p1, p2),
                             residues=(lresid, presid),
                             atoms=(atoms1, atoms2),
                         )
