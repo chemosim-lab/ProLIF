@@ -20,8 +20,6 @@ from prolif.plotting.complex3d.base import Backend, Settings
 from prolif.typeshed import PyMOLRPCServer
 
 if TYPE_CHECKING:
-    from rdkit.Geometry import Point3D
-
     from prolif.molecule import Molecule
     from prolif.residue import Residue, ResidueId
     from prolif.typeshed import Component
@@ -129,8 +127,8 @@ class PyMOLBackend(Backend[PyMOLSettings, str]):
         model_id = self.models[component]
         resid = residue.resid
         selection = (
-            f"%{model_id} and chain {resid.chain} and resid {resid.number} "
-            f"and resname {resid.name}"
+            f"%{model_id} and chain {resid.chain} "
+            f"and resid {resid.number} and resname {resid.name}"
         )
         self.apply_style(selection, style)
 
@@ -154,7 +152,6 @@ class PyMOLBackend(Backend[PyMOLSettings, str]):
         interaction: str,
         distance: float,  # noqa: ARG002
         components: tuple["Component", "Component"],
-        points: tuple["Point3D", "Point3D"],  # noqa: ARG002
         residues: tuple["ResidueId", "ResidueId"],
         atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
     ) -> None:
@@ -241,7 +238,7 @@ class PyMOLScreenshot:
     @staticmethod
     def _last_n_bytes(path: Path, n: int) -> bytes:
         """Reads the last N bytes from a file."""
-        with open(path, "rb") as fh:
+        with path.open("rb") as fh:
             fh.seek(-n, os.SEEK_END)
             return fh.read(n)
 

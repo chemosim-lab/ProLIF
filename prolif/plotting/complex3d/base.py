@@ -9,8 +9,6 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, TypeAlias, Ty
 from prolif.plotting.utils import separated_interaction_colors
 
 if TYPE_CHECKING:
-    from rdkit.Geometry import Point3D
-
     from prolif.molecule import Molecule
     from prolif.residue import Residue, ResidueId
 
@@ -125,7 +123,7 @@ class Backend(Protocol, Generic[SettingsT, ModelT]):
         """Remove all elements from the plot."""
 
     def finalize(self) -> None:
-        """Finalize the plot."""
+        """Finalize the plot, e.g. zoom to the ligand."""
 
     def load_molecule(self, mol: "Molecule", component: Component, style: Any) -> None:
         """Load a molecule into the view with the given style."""
@@ -147,7 +145,6 @@ class Backend(Protocol, Generic[SettingsT, ModelT]):
         interaction: str,
         distance: float,
         components: tuple[Component, Component],
-        points: tuple["Point3D", "Point3D"],
         residues: tuple["ResidueId", "ResidueId"],
         atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
     ) -> None:
