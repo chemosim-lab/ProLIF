@@ -6,6 +6,7 @@ import struct
 from base64 import b64encode
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
@@ -30,6 +31,17 @@ if TYPE_CHECKING:
 
 @dataclass
 class PyMOLSettings(Complex3DBaseBackendSettings):
+    __doc__ = (
+        cast(str, Complex3DBaseBackendSettings.__doc__)
+        + """\
+    group_id: str = "complex"
+        Name of the object in which all PyMOL objects will be loaded.
+    handler: Callable[[str], None] | None = None
+        Function to call for each command sent to PyMOL. If ``None``, the
+        :class:`~prolif.plotting.complex3d.pymol_backend.PyMOLRPCServer` will be used to
+        send commands to a running PyMOL instance.
+    """
+    )
     ligand_style: dict[str, list[str]] = field(
         default_factory=lambda: {
             "stick": ["util.cbac {}"],
@@ -51,6 +63,7 @@ class PyMOLSettings(Complex3DBaseBackendSettings):
         }
     )
     group_id: str = "complex"
+    handler: Callable[[str], None] | None = None
 
 
 @cache
@@ -76,15 +89,80 @@ def _strip_forbidden_chars(s: str) -> str:
     return s.translate(_forbidden_table)
 
 
-class PyMOLBackend(Complex3DBackend[PyMOLSettings, str]):
-    def setup(
-        self,
-        handler: Callable[[str], None] | None = None,
-        **kwargs: Any,
-    ) -> None:
+@dataclass
+class PyMOLScreenshot:
+    callback: Callable[[str], None]
+    is_interactive: bool
+
+    def save_png(self, path: Path, **kwargs: Any) -> None:
+        # wait for all commands to be done
+        self.callback("cmd.sync(timeout=3)")
+
+        # build command
+        if kwargs:
+            params = ", ".join([f"{k}={v}" for k, v in kwargs.items()])
+            params = f", {params}"
+        else:
+            params = ""
+        self.callback(f"png {path}{params}")
+
+        # wait for end chunk of PNG to be written
+        while not self._is_png_written(path):
+            sleep(0.1)
+
+    def _repr_png_(self) -> bytes | None:
+        if not self.is_interactive:
+            # only generate PNG if using RPC server
+            return None
+
+        # write to temp PNG file
+        png_path = Path(mktemp(suffix=".png"))
+        self.save_png(png_path)
+
+        # read data and delete temp file
+        data = png_path.read_bytes()
+        png_path.unlink(missing_ok=True)
+        return data
+
+    @classmethod
+    def _is_png_written(cls, png_path: Path) -> bool:
+        """Returns whether the PNG has been completely written or not."""
+        return (
+            png_path.is_file()
+            and png_path.stat().st_size > 12
+            and struct.unpack("!I4sI", cls._last_n_bytes(png_path, 12))
+            # IEND data chunk for PNG files (12 bytes, network-byte order):
+            # 4 null bytes for length of data (always no data for this chunk)
+            # 4 bytes for name of chunk (IEND for last chunk)
+            # (0 bytes for data)
+            # CRC-32 checksum for `b"IEND"`
+            == (0, b"IEND", 2923585666)
+        )
+
+    @staticmethod
+    def _last_n_bytes(path: Path, n: int) -> bytes:
+        """Reads the last N bytes from a file."""
+        with path.open("rb") as fh:
+            fh.seek(-n, os.SEEK_END)
+            return fh.read(n)
+
+    def _repr_html_(self) -> str | None:
+        png = self._repr_png_()
+        if not png:
+            return None
+        dump = b64encode(png).decode()
+        return (
+            '<image alt="ProLIF PyMOL screenshot" src="data:image/png;base64, '
+            f'{dump}" />'
+        )
+
+
+class PyMOLBackend(Complex3DBackend[PyMOLSettings, str, PyMOLScreenshot]):
+    def setup(self) -> None:
+        handler = self.settings.handler
         self.cmd = handler or get_rpc_server().do
         self.interface = PyMOLScreenshot(
-            callback=self.cmd, kwargs=kwargs, is_interactive=handler is None
+            callback=self.cmd, is_interactive=handler is None
         )
         super().setup()
 
@@ -103,7 +181,7 @@ class PyMOLBackend(Complex3DBackend[PyMOLSettings, str]):
         self.cmd(f"zoom %{model_id}")
 
     @contextmanager
-    def ignore_autozoom(self) -> Iterator[None]:
+    def _ignore_autozoom(self) -> Iterator[None]:
         """Context manager to ignore the automatic zoom when loading an object."""
         self.cmd("view rdinterface, store")
         yield
@@ -114,7 +192,7 @@ class PyMOLBackend(Complex3DBackend[PyMOLSettings, str]):
     ) -> None:
         pdb_dump = Chem.MolToPDBBlock(mol, flavor=16 | 32)
         model_id = f"{self.group_id}.{component}"
-        with self.ignore_autozoom():
+        with self._ignore_autozoom():
             self.cmd(f"cmd.read_pdbstr({pdb_dump!r}, {model_id!r})")
         self._model_count += 1
         self.models[component] = model_id
@@ -133,7 +211,13 @@ class PyMOLBackend(Complex3DBackend[PyMOLSettings, str]):
             f"%{model_id} and chain {resid.chain} "
             f"and resid {resid.number} and resname {resid.name}"
         )
-        self.apply_style(selection, style)
+        if color_override := self.settings.color_overrides.get(resid):
+            resid_style = deepcopy(style)
+            for key in resid_style:
+                resid_style[key].append(f"color {color_override}, {{}}")
+        else:
+            resid_style = style
+        self.apply_style(selection, resid_style)
 
     def apply_style(self, selection: str, style: dict[str, list[str]]) -> None:
         for representation, extras in style.items():
@@ -181,76 +265,6 @@ class PyMOLBackend(Complex3DBackend[PyMOLSettings, str]):
         self.cmd(f"color {colour}, {name}")
         self.interactions.add(interaction)
 
-    def save_png(self, name: str) -> None:
-        path = Path(name)
-        screenshot = cast(PyMOLScreenshot, self.interface)
-        return screenshot.save_png(path, dpi=300, ray=1, **screenshot.kwargs)
-
-
-@dataclass
-class PyMOLScreenshot:
-    callback: Callable[[str], None]
-    kwargs: dict
-    is_interactive: bool
-
-    def save_png(self, path: Path, **kwargs: Any) -> None:
-        # wait for all commands to be done
-        self.callback("cmd.sync(timeout=3)")
-
-        # build command
-        if kwargs:
-            params = ", ".join([f"{k}={v}" for k, v in kwargs.items()])
-            params = f", {params}"
-        else:
-            params = ""
-        self.callback(f"png {path}{params}")
-
-        # wait for end chunk of PNG to be written
-        while not self._is_png_written(path):
-            sleep(0.1)
-
-    def _repr_png_(self) -> bytes | None:
-        if not self.is_interactive:
-            # only generate PNG if using RPC server
-            return None
-
-        # write to temp PNG file
-        png_path = Path(mktemp(suffix=".png"))
-        self.save_png(png_path, **self.kwargs)
-
-        # read data and delete temp file
-        data = png_path.read_bytes()
-        png_path.unlink(missing_ok=True)
-        return data
-
-    @classmethod
-    def _is_png_written(cls, png_path: Path) -> bool:
-        """Returns whether the PNG has been completely written or not."""
-        return (
-            png_path.is_file()
-            and png_path.stat().st_size > 12
-            and struct.unpack("!I4sI", cls._last_n_bytes(png_path, 12))
-            # IEND data chunk for PNG files (12 bytes, network-byte order):
-            # 4 null bytes for length of data (always no data for this chunk)
-            # 4 bytes for name of chunk (IEND for last chunk)
-            # (0 bytes for data)
-            # CRC-32 checksum for `b"IEND"`
-            == (0, b"IEND", 2923585666)
-        )
-
-    @staticmethod
-    def _last_n_bytes(path: Path, n: int) -> bytes:
-        """Reads the last N bytes from a file."""
-        with path.open("rb") as fh:
-            fh.seek(-n, os.SEEK_END)
-            return fh.read(n)
-
-    def _repr_html_(self) -> str | None:
-        png = self._repr_png_()
-        if not png:
-            return None
-        dump = b64encode(png).decode()
-        return (
-            '<image alt="ProLIF PyMOL screenshot" src="data:image/png;base64, '
-            f'{dump}" />'
-        )
+    def save_png(self, path: str) -> None:
+        output = Path(path)
+        return self.interface.save_png(output, dpi=300, ray=1)

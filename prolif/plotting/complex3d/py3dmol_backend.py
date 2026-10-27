@@ -12,8 +12,8 @@ from rdkit import Chem
 from rdkit.Geometry import Point3D
 
 from prolif.plotting.complex3d.base import (
-    Complex3DBackend,
-    Complex3DBaseBackendSettings,
+    Complex3DBaseGridBackendSettings,
+    Complex3DGridBackend,
 )
 
 if TYPE_CHECKING:
@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class Py3DMolSettings(Complex3DBaseBackendSettings[dict[str, dict]]):
+class Py3DMolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
     __doc__ = (
-        cast(str, Complex3DBaseBackendSettings.__doc__)
+        cast(str, Complex3DBaseGridBackendSettings.__doc__)
         + """\
     residue_hover_callback : str
         JavaScript callback executed when hovering a residue involved in an interaction.
@@ -33,6 +33,8 @@ class Py3DMolSettings(Complex3DBaseBackendSettings[dict[str, dict]]):
         JavaScript callback executed when hovering an interaction line.
     disable_hover_callback : str
         JavaScript callback executed when the hovering event is finished.
+    linked: bool = True
+        Link mouse interactions (pan, zoom, translate) on the grid plot.
     """
     )
     ligand_style: dict[str, dict] = field(
@@ -78,42 +80,50 @@ class Py3DMolSettings(Complex3DBaseBackendSettings[dict[str, dict]]):
             delete obj.label;
         }
     }"""
+    grid_color_unique: str | None = "magentaCarbon"
+    linked: bool = True
 
 
-class Py3DmolBackend(Complex3DBackend[Py3DMolSettings, int]):
-    def setup(
-        self,
-        viewergrid: tuple[int, int],
-        **view_kwargs: Any,
-    ) -> None:
-        self.interface = py3Dmol.view(viewergrid=viewergrid, **view_kwargs)
+class Py3DmolBackend(Complex3DGridBackend[Py3DMolSettings, int, py3Dmol.view]):
+    def setup(self) -> None:
+        self.interface = py3Dmol.view(
+            viewergrid=(1, 1), width=self.settings.size[0], height=self.settings.size[1]
+        )
         super().setup()
 
-    def prepare(
-        self,
-        position: tuple[int, int] = (0, 0),
-        colormap: dict[ResidueId, str] | None = None,
-    ) -> None:
+    def prepare(self) -> None:
         super().prepare()
-        self.position = position
-        self.colormap = {} if colormap is None else colormap
+        self.position = (0, 0)
         self.mols: dict[Component, Molecule] = {}
 
+    def grid_setup(self, n_rows: int, n_columns: int) -> None:
+        self.interface = py3Dmol.view(
+            viewergrid=(n_rows, n_columns),
+            width=self.settings.grid_size[0],
+            height=self.settings.grid_size[1],
+            linked=self.settings.linked,
+        )
+        super().setup()
+
+    def grid_prepare(self, row: int, column: int) -> None:
+        super().prepare()
+        self.position = (row, column)
+
     def clear(self) -> None:
-        self.cmd("removeAllModels")
+        self._cmd("removeAllModels")
 
     def finalize(self) -> None:
-        self.cmd("zoomTo", {"model": self.models["ligand"]}, viewer=self.position)
+        self._cmd("zoomTo", {"model": self.models["ligand"]}, viewer=self.position)
 
-    def cmd(self, cmd: str, /, *args: Any, **kwargs: Any) -> Any:
+    def _cmd(self, cmd: str, /, *args: Any, **kwargs: Any) -> Any:
         return getattr(self.interface, cmd)(*args, **kwargs)
 
-    def modelcmd(self, cmd: str, /, *args: Any, **kwargs: Any) -> Any:
+    def _modelcmd(self, cmd: str, /, *args: Any, **kwargs: Any) -> Any:
         model_id = kwargs.pop("model_id", None)
         if model_id is None:
-            model = self.cmd("getModel", viewer=self.position)
+            model = self._cmd("getModel", viewer=self.position)
         else:
-            model = self.cmd("getModel", model_id, viewer=self.position)
+            model = self._cmd("getModel", model_id, viewer=self.position)
         return getattr(model, cmd)(*args, **kwargs)
 
     def load_molecule(
@@ -123,7 +133,7 @@ class Py3DmolBackend(Complex3DBackend[Py3DMolSettings, int]):
         needs_dummy = "cartoon" in style
         if needs_dummy:
             # load dummy model to show requested style (cartoon)
-            self.cmd(
+            self._cmd(
                 "addModel",
                 pdb_dump,
                 "pdb",
@@ -136,7 +146,7 @@ class Py3DmolBackend(Complex3DBackend[Py3DMolSettings, int]):
             )
             self._model_count += 1
         # load actual model with hydrogens and handling of events
-        self.cmd(
+        self._cmd(
             "addModel",
             pdb_dump,
             "pdb",
@@ -147,7 +157,7 @@ class Py3DmolBackend(Complex3DBackend[Py3DMolSettings, int]):
             },
             viewer=self.position,
         )
-        self.modelcmd(
+        self._modelcmd(
             "setHoverable",
             {},
             True,
@@ -164,10 +174,10 @@ class Py3DmolBackend(Complex3DBackend[Py3DMolSettings, int]):
         super().show_residue(residue, component, style)
         model_id = self.models[component]
         resid = residue.resid
-        if resid in self.colormap:
+        if color_override := self.settings.color_overrides.get(resid):
             resid_style = deepcopy(style)
             for key in resid_style:
-                resid_style[key]["colorscheme"] = self.colormap[resid]
+                resid_style[key]["colorscheme"] = color_override
         else:
             resid_style = style
         selection = {
@@ -175,7 +185,7 @@ class Py3DmolBackend(Complex3DBackend[Py3DMolSettings, int]):
             "resn": resid.name,
             "resi": resid.number,
         }
-        self.modelcmd("setStyle", selection, resid_style, True, model_id=model_id)
+        self._modelcmd("setStyle", selection, resid_style, True, model_id=model_id)
 
     def add_interaction(
         self,
@@ -188,13 +198,13 @@ class Py3DmolBackend(Complex3DBackend[Py3DMolSettings, int]):
         points: list[Point3D] = []
         for component, indices in zip(components, atoms, strict=True):
             p = (
-                self.get_ring_centroid(component, indices)
+                self._get_ring_centroid(component, indices)
                 if isinstance(indices, tuple)
                 else self.mols[component].GetConformer().GetAtomPosition(indices)
             )
             points.append(p)
         interaction_label = f"{interaction}: {distance:.2f}Å"
-        self.cmd(
+        self._cmd(
             "addCylinder",
             {
                 "start": {"x": points[0].x, "y": points[0].y, "z": points[0].z},
@@ -210,28 +220,28 @@ class Py3DmolBackend(Complex3DBackend[Py3DMolSettings, int]):
         )
 
     def hide_hydrogens(self, component: "Component", keep_indices: list[int]) -> None:
-        self.modelcmd(
+        self._modelcmd(
             "setStyle",
             {"and": [{"elem": "H"}, {"not": {"index": keep_indices}}]},
             {"stick": {"hidden": True}},
             model_id=self.models[component],
         )
 
-    def save_png(self, name: str) -> None:
+    def save_png(self, path: str) -> None:
         uid = self.interface.uniqueid
         display_javascript(
             f"""
             var png = viewer_{uid}.pngURI()
             var a = document.createElement('a')
             a.href = png
-            a.download = "{name}"
+            a.download = "{path}"
             a.click()
             a.remove()
             """,
             raw=True,
         )
 
-    def get_ring_centroid(
+    def _get_ring_centroid(
         self, component: "Component", indices: tuple[int, ...]
     ) -> Point3D:
         """Get the centroid of a ring system."""
