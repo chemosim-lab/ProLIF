@@ -11,7 +11,10 @@ from IPython.display import display_javascript
 from rdkit import Chem
 from rdkit.Geometry import Point3D
 
-from prolif.plotting.complex3d.base import Backend, Settings
+from prolif.plotting.complex3d.base import (
+    Complex3DBackend,
+    Complex3DBaseBackendSettings,
+)
 
 if TYPE_CHECKING:
     from prolif.molecule import Molecule
@@ -20,9 +23,9 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class Py3DMolSettings(Settings[dict[str, dict]]):
+class Py3DMolSettings(Complex3DBaseBackendSettings[dict[str, dict]]):
     __doc__ = (
-        cast(str, Settings.__doc__)
+        cast(str, Complex3DBaseBackendSettings.__doc__)
         + """\
     residue_hover_callback : str
         JavaScript callback executed when hovering a residue involved in an interaction.
@@ -77,7 +80,7 @@ class Py3DMolSettings(Settings[dict[str, dict]]):
     }"""
 
 
-class Py3DmolBackend(Backend[Py3DMolSettings, int]):
+class Py3DmolBackend(Complex3DBackend[Py3DMolSettings, int]):
     def setup(
         self,
         viewergrid: tuple[int, int],

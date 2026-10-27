@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 from prolif.exceptions import RunRequiredError
 from prolif.plotting.complex3d.py3dmol_backend import Py3DmolBackend, Py3DMolSettings
@@ -26,8 +26,11 @@ if TYPE_CHECKING:
     from prolif.fingerprint import Fingerprint
     from prolif.ifp import IFP
     from prolif.molecule import Molecule
-    from prolif.plotting.complex3d.base import Backend, Settings
-    from prolif.typeshed import Component
+    from prolif.plotting.complex3d.base import (
+        Complex3DBackend,
+        Complex3DBaseBackendSettings,
+    )
+    from prolif.typeshed import Complex3DBackendSettings, Component
 
 
 class Complex3D:
@@ -43,10 +46,11 @@ class Complex3D:
         The protein molecule to display.
     water_mol : Optional[Molecule]
         Additional molecule (e.g. waters) to display.
-    backend_settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings | PyMOLSettings = "py3Dmol"
+    backend_settings: Complex3DBackendSettings
         The backend or backend settings to use. If a string is provided, the
-        relevant backend is used with default settings. If a Settings object is
-        provided, this will be used instead.
+        relevant backend is used with default settings. If a
+        :class:`prolif.plotting.complex3d.base.Complex3DBaseBackendSettings` object
+        is provided, this will be used instead.
     backend_kwargs: Any
         Additional parameters passed to the backend's setup.
 
@@ -59,11 +63,11 @@ class Complex3D:
         ``display`` and ``compare`` methods to show all protein residues in the
         vicinity of the ligand, or only the ones participating in an interaction.
 
-    .. versionchanged:: X.Y.Z
+    .. versionchanged:: 3.0.0
         Added support for multiple backends (``py3Dmol`` and ``pymol``) and moved
         most options to the ``backend_settings`` object (accessible through
         :attr:`backend`'s :attr:`settings`).
-    """  # noqa: E501
+    """
 
     def __init__(
         self,
@@ -71,13 +75,11 @@ class Complex3D:
         lig_mol: Molecule,
         prot_mol: Molecule,
         water_mol: Molecule | None = None,
-        backend_settings: Literal["py3Dmol", "pymol"]
-        | Py3DMolSettings
-        | PyMOLSettings = "py3Dmol",
+        backend_settings: "Complex3DBackendSettings" = "py3Dmol",
         **backend_kwargs: Any,
     ) -> None:
         object.__setattr__(self, "backend", get_3d_plot_backend(backend_settings))
-        self.backend: "Backend"
+        self.backend: "Complex3DBackend"
         self.backend_kwargs = backend_kwargs
         self.ifp = ifp
         self.lig_mol = lig_mol
@@ -94,9 +96,7 @@ class Complex3D:
         water_mol: Molecule | None = None,
         *,
         frame: int,
-        backend_settings: Literal["py3Dmol", "pymol"]
-        | Py3DMolSettings
-        | PyMOLSettings = "py3Dmol",
+        backend_settings: "Complex3DBackendSettings" = "py3Dmol",
         **backend_kwargs: Any,
     ) -> Complex3D:
         """Creates a py3Dmol plot of interactions.
@@ -115,13 +115,14 @@ class Complex3D:
             The protein molecule to display.
         water_mol : Optional[Molecule]
             Additional molecule (e.g. waters) to display.
-        backend_settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings | PyMOLSettings = "py3Dmol"
+        backend_settings: Complex3DBackendSettings
             The backend or backend settings to use. If a string is provided, the
-            relevant backend is used with default settings. If a Settings object is
-            provided, this will be used instead.
+            relevant backend is used with default settings. If a
+            :class:`prolif.plotting.complex3d.base.Complex3DBaseBackendSettings` object
+            is provided, this will be used instead.
         backend_kwargs: Any
             Additional parameters passed to the backend's setup.
-        """  # noqa: E501
+        """
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
                 "Please run the fingerprint analysis before attempting to display"
@@ -381,7 +382,7 @@ class Complex3D:
         remove_hydrogens: "bool | Component" = True,
     ) -> None:
         backend = self.backend
-        settings = cast("Settings", backend.settings)
+        settings = backend.settings  # cast("Complex3DBaseBackendSettings"?
 
         # load molecules
         backend.load_molecule(
@@ -600,9 +601,13 @@ def get_3d_plot_backend(
 ) -> Py3DmolBackend: ...
 @overload
 def get_3d_plot_backend(settings: Literal["pymol"] | PyMOLSettings) -> PyMOLBackend: ...
+@overload
 def get_3d_plot_backend(
-    settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings | PyMOLSettings,
-) -> Backend:
+    settings: "Complex3DBaseBackendSettings",
+) -> Complex3DBackend: ...
+def get_3d_plot_backend(
+    settings: "Complex3DBackendSettings",
+) -> Complex3DBackend:
     """Get the backend for making 3D plots."""
     if isinstance(settings, str):
         if settings == "py3Dmol":
