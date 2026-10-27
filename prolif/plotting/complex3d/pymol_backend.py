@@ -16,7 +16,10 @@ from xmlrpc.client import ServerProxy
 
 from rdkit import Chem
 
-from prolif.plotting.complex3d.base import Backend, Settings
+from prolif.plotting.complex3d.base import (
+    Complex3DBackend,
+    Complex3DBaseBackendSettings,
+)
 from prolif.typeshed import PyMOLRPCServer
 
 if TYPE_CHECKING:
@@ -26,7 +29,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class PyMOLSettings(Settings):
+class PyMOLSettings(Complex3DBaseBackendSettings):
     ligand_style: dict[str, list[str]] = field(
         default_factory=lambda: {
             "stick": ["util.cbac {}"],
@@ -73,7 +76,7 @@ def _strip_forbidden_chars(s: str) -> str:
     return s.translate(_forbidden_table)
 
 
-class PyMOLBackend(Backend[PyMOLSettings, str]):
+class PyMOLBackend(Complex3DBackend[PyMOLSettings, str]):
     def setup(
         self,
         handler: Callable[[str], None] | None = None,

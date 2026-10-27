@@ -20,7 +20,7 @@ StyleT = TypeVar("StyleT")
 
 
 @dataclass
-class Settings(Generic[StyleT]):
+class Complex3DBaseBackendSettings(Generic[StyleT]):
     """
     Attributes
     ----------
@@ -86,22 +86,22 @@ class Settings(Generic[StyleT]):
     )
 
 
-SettingsT = TypeVar("SettingsT", bound=Settings)
+BackendSettingsT = TypeVar("BackendSettingsT", bound=Complex3DBaseBackendSettings)
 ModelT = TypeVar("ModelT")
 
 
-class Backend(Protocol, Generic[SettingsT, ModelT]):
+class Complex3DBackend(Protocol, Generic[BackendSettingsT, ModelT]):
     """
     Protocol for a 3D visualization backend.
     """
 
-    settings: SettingsT
+    settings: BackendSettingsT
     interface: Any = None
     models: dict[Component, ModelT]
     residues: dict["ResidueId", Component]
     _model_count: int
 
-    def __init__(self, settings: SettingsT) -> None:
+    def __init__(self, settings: BackendSettingsT) -> None:
         """Initialize the backend with the given settings."""
         self.settings = settings
 
