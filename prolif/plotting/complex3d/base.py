@@ -1,16 +1,24 @@
-# setup
-# show cartoon (protein, and optionally peptide ligand)
-# show residue (for ligand and pocket)
-# show interaction
-# hide nonpolar hydrogens
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, TypeAlias, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    Protocol,
+    TypeAlias,
+    TypeVar,
+    cast,
+    runtime_checkable,
+)
 
 from prolif.plotting.utils import separated_interaction_colors
+from prolif.residue import ResidueId
 
 if TYPE_CHECKING:
     from prolif.molecule import Molecule
-    from prolif.residue import Residue, ResidueId
+    from prolif.residue import Residue
 
 Component: TypeAlias = Literal["ligand", "protein", "water"]
 
@@ -32,8 +40,12 @@ class Complex3DBaseBackendSettings(Generic[StyleT]):
         Style object for the protein.
     peptide_style : dict
         Style object for the ligand as a peptide if appropriate.
-    colors : dict
+    size : tuple[int, int]
+        Size of the 3D viewer in pixels.
+    colors : dict[str, str]
         Dictionnary of colors used in the plot for interactions.
+    color_overrides : dict[ResidueId, str]
+        Dictionnary of colors used to override the default color for specific residues.
     peptide_threshold : int = 5
         Ligands with this number of residues or more will be displayed using
         :attr:`peptide_style` in addition to the :attr:`ligand_style`.
@@ -58,9 +70,11 @@ class Complex3DBaseBackendSettings(Generic[StyleT]):
     residues_style: StyleT
     protein_style: StyleT
     peptide_style: StyleT
+    size: tuple[int, int] = (650, 600)
     colors: dict[str, str] = field(
         default_factory=lambda: {**separated_interaction_colors}
     )
+    color_overrides: dict[ResidueId, str] = field(default_factory=dict)
     peptide_threshold: int = 5
     ligand_displayed_atoms: dict = field(
         default_factory=lambda: {
@@ -85,18 +99,39 @@ class Complex3DBaseBackendSettings(Generic[StyleT]):
         default_factory=lambda: {"WaterBridge": "water"}
     )
 
+    @contextmanager
+    def overrides(self, **kwargs: Any) -> Iterator[None]:
+        """
+        Context manager to temporarily override settings.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Keyword arguments corresponding to the attributes of the settings.
+        """
+        original_values = {key: getattr(self, key) for key in kwargs}
+        try:
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+            yield
+        finally:
+            for key, value in original_values.items():
+                setattr(self, key, value)
+
 
 BackendSettingsT = TypeVar("BackendSettingsT", bound=Complex3DBaseBackendSettings)
 ModelT = TypeVar("ModelT")
+InterfaceT = TypeVar("InterfaceT")
 
 
-class Complex3DBackend(Protocol, Generic[BackendSettingsT, ModelT]):
+@runtime_checkable
+class Complex3DBackend(Protocol, Generic[BackendSettingsT, ModelT, InterfaceT]):
     """
     Protocol for a 3D visualization backend.
     """
 
     settings: BackendSettingsT
-    interface: Any = None
+    interface: InterfaceT
     models: dict[Component, ModelT]
     residues: dict["ResidueId", Component]
     _model_count: int
@@ -105,12 +140,12 @@ class Complex3DBackend(Protocol, Generic[BackendSettingsT, ModelT]):
         """Initialize the backend with the given settings."""
         self.settings = settings
 
-    def setup(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
+    def setup(self) -> None:
         """Setup the backend for a new plot."""
         self.prepare()
         self.clear()
 
-    def prepare(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
+    def prepare(self) -> None:
         """
         Prepare the backend for plotting new elements. This method must have defaults
         for all parameters.
@@ -150,5 +185,33 @@ class Complex3DBackend(Protocol, Generic[BackendSettingsT, ModelT]):
     ) -> None:
         """Add an interaction to the plot."""
 
-    def save_png(self, name: str) -> None:
+    def save_png(self, path: str) -> None:
         """Saves the current state of the 3D viewer to a PNG."""
+
+
+@dataclass
+class Complex3DBaseGridBackendSettings(Complex3DBaseBackendSettings[StyleT]):
+    __doc__ = (
+        cast(str, Complex3DBaseBackendSettings.__doc__)
+        + """\
+    grid_size : tuple[int, int]
+        Size of the grid in number of rows and columns.
+    grid_color_unique: str | None
+        Which color to use for residues that have interactions that are found in one
+        complex but not the other. Use ``None`` to disable the color override.
+    """
+    )
+
+    grid_size: tuple[int, int] = (900, 600)
+    grid_color_unique: str | None = None
+
+
+@runtime_checkable
+class Complex3DGridBackend(
+    Complex3DBackend[BackendSettingsT, ModelT, InterfaceT], Protocol
+):
+    def grid_setup(self, n_rows: int, n_columns: int) -> None:
+        """Setup the backend for a new grid plot."""
+
+    def grid_prepare(self, row: int, column: int) -> None:
+        """Prepare the backend for plotting new elements in a grid."""

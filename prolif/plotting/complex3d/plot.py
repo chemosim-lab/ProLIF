@@ -13,9 +13,10 @@ from __future__ import annotations
 
 import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
 from prolif.exceptions import RunRequiredError
+from prolif.plotting.complex3d.base import Complex3DGridBackend
 from prolif.plotting.complex3d.py3dmol_backend import Py3DmolBackend, Py3DMolSettings
 from prolif.plotting.complex3d.pymol_backend import PyMOLBackend, PyMOLSettings
 from prolif.plotting.utils import metadata_iterator
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
     from prolif.plotting.complex3d.base import (
         Complex3DBackend,
         Complex3DBaseBackendSettings,
+        Complex3DBaseGridBackendSettings,
     )
     from prolif.typeshed import Complex3DBackendSettings, Component
 
@@ -51,8 +53,6 @@ class Complex3D:
         relevant backend is used with default settings. If a
         :class:`prolif.plotting.complex3d.base.Complex3DBaseBackendSettings` object
         is provided, this will be used instead.
-    backend_kwargs: Any
-        Additional parameters passed to the backend's setup.
 
     .. versionchanged:: 2.1.0
         Added ``water_mol`` parameter to the constructor to display waters
@@ -76,11 +76,9 @@ class Complex3D:
         prot_mol: Molecule,
         water_mol: Molecule | None = None,
         backend_settings: "Complex3DBackendSettings" = "py3Dmol",
-        **backend_kwargs: Any,
     ) -> None:
         object.__setattr__(self, "backend", get_3d_plot_backend(backend_settings))
         self.backend: "Complex3DBackend"
-        self.backend_kwargs = backend_kwargs
         self.ifp = ifp
         self.lig_mol = lig_mol
         self.prot_mol = prot_mol
@@ -97,7 +95,6 @@ class Complex3D:
         *,
         frame: int,
         backend_settings: "Complex3DBackendSettings" = "py3Dmol",
-        **backend_kwargs: Any,
     ) -> Complex3D:
         """Creates a py3Dmol plot of interactions.
 
@@ -120,8 +117,6 @@ class Complex3D:
             relevant backend is used with default settings. If a
             :class:`prolif.plotting.complex3d.base.Complex3DBaseBackendSettings` object
             is provided, this will be used instead.
-        backend_kwargs: Any
-            Additional parameters passed to the backend's setup.
         """
         if not hasattr(fp, "ifp"):
             raise RunRequiredError(
@@ -129,18 +124,10 @@ class Complex3D:
                 " results.",
             )
         ifp = fp.ifp[frame]
-        return cls(
-            ifp,
-            lig_mol,
-            prot_mol,
-            water_mol,
-            backend_settings=backend_settings,
-            **backend_kwargs,
-        )
+        return cls(ifp, lig_mol, prot_mol, water_mol, backend_settings=backend_settings)
 
     def display(
         self,
-        size: tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: "bool | Component" = True,
@@ -149,8 +136,6 @@ class Complex3D:
 
         Parameters
         ----------
-        size: tuple[int, int] = (650, 600)
-            Size of the interface.
         display_all : bool = False
             Display all occurences for a given pair of residues and interaction, or only
             the shortest one. Not relevant if ``count=False`` in the ``Fingerprint``
@@ -178,13 +163,7 @@ class Complex3D:
 
         """
         # setup view parameters
-        if isinstance(self.backend, Py3DmolBackend):
-            kwargs: dict = {"viewergrid": (1, 1), "width": size[0], "height": size[1]}
-        elif isinstance(self.backend, PyMOLBackend):
-            kwargs = {"width": size[0], "height": size[1]}
-        else:
-            kwargs = {}
-        self.backend.setup(**{**self.backend_kwargs, **kwargs})
+        self.backend.setup()
         self.backend.prepare()
 
         # plot
@@ -200,10 +179,7 @@ class Complex3D:
         self,
         other: Complex3D,
         *,
-        size: tuple[int, int] = (900, 600),
         display_all: bool = False,
-        linked: bool = True,
-        color_unique: str | None = "magentaCarbon",
         only_interacting: bool = True,
         remove_hydrogens: "bool | Component" = True,
     ) -> Complex3D:
@@ -214,17 +190,10 @@ class Complex3D:
         ----------
         other: Complex3D
             Other ``Complex3D`` object to compare to.
-        size: tuple[int, int] = (900, 600)
-            The size of the interface.
         display_all : bool = False
             Display all occurences for a given pair of residues and interaction, or only
             the shortest one. Not relevant if ``count=False`` in the ``Fingerprint``
             object.
-        linked: bool = True
-            Link mouse interactions (pan, zoom, translate) on both views.
-        color_unique: str | None = "magentaCarbon",
-            Which color to use for residues that have interactions that are found in one
-            complex but not the other. Use ``None`` to disable the color override.
         only_interacting : bool = True
             Whether to show all protein residues in the vicinity of the ligand, or
             only the ones participating in an interaction.
@@ -240,6 +209,13 @@ class Complex3D:
             hidden. Added support for waters involved in WaterBridge interactions.
 
         """
+        if not isinstance(self.backend, Complex3DGridBackend):
+            raise TypeError(
+                "The current backend does not support grid plots, "
+                "please use a backend that supports it (e.g. 'py3Dmol')",
+            )
+
+        settings = cast("Complex3DBaseGridBackendSettings", self.backend.settings)
         # get set of interactions for both poses
         interactions1 = {
             (resid[1], i)
@@ -254,65 +230,39 @@ class Complex3D:
 
         # get residues with interactions specific to pose 1
         highlights = (
-            {r[0]: color_unique for r in interactions1 - interactions2}
-            if color_unique
+            {r[0]: settings.grid_color_unique for r in interactions1 - interactions2}
+            if settings.grid_color_unique
             else {}
         )
 
         # configure view parameters
-        if isinstance(self.backend, Py3DmolBackend):
-            kwargs: dict = {
-                "viewergrid": (1, 2),
-                "width": size[0],
-                "height": size[1],
-                "linked": linked,
-            }
-        else:
-            kwargs = {}
-
-        self.backend.setup(**{**self.backend_kwargs, **kwargs})
-
-        # prepare first plot
-        if isinstance(self.backend, Py3DmolBackend):
-            kwargs = {
-                "position": (0, 0),
-                "colormap": highlights,
-            }
-        else:
-            kwargs = {}
-        self.backend.prepare(**kwargs)
+        self.backend.grid_setup(n_rows=1, n_columns=2)
 
         # first plot
-        self._populate_view(
-            display_all=display_all,
-            only_interacting=only_interacting,
-            remove_hydrogens=remove_hydrogens,
-        )
+        self.backend.grid_prepare(row=0, column=0)
+        with settings.overrides(color_overrides=settings.color_overrides | highlights):
+            self._populate_view(
+                display_all=display_all,
+                only_interacting=only_interacting,
+                remove_hydrogens=remove_hydrogens,
+            )
 
         # get residues with interactions specific to pose 2
         highlights = (
-            {r[0]: color_unique for r in interactions2 - interactions1}
-            if color_unique
+            {r[0]: settings.grid_color_unique for r in interactions2 - interactions1}
+            if settings.grid_color_unique
             else {}
         )
-
-        # prepare second plot
-        if isinstance(self.backend, Py3DmolBackend):
-            kwargs = {
-                "position": (0, 1),
-                "colormap": highlights,
-            }
-        else:
-            kwargs = {}
         other.backend = self.backend  # copy current plot state to other
-        self.backend.prepare(**kwargs)
 
         # second plot
-        other._populate_view(
-            display_all=display_all,
-            only_interacting=only_interacting,
-            remove_hydrogens=remove_hydrogens,
-        )
+        self.backend.grid_prepare(row=0, column=1)
+        with settings.overrides(color_overrides=settings.color_overrides | highlights):
+            other._populate_view(
+                display_all=display_all,
+                only_interacting=only_interacting,
+                remove_hydrogens=remove_hydrogens,
+            )
         self.interface = self.backend.interface
         return self
 

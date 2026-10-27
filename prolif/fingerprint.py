@@ -75,11 +75,11 @@ if TYPE_CHECKING:
     from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
     from prolif.plotting.complex3d.plot import Complex3D
-    from prolif.plotting.complex3d.py3dmol_backend import Py3DMolSettings
-    from prolif.plotting.complex3d.pymol_backend import PyMOLSettings
     from prolif.plotting.network import LigNetwork
     from prolif.residue import ResidueId
     from prolif.typeshed import (
+        Complex3DBackendSettings,
+        Component,
         IFPData,
         IFPResults,
         InteractionMetadata,
@@ -1378,14 +1378,10 @@ class Fingerprint:
         water_mol: Molecule | None = None,
         *,
         frame: int,
-        size: tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
-        backend_settings: Union[
-            Literal["py3Dmol", "pymol"], "Py3DMolSettings", "PyMOLSettings"
-        ] = "py3Dmol",
-        **backend_kwargs: Any,
+        remove_hydrogens: "bool | Component" = True,
+        backend_settings: "Complex3DBackendSettings" = "py3Dmol",
     ) -> "Complex3D":
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
@@ -1413,16 +1409,10 @@ class Fingerprint:
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
-        sanitize: bool | Literal["ligand", "protein"] = "protein"
-            Whether to sanitize the RDKit molecules used for visualization.
-            This is to avoid unkekulization issues that may arise when using the
-            coordinates of the molecule.
-        backend_settings: Literal["py3Dmol", "pymol"] | Py3DMolSettings | PyMOLSettings = "py3Dmol"
+        backend_settings: Complex3DBackendSettings = "py3Dmol"
             The backend or backend settings to use. If a string is provided, the
             relevant backend is used with default settings. If a Settings object is
             provided, this will be used instead.
-        backend_kwargs: Any
-            Additional parameters passed to the backend's setup.
 
         See Also
         --------
@@ -1440,12 +1430,12 @@ class Fingerprint:
             molecules used for visualization, which can help avoid unkekulization
             issues when using the coordinates of the molecule directly.
 
-        .. versionchanged:: X.Y.Z
+        .. versionchanged:: 3.0.0
             Added support for multiple backends (``py3Dmol`` and ``pymol``) and moved
             most options to the ``backend_settings`` object. Removed ``sanitize``
             parameter as unrequired following the backend changes.
 
-        """  # noqa: E501
+        """
         from prolif.plotting.complex3d import Complex3D
 
         plot3d = Complex3D.from_fingerprint(
@@ -1455,10 +1445,8 @@ class Fingerprint:
             water_mol,
             frame=frame,
             backend_settings=backend_settings,
-            **backend_kwargs,
         )
         return plot3d.display(
-            size=size,
             display_all=display_all,
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
