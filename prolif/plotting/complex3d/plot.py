@@ -523,9 +523,21 @@ class Complex3D:
         if remove_hydrogens in {"protein", True}:
             to_hide.append(("protein", self.prot_mol))
         if remove_hydrogens in {"water", True} and self.water_mol:
-            to_hide.append(("water", self.water_mol))
-        for component, mol in to_hide:
+            # keep all hydrogens in interacting water molecules
+            interacting_waters = {
+                ResidueId.from_atom(self.water_mol.GetAtomWithIdx(i))
+                for i in self._interacting_atoms["water"]
+            }
             keep_indices: list[int] = [
+                atom.GetIdx()
+                for atom in self.water_mol.GetAtoms()
+                if atom.GetAtomicNum() == 1
+                and ResidueId.from_atom(atom) in interacting_waters
+            ]
+            self.backend.hide_hydrogens("water", keep_indices)
+
+        for component, mol in to_hide:
+            keep_indices = [
                 index
                 for index in self._interacting_atoms[component]
                 if mol.GetAtomWithIdx(index).GetAtomicNum() == 1
