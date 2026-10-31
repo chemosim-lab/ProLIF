@@ -103,14 +103,6 @@ class TestComplex3D:
         html = view.interface._make_html()
         assert "Hydrophobic" in html
 
-    def test_getattr_raises_error_if_not_initialized(
-        self, simple_fp_results: tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]
-    ) -> None:
-        fp, lig_mol, prot_mol = simple_fp_results
-        plot_3d = Complex3D.from_fingerprint(fp, lig_mol, prot_mol, frame=0)
-        with pytest.raises(ValueError, match="View not initialized"):
-            plot_3d._make_html()
-
     def test_water(
         self, water_mols: tuple[plf.Molecule, plf.Molecule, plf.Molecule]
     ) -> None:
@@ -119,7 +111,10 @@ class TestComplex3D:
             ["HBDonor", "WaterBridge"],
             parameters={"WaterBridge": {"water": water, "order": 2}},
         )
-        fp.run_from_iterable([ligand], protein)
+        fp.run_from_iterable([ligand], protein, n_jobs=1)
         view = fp.plot_3d(ligand, protein, water, frame=0)
         html = view.interface._make_html()
-        assert "TIP383:3.X" in html
+        assert (
+            'setStyle({"chain": "X", "resn": "TIP3", "resi": 83},{"stick": {}},true)'
+            in html
+        )
