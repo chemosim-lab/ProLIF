@@ -11,7 +11,6 @@ Plot interactions in 3D --- :mod:`prolif.plotting.complex3d`
 
 from __future__ import annotations
 
-import warnings
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Literal, cast, overload
 
@@ -505,39 +504,6 @@ class Complex3D:
                 "View not initialized, did you call `display`/`compare` first?",
             )
         self.backend.save_png(name)
-
-    def __getattr__(self, name: str) -> Any:
-        """Get an attribute from the interface."""
-        if isinstance(self.backend, Py3DmolBackend):
-            if self.interface is None:
-                raise ValueError(
-                    "View not initialized, did you call `display`/`compare` first?",
-                )
-            warnings.warn(
-                f"Accessing `.{name}` from a Complex3D object is deprecated, "
-                "go through the `interface` attribute first, "
-                f"i.e. `.interface.{name}` instead of `.{name}`",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            return getattr(self.interface, name)
-        return super().__getattribute__(name)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if isinstance(self.backend, Py3DmolBackend) and hasattr(
-            self.backend.settings, name.lower()
-        ):
-            warnings.warn(
-                f"Configuring Py3Dmol styles/options `.{name}` on a Complex3D object "
-                "is deprecated, use "
-                f"`backend_settings=Py3DmolSettings({name.lower()}={value})` "
-                "when creating the plot instead",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            setattr(self.backend.settings, name.lower(), value)
-        else:
-            super().__setattr__(name, value)
 
     def _repr_html_(self) -> str | None:
         if self.interface and hasattr(self.interface, "_repr_html_"):
