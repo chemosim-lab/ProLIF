@@ -57,7 +57,7 @@ class PyMOLRPCServer(Protocol):
 
 
 Complex3DBackendSettings: TypeAlias = (
-    "Literal['py3Dmol', 'pymol']"
+    "Literal['py3dmol', 'pymol']"
     " | Py3DMolSettings"
     " | PyMOLSettings"
     " | Complex3DBaseBackendSettings"

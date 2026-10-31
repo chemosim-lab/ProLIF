@@ -6,6 +6,7 @@ from typing import (
     Any,
     Generic,
     Literal,
+    NamedTuple,
     Protocol,
     TypeAlias,
     TypeVar,
@@ -23,8 +24,28 @@ if TYPE_CHECKING:
 Component: TypeAlias = Literal["ligand", "protein", "water"]
 
 _RING_SYSTEMS = ("PiStacking", "EdgeToFace", "FaceToFace")
+_COMPLEX3D_BACKENDS: dict[
+    str | type["Complex3DBaseBackendSettings"], "Complex3DBackendSpec"
+] = {}
+
+
+class Complex3DBackendSpec(NamedTuple):
+    name: str
+    backend: type["Complex3DBackend"]
+    settings: type["Complex3DBaseBackendSettings"]
+
+
+def get_backend(backend: "str | Complex3DBaseBackendSettings") -> Complex3DBackendSpec:
+    """Returns the :class:`Complex3DBackendSpec` matching with ``backend``."""
+    query = backend if isinstance(backend, str) else type(backend)
+    spec = _COMPLEX3D_BACKENDS.get(query)
+    if spec is None:
+        raise ValueError(f"Unknown backend {backend!r}")
+    return spec
+
 
 StyleT = TypeVar("StyleT")
+StyleT_contra = TypeVar("StyleT_contra", contravariant=True)
 
 
 @dataclass
@@ -32,13 +53,13 @@ class Complex3DBaseBackendSettings(Generic[StyleT]):
     """
     Attributes
     ----------
-    ligand_style : dict
+    ligand_style : StyleT
         Style object for the ligand.
-    residues_style : dict
+    residues_style : StyleT
         Style object for any residue involved in interactions.
-    protein_style : dict
+    protein_style : StyleT
         Style object for the protein.
-    peptide_style : dict
+    peptide_style : StyleT
         Style object for the ligand as a peptide if appropriate.
     size : tuple[int, int]
         Size of the 3D viewer in pixels.
@@ -46,6 +67,7 @@ class Complex3DBaseBackendSettings(Generic[StyleT]):
         Dictionnary of colors used in the plot for interactions.
     color_overrides : dict[ResidueId, str]
         Dictionnary of colors used to override the default color for specific residues.
+        Note that this needs to be a valid color for the backend.
     peptide_threshold : int = 5
         Ligands with this number of residues or more will be displayed using
         :attr:`peptide_style` in addition to the :attr:`ligand_style`.
@@ -125,7 +147,9 @@ InterfaceT = TypeVar("InterfaceT")
 
 
 @runtime_checkable
-class Complex3DBackend(Protocol, Generic[BackendSettingsT, ModelT, InterfaceT]):
+class Complex3DBackend(
+    Protocol, Generic[BackendSettingsT, StyleT_contra, ModelT, InterfaceT]
+):
     """
     Protocol for a 3D visualization backend.
     """
@@ -135,6 +159,23 @@ class Complex3DBackend(Protocol, Generic[BackendSettingsT, ModelT, InterfaceT]):
     models: dict[Component, ModelT]
     residues: dict["ResidueId", Component]
     _model_count: int
+
+    def __init_subclass__(
+        cls,
+        settings: type[Complex3DBaseBackendSettings] | None,
+        backend: str | None = None,
+    ) -> None:
+        """Registers new Complex3D backends.
+
+        If no ``settings`` is specified, the class is not registered (e.g. for base
+        classes).
+        """
+        if settings is not None:
+            name = backend or cls.__name__.lower().replace("backend", "")
+            spec = Complex3DBackendSpec(name=name, backend=cls, settings=settings)
+            _COMPLEX3D_BACKENDS[name] = spec
+            _COMPLEX3D_BACKENDS[settings] = spec
+        return super().__init_subclass__()
 
     def __init__(self, settings: BackendSettingsT) -> None:
         """Initialize the backend with the given settings."""
@@ -160,14 +201,16 @@ class Complex3DBackend(Protocol, Generic[BackendSettingsT, ModelT, InterfaceT]):
     def finalize(self) -> None:
         """Finalize the plot, e.g. zoom to the ligand."""
 
-    def load_molecule(self, mol: "Molecule", component: Component, style: Any) -> None:
+    def load_molecule(
+        self, mol: "Molecule", component: Component, style: StyleT_contra
+    ) -> None:
         """Load a molecule into the view with the given style."""
 
     def show_residue(
         self,
         residue: "Residue",
         component: Component,
-        style: Any,  # noqa: ARG002
+        style: StyleT_contra,  # noqa: ARG002
     ) -> None:
         """Show a residue on the plot."""
         self.residues[residue.resid] = component
@@ -208,7 +251,9 @@ class Complex3DBaseGridBackendSettings(Complex3DBaseBackendSettings[StyleT]):
 
 @runtime_checkable
 class Complex3DGridBackend(
-    Complex3DBackend[BackendSettingsT, ModelT, InterfaceT], Protocol
+    Complex3DBackend[BackendSettingsT, StyleT_contra, ModelT, InterfaceT],
+    Protocol,
+    settings=None,
 ):
     def grid_setup(self, n_rows: int, n_columns: int) -> None:
         """Setup the backend for a new grid plot."""
