@@ -84,7 +84,10 @@ class Py3DMolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
     linked: bool = True
 
 
-class Py3DmolBackend(Complex3DGridBackend[Py3DMolSettings, int, py3Dmol.view]):
+class Py3DmolBackend(
+    Complex3DGridBackend[Py3DMolSettings, dict[str, dict], int, py3Dmol.view],  # type: ignore[no-any-unimported]
+    settings=Py3DMolSettings,
+):
     def setup(self) -> None:
         self.interface = py3Dmol.view(
             viewergrid=(1, 1), width=self.settings.size[0], height=self.settings.size[1]

@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class PyMOLSettings(Complex3DBaseBackendSettings):
+class PyMOLSettings(Complex3DBaseBackendSettings[dict[str, list[str]]]):
     __doc__ = (
         cast(str, Complex3DBaseBackendSettings.__doc__)
         + """\
@@ -157,7 +157,10 @@ class PyMOLScreenshot:
         )
 
 
-class PyMOLBackend(Complex3DBackend[PyMOLSettings, str, PyMOLScreenshot]):
+class PyMOLBackend(
+    Complex3DBackend[PyMOLSettings, dict[str, list[str]], str, PyMOLScreenshot],
+    settings=PyMOLSettings,
+):
     def setup(self) -> None:
         handler = self.settings.handler
         self.cmd = handler or get_rpc_server().do

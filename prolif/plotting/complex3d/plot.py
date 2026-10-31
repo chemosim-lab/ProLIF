@@ -12,10 +12,16 @@ Plot interactions in 3D --- :mod:`prolif.plotting.complex3d`
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Literal, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast, overload
 
 from prolif.exceptions import RunRequiredError
-from prolif.plotting.complex3d.base import Complex3DGridBackend
+from prolif.plotting.complex3d.base import (
+    Complex3DBackend,
+    Complex3DBaseBackendSettings,
+    Complex3DBaseGridBackendSettings,
+    Complex3DGridBackend,
+    get_backend,
+)
 from prolif.plotting.complex3d.py3dmol_backend import Py3DmolBackend, Py3DMolSettings
 from prolif.plotting.complex3d.pymol_backend import PyMOLBackend, PyMOLSettings
 from prolif.plotting.utils import metadata_iterator
@@ -26,15 +32,12 @@ if TYPE_CHECKING:
     from prolif.fingerprint import Fingerprint
     from prolif.ifp import IFP
     from prolif.molecule import Molecule
-    from prolif.plotting.complex3d.base import (
-        Complex3DBackend,
-        Complex3DBaseBackendSettings,
-        Complex3DBaseGridBackendSettings,
-    )
     from prolif.typeshed import Complex3DBackendSettings, Component
 
+BackendT = TypeVar("BackendT", bound=Complex3DBackend)
 
-class Complex3D:
+
+class Complex3D(Generic[BackendT]):
     """Creates a py3Dmol plot of interactions.
 
     Parameters
@@ -63,7 +66,7 @@ class Complex3D:
         vicinity of the ligand, or only the ones participating in an interaction.
 
     .. versionchanged:: 3.0.0
-        Added support for multiple backends (``py3Dmol`` and ``pymol``) and moved
+        Added support for multiple backends (``py3dmol`` and ``pymol``) and moved
         most options to the ``backend_settings`` object (accessible through
         :attr:`backend`'s :attr:`settings`).
     """
@@ -74,10 +77,9 @@ class Complex3D:
         lig_mol: Molecule,
         prot_mol: Molecule,
         water_mol: Molecule | None = None,
-        backend_settings: "Complex3DBackendSettings" = "py3Dmol",
+        backend_settings: "Complex3DBackendSettings" = "py3dmol",
     ) -> None:
-        object.__setattr__(self, "backend", get_3d_plot_backend(backend_settings))
-        self.backend: "Complex3DBackend"
+        self.backend = cast(BackendT, get_3d_plot_backend(backend_settings))
         self.ifp = ifp
         self.lig_mol = lig_mol
         self.prot_mol = prot_mol
@@ -93,7 +95,7 @@ class Complex3D:
         water_mol: Molecule | None = None,
         *,
         frame: int,
-        backend_settings: "Complex3DBackendSettings" = "py3Dmol",
+        backend_settings: "Complex3DBackendSettings" = "py3dmol",
     ) -> Complex3D:
         """Creates a py3Dmol plot of interactions.
 
@@ -356,7 +358,7 @@ class Complex3D:
                 (pres, "protein", settings.residues_style),
             ]:
                 if res.resid not in backend.residues:
-                    backend.show_residue(res, component, style)
+                    backend.show_residue(res, component, style)  # type:ignore[arg-type]
             for interaction, metadata_tuple in interactions.items():
                 # whether to display all interactions or only the one with the shortest
                 # distance
@@ -513,29 +515,20 @@ class Complex3D:
 
 @overload
 def get_3d_plot_backend(
-    settings: Literal["py3Dmol"] | Py3DMolSettings,
+    backend: Literal["py3dmol"] | Py3DMolSettings,
 ) -> Py3DmolBackend: ...
 @overload
-def get_3d_plot_backend(settings: Literal["pymol"] | PyMOLSettings) -> PyMOLBackend: ...
+def get_3d_plot_backend(backend: Literal["pymol"] | PyMOLSettings) -> PyMOLBackend: ...
 @overload
 def get_3d_plot_backend(
-    settings: "Complex3DBaseBackendSettings",
+    backend: "Complex3DBaseBackendSettings",
 ) -> Complex3DBackend: ...
-def get_3d_plot_backend(
-    settings: "Complex3DBackendSettings",
-) -> Complex3DBackend:
+def get_3d_plot_backend(backend: "Complex3DBackendSettings") -> Complex3DBackend:
     """Get the backend for making 3D plots."""
-    if isinstance(settings, str):
-        if settings == "py3Dmol":
-            settings = Py3DMolSettings()
-        elif settings == "pymol":
-            settings = PyMOLSettings()
-        else:
-            raise ValueError(f"Unknown backend: {settings}")
-    if isinstance(settings, Py3DMolSettings):
-        return Py3DmolBackend(settings)
-    if isinstance(settings, PyMOLSettings):
-        return PyMOLBackend(settings)
-    raise TypeError(
-        f"Expected Py3DMolSettings or PyMOLSettings, got {type(settings)}",
+    spec = get_backend(backend)
+    settings = (
+        backend
+        if isinstance(backend, Complex3DBaseBackendSettings)
+        else spec.settings()  # type: ignore[call-arg]
     )
+    return spec.backend(settings)

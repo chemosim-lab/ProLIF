@@ -1381,7 +1381,7 @@ class Fingerprint:
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: "bool | Component" = True,
-        backend_settings: "Complex3DBackendSettings" = "py3Dmol",
+        backend_settings: "Complex3DBackendSettings" = "py3dmol",
     ) -> "Complex3D":
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
@@ -1409,7 +1409,7 @@ class Fingerprint:
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
-        backend_settings: Complex3DBackendSettings = "py3Dmol"
+        backend_settings: Complex3DBackendSettings = "py3dmol"
             The backend or backend settings to use. If a string is provided, the
             relevant backend is used with default settings. If a Settings object is
             provided, this will be used instead.
