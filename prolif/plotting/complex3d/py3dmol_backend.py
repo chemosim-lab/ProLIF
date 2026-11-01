@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class Py3DMolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
+class Py3DmolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
     __doc__ = (
         cast(str, Complex3DBaseGridBackendSettings.__doc__)
         + """\
@@ -85,8 +85,8 @@ class Py3DMolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
 
 
 class Py3DmolBackend(
-    Complex3DGridBackend[Py3DMolSettings, dict[str, dict], int, py3Dmol.view],  # type: ignore[no-any-unimported]
-    settings=Py3DMolSettings,
+    Complex3DGridBackend[Py3DmolSettings, dict[str, dict], int, py3Dmol.view],  # type: ignore[no-any-unimported]
+    settings=Py3DmolSettings,
 ):
     def setup(self) -> None:
         self.interface = py3Dmol.view(
