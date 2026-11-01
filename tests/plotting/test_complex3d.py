@@ -113,6 +113,7 @@ class TestComplex3D:
         )
         fp.run_from_iterable([ligand], protein, n_jobs=1)
         view = fp.plot_3d(ligand, protein, water, frame=0)
+        assert view.interface
         html = view.interface._make_html()
         assert (
             'setStyle({"chain": "X", "resn": "TIP3", "resi": 83},{"stick": {}},true)'

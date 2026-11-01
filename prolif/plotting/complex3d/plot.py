@@ -7,15 +7,26 @@ Plot interactions in 3D --- :mod:`prolif.plotting.complex3d`
 .. autoclass:: Complex3D
    :members:
 
+.. autofunction:: get_3d_plot_backend
+
 """
 
-from __future__ import annotations
-
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Generic,
+    Literal,
+    Self,
+    TypeAlias,
+    TypeVar,
+    cast,
+    overload,
+)
 
 from prolif.exceptions import RunRequiredError
 from prolif.plotting.complex3d.base import (
+    COMPLEX3D_BACKENDS,
     Complex3DBackend,
     Complex3DBaseBackendSettings,
     Complex3DGridBackend,
@@ -28,15 +39,27 @@ from prolif.residue import ResidueId
 from prolif.utils import get_residues_near_ligand
 
 if TYPE_CHECKING:
+    import py3Dmol
+
     from prolif.fingerprint import Fingerprint
     from prolif.ifp import IFP
     from prolif.molecule import Molecule
-    from prolif.typeshed import Complex3DBackendSettings, Component
+    from prolif.plotting.complex3d.pymol_backend import PyMOLScreenshot
+    from prolif.typeshed import Component
 
 BackendSettingsT = TypeVar("BackendSettingsT", bound=Complex3DBaseBackendSettings)
+InterfaceT = TypeVar("InterfaceT")
+
+Complex3DBackendSettings: TypeAlias = (
+    Literal["py3dmol", "pymol"]
+    | Py3DmolSettings
+    | PyMOLSettings
+    | str
+    | Complex3DBaseBackendSettings
+)
 
 
-class Complex3D(Generic[BackendSettingsT]):
+class Complex3D(Generic[BackendSettingsT, InterfaceT]):
     """Creates a py3Dmol plot of interactions.
 
     Parameters
@@ -47,7 +70,7 @@ class Complex3D(Generic[BackendSettingsT]):
         The ligand molecule to display.
     prot_mol : Molecule
         The protein molecule to display.
-    water_mol : Optional[Molecule]
+    water_mol : Molecule | None
         Additional molecule (e.g. waters) to display.
     backend_settings: Complex3DBackendSettings
         The backend or backend settings to use. If a string is provided, the
@@ -71,61 +94,61 @@ class Complex3D(Generic[BackendSettingsT]):
     """
 
     @overload
-    def __init__(
-        self: Complex3D[Py3DmolSettings],
-        ifp: IFP,
-        lig_mol: Molecule,
-        prot_mol: Molecule,
-        water_mol: Molecule | None,
+    def __init__(  # type: ignore[no-any-unimported]
+        self: "Complex3D[Py3DmolSettings, py3Dmol.view]",
+        ifp: "IFP",
+        lig_mol: "Molecule",
+        prot_mol: "Molecule",
+        water_mol: "Molecule | None",
         backend_settings: Literal["py3dmol"] | Py3DmolSettings,
     ) -> None: ...
     @overload
     def __init__(
-        self: Complex3D[PyMOLSettings],
-        ifp: IFP,
-        lig_mol: Molecule,
-        prot_mol: Molecule,
-        water_mol: Molecule | None,
+        self: "Complex3D[PyMOLSettings, PyMOLScreenshot]",
+        ifp: "IFP",
+        lig_mol: "Molecule",
+        prot_mol: "Molecule",
+        water_mol: "Molecule | None",
         backend_settings: Literal["pymol"] | PyMOLSettings,
     ) -> None: ...
     @overload
     def __init__(
-        self: Complex3D[Complex3DBaseBackendSettings],
-        ifp: IFP,
-        lig_mol: Molecule,
-        prot_mol: Molecule,
-        water_mol: Molecule | None,
+        self: "Complex3D[Complex3DBaseBackendSettings, Any]",
+        ifp: "IFP",
+        lig_mol: "Molecule",
+        prot_mol: "Molecule",
+        water_mol: "Molecule | None",
         backend_settings: str | Complex3DBaseBackendSettings,
     ) -> None: ...
     def __init__(
         self,
-        ifp: IFP,
-        lig_mol: Molecule,
-        prot_mol: Molecule,
-        water_mol: Molecule | None = None,
+        ifp: "IFP",
+        lig_mol: "Molecule",
+        prot_mol: "Molecule",
+        water_mol: "Molecule | None" = None,
         backend_settings: "Complex3DBackendSettings" = "py3dmol",
     ) -> None:
         self.backend = cast(
-            Complex3DBackend[BackendSettingsT, Any, Any, Any],
+            Complex3DBackend[BackendSettingsT, Any, Any, InterfaceT],
             get_3d_plot_backend(backend_settings),
         )
         self.ifp = ifp
         self.lig_mol = lig_mol
         self.prot_mol = prot_mol
         self.water_mol = water_mol
-        self.interface: Any = None
+        self.interface: InterfaceT | None = None
 
     @classmethod
     def from_fingerprint(
         cls,
-        fp: Fingerprint,
-        lig_mol: Molecule,
-        prot_mol: Molecule,
-        water_mol: Molecule | None = None,
+        fp: "Fingerprint",
+        lig_mol: "Molecule",
+        prot_mol: "Molecule",
+        water_mol: "Molecule | None" = None,
         *,
         frame: int,
         backend_settings: "Complex3DBackendSettings" = "py3dmol",
-    ) -> Complex3D:
+    ) -> Self:
         """Creates a py3Dmol plot of interactions.
 
         Parameters
@@ -140,7 +163,7 @@ class Complex3D(Generic[BackendSettingsT]):
             The ligand molecule to display.
         prot_mol : Molecule
             The protein molecule to display.
-        water_mol : Optional[Molecule]
+        water_mol : Molecule | None
             Additional molecule (e.g. waters) to display.
         backend_settings: Complex3DBackendSettings
             The backend or backend settings to use. If a string is provided, the
@@ -161,7 +184,7 @@ class Complex3D(Generic[BackendSettingsT]):
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: "bool | Component" = True,
-    ) -> Complex3D:
+    ) -> Self:
         """Display the complex in 3D.
 
         Parameters
@@ -207,12 +230,12 @@ class Complex3D(Generic[BackendSettingsT]):
 
     def compare(
         self,
-        other: Complex3D,
+        other: "Complex3D",
         *,
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: "bool | Component" = True,
-    ) -> Complex3D:
+    ) -> Self:
         """Displays the initial complex side-by-side with a second one for easier
         comparison.
 
@@ -239,10 +262,24 @@ class Complex3D(Generic[BackendSettingsT]):
             hidden. Added support for waters involved in WaterBridge interactions.
 
         """
-        if not isinstance(self.backend, Complex3DGridBackend):
+        if not isinstance(other.backend, type(self.backend)):
+            raise TypeError("The backend for both complexes must be the same")
+        if not (
+            isinstance(self.backend, Complex3DGridBackend)
+            and isinstance(other.backend, Complex3DGridBackend)
+        ):
+            supported = ", ".join(
+                sorted(
+                    {
+                        spec.name
+                        for spec in COMPLEX3D_BACKENDS.values()
+                        if issubclass(spec.backend, Complex3DGridBackend)
+                    }
+                )
+            )
             raise TypeError(
-                "The current backend does not support grid plots, "
-                "please use a backend that supports it (e.g. 'py3Dmol')",
+                "The backend for these complexes does not support grid plots, "
+                f"please use one of these compatible backends instead: {supported}",
             )
 
         # get set of interactions for both poses
@@ -309,12 +346,12 @@ class Complex3D(Generic[BackendSettingsT]):
 
     def add(
         self,
-        other: Complex3D,
+        other: "Complex3D",
         *,
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: "bool | Component" = True,
-    ) -> Complex3D:
+    ) -> Self:
         """Add another ``Complex3D`` object to the current plot.
 
         Parameters
@@ -496,7 +533,7 @@ class Complex3D(Generic[BackendSettingsT]):
 
         backend.finalize()
 
-    def _show_unpaired_residues(self, mol: Molecule, component: "Component") -> None:
+    def _show_unpaired_residues(self, mol: "Molecule", component: "Component") -> None:
         pocket_residues = get_residues_near_ligand(self.lig_mol, mol)
         unpaired_residues = set(pocket_residues).difference(self.backend.residues)
         for resid in unpaired_residues:
@@ -508,7 +545,7 @@ class Complex3D(Generic[BackendSettingsT]):
     def _hide_hydrogens(
         self, remove_hydrogens: bool | Literal["ligand", "protein", "water"]
     ) -> None:
-        to_hide: list[tuple["Component", Molecule]] = []
+        to_hide: list[tuple["Component", "Molecule"]] = []
         if remove_hydrogens in {"ligand", True}:
             to_hide.append(("ligand", self.lig_mol))
         if remove_hydrogens in {"protein", True}:
