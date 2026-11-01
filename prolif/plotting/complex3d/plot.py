@@ -245,7 +245,6 @@ class Complex3D(Generic[BackendSettingsT]):
                 "please use a backend that supports it (e.g. 'py3Dmol')",
             )
 
-        settings = self.backend.settings
         # get set of interactions for both poses
         interactions1 = {
             (resid[1], i)
@@ -259,9 +258,10 @@ class Complex3D(Generic[BackendSettingsT]):
         }
 
         # get residues with interactions specific to pose 1
+        settings1 = self.backend.settings
         highlights = (
-            {r[0]: settings.grid_color_unique for r in interactions1 - interactions2}
-            if settings.grid_color_unique
+            {r[0]: settings1.grid_color_unique for r in interactions1 - interactions2}
+            if settings1.grid_color_unique
             else {}
         )
 
@@ -270,7 +270,9 @@ class Complex3D(Generic[BackendSettingsT]):
 
         # first plot
         self.backend.grid_prepare(row=0, column=0)
-        with settings.overrides(color_overrides=settings.color_overrides | highlights):
+        with settings1.overrides(
+            color_overrides=settings1.color_overrides | highlights
+        ):
             self._populate_view(
                 display_all=display_all,
                 only_interacting=only_interacting,
@@ -278,22 +280,31 @@ class Complex3D(Generic[BackendSettingsT]):
             )
 
         # get residues with interactions specific to pose 2
+        settings2 = other.backend.settings
         highlights = (
-            {r[0]: settings.grid_color_unique for r in interactions2 - interactions1}
-            if settings.grid_color_unique
+            {r[0]: settings2.grid_color_unique for r in interactions2 - interactions1}
+            if settings2.grid_color_unique
             else {}
         )
-        other.backend = self.backend  # copy current plot state to other
+        backend = other.backend = self.backend  # copy current plot state to other
+        backend.settings = settings2
 
         # second plot
-        self.backend.grid_prepare(row=0, column=1)
-        with settings.overrides(color_overrides=settings.color_overrides | highlights):
+        backend.grid_prepare(row=0, column=1)
+        with settings2.overrides(
+            color_overrides=settings2.color_overrides | highlights
+        ):
             other._populate_view(
                 display_all=display_all,
                 only_interacting=only_interacting,
                 remove_hydrogens=remove_hydrogens,
             )
-        self.interface = self.backend.interface
+
+        self.interface = backend.interface
+
+        # restore
+        other.backend = get_3d_plot_backend(settings2)
+        backend.settings = settings1
         return self
 
     def add(
