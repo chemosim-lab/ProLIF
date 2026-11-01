@@ -44,7 +44,11 @@ class PyMOLSettings(Complex3DBaseBackendSettings[dict[str, list[str]]]):
     handler: Callable[[str], None] | None = None
         Function to call for each command sent to PyMOL. If ``None``, the
         :class:`~prolif.plotting.complex3d.pymol_backend.PyMOLRPCServer` will be used to
-        send commands to a running PyMOL instance.
+        send commands to a running PyMOL instance. This can be used to write a PyMOL
+        script instead of sending commands to a running PyMOL instance.
+    screenshot_timeout: float = 2.0
+        Timeout in seconds to wait for the PNG screenshot to be written. Note that this
+        freezes PyMOL until the screenshot is written.
     """
     )
     ligand_style: dict[str, list[str]] = field(
@@ -69,6 +73,7 @@ class PyMOLSettings(Complex3DBaseBackendSettings[dict[str, list[str]]]):
     )
     group_id: str = "complex"
     handler: Callable[[str], None] | None = None
+    screenshot_timeout: float = 2.0
 
 
 @cache
@@ -98,6 +103,7 @@ def _strip_forbidden_chars(s: str) -> str:
 class PyMOLScreenshot:
     callback: Callable[[str], None]
     is_interactive: bool
+    timeout: float
 
     def save_png(self, path: Path, **kwargs: Any) -> None:
         # wait for all commands to be done
@@ -170,7 +176,9 @@ class PyMOLBackend(
         handler = self.settings.handler
         self.cmd = handler or get_rpc_server().do
         self.interface = PyMOLScreenshot(
-            callback=self.cmd, is_interactive=handler is None
+            callback=self.cmd,
+            is_interactive=handler is None,
+            timeout=self.settings.screenshot_timeout,
         )
         super().setup()
 
@@ -185,6 +193,7 @@ class PyMOLBackend(
 
     def finalize(self) -> None:
         self.cmd("valence guess, all")
+        self.cmd("set dash_width, 5")
         model_id = self.models["ligand"]
         self.cmd(f"zoom %{model_id}")
 
