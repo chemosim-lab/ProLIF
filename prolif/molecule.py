@@ -18,9 +18,7 @@ from prolif.residue import Residue, ResidueGroup, ResidueId
 from prolif.utils import catch_rdkit_logs, catch_warning, split_mol_by_residues
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
-    from prolif.typeshed import MDAObject, ResidueKey
+    from prolif.typeshed import MDAObject, PathLike, ResidueKey
 
     Self = TypeVar("Self", bound=BaseRDKitMol)
 
@@ -242,7 +240,7 @@ class pdbqt_supplier(Sequence[Molecule]):
 
     Parameters
     ----------
-    paths : list
+    paths : Iterable[PathLike]
         A list (or any iterable) of PDBQT files
     template : rdkit.Chem.rdchem.Mol
         A template molecule with the correct bond orders and charges. It must
@@ -289,7 +287,7 @@ class pdbqt_supplier(Sequence[Molecule]):
 
     def __init__(
         self,
-        paths: Iterable[Union[str, "Path"]],
+        paths: Iterable["PathLike"],
         template: Chem.Mol,
         converter_kwargs: dict | None = None,
         **kwargs: Any,
@@ -321,7 +319,7 @@ class pdbqt_supplier(Sequence[Molecule]):
         pdbqt_path = self.paths[index]
         return self.pdbqt_to_mol(pdbqt_path)
 
-    def pdbqt_to_mol(self, pdbqt_path: Union[str, "Path"]) -> Molecule:
+    def pdbqt_to_mol(self, pdbqt_path: "PathLike") -> Molecule:
         with catch_warning(message=r"^Failed to guess the mass"):
             pdbqt = mda.Universe(pdbqt_path)
         # set attributes needed by the converter
@@ -391,7 +389,7 @@ class sdf_supplier(Sequence[Molecule]):
 
     Parameters
     ----------
-    path : str
+    path : PathLike
         A path to the .sdf file
     sanitize : bool
         Whether to sanitize each molecule or not.
@@ -424,9 +422,9 @@ class sdf_supplier(Sequence[Molecule]):
 
     """
 
-    def __init__(self, path: str, sanitize: bool = True, **kwargs: Any) -> None:
-        self.path = path
-        self._suppl = Chem.SDMolSupplier(path, removeHs=False, sanitize=sanitize)
+    def __init__(self, path: "PathLike", sanitize: bool = True, **kwargs: Any) -> None:
+        self.path = str(path)
+        self._suppl = Chem.SDMolSupplier(self.path, removeHs=False, sanitize=sanitize)
         self._kwargs = kwargs
 
     def __iter__(self) -> Iterator[Molecule]:
@@ -457,7 +455,7 @@ class mol2_supplier(Sequence[Molecule]):
 
     Parameters
     ----------
-    path : str
+    path : PathLike
         A path to the .mol2 file
     sanitize : bool
         Whether to sanitize each molecule or not.
@@ -496,7 +494,7 @@ class mol2_supplier(Sequence[Molecule]):
 
     def __init__(
         self,
-        path: Union[str, "Path"],
+        path: "PathLike",
         cleanup_substructures: bool = True,
         sanitize: bool = True,
         **kwargs: Any,

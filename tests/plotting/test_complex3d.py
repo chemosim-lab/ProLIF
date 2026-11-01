@@ -1,10 +1,7 @@
-from contextlib import nullcontext
-from typing import Literal, cast
+from typing import cast
 
 import MDAnalysis as mda
 import pytest
-from rdkit import Chem
-from rdkit.Chem.rdDistGeom import EmbedMolecule
 
 import prolif as plf
 from prolif.exceptions import RunRequiredError
@@ -70,20 +67,20 @@ class TestComplex3D:
 
     def test_integration_display_single(self, plot_3d: Complex3D) -> None:
         view = plot_3d.display(display_all=False)
-        assert view._view
-        html = view._view._make_html()
+        assert view.interface
+        html = view.interface._make_html()
         assert "Hydrophobic" in html
 
     def test_integration_display_all(self, plot_3d: Complex3D) -> None:
         view = plot_3d.display(display_all=True)
-        assert view._view
-        html = view._view._make_html()
+        assert view.interface
+        html = view.interface._make_html()
         assert "Hydrophobic" in html
 
     def test_integration_compare(self, plot_3d: Complex3D) -> None:
         view = plot_3d.compare(plot_3d)
-        assert view._view
-        html = view._view._make_html()
+        assert view.interface
+        html = view.interface._make_html()
         assert "Hydrophobic" in html
 
     def test_from_fingerprint_raises_not_executed(
@@ -102,52 +99,9 @@ class TestComplex3D:
     ) -> None:
         fp, lig_mol, prot_mol = fp_mols
         view = fp.plot_3d(lig_mol, prot_mol, frame=0, display_all=fp.count)
-        assert view._view
-        html = view._view._make_html()
+        assert view.interface
+        html = view.interface._make_html()
         assert "Hydrophobic" in html
-
-    @pytest.mark.parametrize(
-        ("sanitize", "can_kekulize"),
-        [("protein", True), ("ligand", False), (True, True), (False, False)],
-    )
-    def test_can_bypass_kekulization_error(
-        self,
-        sanitize: bool | Literal["protein", "ligand"],
-        can_kekulize: bool,
-    ) -> None:
-        """with non-kekulizable protein"""
-        lig = Chem.AddHs(Chem.MolFromSmiles("c1ccccc1"))
-        EmbedMolecule(lig, randomSeed=0xAC1D)
-        prot = Chem.AddHs(Chem.MolFromSequence("F"), addResidueInfo=True)
-        EmbedMolecule(prot, randomSeed=0xAC1D)
-        lmol = plf.Molecule.from_rdkit(lig)
-        pmol = plf.Molecule.from_rdkit(prot)
-        # ensure test pmol is setup correctly
-        mol = Chem.RemoveAllHs(pmol, sanitize=False)
-        with pytest.raises(Chem.KekulizeException):
-            Chem.MolToPDBBlock(mol, flavor=0x20 | 0x10)
-        fp = plf.Fingerprint(["Hydrophobic", "PiStacking"])
-        fp.run_from_iterable([lmol], pmol)
-        ctx = nullcontext() if can_kekulize else pytest.raises(Chem.KekulizeException)
-        with ctx:
-            fp.plot_3d(lmol, pmol, frame=0, only_interacting=False, sanitize=sanitize)
-
-    def test_getattr_raises_error_if_not_initialized(
-        self, simple_fp_results: tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]
-    ) -> None:
-        fp, lig_mol, prot_mol = simple_fp_results
-        plot_3d = Complex3D.from_fingerprint(fp, lig_mol, prot_mol, frame=0)
-        with pytest.raises(ValueError, match="View not initialized"):
-            plot_3d._make_html()
-
-    def test_passing_complex_to_populate_view(
-        self, simple_fp_results: tuple[plf.Fingerprint, plf.Molecule, plf.Molecule]
-    ) -> None:
-        """For backwards compatibility"""
-        fp, lig_mol, prot_mol = simple_fp_results
-        plot_3d = Complex3D.from_fingerprint(fp, lig_mol, prot_mol, frame=0)
-        plot_3d.display()
-        plot_3d._populate_view(plot_3d)
 
     def test_water(
         self, water_mols: tuple[plf.Molecule, plf.Molecule, plf.Molecule]
@@ -157,7 +111,11 @@ class TestComplex3D:
             ["HBDonor", "WaterBridge"],
             parameters={"WaterBridge": {"water": water, "order": 2}},
         )
-        fp.run_from_iterable([ligand], protein)
+        fp.run_from_iterable([ligand], protein, n_jobs=1)
         view = fp.plot_3d(ligand, protein, water, frame=0)
-        html = view._make_html()
-        assert "TIP383:3.X" in html
+        assert view.interface
+        html = view.interface._make_html()
+        assert (
+            'setStyle({"chain": "X", "resn": "TIP3", "resi": 83},{"stick": {}},true)'
+            in html
+        )

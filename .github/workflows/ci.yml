@@ -38,19 +38,19 @@ jobs:
         include:
           - label: earliest
             os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
             uv-sync-args: ""
-            uv-run-args: "--with rdkit==2022.09.1 --with mdanalysis==2.2.0"
+            uv-run-args: "--with rdkit==2022.09.5 --with mdanalysis==2.4.1"
             coverage: false
           - label: baseline
             os: ubuntu-latest
-            python-version: "3.11"
+            python-version: "3.12"
             uv-sync-args: "--locked"
             uv-run-args: ""
             coverage: true
           - label: latest
             os: ubuntu-latest
-            python-version: "3.13"
+            python-version: "3.14"
             uv-sync-args: "--upgrade"
             uv-run-args: ""
             coverage: false
