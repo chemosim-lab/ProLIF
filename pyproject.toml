@@ -80,11 +80,13 @@ type-check = [
     "scipy-stubs",
     "types-networkx",
     "types-psutil",
+    "types-seaborn",
 ]
 dev = [
     "ruff==0.12.0",
     "black[jupyter]",
     "poethepoet>=0.33.0",
+    "nbqa>=1.9.1",
     { include-group = "tests" },
     { include-group = "docs" },
     { include-group = "type-check" },
@@ -143,11 +145,22 @@ cmd = "ruff check --preview --fix"
 help = "Fixes formatting and linting issues"
 sequence = [{ ref = "format" }, { ref = "lint" }]
 
-[tool.poe.tasks.type-check]
-help = "Run mypy to check type hints across the codebase"
+[tool.poe.tasks.type-check-src]
+help = "Run mypy to check type hints in the prolif source"
 cmd = "mypy ${FILE_PATHS}"
 args = [
     { name = "FILE_PATHS", positional = true, multiple = true, default = "." },
+]
+
+[tool.poe.tasks.type-check-nb]
+help = "Run mypy to check type hints in the tutorials"
+cmd = "nbqa mypy notebooks/"
+
+[tool.poe.tasks.type-check]
+help = "Run mypy to check type hints across the codebase"
+sequence = [
+    { ref = "type-check-src" },
+    # { ref = "type-check-nb" },  # disabled, run manually before merging PRs
 ]
 
 [tool.poe.tasks.test]
@@ -185,7 +198,7 @@ show_error_context = true
 exclude = "docs/conf.py|build/"
 
 [[tool.mypy.overrides]]
-module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*"]
+module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*", "pyvis.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
