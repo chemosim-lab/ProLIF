@@ -5,17 +5,17 @@ authors = [{ name = "Cédric Bouysset", email = "cedric@bouysset.net" }]
 readme = "README.rst"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 version = "0.0.0"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Chemistry",
 ]
@@ -32,7 +32,7 @@ dependencies = [
     "pandas>=1.1.0",
     "numpy>=1.13.3",
     "scipy>=1.3.0",
-    "mdanalysis>=2.2.0,<3; python_version<'3.13'",
+    "mdanalysis>=2.4.1,<3; python_version<'3.13'",
     "mdanalysis>=2.7.0,<3; python_version>='3.13'",
     "networkx>=2.5.0",
     "tqdm",
@@ -40,12 +40,13 @@ dependencies = [
     "dill",
     "psutil",
     "gemmi>=0.7.5",
+    "black[jupyter]>=26.10.1",
 ]
 
 [project.optional-dependencies]
 plots = ["py3Dmol", "matplotlib>=3.5"]
 tutorials = [
-    "rdkit>=2022.09.1",
+    "rdkit>=2022.09.5",
     "matplotlib>=3.7",
     "seaborn<1.0",
     "pyvis",
@@ -57,7 +58,7 @@ tests = [
     "pytest>=6.1.2",
     "pytest-cov",
     "ipython",
-    "rdkit>=2022.09.1",
+    "rdkit>=2022.09.5",
     "prolif[plots]",
 ]
 docs = [
@@ -171,7 +172,7 @@ sequence = [
 ]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 disallow_untyped_defs = true
 allow_redefinition = true
 disallow_any_unimported = true
@@ -276,7 +277,7 @@ allow-dunder-method-names = ["_repr_html", "_repr_png_"]
 profile = "black"
 
 [tool.black]
-target-version = ["py310", "py311", "py312", "py313"]
+target-version = ["py311", "py312", "py313", "py314", "py315"]
 include = '(docs/notebooks/.+\.ipynb)$'
 
 [tool.coverage.report]
