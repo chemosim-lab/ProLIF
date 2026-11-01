@@ -74,11 +74,10 @@ if TYPE_CHECKING:
     from pandas import DataFrame
     from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
-    from prolif.plotting.complex3d.plot import Complex3D
+    from prolif.plotting.complex3d.plot import Complex3D, Complex3DBackendSettings
     from prolif.plotting.network import LigNetwork
     from prolif.residue import ResidueId
     from prolif.typeshed import (
-        Complex3DBackendSettings,
         Component,
         IFPData,
         IFPResults,

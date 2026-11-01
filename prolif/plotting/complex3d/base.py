@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -7,11 +8,9 @@ from typing import (
     Generic,
     Literal,
     NamedTuple,
-    Protocol,
     TypeAlias,
     TypeVar,
     cast,
-    runtime_checkable,
 )
 
 from prolif.plotting.utils import separated_interaction_colors
@@ -24,7 +23,7 @@ if TYPE_CHECKING:
 Component: TypeAlias = Literal["ligand", "protein", "water"]
 
 _RING_SYSTEMS = ("PiStacking", "EdgeToFace", "FaceToFace")
-_COMPLEX3D_BACKENDS: dict[
+COMPLEX3D_BACKENDS: dict[
     str | type["Complex3DBaseBackendSettings"], "Complex3DBackendSpec"
 ] = {}
 
@@ -38,7 +37,7 @@ class Complex3DBackendSpec(NamedTuple):
 def get_backend(backend: "str | Complex3DBaseBackendSettings") -> Complex3DBackendSpec:
     """Returns the :class:`Complex3DBackendSpec` matching with ``backend``."""
     query = backend if isinstance(backend, str) else type(backend)
-    spec = _COMPLEX3D_BACKENDS.get(query)
+    spec = COMPLEX3D_BACKENDS.get(query)
     if spec is None:
         raise ValueError(f"Unknown backend {backend!r}")
     return spec
@@ -146,12 +145,13 @@ ModelT = TypeVar("ModelT")
 InterfaceT = TypeVar("InterfaceT")
 
 
-@runtime_checkable
 class Complex3DBackend(
-    Protocol, Generic[BackendSettingsT, StyleT_contra, ModelT, InterfaceT]
+    ABC, Generic[BackendSettingsT, StyleT_contra, ModelT, InterfaceT]
 ):
-    """
-    Protocol for a 3D visualization backend.
+    """ABC for a 3D visualization backend.
+
+    All methods that aren't marked with ``@abstractmethod`` have default
+    implementations that should be called by the child implementation.
     """
 
     settings: BackendSettingsT
@@ -173,8 +173,8 @@ class Complex3DBackend(
         if settings is not None:
             name = backend or cls.__name__.lower().replace("backend", "")
             spec = Complex3DBackendSpec(name=name, backend=cls, settings=settings)
-            _COMPLEX3D_BACKENDS[name] = spec
-            _COMPLEX3D_BACKENDS[settings] = spec
+            COMPLEX3D_BACKENDS[name] = spec
+            COMPLEX3D_BACKENDS[settings] = spec
         return super().__init_subclass__()
 
     def __init__(self, settings: BackendSettingsT) -> None:
@@ -195,12 +195,15 @@ class Complex3DBackend(
         self._model_count = 0
         self.residues = {}
 
+    @abstractmethod
     def clear(self) -> None:
         """Remove all elements from the plot."""
 
+    @abstractmethod
     def finalize(self) -> None:
         """Finalize the plot, e.g. zoom to the ligand."""
 
+    @abstractmethod
     def load_molecule(
         self, mol: "Molecule", component: Component, style: StyleT_contra
     ) -> None:
@@ -215,9 +218,11 @@ class Complex3DBackend(
         """Show a residue on the plot."""
         self.residues[residue.resid] = component
 
+    @abstractmethod
     def hide_hydrogens(self, component: Component, keep_indices: list[int]) -> None:
         """Hide non-polar hydrogens in the view."""
 
+    @abstractmethod
     def add_interaction(
         self,
         interaction: str,
@@ -228,6 +233,7 @@ class Complex3DBackend(
     ) -> None:
         """Add an interaction to the plot."""
 
+    @abstractmethod
     def save_png(self, path: str) -> None:
         """Saves the current state of the 3D viewer to a PNG."""
 
@@ -249,14 +255,20 @@ class Complex3DBaseGridBackendSettings(Complex3DBaseBackendSettings[StyleT]):
     grid_color_unique: str | None = None
 
 
-@runtime_checkable
 class Complex3DGridBackend(
     Complex3DBackend[BackendSettingsT, StyleT_contra, ModelT, InterfaceT],
-    Protocol,
+    ABC,
     settings=None,
 ):
+    """
+    ABC for a 3D visualization backend that supports grid plotting through a
+    ``compare`` method.
+    """
+
+    @abstractmethod
     def grid_setup(self, n_rows: int, n_columns: int) -> None:
         """Setup the backend for a new grid plot."""
 
+    @abstractmethod
     def grid_prepare(self, row: int, column: int) -> None:
         """Prepare the backend for plotting new elements in a grid."""

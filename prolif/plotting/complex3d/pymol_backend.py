@@ -12,7 +12,7 @@ from functools import cache
 from pathlib import Path
 from tempfile import mktemp
 from time import sleep
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 from xmlrpc.client import ServerProxy
 
 from rdkit import Chem
@@ -21,12 +21,17 @@ from prolif.plotting.complex3d.base import (
     Complex3DBackend,
     Complex3DBaseBackendSettings,
 )
-from prolif.typeshed import PyMOLRPCServer
 
 if TYPE_CHECKING:
     from prolif.molecule import Molecule
     from prolif.residue import Residue, ResidueId
     from prolif.typeshed import Component
+
+
+class PyMOLRPCServer(Protocol):
+    def ping(self) -> None: ...
+    def do(self, command: str) -> None: ...
+    def __close(self) -> None: ...
 
 
 @dataclass
