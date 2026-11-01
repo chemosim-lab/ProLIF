@@ -18,11 +18,10 @@ from prolif.exceptions import RunRequiredError
 from prolif.plotting.complex3d.base import (
     Complex3DBackend,
     Complex3DBaseBackendSettings,
-    Complex3DBaseGridBackendSettings,
     Complex3DGridBackend,
     get_backend,
 )
-from prolif.plotting.complex3d.py3dmol_backend import Py3DmolBackend, Py3DMolSettings
+from prolif.plotting.complex3d.py3dmol_backend import Py3DmolBackend, Py3DmolSettings
 from prolif.plotting.complex3d.pymol_backend import PyMOLBackend, PyMOLSettings
 from prolif.plotting.utils import metadata_iterator
 from prolif.residue import ResidueId
@@ -34,10 +33,10 @@ if TYPE_CHECKING:
     from prolif.molecule import Molecule
     from prolif.typeshed import Complex3DBackendSettings, Component
 
-BackendT = TypeVar("BackendT", bound=Complex3DBackend)
+BackendSettingsT = TypeVar("BackendSettingsT", bound=Complex3DBaseBackendSettings)
 
 
-class Complex3D(Generic[BackendT]):
+class Complex3D(Generic[BackendSettingsT]):
     """Creates a py3Dmol plot of interactions.
 
     Parameters
@@ -71,6 +70,33 @@ class Complex3D(Generic[BackendT]):
         :attr:`backend`'s :attr:`settings`).
     """
 
+    @overload
+    def __init__(
+        self: Complex3D[Py3DmolSettings],
+        ifp: IFP,
+        lig_mol: Molecule,
+        prot_mol: Molecule,
+        water_mol: Molecule | None,
+        backend_settings: Literal["py3dmol"] | Py3DmolSettings,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: Complex3D[PyMOLSettings],
+        ifp: IFP,
+        lig_mol: Molecule,
+        prot_mol: Molecule,
+        water_mol: Molecule | None,
+        backend_settings: Literal["pymol"] | PyMOLSettings,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self: Complex3D[Complex3DBaseBackendSettings],
+        ifp: IFP,
+        lig_mol: Molecule,
+        prot_mol: Molecule,
+        water_mol: Molecule | None,
+        backend_settings: str | Complex3DBaseBackendSettings,
+    ) -> None: ...
     def __init__(
         self,
         ifp: IFP,
@@ -79,7 +105,10 @@ class Complex3D(Generic[BackendT]):
         water_mol: Molecule | None = None,
         backend_settings: "Complex3DBackendSettings" = "py3dmol",
     ) -> None:
-        self.backend = cast(BackendT, get_3d_plot_backend(backend_settings))
+        self.backend = cast(
+            Complex3DBackend[BackendSettingsT, Any, Any, Any],
+            get_3d_plot_backend(backend_settings),
+        )
         self.ifp = ifp
         self.lig_mol = lig_mol
         self.prot_mol = prot_mol
@@ -216,7 +245,7 @@ class Complex3D(Generic[BackendT]):
                 "please use a backend that supports it (e.g. 'py3Dmol')",
             )
 
-        settings = cast("Complex3DBaseGridBackendSettings", self.backend.settings)
+        settings = self.backend.settings
         # get set of interactions for both poses
         interactions1 = {
             (resid[1], i)
@@ -333,8 +362,7 @@ class Complex3D(Generic[BackendT]):
         remove_hydrogens: "bool | Component" = True,
     ) -> None:
         backend = self.backend
-        settings = backend.settings  # cast("Complex3DBaseBackendSettings"?
-
+        settings = backend.settings
         # load molecules
         backend.load_molecule(
             self.lig_mol,
@@ -463,7 +491,7 @@ class Complex3D(Generic[BackendT]):
         for resid in unpaired_residues:
             res = mol[resid]
             self.backend.show_residue(
-                res, component, self.backend.settings.RESIDUES_STYLE
+                res, component, self.backend.settings.residues_style
             )
 
     def _hide_hydrogens(
@@ -515,13 +543,13 @@ class Complex3D(Generic[BackendT]):
 
 @overload
 def get_3d_plot_backend(
-    backend: Literal["py3dmol"] | Py3DMolSettings,
+    backend: Literal["py3dmol"] | Py3DmolSettings,
 ) -> Py3DmolBackend: ...
 @overload
 def get_3d_plot_backend(backend: Literal["pymol"] | PyMOLSettings) -> PyMOLBackend: ...
 @overload
 def get_3d_plot_backend(
-    backend: "Complex3DBaseBackendSettings",
+    backend: "str |Complex3DBaseBackendSettings",
 ) -> Complex3DBackend: ...
 def get_3d_plot_backend(backend: "Complex3DBackendSettings") -> Complex3DBackend:
     """Get the backend for making 3D plots."""

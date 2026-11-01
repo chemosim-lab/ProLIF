@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from prolif.ifp import IFP
     from prolif.plotting.complex3d.base import Complex3DBaseBackendSettings
-    from prolif.plotting.complex3d.py3dmol_backend import Py3DMolSettings
+    from prolif.plotting.complex3d.py3dmol_backend import Py3DmolSettings
     from prolif.plotting.complex3d.pymol_backend import PyMOLSettings
     from prolif.residue import ResidueId
 
@@ -58,7 +58,8 @@ class PyMOLRPCServer(Protocol):
 
 Complex3DBackendSettings: TypeAlias = (
     "Literal['py3dmol', 'pymol']"
-    " | Py3DMolSettings"
+    " | Py3DmolSettings"
     " | PyMOLSettings"
+    " | str"
     " | Complex3DBaseBackendSettings"
 )
