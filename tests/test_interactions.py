@@ -434,13 +434,22 @@ class TestInteractions:
         assert not set(nitrogens).intersection(acceptors)
 
     @pytest.mark.parametrize(
-        "smiles", ["NCC(=O)O", "NC(C)C=O", "NCC=O", "CN(C)CC=O", "O=C(O)C1CCCN1"]
+        "smiles",
+        [
+            "NCC(=O)O",
+            "NC(C)C=O",
+            "NCC=O",
+            "CN(C)CC=O",
+            "O=C(O)C1CCCN1",
+            "N1=CCC(=O)C1",
+            "N1=CCCC1C(=O)O",
+        ],
     )
     @pytest.mark.parametrize("implicit_h", [True, False])
-    def test_backbone_exclusion_preserves_amine_acceptors(
+    def test_backbone_exclusion_preserves_nitrogen_acceptors(
         self, smiles: str, implicit_h: bool
     ) -> None:
-        """Test that the backbone exclusion does not exclude amine acceptors."""
+        """Test that the backbone exclusion preserves amine and imine acceptors."""
         mol = Chem.MolFromSmiles(smiles)
         if not implicit_h:
             mol = Chem.AddHs(mol)
