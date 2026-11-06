@@ -397,18 +397,29 @@ class TestInteractions:
                 f"expected {expected}"
             )
 
-    @pytest.mark.parametrize("sequence", ["ALG", "LLA", "ALL", "APA"])
+    @pytest.mark.parametrize(
+        ("sequence", "residue_index"),
+        [
+            ("ALG", 1),
+            ("LLA", 1),
+            ("ALL", 1),
+            ("APA", 1),
+            ("AGA", 1),
+            ("AA", 1),
+            ("AG", 1),
+            ("AP", 1),
+        ],
+    )
     @pytest.mark.parametrize("implicit_h", [True, False])
     def test_backbone_nitrogen_matched_as_acceptor(
-        self, sequence: str, implicit_h: bool
+        self, sequence: str, residue_index: int, implicit_h: bool
     ) -> None:
         """
         Test for temporary fix of issue #358.
 
         Once substructure matching is done on the entire molecule instead of residues,
-        the HBond Acceptor pattern should remove the
-        `&!$([ND2v3^2+0](-[H])-[CD4v4H1^3]-[CD2^2+0]=O)` part (same in the
-        ImplicitHBAcceptor class), and remove this test.
+        the backbone nitrogen exclusion can be removed from both acceptor patterns,
+        along with this test.
         """
         mol = Chem.MolFromSequence(sequence)
         if not implicit_h:
@@ -417,10 +428,27 @@ class TestInteractions:
         acceptor_qmol = (
             ImplicitHBAcceptor() if implicit_h else HBAcceptor()
         ).lig_pattern
-        res = mol[1]  # ignore first and last residues
+        res = mol[residue_index]
         nitrogens = [a.GetIdx() for a in res.GetAtoms() if a.GetAtomicNum() == 7]
         acceptors = set().union(*res.GetSubstructMatches(acceptor_qmol))
         assert not set(nitrogens).intersection(acceptors)
+
+    @pytest.mark.parametrize(
+        "smiles", ["NCC(=O)O", "NC(C)C=O", "NCC=O", "CN(C)CC=O", "O=C(O)C1CCCN1"]
+    )
+    @pytest.mark.parametrize("implicit_h", [True, False])
+    def test_backbone_exclusion_preserves_amine_acceptors(
+        self, smiles: str, implicit_h: bool
+    ) -> None:
+        """Test that the backbone exclusion does not exclude amine acceptors."""
+        mol = Chem.MolFromSmiles(smiles)
+        if not implicit_h:
+            mol = Chem.AddHs(mol)
+        pattern = (ImplicitHBAcceptor() if implicit_h else HBAcceptor()).lig_pattern
+        nitrogen = next(
+            atom.GetIdx() for atom in mol.GetAtoms() if atom.GetAtomicNum() == 7
+        )
+        assert nitrogen in {match[0] for match in mol.GetSubstructMatches(pattern)}
 
     @pytest.mark.parametrize(
         ("interaction_qmol", "smiles", "expected"),

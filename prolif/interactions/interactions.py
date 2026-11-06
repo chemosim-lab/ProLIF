@@ -131,12 +131,17 @@ class HBAcceptor(SingleAngle):
         Fixed to explicitly exclude backbone nitrogens from being considered as
         acceptors.
 
+    Notes
+    -----
+    Backbone nitrogens, including glycine and C-terminal residues, are excluded
+    from acceptors after residue splitting.
+
     """
 
     def __init__(
         self,
         acceptor: str = (
-            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([ND2v3^2+0;H1,r5]-[CD4v4H1^3]-[CD2^2+0]=O)"
+            "[$([N&!$([NX3]-*=[O,N,P,S])&!$([ND2v3^2+0;H1,r5]-[CD4v4^3;H1,H2]-[C^2+0]=O)"
             "&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
             ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
             ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
@@ -624,13 +629,18 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         Fixed to explicitly exclude backbone nitrogens from being considered as
         acceptors.
 
+    Notes
+    -----
+    Backbone nitrogens, including glycine and C-terminal residues, are excluded
+    from acceptors after residue splitting.
+
     """
 
     def __init__(
         self,
         acceptor: str = (
             "[$([N&!$([NX3]-*=[O,N,P,S])"
-            "&!$([NX2^2+0;H1,r5]-[CX4v4H1^3]-[CD2^2+0]=O)"
+            "&!$([NX2^2+0;H1,r5]-[CX4v4^3;H1,H2]-[C^2+0]=O)"
             "&!$([NX3]-[a])&!$([Nv4+1])&!$(N=C(-[C,N])-N)])"
             ",$([n+0&!X3&!$([n&r5]:[n+&r5])])"
             ",$([O&!$([OX2](C)C=O)&!$(O(~a)~a)&!$(O=N-*)&!$([O-]-N=O)])"
