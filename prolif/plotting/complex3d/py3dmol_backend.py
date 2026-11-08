@@ -33,6 +33,8 @@ class Py3DmolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
         JavaScript callback executed when hovering an interaction line.
     disable_hover_callback : str
         JavaScript callback executed when the hovering event is finished.
+    grid_size : tuple[int, int]
+        Size of the grid view.
     linked: bool = True
         Link mouse interactions (pan, zoom, translate) on the grid plot.
     """
@@ -49,7 +51,7 @@ class Py3DmolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
             "cartoon": {"style": "edged", "colorscheme": "cyanCarbon"},
         }
     )
-    interaction_style: dict = field(
+    interaction_style: dict[str, Any] = field(
         default_factory=lambda: {
             "radius": 0.15,
             "dashed": True,
@@ -57,6 +59,7 @@ class Py3DmolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
             "toCap": 1,
         }
     )
+    grid_color_unique: str | None = "magentaCarbon"
     residue_hover_callback: str = """
     function(atom,viewer) {
         if(!atom.label) {
@@ -80,7 +83,7 @@ class Py3DmolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
             delete obj.label;
         }
     }"""
-    grid_color_unique: str | None = "magentaCarbon"
+    grid_size: tuple[int, int] = (900, 600)
     linked: bool = True
 
 
@@ -109,7 +112,7 @@ class Py3DmolBackend(
         super().setup()
 
     def grid_prepare(self, row: int, column: int) -> None:
-        super().prepare()
+        self.prepare()
         self.position = (row, column)
 
     def clear(self) -> None:

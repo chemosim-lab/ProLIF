@@ -60,13 +60,15 @@ class Complex3DBaseBackendSettings(Generic[StyleT]):
         Style object for the protein.
     peptide_style : StyleT
         Style object for the ligand as a peptide if appropriate.
+    interaction_style: dict[str, Any]
+        Style object for the interaction lines.
     size : tuple[int, int]
         Size of the 3D viewer in pixels.
     colors : dict[str, str]
         Dictionnary of colors used in the plot for interactions.
     color_overrides : dict[ResidueId, str]
         Dictionnary of colors used to override the default color for specific residues.
-        Note that this needs to be a valid color for the backend.
+        Note that this needs to be a valid color or color command for the backend.
     peptide_threshold : int = 5
         Ligands with this number of residues or more will be displayed using
         :attr:`peptide_style` in addition to the :attr:`ligand_style`.
@@ -91,6 +93,7 @@ class Complex3DBaseBackendSettings(Generic[StyleT]):
     residues_style: StyleT
     protein_style: StyleT
     peptide_style: StyleT
+    interaction_style: dict[str, Any]
     size: tuple[int, int] = (650, 600)
     colors: dict[str, str] = field(
         default_factory=lambda: {**separated_interaction_colors}
@@ -243,15 +246,12 @@ class Complex3DBaseGridBackendSettings(Complex3DBaseBackendSettings[StyleT]):
     __doc__ = (
         cast(str, Complex3DBaseBackendSettings.__doc__)
         + """\
-    grid_size : tuple[int, int]
-        Size of the grid in number of rows and columns.
     grid_color_unique: str | None
         Which color to use for residues that have interactions that are found in one
         complex but not the other. Use ``None`` to disable the color override.
     """
     )
 
-    grid_size: tuple[int, int] = (900, 600)
     grid_color_unique: str | None = None
 
 

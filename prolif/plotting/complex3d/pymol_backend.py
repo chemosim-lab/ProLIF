@@ -18,8 +18,8 @@ from xmlrpc.client import ServerProxy
 from rdkit import Chem
 
 from prolif.plotting.complex3d.base import (
-    Complex3DBackend,
-    Complex3DBaseBackendSettings,
+    Complex3DBaseGridBackendSettings,
+    Complex3DGridBackend,
 )
 
 if TYPE_CHECKING:
@@ -35,9 +35,9 @@ class PyMOLRPCServer(Protocol):
 
 
 @dataclass
-class PyMOLSettings(Complex3DBaseBackendSettings[dict[str, list[str]]]):
+class PyMOLSettings(Complex3DBaseGridBackendSettings[dict[str, list[str]]]):
     __doc__ = (
-        cast(str, Complex3DBaseBackendSettings.__doc__)
+        cast(str, Complex3DBaseGridBackendSettings.__doc__)
         + """\
     group_id: str = "complex"
         Name of the object in which all PyMOL objects will be loaded.
@@ -58,12 +58,12 @@ class PyMOLSettings(Complex3DBaseBackendSettings[dict[str, list[str]]]):
     )
     residues_style: dict[str, list[str]] = field(
         default_factory=lambda: {
-            "stick": ["util.cbag {}"],
+            "stick": ["util.cbaw {}"],
         }
     )
     protein_style: dict[str, list[str]] = field(
         default_factory=lambda: {
-            "cartoon": ["set cartoon_color, green, {}"],
+            "cartoon": ["set cartoon_color, white, {}"],
         }
     )
     peptide_style: dict[str, list[str]] = field(
@@ -71,6 +71,12 @@ class PyMOLSettings(Complex3DBaseBackendSettings[dict[str, list[str]]]):
             "cartoon": ["set cartoon_color, cyan, {}"],
         }
     )
+    interaction_style: dict[str, Any] = field(
+        default_factory=lambda: {
+            "dash_width": 5,
+        }
+    )
+    grid_color_unique: str | None = "util.cbam {}"
     group_id: str = "complex"
     handler: Callable[[str], None] | None = None
     screenshot_timeout: float = 2.0
@@ -92,11 +98,11 @@ def get_rpc_server(port: int = 9123) -> PyMOLRPCServer:
     return proxy
 
 
-_forbidden_table = str.maketrans({".": None, ":": None})
+_FORBIDDEN_CHARS_TRANS = str.maketrans(dict.fromkeys(".:"))
 
 
 def _strip_forbidden_chars(s: str) -> str:
-    return s.translate(_forbidden_table)
+    return s.translate(_FORBIDDEN_CHARS_TRANS)
 
 
 @dataclass
@@ -169,7 +175,7 @@ class PyMOLScreenshot:
 
 
 class PyMOLBackend(
-    Complex3DBackend[PyMOLSettings, dict[str, list[str]], str, PyMOLScreenshot],
+    Complex3DGridBackend[PyMOLSettings, dict[str, list[str]], str, PyMOLScreenshot],
     settings=PyMOLSettings,
 ):
     def setup(self) -> None:
@@ -188,12 +194,28 @@ class PyMOLBackend(
         self.group_id = self.settings.group_id
         self.cmd("set group_auto_mode, 2")
 
+    def grid_setup(self, n_rows: int, n_columns: int) -> None:
+        self.setup()
+        self.cmd("set grid_mode, 1")
+        self.cmd(f"set grid_max, {n_rows * n_columns}")
+        self._n_columns = n_columns
+        self._grid_slots: list[tuple[int, str]] = []
+
+    def grid_prepare(self, row: int, column: int) -> None:
+        self.prepare()
+        position = row * self._n_columns + column
+        self._grid_slots.append((position + 1, self.group_id))
+
     def clear(self) -> None:
         self.cmd("reinitialize")
 
     def finalize(self) -> None:
         self.cmd("valence guess, all")
-        self.cmd("set dash_width, 5")
+        for attr, value in self.settings.interaction_style.items():
+            self.cmd(f"set {attr}, {value}")
+        if hasattr(self, "_grid_slots"):
+            for position, group_id in self._grid_slots:
+                self.cmd(f"set grid_slot, {position}, %{group_id}")
         model_id = self.models["ligand"]
         self.cmd(f"zoom %{model_id}")
 
@@ -231,7 +253,7 @@ class PyMOLBackend(
         if color_override := self.settings.color_overrides.get(resid):
             resid_style = deepcopy(style)
             for key in resid_style:
-                resid_style[key].append(f"color {color_override}, {{}}")
+                resid_style[key].append(color_override)
         else:
             resid_style = style
         self.apply_style(selection, resid_style)
