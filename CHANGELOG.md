@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Hydrogen-bond acceptor patterns now exclude fragmented glycine and C-terminal
+  backbone nitrogens with both explicit and implicit hydrogens (partial fix for #358).
+
 ### Changed
 
 ### Deprecated
