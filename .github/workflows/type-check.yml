@@ -1,8 +1,11 @@
 name: "Type-check"
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize]
+
+permissions:
+  contents: read
 
 jobs:
   typing:
@@ -10,8 +13,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout target branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
 
       - name: Install uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7
@@ -33,8 +38,11 @@ jobs:
           uv run python scripts/check_types.py | tee tmp_data/target.txt
 
       - name: Checkout PR branch
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          git fetch https://github.com/${{ github.event.pull_request.head.repo.owner.login }}/${{ github.event.pull_request.head.repo.name }}.git ${{ github.event.pull_request.head.ref }}:diff-head
+          git fetch "https://github.com/${HEAD_REPO}.git" "refs/heads/${HEAD_REF}:diff-head"
           git checkout diff-head
 
       - name: Run typing tree on PR branch
@@ -49,7 +57,7 @@ jobs:
         run: |
           diff --suppress-common-lines tmp_data/target.txt tmp_data/branch.txt  | tee tmp_data/diff.txt
 
-      - name: Create comment content
+      - name: Report type-checking coverage
         run: |
           {
             echo '### Type-checking report'
@@ -75,20 +83,4 @@ jobs:
             cat tmp_data/log.txt | ansi2txt
             echo '```'
             echo '</details>'
-          } >> tmp_data/comment.md
-
-      - name: Find Comment
-        uses: peter-evans/find-comment@b30e6a3c0ed37e7c023ccd3f1db5c6c0b0c23aad # v4
-        id: fc-typecheck
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          comment-author: "github-actions[bot]"
-          body-includes: "### Type-checking report"
-
-      - name: Create or update comment
-        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
-        with:
-          comment-id: ${{ steps.fc-typecheck.outputs.comment-id }}
-          issue-number: ${{ github.event.pull_request.number }}
-          body-path: "tmp_data/comment.md"
-          edit-mode: replace
+          } >> "$GITHUB_STEP_SUMMARY"
