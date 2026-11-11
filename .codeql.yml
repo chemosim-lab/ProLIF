@@ -3,3 +3,11 @@ queries:
 
 paths-ignore:
   - prolif/_version.py
+
+query-filters:
+  # CodeQL does not understand TYPE_CHECKING-guarded imports
+  - exclude:
+      id: py/unsafe-cyclic-import
+  # CodeQL does not understand Protocols
+  - exclude:
+      id: py/ineffectual-statement

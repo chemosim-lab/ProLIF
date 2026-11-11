@@ -5,17 +5,17 @@ authors = [{ name = "Cédric Bouysset", email = "cedric@bouysset.net" }]
 readme = "README.rst"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 version = "0.0.0"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Chemistry",
 ]
@@ -32,20 +32,23 @@ dependencies = [
     "pandas>=1.1.0",
     "numpy>=1.13.3",
     "scipy>=1.3.0",
-    "mdanalysis>=2.2.0,<3; python_version<'3.13'",
-    "mdanalysis>=2.7.0,<3; python_version>='3.13'",
+    "mdanalysis>=2.4.1,<3; python_version<'3.12'",
+    "mdanalysis>=2.7.0,<3; python_version>='3.12'",
+    "mdanalysis>=2.8.0,<3; python_version>='3.13'",
+    "mdanalysis>=2.10.0,<3; python_version>='3.14'",
     "networkx>=2.5.0",
     "tqdm",
     "multiprocess",
     "dill",
     "psutil",
     "gemmi>=0.7.5",
+    "black[jupyter]>=26.10.1",
 ]
 
 [project.optional-dependencies]
 plots = ["py3Dmol", "matplotlib>=3.5"]
 tutorials = [
-    "rdkit>=2022.09.1",
+    "rdkit>=2022.09.5",
     "matplotlib>=3.7",
     "seaborn<1.0",
     "pyvis",
@@ -57,7 +60,7 @@ tests = [
     "pytest>=6.1.2",
     "pytest-cov",
     "ipython",
-    "rdkit>=2022.09.1",
+    "rdkit>=2022.09.5",
     "prolif[plots]",
 ]
 docs = [
@@ -79,11 +82,13 @@ type-check = [
     "scipy-stubs",
     "types-networkx",
     "types-psutil",
+    "types-seaborn",
 ]
 dev = [
-    "ruff==0.11.2",                   # keep synced with formatting_linting.yml
+    "ruff==0.12.0",
     "black[jupyter]",
     "poethepoet>=0.33.0",
+    "nbqa>=1.9.1",
     { include-group = "tests" },
     { include-group = "docs" },
     { include-group = "type-check" },
@@ -142,11 +147,22 @@ cmd = "ruff check --preview --fix"
 help = "Fixes formatting and linting issues"
 sequence = [{ ref = "format" }, { ref = "lint" }]
 
-[tool.poe.tasks.type-check]
-help = "Run mypy to check type hints across the codebase"
+[tool.poe.tasks.type-check-src]
+help = "Run mypy to check type hints in the prolif source"
 cmd = "mypy ${FILE_PATHS}"
 args = [
     { name = "FILE_PATHS", positional = true, multiple = true, default = "." },
+]
+
+[tool.poe.tasks.type-check-nb]
+help = "Run mypy to check type hints in the tutorials"
+cmd = "nbqa mypy notebooks/"
+
+[tool.poe.tasks.type-check]
+help = "Run mypy to check type hints across the codebase"
+sequence = [
+    { ref = "type-check-src" },
+    # { ref = "type-check-nb" },  # disabled, run manually before merging PRs
 ]
 
 [tool.poe.tasks.test]
@@ -171,7 +187,7 @@ sequence = [
 ]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 disallow_untyped_defs = true
 allow_redefinition = true
 disallow_any_unimported = true
@@ -184,7 +200,7 @@ show_error_context = true
 exclude = "docs/conf.py|build/"
 
 [[tool.mypy.overrides]]
-module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*"]
+module = ["MDAnalysis.*", "py3Dmol.*", "dill.*", "multiprocess.*", "pyvis.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -269,11 +285,14 @@ ignore = [
 "__init__.py" = ["F401"]
 "tests/*" = ["ARG001"]
 
+[tool.ruff.lint.pylint]
+allow-dunder-method-names = ["_repr_html", "_repr_png_"]
+
 [tool.isort]
 profile = "black"
 
 [tool.black]
-target-version = ["py310", "py311", "py312", "py313"]
+target-version = ["py311", "py312", "py313", "py314", "py315"]
 include = '(docs/notebooks/.+\.ipynb)$'
 
 [tool.coverage.report]

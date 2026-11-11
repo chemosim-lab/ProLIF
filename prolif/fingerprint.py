@@ -74,10 +74,11 @@ if TYPE_CHECKING:
     from pandas import DataFrame
     from rdkit.DataStructs import ExplicitBitVect, UIntSparseIntVect
 
-    from prolif.plotting.complex3d import Complex3D
+    from prolif.plotting.complex3d.plot import Complex3D, Complex3DBackendSettings
     from prolif.plotting.network import LigNetwork
     from prolif.residue import ResidueId
     from prolif.typeshed import (
+        Component,
         IFPData,
         IFPResults,
         InteractionMetadata,
@@ -1376,11 +1377,10 @@ class Fingerprint:
         water_mol: Molecule | None = None,
         *,
         frame: int,
-        size: tuple[int, int] = (650, 600),
         display_all: bool = False,
         only_interacting: bool = True,
-        remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True,
-        sanitize: bool | Literal["ligand", "protein"] = "protein",
+        remove_hydrogens: "bool | Component" = True,
+        backend_settings: "Complex3DBackendSettings" = "py3dmol",
     ) -> "Complex3D":
         """Generate and display the complex in 3D with py3Dmol from a fingerprint object
         that has been used to run an analysis.
@@ -1408,10 +1408,10 @@ class Fingerprint:
         remove_hydrogens: bool | Literal["ligand", "protein", "water"] = True
             Whether to remove non-polar hydrogens (unless they are involved in an
             interaction).
-        sanitize: bool | Literal["ligand", "protein"] = "protein"
-            Whether to sanitize the RDKit molecules used for visualization.
-            This is to avoid unkekulization issues that may arise when using the
-            coordinates of the molecule.
+        backend_settings: Complex3DBackendSettings = "py3dmol"
+            The backend or backend settings to use. If a string is provided, the
+            relevant backend is used with default settings. If a Settings object is
+            provided, this will be used instead.
 
         See Also
         --------
@@ -1428,6 +1428,12 @@ class Fingerprint:
             Added ``sanitize`` parameter to allow sanitization of the RDKit
             molecules used for visualization, which can help avoid unkekulization
             issues when using the coordinates of the molecule directly.
+
+        .. versionchanged:: 3.0.0
+            Added support for multiple backends (``py3Dmol`` and ``pymol``) and moved
+            most options to the ``backend_settings`` object. Removed ``sanitize``
+            parameter as unrequired following the backend changes.
+
         """
         from prolif.plotting.complex3d import Complex3D
 
@@ -1437,11 +1443,10 @@ class Fingerprint:
             protein_mol,
             water_mol,
             frame=frame,
+            backend_settings=backend_settings,
         )
         return plot3d.display(
-            size=size,
             display_all=display_all,
             only_interacting=only_interacting,
             remove_hydrogens=remove_hydrogens,
-            sanitize=sanitize,
         )

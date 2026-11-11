@@ -1,0 +1,307 @@
+from __future__ import annotations
+
+import atexit
+import os
+import struct
+from base64 import b64encode
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from copy import deepcopy
+from dataclasses import dataclass, field
+from functools import cache
+from pathlib import Path
+from tempfile import mktemp
+from time import sleep
+from typing import TYPE_CHECKING, Any, Protocol, cast
+from xmlrpc.client import ServerProxy
+
+from rdkit import Chem
+
+from prolif.plotting.complex3d.base import (
+    Complex3DBaseGridBackendSettings,
+    Complex3DGridBackend,
+)
+
+if TYPE_CHECKING:
+    from prolif.molecule import Molecule
+    from prolif.residue import Residue, ResidueId
+    from prolif.typeshed import Component
+
+
+class PyMOLRPCServer(Protocol):
+    def ping(self) -> None: ...
+    def do(self, command: str) -> None: ...
+    def __close(self) -> None: ...
+
+
+@dataclass
+class PyMOLSettings(Complex3DBaseGridBackendSettings[dict[str, list[str]]]):
+    __doc__ = (
+        cast(str, Complex3DBaseGridBackendSettings.__doc__)
+        + """\
+    group_id: str = "complex"
+        Name of the object in which all PyMOL objects will be loaded.
+    handler: Callable[[str], None] | None = None
+        Function to call for each command sent to PyMOL. If ``None``, the
+        :class:`~prolif.plotting.complex3d.pymol_backend.PyMOLRPCServer` will be used to
+        send commands to a running PyMOL instance. This can be used to write a PyMOL
+        script instead of sending commands to a running PyMOL instance.
+    screenshot_timeout: float = 2.0
+        Timeout in seconds to wait for the PNG screenshot to be written. Note that this
+        freezes PyMOL until the screenshot is written.
+    """
+    )
+    ligand_style: dict[str, list[str]] = field(
+        default_factory=lambda: {
+            "stick": ["util.cbac {}"],
+        }
+    )
+    residues_style: dict[str, list[str]] = field(
+        default_factory=lambda: {
+            "stick": ["util.cbaw {}"],
+        }
+    )
+    protein_style: dict[str, list[str]] = field(
+        default_factory=lambda: {
+            "cartoon": ["set cartoon_color, white, {}"],
+        }
+    )
+    peptide_style: dict[str, list[str]] = field(
+        default_factory=lambda: {
+            "cartoon": ["set cartoon_color, cyan, {}"],
+        }
+    )
+    interaction_style: dict[str, Any] = field(
+        default_factory=lambda: {
+            "dash_width": 5,
+        }
+    )
+    grid_color_unique: str | None = "util.cbam {}"
+    group_id: str = "complex"
+    handler: Callable[[str], None] | None = None
+    screenshot_timeout: float = 2.0
+
+
+@cache
+def get_rpc_server(port: int = 9123) -> PyMOLRPCServer:
+    """Get proxy to the PyMOL RPC server."""
+    host = os.environ.get("PYMOL_RPCHOST", "localhost")
+    proxy = cast(PyMOLRPCServer, ServerProxy(f"http://{host}:{port}/RPC2"))
+    try:
+        proxy.ping()
+    except ConnectionRefusedError:
+        raise RuntimeError(
+            "Could not connect to PyMOL RPC server. "
+            "Make sure you run PyMOL with the `-R` flag."
+        ) from None
+    atexit.register(proxy.__close)
+    return proxy
+
+
+_FORBIDDEN_CHARS_TRANS = str.maketrans(dict.fromkeys(".:"))
+
+
+def _strip_forbidden_chars(s: str) -> str:
+    return s.translate(_FORBIDDEN_CHARS_TRANS)
+
+
+@dataclass
+class PyMOLScreenshot:
+    callback: Callable[[str], None]
+    is_interactive: bool
+    timeout: float
+
+    def save_png(self, path: Path, **kwargs: Any) -> None:
+        # wait for all commands to be done
+        self.callback("cmd.sync(timeout=3)")
+
+        # build command
+        if kwargs:
+            params = ", ".join([f"{k}={v}" for k, v in kwargs.items()])
+            params = f", {params}"
+        else:
+            params = ""
+        self.callback(f"png {path}{params}")
+
+        # wait for end chunk of PNG to be written
+        while not self._is_png_written(path):
+            sleep(0.1)
+
+    def _repr_png_(self) -> bytes | None:
+        if not self.is_interactive:
+            # only generate PNG if using RPC server
+            return None
+
+        # write to temp PNG file
+        png_path = Path(mktemp(suffix=".png"))
+        self.save_png(png_path)
+
+        # read data and delete temp file
+        data = png_path.read_bytes()
+        png_path.unlink(missing_ok=True)
+        return data
+
+    @classmethod
+    def _is_png_written(cls, png_path: Path) -> bool:
+        """Returns whether the PNG has been completely written or not."""
+        return (
+            png_path.is_file()
+            and png_path.stat().st_size > 12
+            and struct.unpack("!I4sI", cls._last_n_bytes(png_path, 12))
+            # IEND data chunk for PNG files (12 bytes, network-byte order):
+            # 4 null bytes for length of data (always no data for this chunk)
+            # 4 bytes for name of chunk (IEND for last chunk)
+            # (0 bytes for data)
+            # CRC-32 checksum for `b"IEND"`
+            == (0, b"IEND", 2923585666)
+        )
+
+    @staticmethod
+    def _last_n_bytes(path: Path, n: int) -> bytes:
+        """Reads the last N bytes from a file."""
+        with path.open("rb") as fh:
+            fh.seek(-n, os.SEEK_END)
+            return fh.read(n)
+
+    def _repr_html_(self) -> str | None:
+        png = self._repr_png_()
+        if not png:
+            return None
+        dump = b64encode(png).decode()
+        return (
+            '<image alt="ProLIF PyMOL screenshot" src="data:image/png;base64, '
+            f'{dump}" />'
+        )
+
+
+class PyMOLBackend(
+    Complex3DGridBackend[PyMOLSettings, dict[str, list[str]], str, PyMOLScreenshot],
+    settings=PyMOLSettings,
+):
+    def setup(self) -> None:
+        handler = self.settings.handler
+        self.cmd = handler or get_rpc_server().do
+        self.interface = PyMOLScreenshot(
+            callback=self.cmd,
+            is_interactive=handler is None,
+            timeout=self.settings.screenshot_timeout,
+        )
+        super().setup()
+
+    def prepare(self) -> None:
+        super().prepare()
+        self.interactions: set[str] = set()
+        self.group_id = self.settings.group_id
+        self.cmd("set group_auto_mode, 2")
+
+    def grid_setup(self) -> None:
+        self.setup()
+        self.cmd("set grid_mode, 1")
+        self.cmd(f"set grid_max, {self.settings.n_rows * self.settings.n_columns}")
+        self._grid_slots: list[tuple[int, str]] = []
+
+    def grid_prepare(self, index: int) -> None:
+        self.prepare()
+        self._grid_slots.append((index, self.group_id))
+
+    def clear(self) -> None:
+        self.cmd("reinitialize")
+
+    def finalize(self) -> None:
+        self.cmd("valence guess, all")
+        for attr, value in self.settings.interaction_style.items():
+            self.cmd(f"set {attr}, {value}")
+        if hasattr(self, "_grid_slots"):
+            for position, group_id in self._grid_slots:
+                self.cmd(f"set grid_slot, {position + 1}, %{group_id}")
+        model_id = self.models["ligand"]
+        self.cmd(f"zoom %{model_id}")
+
+    @contextmanager
+    def _ignore_autozoom(self) -> Iterator[None]:
+        """Context manager to ignore the automatic zoom when loading an object."""
+        self.cmd("view rdinterface, store")
+        yield
+        self.cmd("view rdinterface, recall")
+
+    def load_molecule(
+        self, mol: "Molecule", component: "Component", style: dict[str, list[str]]
+    ) -> None:
+        pdb_dump = Chem.MolToPDBBlock(mol, flavor=16 | 32)
+        model_id = f"{self.group_id}.{component}"
+        with self._ignore_autozoom():
+            self.cmd(f"cmd.read_pdbstr({pdb_dump!r}, {model_id!r})")
+        self._model_count += 1
+        self.models[component] = model_id
+        self.apply_style(f"%{model_id}", style)
+
+    def show_residue(
+        self,
+        residue: "Residue",
+        component: "Component",
+        style: dict[str, list[str]],
+    ) -> None:
+        super().show_residue(residue, component, style)
+        model_id = self.models[component]
+        resid = residue.resid
+        selection = (
+            f"%{model_id} and chain {resid.chain} "
+            f"and resid {resid.number} and resname {resid.name}"
+        )
+        if color_override := self.settings.color_overrides.get(resid):
+            resid_style = deepcopy(style)
+            for key in resid_style:
+                resid_style[key].append(color_override)
+        else:
+            resid_style = style
+        self.apply_style(selection, resid_style)
+
+    def apply_style(self, selection: str, style: dict[str, list[str]]) -> None:
+        for representation, extras in style.items():
+            self.cmd(f"show {representation}, {selection}")
+            if extras:
+                for extra in extras:
+                    self.cmd(extra.format(selection))
+
+    def hide_hydrogens(self, component: "Component", keep_indices: list[int]) -> None:
+        model_id = self.models[component]
+        subset = " or ".join([f"rank {i}" for i in keep_indices])
+        selection = f"%{model_id} and elem H"
+        if subset:
+            selection += f" and not ({subset})"
+        self.cmd(f"hide ({selection})")
+
+    def add_interaction(
+        self,
+        interaction: str,
+        distance: float,  # noqa: ARG002
+        components: tuple["Component", "Component"],
+        residues: tuple["ResidueId", "ResidueId"],
+        atoms: tuple[int | tuple[int, ...], int | tuple[int, ...]],
+    ) -> None:
+        lresid, presid = residues
+        colour = (
+            self.settings.colors.get(interaction, "#dedede").upper().replace("#", "0x")
+        )
+        selections = []
+        for component, indices in zip(components, atoms, strict=True):
+            if isinstance(indices, int):
+                sel = f"%{self.group_id}.{component} and (rank {indices})"
+            else:
+                ring_indices = " or rank ".join(map(str, indices))
+                sel = f"%{self.group_id}.{component} and (rank {ring_indices})"
+            selections.append(sel)
+
+        resids = _strip_forbidden_chars(f"{lresid}_{presid}")
+        atom_ids = "_".join(
+            ["".join(map(str, (a,) if isinstance(a, int) else a)) for a in atoms]
+        )
+        name = f"{self.group_id}.interactions.{interaction}.{resids}.{atom_ids}"
+        self.cmd(f"distance {name}, {', '.join(selections)}, mode=4")
+        self.cmd(f"hide labels, {name}")
+        self.cmd(f"color {colour}, {name}")
+        self.interactions.add(interaction)
+
+    def save_png(self, path: str) -> None:
+        output = Path(path)
+        return self.interface.save_png(output, dpi=300, ray=1)
