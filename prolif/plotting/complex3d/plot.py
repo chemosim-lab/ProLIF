@@ -230,8 +230,7 @@ class Complex3D(Generic[BackendSettingsT, InterfaceT]):
 
     def compare(
         self,
-        other: "Complex3D",
-        *,
+        *others: "Complex3D",
         display_all: bool = False,
         only_interacting: bool = True,
         remove_hydrogens: "bool | Component" = True,
@@ -241,8 +240,8 @@ class Complex3D(Generic[BackendSettingsT, InterfaceT]):
 
         Parameters
         ----------
-        other: Complex3D
-            Other ``Complex3D`` object to compare to.
+        *other: Complex3D
+            Other ``Complex3D`` object(s) to compare to.
         display_all : bool = False
             Display all occurences for a given pair of residues and interaction, or only
             the shortest one. Not relevant if ``count=False`` in the ``Fingerprint``
@@ -262,53 +261,53 @@ class Complex3D(Generic[BackendSettingsT, InterfaceT]):
             hidden. Added support for waters involved in WaterBridge interactions.
 
         """
-        if not isinstance(other.backend, type(self.backend)):
-            raise TypeError("The backend for both complexes must be the same")
-        if not (
-            isinstance(self.backend, Complex3DGridBackend)
-            and isinstance(other.backend, Complex3DGridBackend)
-        ):
-            supported = ", ".join(
-                sorted(
-                    {
-                        spec.name
-                        for spec in COMPLEX3D_BACKENDS.values()
-                        if issubclass(spec.backend, Complex3DGridBackend)
-                    }
-                )
+        supported = ", ".join(
+            sorted(
+                {
+                    spec.name
+                    for spec in COMPLEX3D_BACKENDS.values()
+                    if issubclass(spec.backend, Complex3DGridBackend)
+                }
             )
-            raise TypeError(
-                "The backend for these complexes does not support grid plots, "
-                f"please use one of these compatible backends instead: {supported}",
-            )
-
-        # get set of interactions for both poses
-        interactions1 = {
-            (resid[1], i)
-            for resid, interactions in self.ifp.items()
-            for i in interactions
-        }
-        interactions2 = {
-            (resid[1], i)
-            for resid, interactions in other.ifp.items()
-            for i in interactions
-        }
-
-        # get residues with interactions specific to pose 1
-        settings1 = self.backend.settings
-        highlights = (
-            {r[0]: settings1.grid_color_unique for r in interactions1 - interactions2}
-            if settings1.grid_color_unique
-            else {}
         )
+        if not isinstance(self.backend, Complex3DGridBackend):
+            raise TypeError(
+                "The backend for this complex does not support grid plots, please use "
+                f"a compatible backend instead: {supported}.",
+            )
+        if not all(isinstance(other.backend, type(self.backend)) for other in others):
+            raise TypeError("The backend for all complexes must be the same")
 
         # configure view parameters
-        self.backend.grid_setup(n_rows=1, n_columns=2)
+        self.backend.grid_setup()
+        interactions = [
+            {
+                (resid[1], i)
+                for resid, interactions in c.ifp.items()
+                for i in interactions
+            }
+            for c in cast(tuple[Complex3D, ...], (self, *others))
+        ]
+        # get residues with interactions specific to each complex
+        unique = [
+            i1.difference(set().union(*(i2 for i2 in interactions if i2 is not i1)))
+            for i1 in interactions
+        ]
+        # make corresponding color overrides for each complex
+        highlights = [
+            {i[0]: color for i in u} if (color := settings.grid_color_unique) else {}
+            for u, settings in zip(
+                unique,
+                (self.backend.settings, *[o.backend.settings for o in others]),
+                strict=True,
+            )
+        ]
 
         # first plot
-        self.backend.grid_prepare(row=0, column=0)
+        self.backend.grid_prepare(0)
+        settings1 = self.backend.settings
         with settings1.overrides(
-            color_overrides=settings1.color_overrides | highlights
+            color_overrides=settings1.color_overrides | highlights[0]
         ):
             self._populate_view(
                 display_all=display_all,
@@ -316,32 +315,36 @@ class Complex3D(Generic[BackendSettingsT, InterfaceT]):
                 remove_hydrogens=remove_hydrogens,
             )
 
-        # get residues with interactions specific to pose 2
-        settings2 = other.backend.settings
-        highlights = (
-            {r[0]: settings2.grid_color_unique for r in interactions2 - interactions1}
-            if settings2.grid_color_unique
-            else {}
-        )
-        backend = other.backend = self.backend  # copy current plot state to other
-        backend.settings = settings2
-
-        # second plot
-        backend.grid_prepare(row=0, column=1)
-        with settings2.overrides(
-            color_overrides=settings2.color_overrides | highlights
+        for i, (other, highlight) in enumerate(
+            zip(others, highlights[1:], strict=True), start=1
         ):
-            other._populate_view(
-                display_all=display_all,
-                only_interacting=only_interacting,
-                remove_hydrogens=remove_hydrogens,
-            )
+            if not isinstance(other.backend, Complex3DGridBackend):
+                raise TypeError(
+                    "The backend for these complexes does not support grid plots, "
+                    f"please use one of these compatible backends instead: {supported}",
+                )
 
-        self.interface = backend.interface
+            # copy current plot state to other
+            settings2 = other.backend.settings
+            backend = other.backend = self.backend
+            backend.settings = settings2
 
-        # restore
-        other.backend = get_3d_plot_backend(settings2)
+            with settings2.overrides(
+                color_overrides=settings2.color_overrides | highlight,
+                n_rows=settings1.n_rows,
+                n_columns=settings1.n_columns,
+            ):
+                backend.grid_prepare(i)
+                other._populate_view(
+                    display_all=display_all,
+                    only_interacting=only_interacting,
+                    remove_hydrogens=remove_hydrogens,
+                )
+
+            # restore
+            other.backend = get_3d_plot_backend(settings2)
         backend.settings = settings1
+        self.interface = backend.interface
         return self
 
     def add(

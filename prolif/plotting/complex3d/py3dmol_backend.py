@@ -27,6 +27,8 @@ class Py3DmolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
     __doc__ = (
         cast(str, Complex3DBaseGridBackendSettings.__doc__)
         + """\
+    size : tuple[int, int]
+        Size of the 3D viewer in pixels.
     residue_hover_callback : str
         JavaScript callback executed when hovering a residue involved in an interaction.
     interaction_hover_callback : str
@@ -60,6 +62,7 @@ class Py3DmolSettings(Complex3DBaseGridBackendSettings[dict[str, dict]]):
         }
     )
     grid_color_unique: str | None = "magentaCarbon"
+    size: tuple[int, int] = (650, 600)
     residue_hover_callback: str = """
     function(atom,viewer) {
         if(!atom.label) {
@@ -102,18 +105,18 @@ class Py3DmolBackend(
         self.position = (0, 0)
         self.mols: dict[Component, Molecule] = {}
 
-    def grid_setup(self, n_rows: int, n_columns: int) -> None:
+    def grid_setup(self) -> None:
         self.interface = py3Dmol.view(
-            viewergrid=(n_rows, n_columns),
+            viewergrid=(self.settings.n_rows, self.settings.n_columns),
             width=self.settings.grid_size[0],
             height=self.settings.grid_size[1],
             linked=self.settings.linked,
         )
         super().setup()
 
-    def grid_prepare(self, row: int, column: int) -> None:
+    def grid_prepare(self, index: int) -> None:
         self.prepare()
-        self.position = (row, column)
+        self.position = divmod(index, self.settings.n_columns)
 
     def clear(self) -> None:
         self._cmd("removeAllModels")

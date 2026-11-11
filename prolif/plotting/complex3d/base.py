@@ -62,8 +62,6 @@ class Complex3DBaseBackendSettings(Generic[StyleT]):
         Style object for the ligand as a peptide if appropriate.
     interaction_style: dict[str, Any]
         Style object for the interaction lines.
-    size : tuple[int, int]
-        Size of the 3D viewer in pixels.
     colors : dict[str, str]
         Dictionnary of colors used in the plot for interactions.
     color_overrides : dict[ResidueId, str]
@@ -94,7 +92,6 @@ class Complex3DBaseBackendSettings(Generic[StyleT]):
     protein_style: StyleT
     peptide_style: StyleT
     interaction_style: dict[str, Any]
-    size: tuple[int, int] = (650, 600)
     colors: dict[str, str] = field(
         default_factory=lambda: {**separated_interaction_colors}
     )
@@ -249,10 +246,16 @@ class Complex3DBaseGridBackendSettings(Complex3DBaseBackendSettings[StyleT]):
     grid_color_unique: str | None
         Which color to use for residues that have interactions that are found in one
         complex but not the other. Use ``None`` to disable the color override.
+    n_rows: int
+        Number of rows in the grid.
+    n_columns: int
+        Number of columns in the grid.
     """
     )
 
     grid_color_unique: str | None = None
+    n_rows: int = 1
+    n_columns: int = 2
 
 
 class Complex3DGridBackend(
@@ -266,9 +269,15 @@ class Complex3DGridBackend(
     """
 
     @abstractmethod
-    def grid_setup(self, n_rows: int, n_columns: int) -> None:
+    def grid_setup(self) -> None:
         """Setup the backend for a new grid plot."""
 
     @abstractmethod
-    def grid_prepare(self, row: int, column: int) -> None:
-        """Prepare the backend for plotting new elements in a grid."""
+    def grid_prepare(self, index: int) -> None:
+        """Prepare the backend for plotting new elements in a grid.
+
+        Parameters
+        ----------
+        index : int
+            The index of the grid slot to prepare (filled in row-major order).
+        """

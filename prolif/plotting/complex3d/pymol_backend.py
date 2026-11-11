@@ -194,17 +194,15 @@ class PyMOLBackend(
         self.group_id = self.settings.group_id
         self.cmd("set group_auto_mode, 2")
 
-    def grid_setup(self, n_rows: int, n_columns: int) -> None:
+    def grid_setup(self) -> None:
         self.setup()
         self.cmd("set grid_mode, 1")
-        self.cmd(f"set grid_max, {n_rows * n_columns}")
-        self._n_columns = n_columns
+        self.cmd(f"set grid_max, {self.settings.n_rows * self.settings.n_columns}")
         self._grid_slots: list[tuple[int, str]] = []
 
-    def grid_prepare(self, row: int, column: int) -> None:
+    def grid_prepare(self, index: int) -> None:
         self.prepare()
-        position = row * self._n_columns + column
-        self._grid_slots.append((position + 1, self.group_id))
+        self._grid_slots.append((index, self.group_id))
 
     def clear(self) -> None:
         self.cmd("reinitialize")
@@ -215,7 +213,7 @@ class PyMOLBackend(
             self.cmd(f"set {attr}, {value}")
         if hasattr(self, "_grid_slots"):
             for position, group_id in self._grid_slots:
-                self.cmd(f"set grid_slot, {position}, %{group_id}")
+                self.cmd(f"set grid_slot, {position + 1}, %{group_id}")
         model_id = self.models["ligand"]
         self.cmd(f"zoom %{model_id}")
 
