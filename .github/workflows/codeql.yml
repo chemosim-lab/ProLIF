@@ -8,12 +8,16 @@ on:
 
 jobs:
   analyze:
-    name: Analyze
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
       security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, actions]
 
     steps:
       - name: Checkout
@@ -22,8 +26,11 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
         with:
-          languages: python
+          languages: ${{ matrix.language }}
+          build-mode: none
           config-file: ./.codeql.yml
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          category: "/language:${{ matrix.language }}"
