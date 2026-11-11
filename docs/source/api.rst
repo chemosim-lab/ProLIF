@@ -34,7 +34,9 @@ ProLIF comes with a set of functions that should help users analyse the results
 produced by the package more easily. The documentation for these functions can
 be found in the :ref:`source/modules/utils:Helper functions` section.
 You can also find classes to plot the resulting interaction fingerprints in the
-:ref:`source/modules/plotting:Plotting` section
+:ref:`source/modules/plotting:Plotting` section, and functions to export them to
+other formats such as NetworkX graphs in the :ref:`source/modules/exports:Exports`
+section.
 
 Parallel processing
 -------------------

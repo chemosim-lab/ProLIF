@@ -43,13 +43,11 @@ def simple_interaction_df() -> pd.DataFrame:
     )
 
     # Create DataFrame with weight and distance columns
-    df = pd.DataFrame(
+    return pd.DataFrame(
         [(row[4], row[5], row[6]) for row in data],
         index=idx,
         columns=["weight", "distance", "components"],
     )
-
-    return df
 
 
 @pytest.fixture
@@ -85,7 +83,7 @@ def test_to_networkx_graph(
 
     # Check for bonds
     bond_edges = 0
-    for u, v, data in G.edges(data=True):
+    for *_, data in G.edges(data=True):
         if data.get("edge_type") == "bond":
             bond_edges += 1
 
@@ -123,7 +121,8 @@ def test_interaction_edge_attributes(
             if interaction_type in found_interactions:
                 found_interactions[interaction_type] = True
 
-                # Find matching row in dataframe - use .xs() instead of .loc[] for type safety
+                # Find matching row in dataframe - use .xs() instead of .loc[]
+                # for type safety
                 try:
                     matching_rows = simple_interaction_df.xs(
                         (slice(None), residue, interaction_type),
@@ -139,7 +138,7 @@ def test_interaction_edge_attributes(
                 # For at least one row, the atom should be part of the interaction
                 atom_in_interaction = False
                 for idx, _ in matching_rows.iterrows():
-                    # Get the atoms from the multi-index - it's the 'atoms' level (4th position)
+                    # Get the atoms from the multi-index ('atoms' level, 4th position)
                     atoms = cast(
                         tuple[int, ...], idx[-1] if isinstance(idx, tuple) else idx
                     )

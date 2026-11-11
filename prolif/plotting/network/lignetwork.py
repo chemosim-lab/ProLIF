@@ -33,7 +33,11 @@ from rdkit.Chem import rdDepictor
 
 from prolif.exceptions import RunRequiredError
 from prolif.ifp import IFP
-from prolif.plotting.utils import grouped_interaction_colors, metadata_iterator
+from prolif.plotting.utils import (
+    get_interaction_records,
+    grouped_interaction_colors,
+    spring_layout_weight,
+)
 from prolif.residue import ResidueId
 from prolif.utils import requires
 
@@ -192,7 +196,6 @@ class LigNetwork:
         "PiStacking",
         "PiCation",
     ]
-    _BRIDGED_INTERACTIONS: ClassVar[dict[str, str]] = {"WaterBridge": "water_residues"}
     _DISPLAYED_ATOM: ClassVar = {  # index 0 in indices tuple by default
         "HBDonor": 1,
         "XBDonor": 1,
@@ -349,48 +352,7 @@ class LigNetwork:
 
     @classmethod
     def _get_records(cls, ifp: "IFP", all_metadata: bool) -> list[dict[str, Any]]:
-        records = []
-        for (lig_resid, prot_resid), int_data in ifp.items():
-            for int_name, metadata_tuple in int_data.items():
-                is_bridged_interaction = cls._BRIDGED_INTERACTIONS.get(int_name, None)
-                for metadata in metadata_iterator(metadata_tuple, all_metadata):
-                    if is_bridged_interaction:
-                        distances = [d for d in metadata if d.startswith("distance_")]
-                        for distlabel in distances:
-                            _, src, dest = distlabel.split("_")
-                            if src == "ligand":
-                                components = "ligand_water"
-                                src = str(lig_resid)
-                                atoms = metadata["parent_indices"]["ligand"]
-                            elif dest == "protein":
-                                components = "water_protein"
-                                dest = str(prot_resid)
-                                atoms = ()
-                            else:
-                                components = "water_water"
-                                atoms = ()
-                            records.append(
-                                {
-                                    "ligand": src,
-                                    "protein": dest,
-                                    "interaction": int_name,
-                                    "components": components,
-                                    "atoms": atoms,
-                                    "distance": metadata[distlabel],
-                                }
-                            )
-                    else:
-                        records.append(
-                            {
-                                "ligand": str(lig_resid),
-                                "protein": str(prot_resid),
-                                "interaction": int_name,
-                                "components": "ligand_protein",
-                                "atoms": metadata["parent_indices"]["ligand"],
-                                "distance": metadata.get("distance", 0),
-                            }
-                        )
-        return records
+        return get_interaction_records(ifp, all_metadata)
 
     @classmethod
     def _make_agg_df_from_fp(
@@ -534,7 +496,6 @@ class LigNetwork:
         # 3. Add interaction edges
         for idx, row in self.df.iterrows():
             # Explicitly extract and type the index elements
-            lig_res: str = idx[0]
             prot_res: str = idx[1]
             interaction: str = idx[2]
             lig_indices: tuple[int, ...] = idx[3]
@@ -554,7 +515,7 @@ class LigNetwork:
                     weight=weight,
                     distance=distance,
                     components=components,
-                    weight_spring_layout=10 / distance,
+                    weight_spring_layout=spring_layout_weight(distance),
                 )
 
         return G
@@ -725,7 +686,8 @@ class LigNetwork:
         self._calculate_protein_node_coordinates()
 
     def _calculate_protein_node_coordinates(self) -> None:
-        """Calculates optimal 2D coordinates for protein residue nodes in the visualization.
+        """Calculates optimal 2D coordinates for protein residue nodes in the
+        visualization.
 
         This method calculates the 2D coordinates for protein residues based on their
         interactions with ligand atoms.
@@ -733,7 +695,8 @@ class LigNetwork:
         The algorithm follows these steps:
         1. Creates a graph with ligand atoms (fixed) and protein residues (movable)
         2. Places protein residues initially near the ligand atoms they interact with
-        3. Optimizes the layout using spring_layout from NetworkX while keeping ligand atoms fixed
+        3. Optimizes the layout using spring_layout from NetworkX while keeping ligand
+           atoms fixed
         4. Detects and resolves overlapping
         """
         # 1. Extract protein nodes
@@ -860,73 +823,40 @@ class LigNetwork:
 
         min_distance = min(100, max(width, height) * 0.3)  # Minimum separation
         max_iterations = 100  # max number of cycles to resolve overlaps
+        nodes = [res for res in protein_nodes if res in residue_pos]
+        ligand_xy = self.xyz[:, :2]  # all ligand atoms, interacting or not
 
         for itr in range(max_iterations):
             overlap_found = False
-            residue_adjustments = {node: np.zeros(2) for node in protein_nodes}
+            # stronger pushes in the second half if overlaps persist
+            residue_factor = 0.8 if itr >= 50 else 0.5
+            ligand_factor = 2.0 if itr >= 50 else 1.5
 
-            # First phase: Check residue-residue overlaps
-            for i, res1 in enumerate(protein_nodes):
-                if res1 not in residue_pos:
-                    continue
-
-                # check overlap with other residues
-                for res2 in protein_nodes[i + 1 :]:
-                    if res2 not in residue_pos:
-                        continue
-
+            # First phase: residue-residue overlaps
+            adjustments = {node: np.zeros(2) for node in nodes}
+            for i, res1 in enumerate(nodes):
+                for res2 in nodes[i + 1 :]:
                     delta = residue_pos[res2] - residue_pos[res1]
-                    if delta[0] == 0:  # handles edge cases where delta is zero
+                    if not delta.any():  # handles edge cases where delta is zero
                         delta = np.array([1, 1])
                     dist = np.linalg.norm(delta)
-
                     if 0 < dist < min_distance:
                         overlap_found = True
-                        force = (min_distance - dist) * 0.5
-                        if itr >= 50:
-                            force *= 1.6
-                        direction = delta / dist
+                        push = (min_distance - dist) * residue_factor * delta / dist
+                        adjustments[res1] -= push
+                        adjustments[res2] += push
+            for res in nodes:
+                residue_pos[res] += adjustments[res]
 
-                        # Push apart
-                        residue_adjustments[res1] -= direction * force
-                        residue_adjustments[res2] += direction * force
-
-            # Apply residue-residue adjustments
-            for res, adjustment in residue_adjustments.items():
-                if res in residue_pos:
-                    residue_pos[res] = residue_pos[res] + adjustment
-
-            ligand_atom_indices = []  # to store all ligands, irrespective of interaction with residues
-            for idx in range(self.mol.GetNumAtoms()):
-                ligand_atom_indices.append(idx)
-
-            # Second phase: Check residue-ligand overlaps after residue adjustments
-            ligand_adjustments = {node: np.zeros(2) for node in protein_nodes}
-            for res1 in protein_nodes:
-                if res1 not in residue_pos:
-                    continue
-
-                # check overlap with ligand atoms
-                for idx in ligand_atom_indices:
-                    delta = residue_pos[res1] - np.array(
-                        [self.xyz[idx, 0], self.xyz[idx, 1]]
-                    )
-                    dist = np.linalg.norm(delta)
-
-                    if 0 < dist < min_distance:
-                        overlap_found = True
-                        force = (min_distance - dist) * 1.5
-                        if itr >= 50:
-                            force *= 4 / 3
-                        direction = delta / dist
-
-                        # Push away from ligand atom
-                        ligand_adjustments[res1] += direction * force
-
-            # Apply ligand overlap adjustments
-            for res, adjustment in ligand_adjustments.items():
-                if res in residue_pos:
-                    residue_pos[res] += adjustment
+            # Second phase: residue-ligand overlaps after residue adjustments
+            for res in nodes:
+                deltas = residue_pos[res] - ligand_xy
+                dists = np.linalg.norm(deltas, axis=1)
+                mask = (dists > 0) & (dists < min_distance)
+                if mask.any():
+                    overlap_found = True
+                    pushes = (min_distance - dists[mask]) * ligand_factor / dists[mask]
+                    residue_pos[res] += (pushes[:, None] * deltas[mask]).sum(axis=0)
 
             if not overlap_found:
                 break
