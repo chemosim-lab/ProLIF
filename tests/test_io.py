@@ -491,6 +491,62 @@ class TestMoleculeStandardizer:
         acceptors = set().union(*res.GetSubstructMatches(acceptor_qmol))
         assert nitrogens[0] not in acceptors
 
+    def test_standardize_his_explicit_tautomers(self) -> None:
+        """Test that explicit neutral histidine tautomers (HIE/HID) are preserved
+        when standardized with generic residue name 'HIS' (#381).
+        """
+        standardizer = MoleculeStandardizer()
+
+        # Build neutral histidine with hydrogen on NE2 (HIE)
+        histidine = Chem.AddHs(Chem.MolFromSequence("H"), addResidueInfo=True)
+        assert Chem.AllChem.EmbedMolecule(histidine, randomSeed=42) == 0
+
+        ne2 = next(
+            a
+            for a in histidine.GetAtoms()
+            if a.GetPDBResidueInfo().GetName().strip() == "NE2"
+        )
+        ring_h = next(a for a in ne2.GetNeighbors() if a.GetAtomicNum() == 1)
+        ring_h.GetPDBResidueInfo().SetName(" HE2")
+
+        # Standardize as generic HIS
+        mol_hie = Chem.Mol(histidine)
+        for a in mol_hie.GetAtoms():
+            a.GetPDBResidueInfo().SetResidueName("HIS")
+        std_hie = standardizer(mol_hie)[0]
+        assert str(std_hie.resid.name) == "HIE"
+        nd1_atom = next(
+            a
+            for a in std_hie.GetAtoms()
+            if a.GetPDBResidueInfo().GetName().strip() == "ND1"
+        )
+        assert nd1_atom.GetFormalCharge() == 0
+        assert nd1_atom.GetTotalNumHs(includeNeighbors=True) == 0
+
+        # Construct neutral HID (hydrogen on ND1)
+        nd1 = next(
+            a
+            for a in histidine.GetAtoms()
+            if a.GetPDBResidueInfo().GetName().strip() == "ND1"
+        )
+        rw_hid = Chem.RWMol(histidine)
+        h_idx, ne2_idx, nd1_idx = ring_h.GetIdx(), ne2.GetIdx(), nd1.GetIdx()
+        rw_hid.RemoveBond(ne2_idx, h_idx)
+        rw_hid.AddBond(nd1_idx, h_idx, Chem.BondType.SINGLE)
+        rw_hid.GetAtomWithIdx(h_idx).GetPDBResidueInfo().SetName(" HD1")
+        mol_hid = rw_hid.GetMol()
+        for a in mol_hid.GetAtoms():
+            a.GetPDBResidueInfo().SetResidueName("HIS")
+        std_hid = standardizer(mol_hid)[0]
+        assert str(std_hid.resid.name) == "HID"
+        ne2_atom = next(
+            a
+            for a in std_hid.GetAtoms()
+            if a.GetPDBResidueInfo().GetName().strip() == "NE2"
+        )
+        assert ne2_atom.GetFormalCharge() == 0
+        assert ne2_atom.GetTotalNumHs(includeNeighbors=True) == 0
+
 
 @pytest.mark.parametrize(
     ("angles", "expected"),
