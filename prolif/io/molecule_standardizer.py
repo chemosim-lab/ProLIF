@@ -204,7 +204,9 @@ class MoleculeStandardizer:
         new_residues = []
         for residue in protein_mol.residues.values():
             standardized_resname = self.convert_to_standard_resname(
-                resname=residue.resid.name.upper(), forcefield_name=forcefield_name
+                resname=residue.resid.name.upper(),
+                forcefield_name=forcefield_name,
+                residue=residue,
             )
 
             # set the standard residue name
@@ -294,8 +296,67 @@ class MoleculeStandardizer:
         return "unknown"
 
     @staticmethod
+    def detect_his_tautomer(residue: Residue) -> str:
+        """Detect the histidine protonation state/tautomer based on explicit hydrogens.
+
+        Parameters
+        ----------
+        residue : Residue
+            The histidine residue to inspect.
+
+        Returns
+        -------
+        str
+            "HIE" if only NE2 has an explicit hydrogen,
+            "HID" if only ND1 has an explicit hydrogen,
+            "HIS" if both (or neither) have explicit hydrogens.
+        """
+        nd1 = None
+        ne2 = None
+        for atom in residue.GetAtoms():
+            info = atom.GetPDBResidueInfo() or atom.GetMonomerInfo()
+            if info:
+                name = info.GetName().strip()
+                if name == "ND1":
+                    nd1 = atom
+                elif name == "NE2":
+                    ne2 = atom
+
+        has_h_nd1 = (
+            any(n.GetAtomicNum() == 1 for n in nd1.GetNeighbors())
+            if nd1 is not None
+            else False
+        )
+        has_h_ne2 = (
+            any(n.GetAtomicNum() == 1 for n in ne2.GetNeighbors())
+            if ne2 is not None
+            else False
+        )
+
+        if not (has_h_nd1 or has_h_ne2):
+            h_names = {
+                (atom.GetPDBResidueInfo() or atom.GetMonomerInfo()).GetName().strip()
+                for atom in residue.GetAtoms()
+                if atom.GetAtomicNum() == 1
+                and (atom.GetPDBResidueInfo() or atom.GetMonomerInfo())
+            }
+            if "HE2" in h_names and "HD1" not in h_names:
+                return "HIE"
+            if "HD1" in h_names and "HE2" not in h_names:
+                return "HID"
+
+        if has_h_ne2 and not has_h_nd1:
+            return "HIE"
+        if has_h_nd1 and not has_h_ne2:
+            return "HID"
+        return "HIS"
+
+    @classmethod
     def convert_to_standard_resname(
-        resname: str, forcefield_name: str = "unknown"
+        cls,
+        resname: str,
+        forcefield_name: str = "unknown",
+        residue: Residue | None = None,
     ) -> str:
         """Convert a residue name to its standard form based on the forcefield.
 
@@ -333,7 +394,11 @@ class MoleculeStandardizer:
         elif forcefield_name == "gromos" and resname == "CYS":
             return "CYX"
 
-        return STANDARD_RESNAME_MAP.get(resname, resname)
+        standard_resname = STANDARD_RESNAME_MAP.get(resname, resname)
+        if standard_resname == "HIS" and residue is not None:
+            return cls.detect_his_tautomer(residue)
+
+        return standard_resname
 
     @staticmethod
     def n_residue_heavy_atoms(residue: Residue) -> int:
