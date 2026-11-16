@@ -1,12 +1,23 @@
+import warnings
+from typing import Any
 from unittest.mock import MagicMock
 
+import MDAnalysis as mda
 import networkx as nx
 import numpy as np
 import pytest
 from rdkit import Chem
 from rdkit.Chem.rdDistGeom import EmbedMolecule
 
-from prolif.exports.to_networkx import build_graph, to_networkx
+import prolif as plf
+from prolif.exceptions import RunRequiredError
+from prolif.exports.to_networkx import (
+    _AggKey,
+    _AggValue,
+    _prune_dangling_waters,
+    build_graph,
+    to_networkx,
+)
 
 
 @pytest.fixture(scope="session")
@@ -230,3 +241,292 @@ def test_no_overlaps_in_to_networkx_coordinates(
                 f"Residue-ligand overlap detected between {res_id} and atom "
                 f"{atom_id}: {distance:.1f}"
             )
+
+
+# ---- tests on real fingerprints ----
+
+
+@pytest.fixture(scope="module")
+def fp_mol() -> tuple[plf.Fingerprint, plf.Molecule]:
+    u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
+    lig = u.select_atoms("resname LIG")
+    prot = u.select_atoms("protein and byres around 6.5 group ligand", ligand=lig)
+    fp = plf.Fingerprint()
+    fp.run(u.trajectory[0:3], lig, prot, progress=False, n_jobs=1)
+    return fp, plf.Molecule.from_mda(lig)
+
+
+@pytest.fixture(scope="module")
+def water_fp_mol(
+    water_mols: tuple[plf.Molecule, plf.Molecule, plf.Molecule],
+) -> tuple[plf.Fingerprint, plf.Molecule]:
+    ligand, protein, water = water_mols
+    fp = plf.Fingerprint(
+        ["HBDonor", "WaterBridge"],
+        parameters={"WaterBridge": {"water": water, "order": 2}},
+    )
+    fp.run_from_iterable([ligand], protein, progress=False)
+    return fp, ligand
+
+
+def interaction_edges(
+    graph: "nx.MultiGraph[int | str]",
+) -> list[tuple[Any, Any, dict[str, Any]]]:
+    return [
+        (u, v, d)
+        for u, v, d in graph.edges(data=True)
+        if d["edge_type"] == "interaction"
+    ]
+
+
+def nodes_of_type(graph: "nx.MultiGraph[int | str]", node_type: str) -> list[Any]:
+    return [n for n, d in graph.nodes(data=True) if d["node_type"] == node_type]
+
+
+def frequency(fp: plf.Fingerprint, target: str, interaction: str) -> float:
+    """Fraction of frames where the interaction with the protein residue occurs"""
+    count = sum(
+        1
+        for ifp in fp.ifp.values()
+        for (_, prot), data in ifp.items()
+        if str(prot) == target and interaction in data
+    )
+    return count / len(fp.ifp)
+
+
+def test_raises_not_executed(ligand_mol: Chem.Mol) -> None:
+    fp = plf.Fingerprint()
+    with pytest.raises(RunRequiredError, match="Please run the fingerprint analysis"):
+        to_networkx(fp, ligand_mol)
+
+
+def test_raises_kind(fp_mol: tuple[plf.Fingerprint, plf.Molecule]) -> None:
+    fp, lig_mol = fp_mol
+    with pytest.raises(ValueError, match='must be "aggregate" or "frame"'):
+        to_networkx(fp, lig_mol, kind="foo")  # type: ignore[arg-type]
+
+
+def test_raises_missing_frame(fp_mol: tuple[plf.Fingerprint, plf.Molecule]) -> None:
+    fp, lig_mol = fp_mol
+    with pytest.raises(ValueError, match="Frame 42 not found"):
+        to_networkx(fp, lig_mol, kind="frame", frame=42)
+
+
+def test_frame_graph(fp_mol: tuple[plf.Fingerprint, plf.Molecule]) -> None:
+    fp, lig_mol = fp_mol
+    graph = to_networkx(fp, lig_mol, kind="frame", frame=0, mol_scale=10)
+    assert isinstance(graph, nx.MultiGraph)
+
+    # ligand atoms and bonds
+    assert len(nodes_of_type(graph, "ligand")) == lig_mol.GetNumAtoms()
+    bonds = [d for *_, d in graph.edges(data=True) if d["edge_type"] == "bond"]
+    assert len(bonds) == lig_mol.GetNumBonds()
+    xyz = lig_mol.GetConformer().GetPositions() * 10
+    lig_resid = str(next(iter(fp.ifp[0]))[0])
+    for atom in lig_mol.GetAtoms():
+        node = graph.nodes[atom.GetIdx()]
+        assert node["symbol"] == atom.GetSymbol()
+        assert node["ligand"] == lig_resid
+        assert np.allclose([node["x"], node["y"], node["z"]], xyz[atom.GetIdx()])
+
+    # protein residues
+    protein_nodes = nodes_of_type(graph, "protein")
+    assert set(protein_nodes) == {str(prot) for _, prot in fp.ifp[0]}
+    for res in protein_nodes:
+        assert graph.nodes[res]["residue"] == res
+        assert np.isfinite([graph.nodes[res]["x"], graph.nodes[res]["y"]]).all()
+
+    # interactions
+    edges = interaction_edges(graph)
+    expected = {
+        (str(prot), name) for (_, prot), data in fp.ifp[0].items() for name in data
+    }
+    assert {(v, d["interaction"]) for _, v, d in edges} == expected
+    for u, v, d in edges:
+        assert isinstance(u, int) and isinstance(v, str)
+        assert d["components"] == "ligand_protein"
+        assert u in d["atoms"]
+        assert d["weight"] == 1
+        assert d["distance"] > 0
+        assert d["weight_spring_layout"] == pytest.approx(10 / d["distance"])
+
+
+def test_frame_display_all(fp_mol: tuple[plf.Fingerprint, plf.Molecule]) -> None:
+    fp, lig_mol = fp_mol
+    default = interaction_edges(to_networkx(fp, lig_mol, kind="frame"))
+    all_edges = interaction_edges(
+        to_networkx(fp, lig_mol, kind="frame", display_all=True)
+    )
+    assert len(all_edges) >= len(default)
+    # no duplicated edges
+    keys = [(u, v, d["interaction"], d["atoms"]) for u, v, d in all_edges]
+    assert len(keys) == len(set(keys))
+
+
+def test_aggregate_frequencies(fp_mol: tuple[plf.Fingerprint, plf.Molecule]) -> None:
+    fp, lig_mol = fp_mol
+    graph = to_networkx(fp, lig_mol, kind="aggregate", threshold=0)
+    edges = interaction_edges(graph)
+    assert edges
+    atom_sets: dict[tuple[str, str], set[tuple[int, ...]]] = {}
+    for u, v, d in edges:
+        # the weight is the frequency of the set of ligand atoms drawn, which is at
+        # most the frequency of the interaction between the two residues
+        assert 0 < d["weight"] <= frequency(fp, v, d["interaction"]) <= 1
+        assert u in d["atoms"]
+        atom_sets.setdefault((v, d["interaction"]), set()).add(d["atoms"])
+    # only the most frequent set of ligand atoms is kept for each interaction
+    assert all(len(atoms) == 1 for atoms in atom_sets.values())
+    # interactions always involving the same atoms have the interaction frequency
+    for (v, interaction), atoms in atom_sets.items():
+        (atoms_tuple,) = atoms
+        seen = {
+            metadata["parent_indices"]["ligand"]
+            for ifp in fp.ifp.values()
+            for (_, prot), data in ifp.items()
+            if str(prot) == v
+            for metadata in data.get(interaction, ())
+        }
+        if seen == {atoms_tuple}:
+            weight = next(
+                d["weight"]
+                for _, v_, d in edges
+                if v_ == v and d["interaction"] == interaction
+            )
+            assert weight == pytest.approx(frequency(fp, v, interaction))
+
+
+def test_aggregate_threshold(fp_mol: tuple[plf.Fingerprint, plf.Molecule]) -> None:
+    fp, lig_mol = fp_mol
+    no_filter = to_networkx(fp, lig_mol, threshold=0)
+    strict = to_networkx(fp, lig_mol, threshold=1)
+    groups_no_filter = {
+        (v, d["interaction"]) for _, v, d in interaction_edges(no_filter)
+    }
+    groups_strict = {(v, d["interaction"]) for _, v, d in interaction_edges(strict)}
+    assert groups_strict and groups_strict < groups_no_filter
+    for target, interaction in groups_strict:
+        assert frequency(fp, target, interaction) == 1
+    # weights are frequencies, so nothing can pass a threshold above 1
+    empty = to_networkx(fp, lig_mol, threshold=1.5)
+    assert not interaction_edges(empty)
+    assert len(empty.nodes) == lig_mol.GetNumAtoms()
+
+
+def test_aggregate_threshold_sums_over_atoms(ligand_mol: Chem.Mol) -> None:
+    """An interaction present in every frame but through different ligand atoms
+    passes the threshold, and the most frequent set of atoms is used."""
+    fp = MagicMock()
+    frames = [(0,), (1,), (1,)]
+    fp.ifp = {
+        i: {
+            ("LIG1", "PRO100.A"): {
+                "Hydrophobic": [{"parent_indices": {"ligand": atoms}, "distance": 3.5}]
+            }
+        }
+        for i, atoms in enumerate(frames)
+    }
+    graph = to_networkx(fp, ligand_mol, kind="aggregate", threshold=1)
+    edges = interaction_edges(graph)
+    assert len(edges) == 1
+    u, v, d = edges[0]
+    assert (u, v, d["atoms"]) == (1, "PRO100.A", (1,))
+    assert d["weight"] == pytest.approx(2 / 3)
+
+
+def test_zero_distance(ligand_mol: Chem.Mol) -> None:
+    """Interactions without a distance don't break the layout weights"""
+    fp = MagicMock()
+    fp.ifp = {
+        0: {("LIG1", "PRO100.A"): {"Foo": [{"parent_indices": {"ligand": (0,)}}]}}
+    }
+    graph = to_networkx(fp, ligand_mol, kind="frame")
+    ((_, _, d),) = interaction_edges(graph)
+    assert d["distance"] == 0
+    assert d["weight_spring_layout"] == 1
+
+
+@pytest.mark.parametrize("kind", ["frame", "aggregate"])
+def test_water_bridge(
+    water_fp_mol: tuple[plf.Fingerprint, plf.Molecule], kind: str
+) -> None:
+    fp, lig_mol = water_fp_mol
+    graph = to_networkx(fp, lig_mol, kind=kind)  # type: ignore[arg-type]
+    expected_waters = {
+        str(water)
+        for ifp in fp.ifp.values()
+        for data in ifp.values()
+        for metadata in data.get("WaterBridge", ())
+        for water in metadata["water_residues"]
+    }
+    assert len(expected_waters) == 2
+    water_nodes = nodes_of_type(graph, "water")
+    assert set(water_nodes) == expected_waters
+    for water in water_nodes:
+        assert graph.nodes[water]["water_id"] == water
+        # every water molecule bridges the ligand (or another water) to the protein
+        assert graph.degree[water] >= 2
+    components = {d["components"] for *_, d in interaction_edges(graph)}
+    assert components == {
+        "ligand_protein",
+        "ligand_water",
+        "water_water",
+        "water_protein",
+    }
+    for *_, d in interaction_edges(graph):
+        if d["components"] != "ligand_protein":
+            assert d["interaction"] == "WaterBridge"
+            # single frame: a segment shared by several bridges is only counted once
+            assert d["weight"] == 1
+    # protein residues reached through the second water are connected to the ligand
+    for _, v, d in interaction_edges(graph):
+        if d["components"] == "water_protein":
+            assert nx.has_path(graph, 0, v)
+
+
+def test_prune_dangling_waters() -> None:
+    value = _AggValue(weight=1.0, distance=3.0)
+
+    def rec(src: str, dest: str, components: str) -> _AggKey:
+        return (src, dest, "WaterBridge", (), components)
+
+    chain: dict[_AggKey, _AggValue] = {
+        rec("LIG1", "W1", "ligand_water"): value,
+        rec("W1", "W2", "water_water"): value,
+        rec("W2", "RES1", "water_protein"): value,
+        ("LIG1", "RES2", "Hydrophobic", (0,), "ligand_protein"): value,
+    }
+    dangling: dict[_AggKey, _AggValue] = {
+        rec("LIG1", "W3", "ligand_water"): value,  # water only touching the ligand
+        rec("W3", "W4", "water_water"): value,
+        rec("W5", "RES3", "water_protein"): value,  # water only touching the protein
+    }
+    assert _prune_dangling_waters({**chain, **dangling}) == chain
+    assert _prune_dangling_waters(dangling) == {}
+
+
+def test_deterministic_coordinates(
+    fp_mol: tuple[plf.Fingerprint, plf.Molecule],
+) -> None:
+    fp, lig_mol = fp_mol
+    graph = to_networkx(fp, lig_mol, kind="aggregate", mol_scale=35)
+    again = to_networkx(fp, lig_mol, kind="aggregate", mol_scale=35)
+    for node in nodes_of_type(graph, "protein"):
+        assert np.isfinite([graph.nodes[node]["x"], graph.nodes[node]["y"]]).all()
+        assert graph.nodes[node]["x"] == again.nodes[node]["x"]
+        assert graph.nodes[node]["y"] == again.nodes[node]["y"]
+
+
+def test_empty_fingerprint(fp_mol: tuple[plf.Fingerprint, plf.Molecule]) -> None:
+    """No warning when no interaction was detected"""
+    _, lig_mol = fp_mol
+    u = mda.Universe(plf.datafiles.TOP, plf.datafiles.TRAJ)
+    lig = u.select_atoms("resname LIG")
+    prot = u.select_atoms("protein and resid 45:50")  # far from the ligand
+    fp = plf.Fingerprint(["Hydrophobic"])
+    fp.run(u.trajectory[0:1], lig, prot, progress=False, n_jobs=1)
+    assert not fp.ifp[0]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        graph = to_networkx(fp, lig_mol, kind="frame")
+    assert len(graph.nodes) == 0
