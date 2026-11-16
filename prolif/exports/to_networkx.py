@@ -1,5 +1,21 @@
-from collections import defaultdict, deque
+"""
+Export fingerprints as NetworkX graphs --- :mod:`prolif.exports.to_networkx`
+=============================================================================
+
+.. versionadded:: 3.0.0
+
+.. autofunction:: to_networkx
+
+.. autofunction:: build_graph
+
+.. autofunction:: calculate_coordinates
+
+"""
+
+from collections import defaultdict
+from collections.abc import Callable
 from contextlib import suppress
+from operator import itemgetter
 from typing import TYPE_CHECKING, Literal, TypeAlias, TypedDict, cast
 
 import networkx as nx
@@ -28,6 +44,20 @@ class InteractionRecord(TypedDict):
     atoms: tuple[int, ...]
     distance: float
     weight: float
+
+
+_AggKey: TypeAlias = tuple[str, str, str, tuple[int, ...], str]
+"""5-tuple key used in the aggregated interaction dicts:
+(source, target, interaction_name, atom_indices, components)."""
+
+_GroupKey: TypeAlias = tuple[str, str, str]
+"""(source, target, interaction_name): identifies an interaction between two residues
+regardless of the ligand atoms involved."""
+
+
+_record_key: Callable[[InteractionRecord], _AggKey] = itemgetter(
+    "source", "target", "interaction", "atoms", "components"
+)
 
 
 def build_graph(
@@ -83,7 +113,10 @@ def to_networkx(
     display_all : bool
         Show all atom-level occurrences; only used when ``kind="frame"``.
     threshold : float
-        Minimum frequency (0-1) for aggregate graphs.
+        Minimum frequency (0-1) for aggregate graphs. The frequency of an interaction
+        between two residues is summed over the different sets of ligand atoms
+        involved before being compared to the threshold, and only the most frequent
+        set of atoms is kept.
 
     Returns
     -------
@@ -109,7 +142,7 @@ def _get_records(ifp: "IFP", all_metadata: bool) -> tuple[list[InteractionRecord
         Highest water-bridge order seen in this frame. Used by the layout
         algorithm to determine the number of intermediate node layers.
     """
-    records: list[InteractionRecord] = []
+    records: dict[_AggKey, InteractionRecord] = {}
     max_order = 0
     for (lig_resid, prot_resid), int_data in ifp.items():
         if wb := int_data.get("WaterBridge"):
@@ -119,18 +152,25 @@ def _get_records(ifp: "IFP", all_metadata: bool) -> tuple[list[InteractionRecord
             is_bridged = _BRIDGED_INTERACTIONS.get(int_name)
             for metadata in metadata_iterator(metadata_tuple, all_metadata):
                 if is_bridged:
-                    records.extend(
-                        _process_bridged_interaction(
-                            metadata, int_name, lig_resid, prot_resid
-                        )
+                    new_records = _process_bridged_interaction(
+                        metadata, int_name, lig_resid, prot_resid
                     )
                 else:
-                    records.append(
+                    new_records = [
                         _process_standard_interaction(
                             metadata, int_name, lig_resid, prot_resid
                         )
-                    )
-    return records, max_order
+                    ]
+                # the same edge can appear several times in a frame, e.g. a water
+                # segment shared by several water bridges: keep the shortest one
+                for record in new_records:
+                    key = _record_key(record)
+                    if (
+                        key not in records
+                        or record["distance"] < records[key]["distance"]
+                    ):
+                        records[key] = record
+    return list(records.values()), max_order
 
 
 def _process_bridged_interaction(
@@ -255,6 +295,13 @@ def _add_ligand_nodes_and_bonds(
         )
 
 
+def _spring_layout_weight(distance: float) -> float:
+    """Edge weight for :func:`networkx.spring_layout`: shorter interactions pull the
+    nodes closer together. Falls back to a weak attraction when the distance is
+    unknown (zero) to avoid dividing by zero."""
+    return 10.0 / distance if distance > 0 else 1.0
+
+
 _COMPONENT_NODE_ATTRS: dict[str, tuple[str, str]] = {
     "ligand_protein": ("protein", "residue"),
     "ligand_water": ("water", "water_id"),
@@ -278,7 +325,7 @@ def _add_records_to_graph(
         target = record["target"]
         weight = record["weight"]
         distance = record["distance"]
-        spring_weight = 10.0 / distance
+        spring_weight = _spring_layout_weight(distance)
 
         if components in {"ligand_protein", "ligand_water"}:
             node_type, id_attr = _COMPONENT_NODE_ATTRS[components]
@@ -319,11 +366,6 @@ def _add_records_to_graph(
 class _AggValue(TypedDict):
     weight: float
     distance: float
-
-
-_AggKey: TypeAlias = tuple[str, str, str, tuple[int, ...], str]
-"""5-tuple key used in the aggregated interaction dicts:
-(source, target, interaction_name, atom_indices, components)."""
 
 
 def _filtered_data_to_records(
@@ -382,13 +424,7 @@ def _aggregate_interaction_data(
     """
     raw: defaultdict[_AggKey, dict] = defaultdict(lambda: {"count": 0, "distances": []})
     for record in records:
-        key: _AggKey = (
-            record["source"],
-            record["target"],
-            record["interaction"],
-            record["atoms"],
-            record["components"],
-        )
+        key = _record_key(record)
         raw[key]["count"] += 1
         raw[key]["distances"].append(record["distance"])
 
@@ -406,125 +442,54 @@ def _filter_by_threshold(
 ) -> dict[_AggKey, _AggValue]:
     """Keep only interactions whose frequency meets *threshold*.
 
-    For water-bridge chains the algorithm requires every segment of the chain
-    to individually meet the threshold *and* to lie on a path that eventually
-    reaches a protein node.  Segments that fail these checks are pruned
-    recursively to avoid disconnected sub-graphs.
+    The frequency of an interaction between two residues is summed over the
+    different sets of ligand atoms involved before being compared to the threshold,
+    and only the most frequent set of atoms is kept for each interaction. Water
+    molecules that no longer bridge the ligand to a protein residue after this
+    filtering are removed as well, along with their edges.
     """
-    interaction_totals: defaultdict[_AggKey, float] = defaultdict(float)
-    processed_data: dict[_AggKey, _AggValue] = {}
-
+    totals: defaultdict[_GroupKey, float] = defaultdict(float)
     for key, data_item in grouped_data.items():
-        interaction_totals[key] += data_item["weight"]
-        processed_data[key] = data_item
+        totals[key[:3]] += data_item["weight"]
 
-    filtered_data: dict[_AggKey, _AggValue] = {}
-
-    for key, data_item in processed_data.items():
-        if (
-            key[4] == "ligand_protein"
-            and interaction_totals[key] >= threshold
-            and (
-                key not in filtered_data
-                or data_item["weight"] > filtered_data[key]["weight"]
-            )
-        ):
-            filtered_data[key] = data_item
-
-    for key, data_item in processed_data.items():
-        if key[4] != "ligand_protein":
-            if (
-                interaction_totals[key] >= threshold
-                and _in_path_to_protein_above_threshold(
-                    key[1], interaction_totals, threshold, key[4]
-                )
-                and (
-                    key not in filtered_data
-                    or data_item["weight"] > filtered_data[key]["weight"]
-                )
-            ):
-                filtered_data[key] = data_item
-            else:
-                _clean_processed_data(key, processed_data)
-    return filtered_data
+    # most frequent set of atoms for each interaction above the threshold
+    best: dict[_GroupKey, _AggKey] = {}
+    for key in sorted(grouped_data, key=lambda k: (-grouped_data[k]["weight"], k)):
+        if totals[key[:3]] >= threshold:
+            best.setdefault(key[:3], key)
+    kept = set(best.values())
+    filtered_data = {key: v for key, v in grouped_data.items() if key in kept}
+    return _prune_dangling_waters(filtered_data)
 
 
-def _clean_processed_data(
-    key: _AggKey,
-    processed_data: dict[_AggKey, _AggValue],
-    visited_keys: set[_AggKey] | None = None,
-) -> None:
-    """Recursively mark downstream water-bridge segments as removed.
+def _prune_dangling_waters(
+    filtered_data: dict[_AggKey, _AggValue],
+) -> dict[_AggKey, _AggValue]:
+    """Remove the water molecules (and their edges) that are not on a path between
+    the ligand and a protein residue, which can happen after thresholding."""
+    graph: "nx.Graph[str]" = nx.Graph()
+    node_types: dict[str, str] = {}
+    for source, target, _, _, components in filtered_data:
+        node_types[source], node_types[target] = components.split("_")
+        graph.add_edge(source, target)
 
-    When a segment fails the threshold check, all segments that depend on it
-    (i.e., are reachable through subsequent water nodes) must also be removed
-    to prevent disconnected sub-graphs in the final output.
-    Weight is set to -1 as a tombstone so the caller can skip already-pruned
-    entries without a separate tracking set.
-    """
-    if visited_keys is None:
-        visited_keys = set()
-    if processed_data.get(key) is None or key in visited_keys:
-        return
-    visited_keys.add(key)
-    # Tombstone: mark as removed so downstream callers skip it.
-    processed_data[key]["weight"] = -1
-    node1, node2, _, _, comp_type = key
-    if comp_type == "ligand_water":
-        # A ligand→water segment was pruned: cascade to all water→water and
-        # water→protein segments that start from the same water node.
-        water_node = node2
-        for next_key in processed_data:
-            if processed_data[next_key]["weight"] <= 0:
-                continue  # already tombstoned
-            next_n1, _, _, _, next_type = next_key
-            if next_type in {"water_protein", "water_water"} and next_n1 == water_node:
-                _clean_processed_data(next_key, processed_data, visited_keys)
-    elif comp_type == "water_water":
-        # A water→water segment was pruned: cascade to all segments that start
-        # from either water node in this pair.
-        for next_key in processed_data:
-            if processed_data[next_key]["weight"] <= 0:
-                continue  # already tombstoned
-            next_n1, _, _, _, next_type = next_key
-            if next_n1 in {node1, node2}:
-                _clean_processed_data(next_key, processed_data, visited_keys)
+    # a water molecule with a single neighbor cannot bridge anything
+    while leaves := [
+        node
+        for node, degree in graph.degree
+        if node_types[node] == "water" and degree <= 1
+    ]:
+        graph.remove_nodes_from(leaves)
 
-
-def _in_path_to_protein_above_threshold(
-    node: str,
-    interaction_totals: defaultdict[_AggKey, float],
-    threshold: float,
-    comp_type: str,
-) -> bool:
-    """Return True if *node* lies on a water-bridge path that reaches a protein node.
-
-    Uses breadth-first search through all interactions that individually meet
-    *threshold*.  Direct water→protein interactions always qualify; water→water
-    interactions are only included if a protein-reaching path exists downstream.
-    """
-    if comp_type == "water_protein":
-        return True
-
-    visited: set[str] = set()
-    queue: deque[tuple[str, str]] = deque([(node, comp_type)])
-
-    while queue:
-        current_node, _ = queue.popleft()
-        if current_node in visited:
-            continue
-        visited.add(current_node)
-
-        for key, total in interaction_totals.items():
-            if total < threshold:
-                continue
-            if key[0] == current_node:
-                if key[4] == "water_protein":
-                    return True
-                if key[4] in {"water_water", "ligand_water"}:
-                    queue.append((key[1], key[4]))
-
-    return False
+    valid: set[str] = set()
+    for component in nx.connected_components(graph):
+        if {"ligand", "protein"} <= {node_types[node] for node in component}:
+            valid.update(component)
+    return {
+        key: v
+        for key, v in filtered_data.items()
+        if key[0] in valid and key[1] in valid
+    }
 
 
 def calculate_coordinates(
@@ -569,6 +534,8 @@ def calculate_coordinates(
             protein_nodes.append(cast(str, n))
         else:
             continue
+    if not ligand_nodes:
+        return graph
 
     # Calculate ligand center and dimensions
     ligand_coords = np.array(
@@ -658,7 +625,7 @@ def _calculate_initial_positions(
         if layer_num == 0:  # Ligand layer - already positioned
             continue
 
-        for node in layer_nodes:
+        for i, node in enumerate(cast("list[int | str]", layer_nodes)):
             # Get connected nodes from previous layer
             connected_atoms: list[int] = []
             for neighbor in graph.neighbors(node):
@@ -680,15 +647,15 @@ def _calculate_initial_positions(
                     distance = size * distance_scaler.get(layer_num, 0.2)
                     pos[node] = avg_pos + direction_unit * distance
                 else:
-                    # Random position if direction is zero
-                    angle = hash(str(node)) % 360 * np.pi / 180
+                    # Spread around the center if direction is zero
+                    angle = 2 * np.pi * i / len(layer_nodes)
                     distance = size * distance_scaler.get(layer_num, 0.2) * 1.2
                     pos[node] = center + distance * np.array(
                         [np.cos(angle), np.sin(angle)]
                     )
             else:
                 # For unconnected nodes, place around periphery
-                angle = hash(str(node)) % 360 * np.pi / 180
+                angle = 2 * np.pi * i / len(layer_nodes)
                 distance = size * distance_scaler.get(layer_num, 0.2) * 2
                 pos[node] = center + distance * np.array([np.cos(angle), np.sin(angle)])
 
@@ -718,9 +685,7 @@ def _create_layers(
         current_layer: list[str] = []
         nodes_to_remove: set[str] = set()
 
-        for node in list(
-            remaining_nodes
-        ):  # Convert to list to avoid modification during iteration
+        for node in sorted(remaining_nodes):
             # Check if this node is connected to any node in previous layers
             connected_to_previous = next(
                 (
@@ -746,7 +711,7 @@ def _create_layers(
     # Add any remaining unconnected nodes to the last layer
     if remaining_nodes:
         last_layer = max(layers) + 1 if layers else 1
-        layers[last_layer] = list(remaining_nodes)
+        layers[last_layer] = sorted(remaining_nodes)
 
     return layers
 
