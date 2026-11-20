@@ -172,19 +172,19 @@ class Barcode:
         residues = self.df.index.get_level_values("protein")
         interactions = self.df.index.get_level_values("interaction")
         if residues_tick_location == "top":
-            indices = [
+            residue_indices = [
                 i
                 for i in range(n_items)
                 if (i - 1 >= 0 and residues[i - 1] != residues[i]) or i == 0
             ]
         else:
-            indices = [
+            residue_indices = [
                 i
                 for i in range(n_items)
                 if (i + 1 < n_items and residues[i + 1] != residues[i])
                 or i + 1 == n_items
             ]
-        ax.yaxis.set_ticks(indices, residues[indices])
+        ax.yaxis.set_ticks(residue_indices, residues[residue_indices])
 
         # legend
         values: list[int] = np.unique(self.df.values).tolist()
