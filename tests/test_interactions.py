@@ -8,6 +8,7 @@ import pytest
 from MDAnalysis.topology.guessers import guess_types
 from MDAnalysis.transformations import rotateby, translate
 from rdkit import Chem, RDLogger
+from rdkit.Chem import AllChem
 
 import prolif
 from prolif.fingerprint import Fingerprint
@@ -15,6 +16,7 @@ from prolif.interactions import HBAcceptor, ImplicitHBAcceptor, VdWContact
 from prolif.interactions.base import _INTERACTIONS, Interaction
 from prolif.interactions.constants import IDEAL_ATOM_ANGLES, VDW_PRESETS
 from prolif.interactions.utils import get_mapindex
+from prolif.residue import Residue
 
 # Disable RDKit warnings
 lg = RDLogger.logger()
@@ -28,7 +30,6 @@ if TYPE_CHECKING:
     from MDAnalysis.core.universe import Universe
 
     from prolif.molecule import Molecule
-    from prolif.residue import Residue
     from prolif.typeshed import InteractionMetadata
 
 
@@ -79,6 +80,78 @@ def ihb_include_water(request: pytest.FixtureRequest):  # type: ignore
 @pytest.fixture(scope="module", params=[False, True])
 def ihb_ignore_geometry_checks(request: pytest.FixtureRequest):  # type: ignore
     return request.param
+
+
+def _build_backbone_donor_case(
+    out_of_plane_angle: float = 0.0,
+) -> tuple["Molecule", "Molecule", Chem.Mol, Residue, int, int]:
+    """Build a Gly-Ala-Gly peptide with an acetaldehyde acceptor placed 2.9 A
+    from the middle alanine's backbone N, along the ideal N-H direction.
+
+    Based on the reproducer in issue #380 (thanks @awjdean). The acceptor can
+    be rotated ``out_of_plane_angle`` degrees out of the peptide plane, around
+    the N-CA bond: the angle to CA (donor atom angle check) is unchanged, so
+    only the donor-plane check is affected.
+
+    Returns the protein and ligand molecules, the intact peptide mol, the ALA2
+    residue fragment, and the backbone nitrogen indices in the intact peptide
+    and in the fragment.
+    """
+    peptide = Chem.AddHs(Chem.MolFromSequence("GAG"))
+    params = AllChem.ETKDGv3()  # type: ignore[attr-defined]
+    params.randomSeed = 42
+    assert AllChem.EmbedMolecule(peptide, params) == 0  # type: ignore[attr-defined]
+    assert AllChem.MMFFOptimizeMolecule(peptide) == 0  # type: ignore[attr-defined]
+    peptide = Chem.RemoveHs(peptide)
+
+    nitrogen = next(
+        atom
+        for atom in peptide.GetAtoms()
+        if atom.GetPDBResidueInfo().GetResidueNumber() == 2
+        and atom.GetPDBResidueInfo().GetName().strip() == "N"
+    )
+    xyz = peptide.GetConformer().GetPositions()
+    origin = xyz[nitrogen.GetIdx()]
+    bonds = xyz[[atom.GetIdx() for atom in nitrogen.GetNeighbors()]] - origin
+    bonds /= np.linalg.norm(bonds, axis=1)[:, None]
+
+    direction = -bonds.sum(axis=0)
+    direction /= np.linalg.norm(direction)
+    if out_of_plane_angle:
+        ca = next(
+            atom
+            for atom in nitrogen.GetNeighbors()
+            if atom.GetPDBResidueInfo().GetName().strip() == "CA"
+        )
+        axis = xyz[ca.GetIdx()] - origin
+        axis /= np.linalg.norm(axis)
+        theta = np.radians(out_of_plane_angle)
+        direction = (
+            direction * np.cos(theta)
+            + np.cross(axis, direction) * np.sin(theta)
+            + axis * np.dot(axis, direction) * (1 - np.cos(theta))
+        )
+        direction /= np.linalg.norm(direction)
+    perpendicular = np.cross(direction, bonds[0])
+    perpendicular /= np.linalg.norm(perpendicular)
+    oxygen = origin + 2.9 * direction
+    carbon = oxygen + 1.23 * (0.5 * direction + np.sqrt(3) / 2 * perpendicular)
+    acceptor = Chem.MolFromSmiles("CC=O")
+    conf = Chem.Conformer(3)
+    conf.SetAtomPosition(2, tuple(oxygen))
+    conf.SetAtomPosition(1, tuple(carbon))
+    conf.SetAtomPosition(0, tuple(carbon + 1.5 * direction))
+    acceptor.AddConformer(conf)
+
+    protein = prolif.Molecule(peptide)
+    ligand = prolif.Molecule(acceptor)
+    residue = next(res for res in protein.residues.values() if res.resid.number == 2)
+    local_n = next(
+        atom
+        for atom in residue.GetAtoms()
+        if atom.GetPDBResidueInfo().GetName().strip() == "N"
+    )
+    return protein, ligand, peptide, residue, nitrogen.GetIdx(), local_n.GetIdx()
 
 
 class TestInteractions:
@@ -664,6 +737,51 @@ class TestInteractions:
             ),
         ):
             interaction._get_atom_angles(ihb_donor_h2o[0], 0, ihb_ligand[0], 13)
+
+    def test_implicithbacceptor_backbone_donor_after_residue_splitting(
+        self,
+    ) -> None:
+        # Regression test for #380: after residue splitting, a backbone
+        # nitrogen only has its CA as a heavy neighbour, so the donor plane
+        # cannot be determined from the fragment. The plane check must not
+        # reject the contact: an acceptor in the peptide plane is detected
+        # with default tolerances.
+        protein, ligand, peptide, residue, nitrogen_idx, local_n_idx = (
+            _build_backbone_donor_case()
+        )
+        interaction = ImplicitHBAcceptor()
+        # On the intact peptide the acceptor lies in the peptide plane.
+        assert (
+            interaction._get_plane_angle(Residue(peptide), nitrogen_idx, ligand[0], 2)
+            < interaction.tolerance_dev_dpa
+        )
+        # The plane cannot be determined from the residue fragment, so the
+        # plane check is skipped (0 degrees).
+        assert interaction._get_plane_angle(residue, local_n_idx, ligand[0], 2) == 0.0
+        fp = Fingerprint(["ImplicitHBAcceptor"], count=True)
+        result = fp.generate(ligand, protein, metadata=True)
+        contacts = [
+            contact
+            for (_, protein_residue), interactions in result.items()
+            if protein_residue.number == 2
+            for contact in interactions["ImplicitHBAcceptor"]
+        ]
+        assert len(contacts) == 1
+
+    def test_implicithbacceptor_backbone_donor_out_of_plane_rejected(
+        self,
+    ) -> None:
+        # The plane check still applies when the plane can be determined: an
+        # acceptor rotated 60 degrees out of the peptide plane gets a plane
+        # angle above the default tolerance on the intact peptide.
+        _, ligand, peptide, _, nitrogen_idx, _ = _build_backbone_donor_case(
+            out_of_plane_angle=60
+        )
+        interaction = ImplicitHBAcceptor()
+        assert (
+            interaction._get_plane_angle(Residue(peptide), nitrogen_idx, ligand[0], 2)
+            > interaction.tolerance_dev_dpa
+        )
 
     @pytest.mark.parametrize(
         ("good_value", "bad_value", "expected"),
