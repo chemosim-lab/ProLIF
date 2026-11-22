@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Implicit HBond detection no longer rejects valid backbone donors after
+  residue splitting: the donor-plane calculation no longer extends through a
+  tetrahedral neighbour (e.g. the CA of a backbone nitrogen), as its
+  neighbours do not lie in the donor's plane. When the plane cannot be
+  determined from the residue fragment, the plane check is skipped and the
+  atom-angle check still applies.
+
 ### Changed
 
 ### Deprecated

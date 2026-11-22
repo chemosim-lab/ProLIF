@@ -1024,6 +1024,13 @@ class ImplicitHBAcceptor(Distance, VdWContact):
         if len(nearby_heavy_atoms) < 2:
             nearby_nearby_atoms = []
             for each_atom in nearby_heavy_atoms:
+                # Only extend through planar (sp2) neighbours, as their neighbours
+                # lie in the same plane as the atom and can define it. Extending
+                # through a tetrahedral (sp3) neighbour, e.g. the CA of a backbone
+                # nitrogen after residue splitting, would use atoms that are not
+                # in the atom's plane and give a meaningless plane angle.
+                if each_atom.GetHybridization() != HybridizationType.SP2:
+                    continue
                 nearby_nearby_atoms.extend(
                     [
                         nearby_nearby_atom
@@ -1033,6 +1040,14 @@ class ImplicitHBAcceptor(Distance, VdWContact):
                     ]
                 )
             nearby_heavy_atoms.extend(nearby_nearby_atoms)
+
+        # If we still don't have 2 atoms to define the plane (e.g. a backbone
+        # nitrogen whose only heavy neighbour is its CA after residue splitting),
+        # the plane cannot be determined from this residue: return 0 degrees so
+        # the plane check doesn't reject a contact it cannot assess. The
+        # atom-angle check still applies.
+        if len(nearby_heavy_atoms) < 2:
+            return 0.0
 
         # Get the coordinates of the atoms
         nearby_atom_1_idx = nearby_heavy_atoms[0].GetIdx()
